@@ -32,7 +32,7 @@ concurrency:
 
 jobs:
   preflight:
-    if: ${{ github.repository == 'Jchernand3z19/Portafolio' && github.ref == 'refs/heads/main' }}
+    if: ${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     outputs:
       allowed: ${{ steps.request.outputs.allowed }}

@@ -12,14 +12,14 @@ export const CONTROLLED_PROBE_MAX_BODY_BYTES = 32 * 1024;
 export const CONTROLLED_PROBE_MAX_REQUEST_BODY_BYTES = 16 * 1024;
 
 export const CONTROLLED_PROBE_WORKER_POLICY = Object.freeze({
-  repository: "Jchernand3z19/Portafolio",
+  repository: "jchernandez-portfolio/precios-supermercados-sps",
   repositoryId: "1282475205",
   ref: "refs/heads/main",
   workflowRef:
-    "Jchernand3z19/Portafolio/.github/workflows/precios-supermercados-sps-cloudflare-probe.yml@refs/heads/main",
+    "jchernandez-portfolio/precios-supermercados-sps/.github/workflows/precios-supermercados-sps-cloudflare-probe.yml@refs/heads/main",
   environment: "cloudflare-probe",
   eventName: "workflow_dispatch",
-  subject: "repo:Jchernand3z19/Portafolio:environment:cloudflare-probe",
+  subject: "repo:jchernandez-portfolio/precios-supermercados-sps:environment:cloudflare-probe",
   audience: CONTROLLED_PROBE_OIDC_AUDIENCE,
   clockSkewSeconds: 30,
   maxTokenAgeSeconds: 600,

@@ -63,18 +63,18 @@ def _receipt_payload(
         response_body_bytes=1234,
         physical_started_at_utc=T0 + timedelta(seconds=from_index),
         response_completed_at_utc=T0 + timedelta(seconds=from_index + completed_offset),
-        github_repository="Jchernand3z19/Portafolio",
+        github_repository="jchernandez-portfolio/precios-supermercados-sps",
         github_repository_id="1282475205",
         github_ref="refs/heads/main",
         github_workflow_ref=(
-            "Jchernand3z19/Portafolio/.github/workflows/"
+            "jchernandez-portfolio/precios-supermercados-sps/.github/workflows/"
             "precios-supermercados-sps-la-colonia-live.yml@refs/heads/main"
         ),
         github_environment="la-colonia-live",
         github_run_id="32400000000",
         github_run_attempt=1,
         oidc_subject=(
-            "repo:Jchernand3z19/Portafolio:environment:la-colonia-live"
+            "repo:jchernandez-portfolio/precios-supermercados-sps:environment:la-colonia-live"
         ),
         oidc_jti="oidc-jti-001",
         collector_provider=provider,
@@ -129,11 +129,11 @@ def _attestation_payload(
         run_id="run-001",
         authorization_id="authorization-001",
         approved_commit_sha=COMMIT,
-        github_repository="Jchernand3z19/Portafolio",
+        github_repository="jchernandez-portfolio/precios-supermercados-sps",
         github_repository_id="1282475205",
         github_ref="refs/heads/main",
         github_workflow_ref=(
-            "Jchernand3z19/Portafolio/.github/workflows/"
+            "jchernandez-portfolio/precios-supermercados-sps/.github/workflows/"
             "precios-supermercados-sps-la-colonia-live.yml@refs/heads/main"
         ),
         github_environment="la-colonia-live",

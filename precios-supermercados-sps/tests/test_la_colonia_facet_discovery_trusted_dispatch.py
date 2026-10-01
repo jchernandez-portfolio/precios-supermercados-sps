@@ -31,12 +31,12 @@ SOURCE_RUN_ID = "31070000001"
 
 def context():
     return {
-        "repository_owner": "Jchernand3z19",
-        "repository_full_name": "Jchernand3z19/Portafolio",
+        "repository_owner": "jchernandez-portfolio",
+        "repository_full_name": "jchernandez-portfolio/precios-supermercados-sps",
         "pr_number": 7,
         "state": "open",
-        "base_repo_full_name": "Jchernand3z19/Portafolio",
-        "head_repo_full_name": "Jchernand3z19/Portafolio",
+        "base_repo_full_name": "jchernandez-portfolio/precios-supermercados-sps",
+        "head_repo_full_name": "jchernandez-portfolio/precios-supermercados-sps",
         "head_repo_fork": False,
         "head_ref": "feature/la-colonia-full-crawl-validation",
         "head_sha": "a" * 40,

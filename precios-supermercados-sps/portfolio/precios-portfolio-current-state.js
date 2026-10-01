@@ -17,7 +17,7 @@
 
   const SAFE_SAMPLE_SCHEMA = 'precios-sps-safe-portfolio-sample/v1';
   const SAFE_POLICY = 'fail_closed_strong_identity_and_commercial_consistency';
-  const SAFE_SAMPLE_REPOSITORY_URL = 'https://raw.githubusercontent.com/Jchernand3z19/Portafolio/portfolio-data/precios-supermercados-sps/portfolio/sample-data.json';
+  const SAFE_SAMPLE_REPOSITORY_URL = 'https://raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/portfolio-data/precios-supermercados-sps/portfolio/sample-data.json';
   const SAFE_SAMPLE_URL = ['localhost', '127.0.0.1'].includes(window.location.hostname)
     ? 'precios-supermercados-sps/portfolio/sample-data.json'
     : SAFE_SAMPLE_REPOSITORY_URL;

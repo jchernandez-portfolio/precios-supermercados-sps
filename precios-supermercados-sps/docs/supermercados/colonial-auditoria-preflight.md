@@ -11,14 +11,14 @@ validada/segunda observación; no cambia facturación ni habilita ejecución dia
 
 ## Base auditada
 
-- `Jchernand3z19/Portafolio/main`:
+- `jchernandez-portfolio/precios-supermercados-sps/main`:
   `f34a324b2cb177baa77ce788c360476268af0f01`.
 - Leídos `precios-supermercados-sps/AGENTS.md`, `.github/workflows/AGENTS.md`,
   `docs/PROJECT_STATE.md`, extractor vigente SPS/TGU, schema y updaters SQLite/Turso.
 - Cero PRs abiertos al auditar. PRs #340, #341, #343–#346 fusionados; #342 cerrado
   sin merge. Búsqueda de PRs con `Colonial`: cero resultados.
 - Sin código, fixtures ni documentación Colonial en el árbol auditado.
-- [CI de main](https://github.com/Jchernand3z19/Portafolio/actions/runs/33314520368)
+- [CI de main](https://github.com/jchernandez-portfolio/precios-supermercados-sps/actions/runs/33314520368)
   verde, incluida suite completa. Verificados triggers de PR y push a main.
 - Workflow permanente de actualización: `precios-supermercados-sps-la-colonia-mvp-update.yml`,
   con dispatch y schedule. El listado Actions conserva workflows históricos

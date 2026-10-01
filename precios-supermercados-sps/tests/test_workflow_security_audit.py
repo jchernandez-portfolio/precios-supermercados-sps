@@ -170,11 +170,11 @@ def test_production_operator_is_main_only_closed_and_least_privilege() -> None:
     dispatch = operator_jobs["dispatch"]
     recover = operator_jobs["recover"]
     assert dispatch["if"] == (
-        "${{ github.repository == 'Jchernand3z19/Portafolio' && "
+        "${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' && "
         "github.ref == 'refs/heads/main' && github.event_name == 'push' }}"
     )
     assert recover["if"] == (
-        "${{ github.repository == 'Jchernand3z19/Portafolio' && "
+        "${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' && "
         "github.ref == 'refs/heads/main' && github.event_name == 'schedule' }}"
     )
     assert dispatch["timeout-minutes"] == "5"
@@ -261,7 +261,7 @@ def test_safe_analytics_publication_is_trusted_read_only_and_fail_closed() -> No
     assert "permissions" not in publish
     assert "environment" not in publish
     expected_if = (
-        "${{ github.repository == 'Jchernand3z19/Portafolio' && "
+        "${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' && "
         "(github.event_name == 'workflow_dispatch' || "
         "(github.event_name == 'push' && github.ref == 'refs/heads/main') || "
         "(github.event_name == 'workflow_run' && "
@@ -366,7 +366,7 @@ def test_turso_schema_migration_is_manual_scoped_and_fail_closed() -> None:
     assert set(workflow_jobs) == {"migrate"}
     migrate = workflow_jobs["migrate"]
     assert migrate["if"] == (
-        "${{ github.repository == 'Jchernand3z19/Portafolio' && "
+        "${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' && "
         "inputs.schema_migration_authorized == true }}"
     )
     assert migrate["timeout-minutes"] == "15"
@@ -403,7 +403,7 @@ def test_turso_schema_migration_operator_is_main_only_closed_and_least_privilege
     assert set(workflow_jobs) == {"dispatch"}
     dispatch = workflow_jobs["dispatch"]
     assert dispatch["if"] == (
-        "${{ github.repository == 'Jchernand3z19/Portafolio' && "
+        "${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' && "
         "github.ref == 'refs/heads/main' && github.event_name == 'push' }}"
     )
     assert dispatch["timeout-minutes"] == "5"
@@ -463,7 +463,7 @@ def test_portfolio_data_sync_reuses_safe_artifact_without_turso_reads() -> None:
     assert "permissions" not in sync
     assert "environment" not in sync
     expected_if = (
-        "${{ github.repository == 'Jchernand3z19/Portafolio' && "
+        "${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' && "
         "github.event.workflow_run.conclusion == 'success' && "
         "github.event.workflow_run.head_branch == 'main' }}"
     )
@@ -512,8 +512,8 @@ def test_portfolio_data_sync_reuses_safe_artifact_without_turso_reads() -> None:
         / "portfolio"
         / "precios-portfolio-current-state.js"
     ).read_text(encoding="utf-8")
-    assert "raw.githubusercontent.com/Jchernand3z19/Portafolio/portfolio-data/precios-supermercados-sps/portfolio/sample-data.json" in frontend
-    assert "raw.githubusercontent.com/Jchernand3z19/Portafolio/main/precios-supermercados-sps/portfolio/sample-data.json" not in frontend
+    assert "raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/portfolio-data/precios-supermercados-sps/portfolio/sample-data.json" in frontend
+    assert "raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/main/precios-supermercados-sps/portfolio/sample-data.json" not in frontend
     assert "['localhost', '127.0.0.1'].includes(window.location.hostname)" in frontend
     assert "cache: 'no-store'" in frontend
     assert "TURSO_DATABASE_URL" not in frontend

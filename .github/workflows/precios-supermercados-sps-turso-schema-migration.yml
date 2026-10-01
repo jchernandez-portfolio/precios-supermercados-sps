@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   migrate:
-    if: ${{ github.repository == 'Jchernand3z19/Portafolio' && inputs.schema_migration_authorized == true }}
+    if: ${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' && inputs.schema_migration_authorized == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:

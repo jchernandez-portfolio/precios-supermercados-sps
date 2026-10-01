@@ -60,10 +60,10 @@ from precios_supermercados.scrapers.la_colonia_sps_structural_plan import (
 )
 from precios_supermercados.structural_receipt_crypto import Ed25519StructuralReceiptVerifier
 
-EXPECTED_REPOSITORY = "Jchernand3z19/Portafolio"
+EXPECTED_REPOSITORY = "jchernandez-portfolio/precios-supermercados-sps"
 EXPECTED_REF = "refs/heads/main"
 EXPECTED_WORKFLOW_REF = (
-    "Jchernand3z19/Portafolio/.github/workflows/"
+    "jchernandez-portfolio/precios-supermercados-sps/.github/workflows/"
     "precios-supermercados-sps-la-colonia-live.yml@refs/heads/main"
 )
 EXPECTED_EVENT = "workflow_dispatch"

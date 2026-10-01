@@ -90,11 +90,11 @@ def _payload(expected: ExpectedProvenancePage, index: int) -> ContextBoundEdgeRe
         raw_response_sha256=f"{index + 4:x}" * 64,
         physical_started_at_utc=START + timedelta(seconds=index),
         response_completed_at_utc=START + timedelta(seconds=index, milliseconds=500),
-        github_repository="Jchernand3z19/Portafolio",
+        github_repository="jchernandez-portfolio/precios-supermercados-sps",
         github_repository_id="1282475205",
         github_ref="refs/heads/main",
         github_workflow_ref=(
-            "Jchernand3z19/Portafolio/.github/workflows/"
+            "jchernandez-portfolio/precios-supermercados-sps/.github/workflows/"
             "precios-supermercados-sps-la-colonia-live.yml@refs/heads/main"
         ),
         github_environment="la-colonia-live",

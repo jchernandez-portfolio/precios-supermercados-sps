@@ -33,16 +33,16 @@ CONTROLLED_PROBE_SIGNATURE_DOMAIN = (
 )
 CONTROLLED_PROBE_SIGNING_KEY_ID = "cloudflare-probe-ed25519-v1"
 CONTROLLED_PROBE_ORIGIN_PATH = "/v1/probe-origin"
-CONTROLLED_PROBE_REPOSITORY = "Jchernand3z19/Portafolio"
+CONTROLLED_PROBE_REPOSITORY = "jchernandez-portfolio/precios-supermercados-sps"
 CONTROLLED_PROBE_REPOSITORY_ID = "1282475205"
 CONTROLLED_PROBE_REF = "refs/heads/main"
 CONTROLLED_PROBE_ENVIRONMENT = "cloudflare-probe"
 CONTROLLED_PROBE_WORKFLOW_REF = (
-    "Jchernand3z19/Portafolio/.github/workflows/"
+    "jchernandez-portfolio/precios-supermercados-sps/.github/workflows/"
     "precios-supermercados-sps-cloudflare-probe.yml@refs/heads/main"
 )
 CONTROLLED_PROBE_SUBJECT = (
-    "repo:Jchernand3z19/Portafolio:environment:cloudflare-probe"
+    "repo:jchernandez-portfolio/precios-supermercados-sps:environment:cloudflare-probe"
 )
 
 _SHA1 = re.compile(r"[0-9a-f]{40}\Z")

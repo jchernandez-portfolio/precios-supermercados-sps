@@ -19,7 +19,7 @@ las fronteras de proyecto requiere un PR `[MONOREPO]` separado.
 
 ## Fuente de verdad
 
-- Repositorio: `Jchernand3z19/Portafolio`.
+- Repositorio: `jchernandez-portfolio/precios-supermercados-sps`.
 - Proyecto: `precios-supermercados-sps/`.
 - GitHub `main`, PRs, Actions, artifacts, Turso y `portfolio-data` mandan sobre
   prompts, recuerdos y snapshots antiguos.

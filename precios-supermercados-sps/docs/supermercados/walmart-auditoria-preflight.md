@@ -29,8 +29,8 @@ momento, no el estado actual ni permiso para repetir el adquirente archivado.
 ## Auditoría inicial contra GitHub — 2026-08-30
 
 - Base auditada: `e8da4737476c8166728d320c87c2c471679d0878`, con
-  [PR #351](https://github.com/Jchernand3z19/Portafolio/pull/351) fusionado y
-  [CI de main verde](https://github.com/Jchernand3z19/Portafolio/actions/runs/33337389512).
+  [PR #351](https://github.com/jchernandez-portfolio/precios-supermercados-sps/pull/351) fusionado y
+  [CI de main verde](https://github.com/jchernandez-portfolio/precios-supermercados-sps/actions/runs/33337389512).
 - Cero PRs abiertos al comenzar; búsqueda de Walmart en archivos, contenido,
   configuración y workflows sin implementación o fixtures existentes.
 - Leídos AGENTS aplicables, PROJECT_STATE, workflow diario, schema, validador,

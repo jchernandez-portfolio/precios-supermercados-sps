@@ -105,7 +105,7 @@ jobs:
           if receipt.get("github_environment") != "cloudflare-probe":
               raise SystemExit("Environment OIDC inesperado")
           expected_workflow = (
-              "Jchernand3z19/Portafolio/.github/workflows/"
+              "jchernandez-portfolio/precios-supermercados-sps/.github/workflows/"
               "precios-supermercados-sps-cloudflare-probe.yml@refs/heads/main"
           )
           if receipt.get("github_workflow_ref") != expected_workflow:

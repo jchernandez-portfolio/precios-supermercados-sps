@@ -1,99 +1,10 @@
-# Portafolio de datos y automatización
+# Precios Supermercados SPS
 
-Portafolio profesional de **Juan Carlos Hernández Ramos**, enfocado en reportes, dashboards, preparación de datos, automatización de procesos y proyectos de datos aplicados a problemas reales.
+Web scraping, monitoreo e inteligencia de precios de supermercados en Honduras.
 
-**Sitio publicado:** https://jchernand3z19.github.io/Portafolio/
+- Código y documentación: [`precios-supermercados-sps/`](precios-supermercados-sps/) — empieza por [`precios-supermercados-sps/README.md`](precios-supermercados-sps/README.md).
+- Portafolio: https://jchernandez-portfolio.github.io/Portafolio/
+- Organización: https://github.com/jchernandez-portfolio
+- La rama `portfolio-data` guarda los datos publicados que consume el sitio del portafolio.
 
-El sitio funciona en **español e inglés**, con español como idioma predeterminado.
-
-## Organización del repositorio
-
-`Portafolio` es el único repositorio público y funciona como un monorepositorio: cada proyecto completo vive en una carpeta propia en la raíz.
-
-```text
-Portafolio/
-├── .github/workflows/          # Entradas de GitHub Actions
-├── css/                        # Estilos compartidos del sitio
-├── js/                         # Lógica compartida, i18n y registro de proyectos
-├── docs/                       # Reglas generales del repositorio
-├── precios-supermercados-sps/  # Web scraping, monitoreo e inteligencia de precios
-├── mundial-2026/               # Proyecto Mundial 2026 completo
-├── index.html                  # Página principal de GitHub Pages
-├── script.js                   # Cargador de js/main.js
-├── PROJECT_TEMPLATE.md         # Plantilla para proyectos futuros
-├── README.md
-└── .gitignore
-```
-
-La única excepción a la regla de encapsulación es `.github/workflows/`: GitHub solo reconoce workflows ejecutables desde esa ubicación. Cada archivo debe indicar claramente el proyecto al que pertenece y trabajar dentro de su carpeta.
-
-## Monorepo Project Registry
-
-El contrato operativo está en [`.github/project-scopes.yml`](.github/project-scopes.yml).
-El número o la antigüedad de un PR no determina su proyecto; el registry y sus
-changed paths sí.
-La auditoría de workflows, outputs y secretos se documenta en
-[`docs/MONOREPO-GOVERNANCE.md`](docs/MONOREPO-GOVERNANCE.md).
-
-| Project ID | Project root | PR prefix | Branch prefix |
-| --- | --- | --- | --- |
-| RPI | `precios-supermercados-sps/` | `[RPI]` | `rpi/` |
-| PAGOS | `pagos-whatsapp-residencial/` | `[PAGOS]` | `pagos/` |
-| MUNDIAL | `mundial-2026/` | `[MUNDIAL]` | `mundial/` |
-| SHARED | `/` (gobernanza e integraciones declaradas) | `[MONOREPO]` | `monorepo/` |
-
-El registry puede reservar un project root antes de su primera integración a
-`main`. La infraestructura shared no permite mezclar features de project roots
-distintos.
-
-## Proyectos publicados
-
-### 1. Monitoreo automatizado de precios — Web Scraping
-
-Proyecto principal del portafolio. Obtiene precios y promociones desde sitios web públicos de supermercados, valida las capturas, estructura los datos y conserva su histórico para análisis.
-
-Estado público verificado al **8 de septiembre de 2026**:
-
-- **6 supermercados / cadenas productivas integradas**.
-- **11 ubicaciones monitoreadas**.
-- **58K+ productos registrados** (`58,114` en el corte verificado).
-- **127K+ registros históricos de precio** (`127,980` en el corte verificado).
-- Cobertura actual en **San Pedro Sula y Tegucigalpa**.
-- Cadenas con datos aceptados: **La Colonia, Supermercados Colonial, Walmart, PriceSmart, Comisariato Los Andes y Paiz**.
-- Evidencia pública de una captura aceptada con **6,646 productos con precio** y **120 promociones**.
-- Comparador cross-source **fail-closed**: una fila sólo puede entrar a ahorro, mejor precio o canasta cuando existe identidad fuerte y coherencia comercial; marca + presentación por sí solas no autorizan una equivalencia.
-- Analítica intra-cadena respaldada por evidencia, como la comparación completa de Walmart TGU con `12,042` artículos comercialmente comparables y `255` con al menos una diferencia comercial.
-
-El detalle del sitio enlaza la **página de origen**, la **evidencia versionada en GitHub** y el **código de extracción** para que la capacidad de web scraping sea comprobable y no sólo declarativa.
-
-**Carpeta completa:** [`precios-supermercados-sps/`](precios-supermercados-sps/)
-
-**Procedencia de la presentación:** [`precios-supermercados-sps/docs/portfolio-showcase.md`](precios-supermercados-sps/docs/portfolio-showcase.md)
-
-**Metodología del comparador:** [`precios-supermercados-sps/docs/COMPARATOR-METHODOLOGY.md`](precios-supermercados-sps/docs/COMPARATOR-METHODOLOGY.md)
-
-### 2. Mundial 2026: análisis histórico y predicción
-
-Proyecto de datos que integra información histórica, calendario, ranking y resultados recientes para generar análisis, predicciones y una aplicación web interactiva.
-
-- **Carpeta completa:** [`mundial-2026/`](mundial-2026/)
-- **Dashboard:** https://script.google.com/macros/s/AKfycbzE26z7tcEbnwLPKSLLW8H_rK7UqwKV17rV8YBJVT4lB4slY0qorsf8cL4cnsys5ShGhw/exec
-- **Tecnologías:** Python, Google Sheets, Google Apps Script, Chart.js y GitHub Actions.
-
-## Regla para proyectos futuros
-
-Cada proyecto nuevo debe crearse como otra carpeta al mismo nivel:
-
-```text
-Portafolio/
-├── precios-supermercados-sps/
-├── mundial-2026/
-├── automatizacion-reportes/
-└── nombre-del-proyecto/
-```
-
-Dentro de su carpeta deben quedar el README, código, dependencias, documentación, pruebas, datos publicables y los recursos visuales utilizados para presentarlo en el portafolio.
-
-No se deben crear tarjetas ficticias ni carpetas vacías. Solo se publica un proyecto cuando exista contenido real y la presentación pública pueda vincularse con evidencia verificable del repositorio.
-
-Consulta [`PROJECT_TEMPLATE.md`](PROJECT_TEMPLATE.md) y [`docs/ESTRUCTURA_REPOSITORIO.md`](docs/ESTRUCTURA_REPOSITORIO.md).
+El proyecto se separó del antiguo monorepo `Portafolio` conservando su historial. Se mantiene dentro de `precios-supermercados-sps/` para que las rutas de workflows, tests y datos sigan funcionando igual.

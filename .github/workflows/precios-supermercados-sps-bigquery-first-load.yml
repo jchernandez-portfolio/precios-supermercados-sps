@@ -16,7 +16,7 @@ permissions:
 jobs:
   first-load:
     if: >-
-      ${{ github.repository == 'Jchernand3z19/Portafolio' &&
+      ${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' &&
           github.ref == 'refs/heads/main' &&
           inputs.apply_initial_snapshot == true }}
     runs-on: ubuntu-latest

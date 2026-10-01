@@ -1,5 +1,5 @@
 let
-    SourceUrl = "https://raw.githubusercontent.com/Jchernand3z19/Portafolio/portfolio-data/precios-supermercados-sps/published/bi/la-colonia-walmart-sps/dataset.json",
+    SourceUrl = "https://raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/portfolio-data/precios-supermercados-sps/published/bi/la-colonia-walmart-sps/dataset.json",
     Raw = Json.Document(Web.Contents(SourceUrl, [Headers = [Accept = "application/json"]])),
     ExpectedSchema = "precios-sps-static-bi-dataset/v1",
     ExpectedPolicy = "fail_closed_strong_identity_and_commercial_consistency",

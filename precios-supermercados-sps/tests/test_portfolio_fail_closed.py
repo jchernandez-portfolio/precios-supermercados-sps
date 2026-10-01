@@ -35,7 +35,7 @@ def test_verified_adapter_is_the_only_path_that_reopens_public_sample() -> None:
     assert "precios-sps-safe-portfolio-sample/v1" in adapter
     assert "fail_closed_strong_identity_and_commercial_consistency" in adapter
     assert (
-        "https://raw.githubusercontent.com/Jchernand3z19/Portafolio/portfolio-data/"
+        "https://raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/portfolio-data/"
         "precios-supermercados-sps/portfolio/sample-data.json"
     ) in adapter
     assert "validatePublishedSample" in adapter

@@ -204,7 +204,7 @@ jobs:
           if event.get("ref") != "refs/heads/main":
               raise SystemExit("mvp_live_push_not_main")
           repository = event.get("repository") or {}
-          if repository.get("full_name") != "Jchernand3z19/Portafolio":
+          if repository.get("full_name") != "jchernandez-portfolio/precios-supermercados-sps":
               raise SystemExit("mvp_live_repository_mismatch")
 
           # El one-shot terminó en el run 32922877781. Este push sólo verifica
@@ -213,7 +213,7 @@ jobs:
           # historical schema sentinel: precios-sps-la-colonia-mvp-live-request/v1
           # 2026-08-25T01:20:22Z / PR #277
           # Merge pull request #277 from
-          # Jchernand3z19/feature/precios-sps-mvp-live-trigger
+          # jchernandez-portfolio/feature/precios-sps-mvp-live-trigger
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write("sample_size=10\n")
               output.write("capture_mode=consumed_no_network\n")

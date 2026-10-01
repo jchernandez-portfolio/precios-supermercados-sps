@@ -20,12 +20,12 @@ def _module():
 
 
 def _trusted_env(monkeypatch) -> None:
-    monkeypatch.setenv("GITHUB_REPOSITORY", "Jchernand3z19/Portafolio")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "jchernandez-portfolio/precios-supermercados-sps")
     monkeypatch.setenv("GITHUB_REF", "refs/heads/main")
     monkeypatch.setenv("GITHUB_EVENT_NAME", "workflow_dispatch")
     monkeypatch.setenv(
         "GITHUB_WORKFLOW_REF",
-        "Jchernand3z19/Portafolio/.github/workflows/"
+        "jchernandez-portfolio/precios-supermercados-sps/.github/workflows/"
         "precios-supermercados-sps-la-colonia-live.yml@refs/heads/main",
     )
     monkeypatch.setenv("GITHUB_SHA", "a" * 40)

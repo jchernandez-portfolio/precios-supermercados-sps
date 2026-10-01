@@ -40,9 +40,9 @@ function rootUrl() {
 
 function claims() {
   return {
-    sha: "a".repeat(40), repository: "Jchernand3z19/Portafolio", repository_id: "1282475205",
+    sha: "a".repeat(40), repository: "jchernandez-portfolio/precios-supermercados-sps", repository_id: "1282475205",
     ref: "refs/heads/main", workflow_ref: "repo/workflow@refs/heads/main", environment: "la-colonia-live",
-    run_id: "32530000000", run_attempt: "1", sub: "repo:Jchernand3z19/Portafolio:environment:la-colonia-live",
+    run_id: "32530000000", run_attempt: "1", sub: "repo:jchernandez-portfolio/precios-supermercados-sps:environment:la-colonia-live",
     jti: "jti-context-001",
   };
 }

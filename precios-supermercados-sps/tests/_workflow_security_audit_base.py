@@ -21,6 +21,8 @@ def is_sps_workflow(path: Path) -> bool:
     """Clasifica por nombre o contenido para que renombrar no evada la auditoría."""
 
     raw = path.read_text(encoding="utf-8").casefold()
+    # El nombre del repo es identidad, no un marcador de contenido SPS.
+    raw = raw.replace("jchernandez-portfolio/precios-supermercados-sps", "")
     return any(
         marker in path.name.casefold() or marker in raw
         for marker in (
@@ -389,7 +391,7 @@ def test_mvp_sample_is_the_only_nonprivileged_live_catalog_path() -> None:
     assert "trigger_pr_number" in sample_raw
     assert "2026-08-25T01:20:22Z" in sample_raw
     assert "Merge pull request #277 from" in sample_raw
-    assert "Jchernand3z19/feature/precios-sps-mvp-live-trigger" in sample_raw
+    assert "jchernandez-portfolio/feature/precios-sps-mvp-live-trigger" in sample_raw
     assert "commercial_persistence" in sample_raw
     assert "production_authority" in sample_raw
 
@@ -644,7 +646,7 @@ def test_google_sheets_storage_has_controlled_main_trigger_and_least_privilege()
     assert "environment" not in preflight
     assert "permissions" not in preflight
     assert preflight.get("if") == (
-        "${{ github.repository == 'Jchernand3z19/Portafolio' && "
+        "${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' && "
         "github.ref == 'refs/heads/main' }}"
     )
     assert preflight["outputs"] == {

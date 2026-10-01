@@ -24,7 +24,7 @@ Después de cada publicación analítica válida, el workflow de sincronización
 Fuente Web recomendada para Power BI:
 
 ```text
-https://raw.githubusercontent.com/Jchernand3z19/Portafolio/portfolio-data/precios-supermercados-sps/published/bi/la-colonia-walmart-sps/dataset.json
+https://raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/portfolio-data/precios-supermercados-sps/published/bi/la-colonia-walmart-sps/dataset.json
 ```
 
 Ese archivo contiene el contrato `precios-sps-static-bi-dataset/v1` con:

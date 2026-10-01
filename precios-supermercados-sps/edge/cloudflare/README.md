@@ -32,7 +32,7 @@ El estado real de despliegue, variables de GitHub Environment y blockers vigente
 
 La identidad OIDC queda fijada en código a:
 
-- repositorio `Jchernand3z19/Portafolio`;
+- repositorio `jchernandez-portfolio/precios-supermercados-sps`;
 - repository ID esperado;
 - ref `refs/heads/main`;
 - workflow live canónico en `main`;

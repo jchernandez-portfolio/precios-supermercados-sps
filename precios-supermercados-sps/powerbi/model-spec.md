@@ -7,7 +7,7 @@ Esta especificación completa los activos versionables de `powerbi/` y define c�
 La única consulta que puede acceder a Web es `StaticDataset` y debe usar el dataset público estático de `portfolio-data`:
 
 ```text
-https://raw.githubusercontent.com/Jchernand3z19/Portafolio/portfolio-data/precios-supermercados-sps/published/bi/la-colonia-walmart-sps/dataset.json
+https://raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/portfolio-data/precios-supermercados-sps/published/bi/la-colonia-walmart-sps/dataset.json
 ```
 
 `StaticDataset` valida el schema `precios-sps-static-bi-dataset/v1` y la política `fail_closed_strong_identity_and_commercial_consistency`. Las demás consultas se derivan de ese objeto en memoria y no consultan Turso ni los sitios de supermercados.

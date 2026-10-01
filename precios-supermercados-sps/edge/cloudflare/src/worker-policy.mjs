@@ -9,13 +9,13 @@ export const GITHUB_OIDC_JWKS_URL = "https://token.actions.githubusercontent.com
 export const GITHUB_OIDC_AUDIENCE = "urn:precios-sps:cloudflare:collector:v1";
 
 export const WORKER_POLICY = Object.freeze({
-  repository: "Jchernand3z19/Portafolio",
+  repository: "jchernandez-portfolio/precios-supermercados-sps",
   repositoryId: "1282475205",
   ref: "refs/heads/main",
-  workflowRef: "Jchernand3z19/Portafolio/.github/workflows/precios-supermercados-sps-la-colonia-live.yml@refs/heads/main",
+  workflowRef: "jchernandez-portfolio/precios-supermercados-sps/.github/workflows/precios-supermercados-sps-la-colonia-live.yml@refs/heads/main",
   environment: "la-colonia-live",
   eventName: "workflow_dispatch",
-  subject: "repo:Jchernand3z19/Portafolio:environment:la-colonia-live",
+  subject: "repo:jchernandez-portfolio/precios-supermercados-sps:environment:la-colonia-live",
   audience: GITHUB_OIDC_AUDIENCE,
   clockSkewSeconds: 30,
   maxTokenAgeSeconds: 600,

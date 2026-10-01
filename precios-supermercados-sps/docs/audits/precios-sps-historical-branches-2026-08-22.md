@@ -1,7 +1,7 @@
 # Auditoría de ramas históricas `precios-sps`
 
 Fecha de corte: 2026-08-22  
-Repositorio: `Jchernand3z19/Portafolio`  
+Repositorio: `jchernandez-portfolio/precios-supermercados-sps`  
 Snapshot de `main`: `94bf90671d92046515e0820894d083826d676358`  
 Workflow de evidencia: `Precios Supermercados SPS - Pruebas base`, run `32606702456`
 

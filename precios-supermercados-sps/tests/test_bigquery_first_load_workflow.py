@@ -36,7 +36,7 @@ def test_first_load_is_manual_main_only_and_requires_explicit_boolean() -> None:
     jobs = workflow["jobs"]
     assert set(jobs) == {"first-load"}
     job = jobs["first-load"]
-    assert "github.repository == 'Jchernand3z19/Portafolio'" in job["if"]
+    assert "github.repository == 'jchernandez-portfolio/precios-supermercados-sps'" in job["if"]
     assert "github.ref == 'refs/heads/main'" in job["if"]
     assert "inputs.apply_initial_snapshot == true" in job["if"]
     assert job["permissions"] == {

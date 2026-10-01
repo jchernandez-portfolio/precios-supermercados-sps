@@ -69,7 +69,7 @@ SQL Turso**.
 
 La auditoría partió de `main` `140025336b08efc13cf4f16d3c545a4859f1f6ef`, sin
 PRs abiertos. El workflow base del proyecto
-[`33358007557`](https://github.com/Jchernand3z19/Portafolio/actions/runs/33358007557)
+[`33358007557`](https://github.com/jchernandez-portfolio/precios-supermercados-sps/actions/runs/33358007557)
 estaba verde con 1,993 pruebas. Paiz permanece excluido por la instrucción vigente;
 la elección de PriceSmart es el primer candidato oficial con señales suficientes,
 no un censo exhaustivo de supermercados hondureños.

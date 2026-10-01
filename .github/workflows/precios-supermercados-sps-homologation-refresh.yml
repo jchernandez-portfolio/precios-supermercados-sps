@@ -23,7 +23,7 @@ concurrency:
 jobs:
   refresh:
     if: >-
-      ${{ github.repository == 'Jchernand3z19/Portafolio' &&
+      ${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' &&
           (github.event_name == 'workflow_dispatch' ||
            (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
            (github.event_name == 'workflow_run' &&

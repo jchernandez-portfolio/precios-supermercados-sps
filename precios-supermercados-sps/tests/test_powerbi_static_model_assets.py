@@ -7,7 +7,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 POWERBI_ROOT = PROJECT_ROOT / "powerbi"
 QUERY_ROOT = POWERBI_ROOT / "queries"
 STATIC_URL = (
-    "https://raw.githubusercontent.com/Jchernand3z19/Portafolio/portfolio-data/"
+    "https://raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/portfolio-data/"
     "precios-supermercados-sps/published/bi/la-colonia-walmart-sps/dataset.json"
 )
 

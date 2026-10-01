@@ -16,7 +16,7 @@ import {
 } from "../src/core.mjs";
 
 const QUERY = "query productSearchV3 { productSearch { recordsFiltered } }";
-const REPOSITORY = "Jchernand3z19/Portafolio";
+const REPOSITORY = "jchernandez-portfolio/precios-supermercados-sps";
 const REPOSITORY_ID = "1282475205";
 const WORKFLOW_REF = `${REPOSITORY}/.github/workflows/precios-supermercados-sps-la-colonia-live.yml@refs/heads/main`;
 const ENVIRONMENT = "la-colonia-live";

@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   acquire:
-    if: ${{ github.repository == 'Jchernand3z19/Portafolio' && (github.event_name == 'schedule' || inputs.live_read_only_authorized == true) }}
+    if: ${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' && (github.event_name == 'schedule' || inputs.live_read_only_authorized == true) }}
     strategy:
       fail-fast: false
       matrix:

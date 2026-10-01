@@ -22,12 +22,12 @@ DIAGNOSTIC = REPO_ROOT / ".github/workflows/precios-supermercados-sps-la-colonia
 
 def valid_context():
     return {
-        "repository_owner": "Jchernand3z19",
-        "repository_full_name": "Jchernand3z19/Portafolio",
+        "repository_owner": "jchernandez-portfolio",
+        "repository_full_name": "jchernandez-portfolio/precios-supermercados-sps",
         "pr_number": 7,
         "state": "open",
-        "base_repo_full_name": "Jchernand3z19/Portafolio",
-        "head_repo_full_name": "Jchernand3z19/Portafolio",
+        "base_repo_full_name": "jchernandez-portfolio/precios-supermercados-sps",
+        "head_repo_full_name": "jchernandez-portfolio/precios-supermercados-sps",
         "head_repo_fork": False,
         "head_ref": "feature/la-colonia-full-crawl-validation",
         "head_sha": "a" * 40,
@@ -98,7 +98,7 @@ def test_comentario_diagnostico_es_sanitizado_y_no_es_autoridad():
     comment = build_controller_comment(
         decision,
         controller_run_id=123,
-        controller_url="https://github.com/Jchernand3z19/Portafolio/actions/runs/123",
+        controller_url="https://github.com/jchernandez-portfolio/precios-supermercados-sps/actions/runs/123",
     )
     assert "diagnostic_overlap" in comment
     assert DIAGNOSTIC_WORKFLOW in comment

@@ -36,7 +36,7 @@ EXTRACTOR_VERSION = "0.3.1"
 SCHEMA_VERSION = "1.0.0"
 USER_AGENT = (
     "PreciosSupermercadosSPS-LaColonia/0.3 "
-    "(+https://github.com/Jchernand3z19/Portafolio)"
+    "(+https://github.com/jchernandez-portfolio/precios-supermercados-sps)"
 )
 FORBIDDEN_PATH_PREFIXES = (
     "/img",

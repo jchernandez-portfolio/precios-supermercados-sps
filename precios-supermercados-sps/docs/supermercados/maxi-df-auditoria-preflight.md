@@ -24,8 +24,8 @@ antes de la autorización y captura. Sus frases «pendiente», «cero requests»
 ## Estado comprobado antes de implementar
 
 - Main `3e77145c237102f835ae147d4923119597c3cb5e`,
-  [PR #355](https://github.com/Jchernand3z19/Portafolio/pull/355) fusionado,
-  [CI main 33352854520](https://github.com/Jchernand3z19/Portafolio/actions/runs/33352854520)
+  [PR #355](https://github.com/jchernandez-portfolio/precios-supermercados-sps/pull/355) fusionado,
+  [CI main 33352854520](https://github.com/jchernandez-portfolio/precios-supermercados-sps/actions/runs/33352854520)
   verde con 1,985 pruebas. Cero PRs abiertos al iniciar la auditoría.
 - Búsqueda por nombres/dominio en proyecto y workflows: sin implementación,
   configuración, fixtures ni documentación Maxi/DF. Leídos AGENTS, PROJECT_STATE,

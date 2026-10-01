@@ -152,7 +152,7 @@ No incluir en PBIX/PBIP, parámetros, consultas o archivos públicos:
 `precios-sps-static-bi-dataset/v1` y su refresh histórico se conservan como compatibilidad/evidencia de la fase anterior. La URL estable de ese dataset sigue siendo:
 
 ```text
-https://raw.githubusercontent.com/Jchernand3z19/Portafolio/portfolio-data/precios-supermercados-sps/published/bi/la-colonia-walmart-sps/dataset.json
+https://raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/portfolio-data/precios-supermercados-sps/published/bi/la-colonia-walmart-sps/dataset.json
 ```
 
 Para reconstruir el modelo legado, el mapeo contractual original permanece explícito:

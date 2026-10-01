@@ -51,8 +51,8 @@ cubre Colonial, Walmart, Maxi ni DF. Ver la
 ## Maxi Despensa + Despensa Familiar — NO-GO temporal cerrado
 
 Auditoría previa: main `9592901c95aa2cb447effe1c514fe85eb5e74265`,
-[PR #356](https://github.com/Jchernand3z19/Portafolio/pull/356) fusionado,
-[CI main verde, 1,985 pruebas](https://github.com/Jchernand3z19/Portafolio/actions/runs/33355963991),
+[PR #356](https://github.com/jchernandez-portfolio/precios-supermercados-sps/pull/356) fusionado,
+[CI main verde, 1,985 pruebas](https://github.com/jchernandez-portfolio/precios-supermercados-sps/actions/runs/33355963991),
 cero PRs abiertos. Biblioteca reusable sin cambios en
 `252b245e0f416b57c324db97bc9cee868fc8124d`; seis skills web y
 `production-data-engineering` aplicadas, sin copiar skills ni generalizar Walmart.
@@ -227,7 +227,7 @@ local como ejecución GitHub ni persistencia Turso.
 
 ## Eficiencia compartida vigente — PR #351
 
-El [PR #351](https://github.com/Jchernand3z19/Portafolio/pull/351) materializa `delta`
+El [PR #351](https://github.com/jchernandez-portfolio/precios-supermercados-sps/pull/351) materializa `delta`
 una vez, evita updates de metadata idéntica y limita la verificación diaria a
 La Colonia SPS/TGU. No añade tablas persistentes ni cambia las cinco existentes.
 Walmart reutiliza esta ruta; su evidencia específica se documenta arriba.
@@ -270,7 +270,7 @@ Suite completa local con Python 3.12 y dependencias fijadas del proyecto:
 1,905 passed, 21 skipped. Incluye reproducción de la captura íntegra con HTTP
 bloqueado. CI de PR y main deben confirmar la revisión publicada.
 
-Entrega en [PR #349](https://github.com/Jchernand3z19/Portafolio/pull/349).
+Entrega en [PR #349](https://github.com/jchernandez-portfolio/precios-supermercados-sps/pull/349).
 El primer CI pasó todos los casos Colonial, pero detectó una carrera en un fixture
 antiguo del selector: su timer de 1.8 s podía vencer antes del primer click.
 Se reprodujo offline y se cambió sólo el fixture para que el primer click siempre
@@ -579,15 +579,15 @@ La auditoría del 2026-08-30 sobre `main`
 `f34a324b2cb177baa77ce788c360476268af0f01` encontró dos ejecuciones por
 `schedule`, ambas fallidas; por tanto, no se declara cierre operativo:
 
-- [33260860123](https://github.com/Jchernand3z19/Portafolio/actions/runs/33260860123):
+- [33260860123](https://github.com/jchernandez-portfolio/precios-supermercados-sps/actions/runs/33260860123):
   timeout de catálogo TGU; el PR #346 añadió retry acotado y fue fusionado con CI
   verde. No se repite esa corrección.
-- [33319436863](https://github.com/Jchernand3z19/Portafolio/actions/runs/33319436863):
+- [33319436863](https://github.com/jchernandez-portfolio/precios-supermercados-sps/actions/runs/33319436863):
   ambos catálogos completos, pero el preflight de persistencia SPS y TGU recibió
   de Turso `BLOCKED`: `SQL read operations are forbidden`. La verificación final
   también fue rechazada. El error precede al batch de mutación; este run no
   demuestra nuevas escrituras ni permite certificar el estado actual de Turso.
-- [33422772623](https://github.com/Jchernand3z19/Portafolio/actions/runs/33422772623):
+- [33422772623](https://github.com/jchernandez-portfolio/precios-supermercados-sps/actions/runs/33422772623):
   ambos downloads SPS/TGU terminaron, pero la aceptación falló antes de persistir
   con `SnapshotError("snapshot_sku_count_mismatch")`. Todas las etapas Turso y sus
   verificaciones quedaron omitidas. Artifact `9770327081`, digest
@@ -606,7 +606,7 @@ atribuir una cifra exacta facturada a cada sentencia.
 
 Se reprodujo offline un defecto del SQL aplicable a la futura integración Colonial:
 `close_history` recorría toda la tabla temporal `incoming` por cada periodo sin
-cambios. El [PR #348](https://github.com/Jchernand3z19/Portafolio/pull/348) añade sólo
+cambios. El [PR #348](https://github.com/jchernandez-portfolio/precios-supermercados-sps/pull/348) añade sólo
 un índice único de identidad mediante `UNIQUE(source_key_type, source_key)` en esa
 tabla TEMP existente. Con 1,000 productos la comprobación pasó de aproximadamente
 13,018,000 a 34,000 instrucciones SQLite. La regresión falla sin el cambio y pasa

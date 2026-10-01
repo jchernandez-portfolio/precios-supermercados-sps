@@ -7,7 +7,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = PROJECT_ROOT.parent
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "precios-supermercados-sps-portfolio-data-sync.yml"
 BI_URL = (
-    "https://raw.githubusercontent.com/Jchernand3z19/Portafolio/portfolio-data/"
+    "https://raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/portfolio-data/"
     "precios-supermercados-sps/published/bi/la-colonia-walmart-sps/dataset.json"
 )
 

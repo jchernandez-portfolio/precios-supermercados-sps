@@ -1,10 +1,10 @@
 (() => {
   const PROJECT_ID = 'precios-supermercados';
-  const REPO = 'https://github.com/Jchernand3z19/Portafolio/tree/main/precios-supermercados-sps';
+  const REPO = 'https://github.com/jchernandez-portfolio/precios-supermercados-sps/tree/main/precios-supermercados-sps';
   const B2C_URL = 'precios-supermercados-sps/b2c/';
   const SOURCE_URL = 'https://comisariatolosandes.com/';
-  const EVIDENCE_URL = 'https://github.com/Jchernand3z19/Portafolio/tree/main/precios-supermercados-sps/reports/comisariato-los-andes/2026-09-04-full';
-  const CODE_URL = 'https://github.com/Jchernand3z19/Portafolio/tree/main/precios-supermercados-sps/src/precios_supermercados';
+  const EVIDENCE_URL = 'https://github.com/jchernandez-portfolio/precios-supermercados-sps/tree/main/precios-supermercados-sps/reports/comisariato-los-andes/2026-09-04-full';
+  const CODE_URL = 'https://github.com/jchernandez-portfolio/precios-supermercados-sps/tree/main/precios-supermercados-sps/src/precios_supermercados';
 
   const SCRAPING_PROOF = Object.freeze({
     capturedAtUtc: '2026-09-04T01:44:35.172709Z',

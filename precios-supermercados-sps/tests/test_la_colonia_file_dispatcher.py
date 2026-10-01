@@ -12,12 +12,12 @@ from precios_supermercados.automation.la_colonia_file_dispatcher import (
 
 def valid_context(**overrides):
     context = {
-        "repository_owner": "Jchernand3z19",
-        "repository_full_name": "Jchernand3z19/Portafolio",
+        "repository_owner": "jchernandez-portfolio",
+        "repository_full_name": "jchernandez-portfolio/precios-supermercados-sps",
         "pr_number": 7,
         "state": "open",
-        "base_repo_full_name": "Jchernand3z19/Portafolio",
-        "head_repo_full_name": "Jchernand3z19/Portafolio",
+        "base_repo_full_name": "jchernandez-portfolio/precios-supermercados-sps",
+        "head_repo_full_name": "jchernandez-portfolio/precios-supermercados-sps",
         "head_repo_fork": False,
         "head_ref": "feature/la-colonia-full-crawl-validation",
         "head_sha": "a" * 40,
@@ -274,7 +274,7 @@ def test_comentario_de_aceptacion():
     comment = build_controller_comment(
         decision,
         controller_run_id=12345,
-        controller_url="https://github.com/Jchernand3z19/Portafolio/actions/runs/12345",
+        controller_url="https://github.com/jchernandez-portfolio/precios-supermercados-sps/actions/runs/12345",
     )
     assert "Solicitud válida pero bloqueada" in comment
     assert "la-colonia-smoke-10-001" in comment
@@ -290,7 +290,7 @@ def test_comentario_de_rechazo_no_publica_contenido_inseguro():
     comment = build_controller_comment(
         decision,
         controller_run_id=12345,
-        controller_url="https://github.com/Jchernand3z19/Portafolio/actions/runs/12345",
+        controller_url="https://github.com/jchernandez-portfolio/precios-supermercados-sps/actions/runs/12345",
     )
     assert "Solicitud rechazada" in comment
     assert "no se envió workflow_dispatch" in comment

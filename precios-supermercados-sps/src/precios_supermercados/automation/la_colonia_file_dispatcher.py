@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any, Iterable, Mapping
 
-EXPECTED_OWNER = "Jchernand3z19"
-EXPECTED_REPOSITORY = "Jchernand3z19/Portafolio"
+EXPECTED_OWNER = "jchernandez-portfolio"
+EXPECTED_REPOSITORY = "jchernandez-portfolio/precios-supermercados-sps"
 COMMAND_PATH = "precios-supermercados-sps/.automation/la-colonia-live-command.json"
 LIVE_WORKFLOW = ".github/workflows/precios-supermercados-sps-la-colonia-live.yml"
 DIAGNOSTIC_WORKFLOW = ".github/workflows/precios-supermercados-sps-la-colonia-diagnostic.yml"

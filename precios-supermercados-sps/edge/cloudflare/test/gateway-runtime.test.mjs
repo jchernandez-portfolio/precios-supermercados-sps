@@ -78,14 +78,14 @@ async function makeOrigin(page = 1) {
 function claims() {
   return {
     sha: SHA,
-    repository: "Jchernand3z19/Portafolio",
+    repository: "jchernandez-portfolio/precios-supermercados-sps",
     repository_id: "1282475205",
     ref: "refs/heads/main",
-    workflow_ref: "Jchernand3z19/Portafolio/.github/workflows/precios-supermercados-sps-la-colonia-live.yml@refs/heads/main",
+    workflow_ref: "jchernandez-portfolio/precios-supermercados-sps/.github/workflows/precios-supermercados-sps-la-colonia-live.yml@refs/heads/main",
     environment: "la-colonia-live",
     run_id: "32500000000",
     run_attempt: "1",
-    sub: "repo:Jchernand3z19/Portafolio:environment:la-colonia-live",
+    sub: "repo:jchernandez-portfolio/precios-supermercados-sps:environment:la-colonia-live",
     jti: "jti-runtime-001",
   };
 }

@@ -51,7 +51,7 @@ def test_existing_probe_verifier_has_controlled_main_trigger_and_least_privilege
     publisher = jobs["publish-status"]
 
     assert preflight["if"] == (
-        "${{ github.repository == 'Jchernand3z19/Portafolio' && "
+        "${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' && "
         "github.ref == 'refs/heads/main' }}"
     )
     assert "environment" not in preflight
