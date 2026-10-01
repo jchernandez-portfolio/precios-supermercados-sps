@@ -153,6 +153,8 @@ jobs:
               assert snapshot['catalog_products_reported'] == snapshot['unique_products_extracted']
           PY
 
+      # No-op barato cuando el esquema Paiz, sus contextos e idx_ph_loc_hist ya
+      # están aplicados: sólo lee sqlite_master y las filas Paiz registradas.
       - name: Asegurar esquema Paiz en Turso
         shell: bash
         env:
@@ -297,21 +299,23 @@ jobs:
           if runs != expected_runs:
               raise SystemExit(f'commit_not_confirmed:expected={expected_runs}:actual={runs}')
 
+          # Sanity check diario barato: conteos current por contexto vía
+          # idx_price_history_current. Los periodos abiertos duplicados, FK e
+          # integrity_check de toda la base corren en el workflow semanal
+          # precios-supermercados-sps-turso-weekly-integrity.yml; la persistencia
+          # ya los impide dentro de su batch transaccional (guard_existing_duplicates
+          # y guard_current).
           data = _pipeline(
               os.environ['TURSO_DATABASE_URL'],
               os.environ['TURSO_AUTH_TOKEN'],
               [
-                  {'type':'execute','stmt':_stmt('''SELECT COUNT(*) FROM (SELECT supermarket_id,product_id,location_id FROM price_history WHERE ((supermarket_id=? AND location_id IN (?,?)) OR (supermarket_id=? AND location_id=?)) AND valid_to_utc IS NULL GROUP BY supermarket_id,product_id,location_id HAVING COUNT(*)>1)''', ('la_colonia','la_colonia_sps','la_colonia_tgu','comisariato_los_andes','comisariato_los_andes_sps'))},
                   {'type':'execute','stmt':_stmt('''SELECT location_id,COUNT(*) FROM price_history WHERE supermarket_id=? AND location_id IN (?,?) AND valid_to_utc IS NULL GROUP BY location_id ORDER BY location_id''', ('la_colonia','la_colonia_sps','la_colonia_tgu'))},
                   {'type':'execute','stmt':_stmt('''SELECT supermarket_id,location_id,COUNT(*) FROM price_history WHERE supermarket_id=? AND location_id=? AND valid_to_utc IS NULL GROUP BY supermarket_id,location_id''', ('comisariato_los_andes','comisariato_los_andes_sps'))},
                   {'type':'close'},
               ],
           )
-          duplicates = _execute_rows(data['results'][0])
-          open_by_location = _execute_rows(data['results'][1])
-          los_andes_open = _execute_rows(data['results'][2])
-          if duplicates != [[0]]:
-              raise SystemExit(f'duplicate_open_periods:{duplicates}')
+          open_by_location = _execute_rows(data['results'][0])
+          los_andes_open = _execute_rows(data['results'][1])
           if [row[0] for row in open_by_location] != [row[0] for row in expected_open_by_location]:
               raise SystemExit(f'current_location_mismatch:expected={expected_open_by_location}:actual={open_by_location}')
           if any(actual[1] < expected[1] for actual, expected in zip(open_by_location, expected_open_by_location, strict=True)):
@@ -320,7 +324,7 @@ jobs:
               raise SystemExit(f'los_andes_current_scope_mismatch:expected={expected_los_andes}:actual={los_andes_open}')
           if any(actual[2] < expected[2] for actual, expected in zip(los_andes_open, expected_los_andes, strict=True)):
               raise SystemExit(f'los_andes_current_state_incomplete:minimum={expected_los_andes}:actual={los_andes_open}')
-          print(json.dumps({'runs': runs, 'open_by_location': open_by_location, 'los_andes_open': los_andes_open, 'duplicate_open_periods': 0}, ensure_ascii=False, sort_keys=True))
+          print(json.dumps({'runs': runs, 'open_by_location': open_by_location, 'los_andes_open': los_andes_open, 'integrity_checks': 'weekly'}, ensure_ascii=False, sort_keys=True))
           PY
 
       - name: Verificar nuevos retailers y Paiz en Turso
@@ -386,20 +390,16 @@ jobs:
           pairs = sorted(expected_current)
           scope_sql = ' OR '.join('(supermarket_id=? AND location_id=?)' for _ in pairs)
           scope_args = tuple(value for pair in pairs for value in pair)
+          # Sólo conteos current por contexto (índice parcial). Duplicados, FK
+          # e integrity_check de toda la base: workflow semanal de integridad.
           data = _pipeline(
               os.environ['TURSO_DATABASE_URL'], os.environ['TURSO_AUTH_TOKEN'],
               [
                   {'type':'execute','stmt':_stmt(f'''SELECT supermarket_id,location_id,COUNT(*) FROM price_history WHERE valid_to_utc IS NULL AND ({scope_sql}) GROUP BY supermarket_id,location_id ORDER BY supermarket_id,location_id''', scope_args)},
-                  {'type':'execute','stmt':_stmt(f'''SELECT COUNT(*) FROM (SELECT supermarket_id,product_id,location_id FROM price_history WHERE valid_to_utc IS NULL AND ({scope_sql}) GROUP BY supermarket_id,product_id,location_id HAVING COUNT(*)>1)''', scope_args)},
-                  {'type':'execute','stmt':_stmt('SELECT COUNT(*) FROM pragma_foreign_key_check')},
-                  {'type':'execute','stmt':_stmt('PRAGMA integrity_check')},
                   {'type':'close'},
               ],
           )
           current_rows = _execute_rows(data['results'][0])
-          duplicates = _execute_rows(data['results'][1])
-          foreign_keys = _execute_rows(data['results'][2])
-          integrity = _execute_rows(data['results'][3])
           actual_current = {(row[0], row[1]): row[2] for row in current_rows}
           if set(actual_current) != set(expected_current):
               raise SystemExit(f'new_retailer_scope_missing:expected={sorted(expected_current)}:actual={sorted(actual_current)}')
@@ -409,9 +409,7 @@ jobs:
           }
           if incomplete:
               raise SystemExit(f'new_retailer_current_state_incomplete:{incomplete}')
-          if duplicates != [[0]] or foreign_keys != [[0]] or integrity != [['ok']]:
-              raise SystemExit(f'new_retailer_integrity_failed:{duplicates}:{foreign_keys}:{integrity}')
-          print(json.dumps({'runs': runs, 'current_open_by_location': current_rows, 'duplicate_open_periods': 0, 'foreign_key_violations': 0, 'integrity_check': 'ok'}, ensure_ascii=False, sort_keys=True))
+          print(json.dumps({'runs': runs, 'current_open_by_location': current_rows, 'integrity_checks': 'weekly'}, ensure_ascii=False, sort_keys=True))
           PY
 
       - name: Publicar evidencia

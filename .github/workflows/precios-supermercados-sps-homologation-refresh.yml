@@ -95,10 +95,16 @@ jobs:
           mkdir -p run-artifacts/homologation
           python scripts/evaluar_identidad_productos.py \
             --output run-artifacts/homologation/identity-evaluation.json
-          python scripts/backfill_homologacion_turso.py \
-            --updated-at-utc "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --dry-run \
-            | tee run-artifacts/homologation/daily-refresh-plan.json
+          # Optimización Turso: el plan --dry-run relee products y perfiles
+          # completos. En el refresco diario (workflow_run) el paso --apply ya es
+          # fail-closed, así que el plan remoto sólo corre en ejecuciones manuales
+          # o por solicitud.
+          if [ "$GITHUB_EVENT_NAME" != "workflow_run" ]; then
+            python scripts/backfill_homologacion_turso.py \
+              --updated-at-utc "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+              --dry-run \
+              | tee run-artifacts/homologation/daily-refresh-plan.json
+          fi
 
       - name: Refrescar perfiles derivados
         working-directory: precios-supermercados-sps

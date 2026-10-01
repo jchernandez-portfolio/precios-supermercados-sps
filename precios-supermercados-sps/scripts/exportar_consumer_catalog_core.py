@@ -18,9 +18,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 from exportar_modelo_analitico import (  # noqa: E402
-    ExportError, QueryBackend, SQLiteBackend, TursoBackend, _scope_predicate, parse_scope,
+    ExportError, QueryBackend, SQLiteBackend, TursoBackend, _scope_predicate,
+    fetch_current_rows_by_location, parse_scope, scope_contexts,
 )
 from exportar_rpi_marts import _parse_utc, fetch_freshness  # noqa: E402
+from generar_mvp_sqlite_la_colonia import HISTORY_INDEX_NAME  # noqa: E402
 from precios_supermercados.price_analytics import ComparisonScope  # noqa: E402
 from precios_supermercados.price_history_analytics import (  # noqa: E402
     HistoricalPriceObservation,
@@ -46,6 +48,20 @@ RETAILER_NAMES = {
     "comisariato_los_andes": "Los Andes",
 }
 PUBLIC_COMPARABILITY = {"comparable", "single_source", "individual"}
+VISIBLE_OFFERS_PAGE_SIZE = 2000
+HISTORY_PAGE_SIZE = 5000
+_VISIBLE_OFFERS_SELECT = """SELECT p.product_id,p.supermarket_id,p.name,
+                   hp.normalized_brand,hp.display_presentation,
+                   h.location_id,h.current_price_minor,h.reported_regular_price_minor,
+                   h.is_promotion,h.availability,h.valid_from_utc,
+                   hp.canonical_product_id,hp.category,hp.product_type,
+                   hp.presentation_dimension,hp.presentation_total_base,
+                   hp.presentation_status,hp.comparison_status,hp.normalization_version
+            FROM price_history AS h
+            JOIN products AS p
+              ON p.product_id=h.product_id AND p.supermarket_id=h.supermarket_id
+            JOIN product_homologation_profiles AS hp
+              ON hp.product_id=p.product_id AND hp.supermarket_id=p.supermarket_id"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,90 +181,168 @@ def fetch_visible_offers(
     backend: QueryBackend,
     scope: ComparisonScope,
 ) -> tuple[VisibleOffer, ...]:
-    """Lee una fila current por identidad fuente dentro del scope explícito."""
-    predicate, scope_args = _scope_predicate(scope)
-    cursor_product = -1
-    cursor_location = ""
+    """Lee una fila current por identidad fuente dentro del scope explícito.
+
+    La lectura se pagina por contexto exacto sobre ``idx_price_history_current`` y
+    se reordena por ``(product_id, location_id)``: mismo resultado que el keyset
+    global anterior, pero cada fila current se lee una sola vez en Turso.
+    """
     result: list[VisibleOffer] = []
     seen: set[tuple[int, str]] = set()
+    rows = fetch_current_rows_by_location(
+        backend,
+        scope,
+        select_sql=_VISIBLE_OFFERS_SELECT,
+        location_index=5,
+        invalid_code="consumer_catalog_offer_invalid",
+        page_size=VISIBLE_OFFERS_PAGE_SIZE,
+    )
+    for row in rows:
+        (
+            product_id, supermarket_id, name, brand, presentation,
+            location_id, current_price, regular_price, is_promotion, availability,
+            observed_at, canonical_product_id, category, product_type,
+            presentation_dimension, presentation_total_base, presentation_status,
+            comparison_status, normalization_version,
+        ) = row
+        key = (product_id, str(location_id))
+        if key in seen:
+            raise ExportError("consumer_catalog_offer_duplicate")
+        seen.add(key)
+        if (
+            type(product_id) is not int
+            or not isinstance(supermarket_id, str)
+            or not isinstance(location_id, str)
+            or not _text(name)
+            or (current_price is not None and type(current_price) is not int)
+            or (regular_price is not None and type(regular_price) is not int)
+            or (is_promotion is not None and (type(is_promotion) is not int or is_promotion not in {0, 1}))
+            or availability not in {"in_stock", "out_of_stock", "unknown"}
+            or not _text(observed_at)
+            or comparison_status not in {"ready", "review_required", "single_source", "unmapped"}
+            or normalization_version != NORMALIZATION_VERSION
+        ):
+            raise ExportError("consumer_catalog_offer_invalid")
+        result.append(
+            VisibleOffer(
+                source_product_id=f"{supermarket_id}:{product_id}",
+                supermarket_id=supermarket_id,
+                location_id=location_id,
+                product_name=_text(name) or "",
+                brand=_display_brand(brand),
+                presentation=_text(presentation),
+                current_price_minor=current_price,
+                reported_regular_price_minor=regular_price,
+                is_promotion=None if is_promotion is None else bool(is_promotion),
+                availability=availability,
+                observed_at=_text(observed_at) or "",
+                canonical_product_id=_text(canonical_product_id),
+                category=_text(category),
+                product_type=_text(product_type),
+                presentation_dimension=_text(presentation_dimension),
+                presentation_total_base=_text(presentation_total_base),
+                presentation_status=str(presentation_status),
+                comparison_status=str(comparison_status),
+            )
+        )
+    return tuple(result)
+
+
+# `idx_ph_loc_hist` lo crea `migrar_mvp_paiz.py`; si todavía no existe, el
+# histórico usa el keyset de fila sobre la PK (lineal, sin el índice nuevo).
+def _history_index_available(backend: QueryBackend) -> bool:
+    rows = backend.query(
+        "SELECT name FROM sqlite_master WHERE type='index' AND name=? AND tbl_name='price_history'",
+        (HISTORY_INDEX_NAME,),
+    )
+    return bool(rows)
+
+
+_HISTORY_SELECT = """SELECT h.product_id,h.supermarket_id,h.location_id,h.current_price_minor,h.valid_from_utc
+            FROM price_history AS h"""
+_HISTORY_FILTER = """current_price_minor IS NOT NULL
+              AND current_price_minor > 0
+              AND julianday(valid_from_utc)<=julianday(?)"""
+
+
+def _validate_history_key(row: Sequence[object]) -> None:
+    """Valida antes de ordenar, con los mismos códigos y precedencia del bucle final."""
+    product_id, supermarket_id, location_id, current_price, observed_at = row
+    if (
+        type(product_id) is not int
+        or not isinstance(supermarket_id, str)
+        or not isinstance(location_id, str)
+        or type(current_price) is not int
+        or current_price <= 0
+    ):
+        raise ExportError("consumer_catalog_history_invalid")
+    if not isinstance(observed_at, str):
+        raise ExportError("consumer_catalog_history_timestamp_invalid")
+
+
+def _history_rows_by_location(
+    backend: QueryBackend,
+    scope: ComparisonScope,
+    as_of_text: str,
+) -> list[tuple[object, ...]]:
+    """Pagina cada contexto sobre ``idx_ph_loc_hist(location_id,product_id,valid_from_utc)``."""
+    collected: list[tuple[object, ...]] = []
+    for supermarket_id, location_id in scope_contexts(scope):
+        cursor_product, cursor_observed = -1, ""
+        while True:
+            rows = backend.query(
+                f"""
+            {_HISTORY_SELECT}
+            WHERE h.supermarket_id=? AND h.location_id=?
+              AND {_HISTORY_FILTER}
+              AND (h.product_id,h.valid_from_utc)>(?,?)
+            ORDER BY h.product_id,h.valid_from_utc
+            LIMIT {int(HISTORY_PAGE_SIZE)}
+            """,
+                (supermarket_id, location_id, as_of_text, cursor_product, cursor_observed),
+            )
+            if not rows:
+                break
+            for row in rows:
+                _validate_history_key(row)
+            collected.extend(rows)
+            cursor_product, cursor_observed = int(rows[-1][0]), str(rows[-1][4])
+            if len(rows) < HISTORY_PAGE_SIZE:
+                break
+    collected.sort(key=lambda row: (row[0], row[2], row[4]))
+    return collected
+
+
+def _history_rows_global(
+    backend: QueryBackend,
+    scope: ComparisonScope,
+    as_of_text: str,
+) -> list[tuple[object, ...]]:
+    """Fallback sin índice nuevo: rango de fila sobre la PK, una pasada lineal."""
+    predicate, scope_args = _scope_predicate(scope)
+    cursor: tuple[object, object, object] = (-1, "", "")
+    collected: list[tuple[object, ...]] = []
     while True:
         rows = backend.query(
             f"""
-            SELECT p.product_id,p.supermarket_id,p.name,
-                   hp.normalized_brand,hp.display_presentation,
-                   h.location_id,h.current_price_minor,h.reported_regular_price_minor,
-                   h.is_promotion,h.availability,h.valid_from_utc,
-                   hp.canonical_product_id,hp.category,hp.product_type,
-                   hp.presentation_dimension,hp.presentation_total_base,
-                   hp.presentation_status,hp.comparison_status,hp.normalization_version
-            FROM price_history AS h
-            JOIN products AS p
-              ON p.product_id=h.product_id AND p.supermarket_id=h.supermarket_id
-            JOIN product_homologation_profiles AS hp
-              ON hp.product_id=p.product_id AND hp.supermarket_id=p.supermarket_id
-            WHERE h.valid_to_utc IS NULL
-              AND ({predicate})
-              AND (p.product_id>? OR (p.product_id=? AND h.location_id>?))
-            ORDER BY p.product_id,h.location_id
-            LIMIT 2000
+            {_HISTORY_SELECT}
+            WHERE ({predicate})
+              AND {_HISTORY_FILTER}
+              AND (h.product_id,h.location_id,h.valid_from_utc)>(?,?,?)
+            ORDER BY h.product_id,h.location_id,h.valid_from_utc
+            LIMIT {int(HISTORY_PAGE_SIZE)}
             """,
-            (*scope_args, cursor_product, cursor_product, cursor_location),
+            (*scope_args, as_of_text, *cursor),
         )
         if not rows:
             break
         for row in rows:
-            (
-                product_id, supermarket_id, name, brand, presentation,
-                location_id, current_price, regular_price, is_promotion, availability,
-                observed_at, canonical_product_id, category, product_type,
-                presentation_dimension, presentation_total_base, presentation_status,
-                comparison_status, normalization_version,
-            ) = row
-            key = (product_id, str(location_id))
-            if key in seen:
-                raise ExportError("consumer_catalog_offer_duplicate")
-            seen.add(key)
-            if (
-                type(product_id) is not int
-                or not isinstance(supermarket_id, str)
-                or not isinstance(location_id, str)
-                or not _text(name)
-                or (current_price is not None and type(current_price) is not int)
-                or (regular_price is not None and type(regular_price) is not int)
-                or (is_promotion is not None and (type(is_promotion) is not int or is_promotion not in {0, 1}))
-                or availability not in {"in_stock", "out_of_stock", "unknown"}
-                or not _text(observed_at)
-                or comparison_status not in {"ready", "review_required", "single_source", "unmapped"}
-                or normalization_version != NORMALIZATION_VERSION
-            ):
-                raise ExportError("consumer_catalog_offer_invalid")
-            result.append(
-                VisibleOffer(
-                    source_product_id=f"{supermarket_id}:{product_id}",
-                    supermarket_id=supermarket_id,
-                    location_id=location_id,
-                    product_name=_text(name) or "",
-                    brand=_display_brand(brand),
-                    presentation=_text(presentation),
-                    current_price_minor=current_price,
-                    reported_regular_price_minor=regular_price,
-                    is_promotion=None if is_promotion is None else bool(is_promotion),
-                    availability=availability,
-                    observed_at=_text(observed_at) or "",
-                    canonical_product_id=_text(canonical_product_id),
-                    category=_text(category),
-                    product_type=_text(product_type),
-                    presentation_dimension=_text(presentation_dimension),
-                    presentation_total_base=_text(presentation_total_base),
-                    presentation_status=str(presentation_status),
-                    comparison_status=str(comparison_status),
-                )
-            )
-        cursor_product = int(rows[-1][0])
-        cursor_location = str(rows[-1][5])
-        if len(rows) < 2000:
+            _validate_history_key(row)
+        collected.extend(rows)
+        cursor = (int(rows[-1][0]), str(rows[-1][2]), str(rows[-1][4]))
+        if len(rows) < HISTORY_PAGE_SIZE:
             break
-    return tuple(result)
+    return collected
 
 
 def fetch_historical_points(
@@ -258,64 +352,31 @@ def fetch_historical_points(
     as_of_utc: datetime,
 ) -> dict[tuple[str, str], tuple[HistoricalPoint, ...]]:
     """Lee periodos con precio mediante keyset pagination, sin queries por producto."""
-    predicate, scope_args = _scope_predicate(scope)
     as_of_text = as_of_utc.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-    cursor_product, cursor_location, cursor_observed = -1, "", ""
     grouped: dict[tuple[str, str], list[HistoricalPoint]] = defaultdict(list)
     seen: set[tuple[int, str, str]] = set()
-    while True:
-        rows = backend.query(
-            f"""
-            SELECT h.product_id,h.supermarket_id,h.location_id,h.current_price_minor,h.valid_from_utc
-            FROM price_history AS h
-            WHERE ({predicate})
-              AND current_price_minor IS NOT NULL
-              AND current_price_minor > 0
-              AND julianday(valid_from_utc)<=julianday(?)
-              AND (
-                product_id>?
-                OR (product_id=? AND location_id>?)
-                OR (product_id=? AND location_id=? AND valid_from_utc>?)
-              )
-            ORDER BY product_id,location_id,valid_from_utc
-            LIMIT 5000
-            """,
-            (
-                *scope_args,
-                as_of_text,
-                cursor_product,
-                cursor_product,
-                cursor_location,
-                cursor_product,
-                cursor_location,
-                cursor_observed,
-            ),
+    if _history_index_available(backend):
+        rows = _history_rows_by_location(backend, scope, as_of_text)
+    else:
+        rows = _history_rows_global(backend, scope, as_of_text)
+    for product_id, supermarket_id, location_id, current_price, observed_at in rows:
+        if (
+            type(product_id) is not int
+            or not isinstance(supermarket_id, str)
+            or not isinstance(location_id, str)
+            or type(current_price) is not int
+            or current_price <= 0
+        ):
+            raise ExportError("consumer_catalog_history_invalid")
+        observed = _parse_utc(observed_at, "consumer_catalog_history_timestamp_invalid")
+        identity = (product_id, location_id, observed.isoformat())
+        if identity in seen:
+            raise ExportError("consumer_catalog_history_duplicate")
+        seen.add(identity)
+        source_id = f"{supermarket_id}:{product_id}"
+        grouped[(source_id, location_id)].append(
+            HistoricalPoint(source_id, supermarket_id, location_id, observed, current_price)
         )
-        if not rows:
-            break
-        for product_id, supermarket_id, location_id, current_price, observed_at in rows:
-            if (
-                type(product_id) is not int
-                or not isinstance(supermarket_id, str)
-                or not isinstance(location_id, str)
-                or type(current_price) is not int
-                or current_price <= 0
-            ):
-                raise ExportError("consumer_catalog_history_invalid")
-            observed = _parse_utc(observed_at, "consumer_catalog_history_timestamp_invalid")
-            identity = (product_id, location_id, observed.isoformat())
-            if identity in seen:
-                raise ExportError("consumer_catalog_history_duplicate")
-            seen.add(identity)
-            source_id = f"{supermarket_id}:{product_id}"
-            grouped[(source_id, location_id)].append(
-                HistoricalPoint(source_id, supermarket_id, location_id, observed, current_price)
-            )
-        cursor_product = int(rows[-1][0])
-        cursor_location = str(rows[-1][2])
-        cursor_observed = str(rows[-1][4])
-        if len(rows) < 5000:
-            break
     return {key: tuple(value) for key, value in grouped.items()}
 
 

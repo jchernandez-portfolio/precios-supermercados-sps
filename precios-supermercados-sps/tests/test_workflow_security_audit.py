@@ -30,6 +30,7 @@ base.TURSO_SCHEMA_MIGRATION_REQUEST = (
     "precios-supermercados-sps/.automation/turso-schema-migration-request.json"
 )
 base.PORTFOLIO_DATA_SYNC_WORKFLOW = "precios-supermercados-sps-portfolio-data-sync.yml"
+base.TURSO_WEEKLY_INTEGRITY_WORKFLOW = "precios-supermercados-sps-turso-weekly-integrity.yml"
 base.EXPECTED_PERMISSIONS[base.PRODUCTION_OPERATOR_WORKFLOW] = {
     "actions": "write",
     "contents": "read",
@@ -61,6 +62,12 @@ base.EXPECTED_PERMISSIONS[base.PORTFOLIO_DATA_SYNC_WORKFLOW] = {
 base.EXPECTED_TRIGGERS[base.PORTFOLIO_DATA_SYNC_WORKFLOW] = {"workflow_run"}
 base.EXPECTED_TRIGGERS[base.HOMOLOGATION_REFRESH_WORKFLOW] = {
     "workflow_dispatch", "workflow_run", "push"
+}
+base.EXPECTED_PERMISSIONS[base.TURSO_WEEKLY_INTEGRITY_WORKFLOW] = {"contents": "read"}
+base.EXPECTED_TRIGGERS[base.TURSO_WEEKLY_INTEGRITY_WORKFLOW] = {"schedule", "workflow_dispatch"}
+base.ALLOWED_SECRET_REFERENCES[base.TURSO_WEEKLY_INTEGRITY_WORKFLOW] = {
+    base.TURSO_DATABASE_URL_SECRET,
+    base.TURSO_AUTH_TOKEN_SECRET,
 }
 
 
@@ -519,3 +526,45 @@ def test_portfolio_data_sync_reuses_safe_artifact_without_turso_reads() -> None:
     assert "TURSO_DATABASE_URL" not in frontend
     assert "TURSO_AUTH_TOKEN" not in frontend
     assert "libsql://" not in frontend
+
+
+def test_turso_weekly_integrity_is_scheduled_read_only_and_owns_full_scans() -> None:
+    path = base.WORKFLOW_DIR / base.TURSO_WEEKLY_INTEGRITY_WORKFLOW
+    workflow = base.load_workflow(path)
+    assert workflow["permissions"] == {"contents": "read"}
+    assert workflow["on"] == {
+        "schedule": [{"cron": "23 10 * * 0"}],
+        "workflow_dispatch": "",
+    }
+    assert workflow["concurrency"] == {
+        "group": "precios-sps-turso-weekly-integrity",
+        "cancel-in-progress": "false",
+    }
+    workflow_jobs = base.jobs(workflow)
+    assert set(workflow_jobs) == {"integrity"}
+    integrity = workflow_jobs["integrity"]
+    assert integrity["if"] == (
+        "${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' }}"
+    )
+    assert "permissions" not in integrity
+    assert "environment" not in integrity
+
+    raw = path.read_text(encoding="utf-8")
+    assert "python scripts/verificar_integridad_turso.py" in raw
+    assert "TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}" in raw
+    assert "TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}" in raw
+    assert "pull_request:" not in raw
+    assert "pull_request_target:" not in raw
+    assert "id-token" not in raw
+    assert "contents: write" not in raw
+
+    # Los recorridos completos de la base ya no corren en el ciclo diario.
+    daily_paths = (
+        base.WORKFLOW_DIR / base.MVP_UPDATE_WORKFLOW,
+        base.WORKFLOW_DIR / base.HOMOLOGATION_REFRESH_WORKFLOW,
+    )
+    for daily in daily_paths:
+        daily_raw = daily.read_text(encoding="utf-8")
+        assert "PRAGMA integrity_check" not in daily_raw
+        assert "pragma_foreign_key_check" not in daily_raw
+        assert "SELECT COUNT(*) FROM price_history" not in daily_raw

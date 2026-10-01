@@ -22,15 +22,12 @@ SHEETS_WORKFLOW = (
 )
 
 
-def test_bigquery_contract_is_active_and_retired_sheets_workflow_is_fail_closed():
+def test_bigquery_contract_is_active_and_retired_sheets_workflow_is_removed():
     assert ACTIVE_STORAGE_BACKEND == "bigquery"
     assert ACTIVE_STORAGE_TABLE_NAMES == BIGQUERY_TABLE_NAMES
 
-    source = SHEETS_WORKFLOW.read_text(encoding="utf-8")
-    assert 'handle.write("allowed=false\\n")' in source
-    assert 'handle.write("allowed=true\\n")' not in source
-    assert "needs.preflight.outputs.allowed == 'true'" in source
-    assert "PRECIOS_SPS_GOOGLE_SERVICE_ACCOUNT_JSON" in source
+    # El workflow de Google Sheets era de otro proyecto y se eliminó.
+    assert not SHEETS_WORKFLOW.exists()
 
 
 def test_real_client_immutable_guard_uses_transaction_supported_query_statement():
