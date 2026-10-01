@@ -1,0 +1,123 @@
+schema: precios-sps-source-category-taxonomy/v1
+# Deriva departamento y tipo de producto desde la ruta de categoría que reporta
+# cada supermercado (``products.category``). Sólo se usa para blocking y como
+# evidencia débil del vector de comparación; nunca confirma identidad.
+# Las llaves se comparan con fold_text (minúsculas, sin acentos ni signos).
+
+departments:
+  # Walmart / Paiz (ruta /Departamento/Familia/Hoja/)
+  abarrotes: Alimentos
+  lacteos: Alimentos
+  carnes embutidos y mariscos: Alimentos
+  panaderia y tortilleria: Alimentos
+  alimentos congelados: Alimentos
+  frutas y verduras: Alimentos
+  jugos y bebidas: Bebidas
+  cervezas vinos y licores: Bebidas
+  higiene y belleza: Cuidado personal
+  farmacia: Salud
+  anthistaminicos: Salud
+  limpieza: Limpieza
+  articulos para el hogar: Hogar
+  bebes y ninos: Bebés
+  mascota: Mascotas
+  ropa y zapateria: General
+  juguetes: General
+  electronica: General
+  autos: General
+  deportes: General
+  # Colonial
+  carnes y refrigerados: Alimentos
+  snack: Alimentos
+  bebidas no alcoholicas: Bebidas
+  bebidas alcoholicas: Bebidas
+  cuidado personal: Cuidado personal
+  hogar y limpieza: Limpieza
+  mascotas: Mascotas
+  # PriceSmart
+  alimentos: Alimentos
+  licor cerveza y vino: Bebidas
+  salud y belleza: Cuidado personal
+  hogar: Hogar
+  moda y accesorios: General
+  electrodomesticos: General
+  electronicos: General
+  automotriz: General
+  exteriores: General
+  ferreteria y mejoras al hogar: General
+  deportes y fitness: General
+  juguetes y juegos: General
+  optica: Salud
+  productos de temporada: General
+  tarjetas de regalo: General
+
+# Palabra/frase dentro de un segmento de la ruta (de la hoja hacia la raíz) →
+# tipo de producto [frase, tipo, departamento]. El primer match gana; las
+# frases largas van primero. Si el departamento de la ruta es conocido y no
+# coincide con el de la regla, la regla no aplica (p. ej. "Agua micelar").
+keyword_rules:
+  - [leche en polvo, Leche en polvo, Alimentos]
+  - [leche condensada, Leche condensada, Alimentos]
+  - [leche evaporada, Leche evaporada, Alimentos]
+  - [aceites de cocina, Aceite comestible, Alimentos]
+  - [aceite, Aceite comestible, Alimentos]
+  - [arroz, Arroz, Alimentos]
+  - [frijol, Frijol, Alimentos]
+  - [pastas, Pasta, Alimentos]
+  - [cereales, Cereal, Alimentos]
+  - [avena, Avena, Alimentos]
+  - [galletas, Galleta, Alimentos]
+  - [mayonesa, Mayonesa, Alimentos]
+  - [ketchup, Ketchup, Alimentos]
+  - [mostaza, Mostaza, Alimentos]
+  - [atun, Atún, Alimentos]
+  - [sardina, Sardina, Alimentos]
+  - [sopas, Sopa, Alimentos]
+  - [cafe, Café, Bebidas]
+  - [gaseosas, Refresco, Bebidas]
+  - [refrescos, Refresco, Bebidas]
+  - [jugos y nectares, Jugo, Bebidas]
+  - [agua, Agua, Bebidas]
+  - [cervezas, Cerveza, Bebidas]
+  - [cerveza, Cerveza, Bebidas]
+  - [vinos, Vino, Bebidas]
+  - [yogurt, Yogurt, Alimentos]
+  - [queso, Queso, Alimentos]
+  - [mantequilla, Mantequilla, Alimentos]
+  - [margarina, Margarina, Alimentos]
+  - [huevos, Huevo, Alimentos]
+  - [helados, Helado, Alimentos]
+  - [azucar, Azúcar, Alimentos]
+  - [harinas, Harina, Alimentos]
+  - [shampoo, Shampoo, Cuidado personal]
+  - [acondicionador, Acondicionador, Cuidado personal]
+  - [desodorante, Desodorante, Cuidado personal]
+  - [pasta dental, Pasta dental, Cuidado personal]
+  - [cepillos dentales, Cepillo dental, Cuidado personal]
+  - [enjuague bucal, Enjuague bucal, Cuidado personal]
+  - [jabon de tocador, Jabón, Cuidado personal]
+  - [jabon, Jabón, Cuidado personal]
+  - [panales, Pañal, Bebés]
+  - [toallitas humedas, Toallita húmeda, Bebés]
+  - [toallas femeninas, Toalla femenina, Cuidado personal]
+  - [protectores diarios, Protector diario, Cuidado personal]
+  - [papel higienico, Papel higiénico, Hogar]
+  - [papel toalla, Papel toalla, Hogar]
+  - [servilletas, Servilleta, Hogar]
+  - [detergente, Detergente, Limpieza]
+  - [suavizante, Suavizante, Limpieza]
+  - [lavaplatos, Lavaplatos, Limpieza]
+  - [cloro, Cloro, Limpieza]
+  - [desinfectante, Desinfectante, Limpieza]
+  - [aromatizantes, Aromatizante, Hogar]
+  - [alimento para perro, Alimento para perro, Mascotas]
+  - [alimento para gato, Alimento para gato, Mascotas]
+  - [tintes, Tinte para cabello, Cuidado personal]
+
+# Propagación de tipo por hoja de categoría: si al menos ``min_agreement`` de
+# los productos con tipo derivado del nombre comparten tipo dentro de una misma
+# ruta (y hay ``min_support`` ejemplos), los productos sin tipo de esa ruta
+# heredan el tipo. Es reproducible y se reporta en la salida para revisión.
+leaf_propagation:
+  min_support: 5
+  min_agreement: 0.8
