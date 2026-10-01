@@ -837,10 +837,249 @@ def canonical_egg_size(record: SourceProductRecord, taxonomy: TaxonomyAssignment
     return None
 
 
+# --- Tipo de producto: contexto negativo y ruta de categoría fuente ----------
+# Contextos que contradicen un tipo alimenticio asignado por palabra clave. Se
+# miden sobre el nombre plegado (sin acentos, minúsculas). Precision first: un
+# contexto negativo deja el tipo vacío (o en el tipo no alimenticio correcto),
+# nunca inventa otro tipo alimenticio.
+_VISCOSITY_RE = re.compile(r"(?<![a-z0-9])\d{1,2}\s?w\s?\d{2}")
+_MOTOR_CONTEXT = frozenset(
+    {
+        "2t", "4t", "atf", "automatico", "automotriz", "auto", "autos", "diesel",
+        "frenos", "hidraulico", "llave", "lubricante", "lubricantes", "moto", "motocicleta",
+        "motor", "motordiesel", "motos", "multigrado", "sintetico", "transmision", "vehiculo",
+    }
+)
+_PAINT_CONTEXT = frozenset(
+    {"anticorrosivo", "barniz", "esmalte", "latex", "pintura", "pinturas", "sellador", "thinner"}
+)
+_COSMETIC_CONTEXT = frozenset(
+    {
+        "acondicionador", "alisadora", "aromaterapia", "argan", "baby", "barba", "bebe", "bebes",
+        "bronceador", "bronceadora", "cabello", "capilar", "corporal", "cuticula", "cuticulas",
+        "depilatorio", "desmaquillante", "enjuague", "esencial", "esenciales", "espuma",
+        "facial", "fijador", "fijadora", "frizz", "hidratante", "humectante", "keratina",
+        "labial", "labios", "limpiadora", "locion", "masaje", "mascarilla", "mosqueta", "peinar",
+        "piel", "plancha", "ricino", "rizos", "rostro", "serum", "shampoo", "solar",
+        "tratamiento", "unas",
+    }
+)
+_ORAL_CARE_CONTEXT = frozenset(
+    {
+        "aquafresh", "blanqueadora", "colgate", "crest", "dental", "dentifrica", "dientes",
+        "dnt", "encias", "kolynos", "oralb", "parodontax", "sensodyne",
+    }
+)
+_ORAL_CARE_PHRASES = ("close up", "oral b")
+_NON_FOOD_PASTA_CONTEXT = frozenset(
+    {"calzado", "ceramica", "lustrar", "modelar", "muro", "pared", "plastilina", "resanar", "silicon"}
+)
+_COFFEE_OBJECT_CONTEXT = frozenset(
+    {
+        "betun", "cafetera", "esponja", "filtro", "filtros", "gancho", "mesa", "percoladora",
+        "silla", "sillon", "taza", "tazas", "termo", "toalla", "vaso",
+    }
+)
+_HAIR_GEL_CONTEXT = frozenset(
+    {"cabello", "capilar", "ego", "fijador", "fijadora", "herbal", "peinar", "rizos", "sabila", "vitacreme"}
+)
+_BATH_SALT_CONTEXT = frozenset({"bano", "epsom", "piscina", "tina"})
+_COSMETIC_MILK_CONTEXT = frozenset(
+    {"bronceadora", "corporal", "desmaquillante", "facial", "hidratante", "humectante", "limpiadora", "magnesia", "solar"}
+)
+_CAT_CONTEXT = frozenset({"felix", "friskies", "gati", "gato", "gatos", "minino", "whiskas"})
+_DOG_CONTEXT = frozenset({"beneful", "canino", "dogui", "pedigree", "perro", "perros"})
+_CAT_PHRASES = ("cat chow",)
+_DOG_PHRASES = ("dog chow",)
+# "Pan para perro caliente" / "hot dog" es comida humana.
+_HOT_DOG_CONTEXT = frozenset({"caliente", "calientes", "hot"})
+_PET_NON_FOOD = frozenset(
+    {"arena", "cama", "cepillo", "collar", "comedero", "correa", "juguete", "plato", "rascador", "shampoo", "transportadora"}
+)
+_SUGAR_FREE_RE = re.compile(r"(?<!\w)(?:s|zero|cero|0|libre de|no|sugar free)\s*azucar(?!\w)|(?<!\w)sugar free(?!\w)")
+_FOOD_CATEGORIES = frozenset({"Alimentos", "Bebidas"})
+# Departamentos fuente que contradicen un tipo alimenticio por nombre ("Pintura
+# de Aceite" en /Artículos para el hogar/, "Aceite 20W50" en /Autos/). Salud y
+# Mascotas no cuentan: farmacias venden té y dulces (Walmart cuelga chocolates
+# de "/Anthistaminicos/Dulces y Chocolates/") y el alimento de mascota con
+# sabor a atún ya tiene su regla de contexto.
+_NON_FOOD_DEPARTMENTS = frozenset({"General", "Cuidado personal", "Limpieza", "Hogar"})
+# Departamentos que ya existen como categoría pública del catálogo.
+_PUBLIC_CATEGORIES = frozenset(
+    {"Alimentos", "Bebidas", "Cuidado personal", "Limpieza", "Hogar", "Bebés", "Mascotas"}
+)
+SOURCE_CATEGORY_RULE_PREFIX = "source_category"
+
+
+def _known_product_types() -> dict[str, tuple[str, str]]:
+    from . import product_homologation as v1
+
+    known: dict[str, tuple[str, str]] = {}
+    for rule in v1._TAXONOMY_RULES:
+        known.setdefault(rule.product_type, (rule.category, rule.subcategory))
+    for _, category, subcategory, product_type, _ in v1._HEAD_TAXONOMY:
+        known.setdefault(product_type, (category, subcategory))
+    known.setdefault("Miel", ("Alimentos", "Miel"))
+    return known
+
+
+_KNOWN_PRODUCT_TYPES = _known_product_types()
+
+
+@lru_cache(maxsize=1)
+def _source_category_taxonomy():  # type: ignore[no-untyped-def]
+    """Mapa versionado de rutas de categoría fuente (config/homologation)."""
+
+    from .matching.config import DEFAULT_TAXONOMY_PATH
+    from .matching.taxonomy import load_source_taxonomy
+
+    return load_source_taxonomy(DEFAULT_TAXONOMY_PATH)
+
+
+def is_source_category_type(taxonomy: TaxonomyAssignment) -> bool:
+    """Tipo derivado de la ruta de categoría: evidencia débil, nunca conflicto."""
+
+    return (taxonomy.rule_id or "").startswith(SOURCE_CATEGORY_RULE_PREFIX)
+
+
+def _object_before_noun(text: str, noun: str) -> bool:
+    words = text.split()
+    if noun not in words:
+        return False
+    head = words.index(noun)
+    return any(word in _COFFEE_OBJECT_CONTEXT for word in words[:head])
+
+
+def _category_path_type(source_taxonomy, category: str) -> str | None:  # type: ignore[no-untyped-def]
+    """Tipo por palabra clave al INICIO de la hoja de la ruta fuente.
+
+    Sólo la hoja describe el producto: el departamento ("Cervezas, Vinos y
+    Licores") y la familia ("Azúcar y Postres" contiene flanes) son demasiado
+    amplios, y "Tacos, Pizzas y Pastas" no es Pasta. Rutas de un solo segmento
+    (Colonial, PriceSmart) sólo aportan departamento. La regla debe ser
+    compatible con el departamento de la ruta completa ("Desmaquillante y agua
+    micelar" en Higiene y Belleza no es Agua).
+    """
+
+    from .matching.taxonomy import category_segments, departments_compatible
+
+    segments = category_segments(category)
+    if len(segments) < 2:
+        return None
+    leaf = segments[-1]
+    department = source_taxonomy.department_for(category)
+    for keyword, product_type, rule_department in source_taxonomy.keyword_rules:
+        if leaf != keyword and not leaf.startswith(keyword + " "):
+            continue
+        if departments_compatible(department, rule_department) is False:
+            continue
+        return product_type
+    return None
+
+
+def _non_food_override(
+    taxonomy: TaxonomyAssignment,
+    text: str,
+    tokens: set[str],
+) -> TaxonomyAssignment | None:
+    product_type = taxonomy.product_type
+    if product_type is None or taxonomy.category not in _FOOD_CATEGORIES:
+        return None
+    if _VISCOSITY_RE.search(text) or tokens & _MOTOR_CONTEXT:
+        return TaxonomyAssignment(None, None, None, "v2_motor_context_not_food")
+    if tokens & _PAINT_CONTEXT:
+        return TaxonomyAssignment(None, None, None, "v2_paint_context_not_food")
+    cat = bool(tokens & _CAT_CONTEXT) or any(_phrase_present(text, phrase) for phrase in _CAT_PHRASES)
+    dog = bool(tokens & _DOG_CONTEXT) or any(_phrase_present(text, phrase) for phrase in _DOG_PHRASES)
+    # Sólo alimentos (no bebidas: "Vino Gato Negro" es vino).
+    if (
+        (cat or dog)
+        and taxonomy.category == "Alimentos"
+        and not tokens & (_PET_NON_FOOD | _HOT_DOG_CONTEXT)
+    ):
+        if cat and not dog:
+            return TaxonomyAssignment("Mascotas", "Alimento para mascotas", "Alimento para gato", "v2_pet_food_cat")
+        if dog and not cat:
+            return TaxonomyAssignment("Mascotas", "Alimento para mascotas", "Alimento para perro", "v2_pet_food_dog")
+        return TaxonomyAssignment("Mascotas", None, None, "v2_pet_food_ambiguous")
+    if product_type == "Aceite comestible" and tokens & _COSMETIC_CONTEXT:
+        return TaxonomyAssignment("Cuidado personal", None, None, "v2_cosmetic_oil_not_food")
+    if product_type == "Pasta":
+        if tokens & _ORAL_CARE_CONTEXT or any(_phrase_present(text, phrase) for phrase in _ORAL_CARE_PHRASES):
+            return TaxonomyAssignment("Cuidado personal", "Higiene oral", "Pasta dental", "v2_pasta_oral_care")
+        if tokens & _NON_FOOD_PASTA_CONTEXT:
+            return TaxonomyAssignment(None, None, None, "v2_pasta_not_food")
+    if product_type == "Café" and (_object_before_noun(text, "cafe") or _phrase_present(text, "color cafe")):
+        # "Taza de café", "Filtro para café", "Betún Café"; "Café molido tipo
+        # percoladora" sigue siendo café (el objeto va después del sustantivo).
+        return TaxonomyAssignment(None, None, None, "v2_coffee_object_or_color")
+    if product_type == "Gelatina" and tokens & _HAIR_GEL_CONTEXT:
+        return TaxonomyAssignment("Cuidado personal", None, None, "v2_hair_gel_not_food")
+    if product_type == "Sal" and tokens & _BATH_SALT_CONTEXT:
+        return TaxonomyAssignment("Cuidado personal", None, None, "v2_bath_salt_not_food")
+    if product_type == "Leche" and tokens & _COSMETIC_MILK_CONTEXT:
+        return TaxonomyAssignment(None, None, None, "v2_cosmetic_milk_not_food")
+    return None
+
+
 def assign_taxonomy_v2(record: SourceProductRecord) -> TaxonomyAssignment:
-    """Corrige falsos positivos demostrados antes de aplicar la taxonomía v1."""
+    """Taxonomía v2: nombre con contexto negativo y, sin tipo, ruta de categoría.
+
+    1. Reglas por nombre (v2 + v1), con "S/Azúcar", "Zero Azúcar" leídos como
+       "sin azúcar" para que no se clasifiquen como Azúcar.
+    2. Contexto negativo: aceite de motor (20W50, ATF, moto), pintura, cosmética
+       (argán, cabello, bebé), pasta dental, alimento para mascota, objetos color
+       café, gel para cabello, sal de baño.
+    3. Si el departamento de la ruta fuente es no alimenticio, un tipo
+       alimenticio por nombre se descarta (fail-closed).
+    4. Sin tipo por nombre: palabra clave de la ruta (``source_category``,
+       evidencia débil que nunca crea un conflicto de tipo) o, al menos, el
+       departamento como categoría pública.
+    """
+
     text = fold_text(record.source_name) or ""
     tokens = set(text.split())
+    by_name = _assign_taxonomy_by_name(record, text, tokens)
+    override = _non_food_override(by_name, text, tokens)
+    if override is not None:
+        by_name = override
+    if record.source_category is None:
+        return by_name
+    try:
+        source_taxonomy = _source_category_taxonomy()
+    except Exception:  # pragma: no cover - el mapa es parte versionada del repo
+        return by_name
+    department = source_taxonomy.department_for(record.source_category)
+    seasonal = "temporada" in (fold_text(record.source_category) or "")
+    if (
+        by_name.product_type is not None
+        and by_name.category in _FOOD_CATEGORIES
+        and department in _NON_FOOD_DEPARTMENTS
+        and not seasonal
+    ):
+        return TaxonomyAssignment(
+            department if department in _PUBLIC_CATEGORIES else None,
+            None,
+            None,
+            "v2_source_department_not_food",
+        )
+    if by_name.product_type is not None or by_name.rule_id is not None:
+        return by_name
+    category_type = _category_path_type(source_taxonomy, record.source_category)
+    if category_type is not None and category_type in _KNOWN_PRODUCT_TYPES:
+        category, subcategory = _KNOWN_PRODUCT_TYPES[category_type]
+        return TaxonomyAssignment(category, subcategory, category_type, f"{SOURCE_CATEGORY_RULE_PREFIX}_keyword")
+    if department in _PUBLIC_CATEGORIES:
+        return TaxonomyAssignment(department, None, None, f"{SOURCE_CATEGORY_RULE_PREFIX}_department")
+    return by_name
+
+
+def _assign_taxonomy_by_name(
+    record: SourceProductRecord,
+    text: str,
+    tokens: set[str],
+) -> TaxonomyAssignment:
+    """Corrige falsos positivos demostrados antes de aplicar la taxonomía v1."""
     if "abrillantador" in tokens and "calzado" in tokens:
         return TaxonomyAssignment(
             "Hogar",
@@ -867,6 +1106,11 @@ def assign_taxonomy_v2(record: SourceProductRecord) -> TaxonomyAssignment:
         return TaxonomyAssignment("Alimentos", "Dulces y chocolates", "Chocolate", "v2_kinder_huevo")
     if "toro" in tokens and ("huevo" in tokens or "huevos" in tokens):
         return TaxonomyAssignment(None, None, None, "v2_huevos_toro_unresolved")
+    sugar_free = _SUGAR_FREE_RE.sub("sin azucar", text)
+    if sugar_free != text:
+        # La regla v1 de Azúcar ya excluye "sin azucar"; "S/Azúcar" y "Zero
+        # Azúcar" son la misma declaración ("SILK Almendra S/Azucar").
+        return assign_taxonomy(replace(record, source_name=sugar_free))
     return assign_taxonomy(record)
 
 
@@ -1269,6 +1513,8 @@ def _hard_conflicts(left: ProductProfile, right: ProductProfile) -> tuple[str, .
         left.taxonomy.product_type is not None
         and right.taxonomy.product_type is not None
         and left.taxonomy.product_type != right.taxonomy.product_type
+        and not is_source_category_type(left.taxonomy)
+        and not is_source_category_type(right.taxonomy)
     ):
         conflicts.add("product_type_conflict")
     if (

@@ -312,6 +312,8 @@ class Standardizer:
         size = _size_info(size_profile)
         product_type = profile.taxonomy.product_type or size_profile.taxonomy.product_type
         product_type_source = "name" if product_type is not None else None
+        if product_type is not None and (profile.taxonomy.rule_id or "").startswith("source_category"):
+            product_type_source = "category_rule"
         department = None
         if self.taxonomy is not None:
             department = self.taxonomy.department_for(record.source_category)
