@@ -46,6 +46,9 @@ restricted_gtin:
     # Walmart y Paiz publican el mismo catálogo VTEX de Walmart Centroamérica.
     walmart_cam: [paiz, walmart]
   # La Colonia SPS/TGU comparten supermarket_id: nunca forman grupo consigo misma.
+  # Colonial: ean derivado del sku GS1 válido (aprobado 2026-10-01). En grupos
+  # exactos su marca contradictoria también bloquea (sku_gtin_brand_conflict).
+  sku_derived_gtin_supermarkets: [colonial]
   outside_master_status: review_required
 
 hard_conflicts:

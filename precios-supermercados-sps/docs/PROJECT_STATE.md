@@ -160,13 +160,17 @@ La cola privada de revisión (#460) materializa, bajo ejecución manual y read-o
 Rama `rpi/homolog-quick` (no fusionada). Motor `product-homologation-v2.4`; al
 fusionarse, el refresh diario de homologación reescribe los perfiles derivados
 con la nueva versión. Política y casos en
-[`homologation/product-identity-standard-v1.md`](homologation/product-identity-standard-v1.md) (reglas 8–13).
+[`homologation/product-identity-standard-v1.md`](homologation/product-identity-standard-v1.md) (reglas 8–14).
 
-- **Captura de GTIN:** Colonial valida `barcode` con check digit GS1. La causa de
-  0 GTIN Colonial no es la normalización: `barcode` es null en las 9,205
-  variantes; el código tipo UPC/EAN está en `sku` (92 % pasa el check digit) y
-  no se reinterpreta como GTIN. PriceSmart (Bloomreach) y Comisariato
-  (material interno) no exponen barcode.
+- **Captura de GTIN:** Colonial no publica `barcode` (null en las 9,205
+  variantes de 2026-08-30); el UPC/EAN vive en `sku`. Con aprobación del
+  usuario (2026-10-01), un `sku` recortado, todo dígitos, de 8/12/13/14 dígitos
+  y GS1 válido pasa a `ean` (8,501 de 9,205); `reference` sigue siendo el SKU y
+  la procedencia se deriva (`ean == reference` ⇒ `sku_gs1_valid`) porque el
+  contrato de snapshot tiene llaves cerradas. Ese GTIN conserva todos los
+  conflictos del grupo y además una marca claramente contradictoria lo excluye
+  (`sku_gtin_brand_conflict`). PriceSmart (Bloomreach) y Comisariato (material
+  interno) no exponen barcode.
 - **GTIN restringidos GS1:** sólo forman identidad dentro de un maestro
   compartido (`walmart_cam` = Walmart + Paiz). En el corte 2026-09-21, las 315
   filas comparables TGU con GTIN restringido son Walmart+Paiz: 0 degradadas.
@@ -176,7 +180,10 @@ con la nueva versión. Política y casos en
   envase, "1 Pack" no ambiguo, combos/kits como bundle no comparable.
 - **Variante de un solo lado:** bloquea la identidad automática por GTIN.
   Elimina el falso positivo Gwaltney (TGU: sale La Colonia, Walmart+Paiz
-  siguen) y uno nuevo (Glade Lavender vs Sweet Citrus, SPS).
+  siguen) y uno nuevo (Glade Lavender vs Sweet Citrus, SPS). Para nombres
+  abreviados (Colonial) se separan palabras pegadas y se expande una tabla de
+  abreviaturas (`Vaini`, `Meloctn`, `S/Azu`, `Sugar Free`…); el sustantivo del
+  tipo ("Chocolate Ferrero") no cuenta como sabor.
 
 Medición (offline; el catálogo publicado sólo expone GTIN de filas comparables):
 
@@ -185,10 +192,17 @@ Medición (offline; el catálogo publicado sólo expone GTIN de filas comparable
 | Comparables publicados SPS / TGU | 7.1 % / 24.9 % | sin degradación por GTIN restringido; muestra de variante: 1 grupo SPS y 3 TGU de 246 con nombres visibles |
 | Falsos positivos confirmados en la muestra de 246 grupos | 2 | 0 |
 | Grupos Walmart+Paiz comparables (snapshots 2026-08-31/09-04) | 8,327 | 8,336 |
-| Hipótesis Colonial `sku`→GTIN (no activada): grupos comparables / productos Colonial | 8,135 / 2,463 | 8,611 / 2,214 |
+| Colonial `sku`→GTIN (snapshots): grupos comparables / productos Colonial en ellos | 8,327 / 0 | 8,620 / 2,359 |
+| SPS estimado (Colonial+Walmart SPS sobre el corte 2026-09-21) | 7.1 % filas comparables; 0 % ofertas Colonial | ≈9.6 %; ≈23 % de ofertas Colonial |
 
-La palanca grande para SPS sigue siendo el GTIN de Colonial: requiere una
-decisión explícita sobre usar su `sku` como GTIN.
+Colonial: 2,153 grupos con Walmart SPS (926 nuevos, 1,227 amplían filas La
+Colonia+Walmart). Es cota inferior: no hay snapshot de La Colonia para medir
+Colonial+La Colonia sin Walmart. Spot-check de 2,359 grupos con Colonial: 30
+aleatorios correctos; en las colas (similitud baja, ratio de precio ≥2) quedan
+~6 sospechosos (p. ej. "D OLANCHO Chile Añejo" vs "Salsa Riberenas Picante
+Inglesa", "LOREAL Vol Blackest Black" vs "Lash Paradise", "EVENFLO Biberon
+Campestre" vs "Acuario"). Evidencia en el scratchpad de la sesión
+(`colonial_spotcheck.csv`).
 
 ## Autoridad live y binding SPS
 

@@ -4,7 +4,8 @@ Hallazgos 2026-09-30 sobre fixtures y capturas versionadas en ``reports/``:
 
 - Colonial: ``barcode`` es ``null`` en las 9,205 variantes de la captura completa
   2026-08-30; el código tipo UPC/EAN vive en ``sku`` (92% supera el check digit).
-  El SKU se conserva en ``reference`` y nunca se reinterpreta como GTIN.
+  Desde 2026-10-01 (aprobado por el usuario) el SKU GS1 válido es ``ean``; el SKU
+  sigue en ``reference`` y la procedencia se deriva (``ean == reference``).
 - PriceSmart: Bloomreach no expone barcode/GTIN/UPC; las variantes ``<pid>-<dígitos>``
   son SKU fuente (y no coinciden con GTIN de otras cadenas).
 - Comisariato Los Andes: ``code`` es un código de material interno.
@@ -17,7 +18,13 @@ from pathlib import Path
 
 import pytest
 
-from precios_supermercados.scrapers.colonial import declared_barcode, parse_products
+from precios_supermercados.scrapers.colonial import (
+    declared_barcode,
+    ean_source,
+    ean_with_source,
+    gtin_from_sku,
+    parse_products,
+)
 from precios_supermercados.scrapers.comisariato_los_andes import parse_catalog_page
 from precios_supermercados.scrapers.pricesmart import parse_documents
 
@@ -49,23 +56,53 @@ def test_colonial_declared_barcode_requires_valid_gs1(value, expected) -> None:
     assert declared_barcode(value) == expected
 
 
-def test_colonial_explicit_valid_barcode_survives_and_sku_never_does() -> None:
+@pytest.mark.parametrize(
+    ("sku", "expected"),
+    [
+        ("894700010144", "894700010144"),  # UPC-A Chobani
+        (" 7424634300146 ", "7424634300146"),  # recortado
+        ("070404001491", "070404001491"),  # cero inicial conservado
+        ("75076870", "75076870"),  # EAN-8 Rexona
+        ("00070404001491", "00070404001491"),
+        ("7424634300147", None),  # check digit inválido
+        ("70404001491", None),  # 11 dígitos
+        ("123", None),  # código interno corto
+        ("7424634300146A", None),  # no todo dígitos
+        ("7424-634300146", None),
+        ("", None),
+        (None, None),
+        (894700010144, None),
+    ],
+)
+def test_colonial_sku_becomes_gtin_only_when_gs1_valid(sku, expected) -> None:
+    assert gtin_from_sku(sku) == expected
+
+
+def test_colonial_explicit_barcode_wins_over_sku_and_provenance_is_recorded() -> None:
+    assert ean_with_source("070404001491", "894700010144") == ("070404001491", "barcode")
+    assert ean_with_source(None, "894700010144") == ("894700010144", "sku_gs1_valid")
+    assert ean_with_source("7424634300147", "894700010144") == ("894700010144", "sku_gs1_valid")
+    assert ean_with_source(None, "7424634300147") == (None, None)
+    assert ean_with_source(None, None) == (None, None)
+
+
+def test_colonial_rows_keep_closed_schema_and_derive_provenance() -> None:
     payload = _colonial_payload()
-    variants = payload["products"][0]["variants"]
-    variants[0]["barcode"] = "070404001491"
-    payload["products"][1]["variants"][0]["barcode"] = "7424634300147"  # inválido
+    payload["products"][0]["variants"][0]["barcode"] = "070404001491"
+    payload["products"][1]["variants"][0]["sku"] = "7424634300147"  # inválido
     rows = parse_products(json.dumps(payload).encode())
-    assert rows[0]["ean"] == "070404001491"
+    assert rows[0]["ean"] == "070404001491" and ean_source(rows[0]) == "barcode"
     assert rows[0]["reference"] == "894700010144"
-    assert rows[1]["ean"] is None
-    # Las 38 variantes restantes tienen SKU numérico válido como GTIN pero barcode null.
-    assert all(row["ean"] is None for row in rows[2:])
-    assert all(row["reference"] for row in rows)
+    assert rows[1]["ean"] is None and ean_source(rows[1]) is None
+    assert rows[1]["reference"] == "7424634300147"
+    assert all(ean_source(row) == "sku_gs1_valid" for row in rows[2:])
+    assert all("ean_source" not in row for row in rows)  # contrato de snapshot cerrado
 
 
-def test_colonial_fixture_has_no_explicit_barcode() -> None:
+def test_colonial_fixture_gtins_all_come_from_sku() -> None:
     rows = parse_products((FIXTURES / "colonial/products-40.json").read_bytes())
-    assert [row["ean"] for row in rows] == [None] * 40
+    assert [row["ean"] for row in rows] == [row["reference"] for row in rows]
+    assert {ean_source(row) for row in rows} == {"sku_gs1_valid"}
 
 
 def test_pricesmart_composite_sku_suffix_is_not_promoted_to_ean() -> None:

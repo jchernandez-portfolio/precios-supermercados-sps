@@ -91,11 +91,20 @@ confirman identidad por sí mismos.
     multipack nunca equivale a la unidad. Combos, kits, "gratis", `2x1` y
     "cantidad + cantidad" son bundles: `bundle_vs_single_conflict` frente a un
     individual.
-13. **Captura de GTIN por fuente.** `ean` sólo recibe un barcode explícito de la
-    fuente que supera el check digit GS1. Colonial no publica `barcode` (null en
-    las 9,205 variantes de la captura 2026-08-30) y su `sku` —aunque 92 % pase el
-    check digit— no se reinterpreta como GTIN; PriceSmart y Comisariato no
-    exponen barcode.
+13. **Captura de GTIN por fuente.** `ean` recibe un barcode explícito de la
+    fuente que supera el check digit GS1. **Colonial (aprobado 2026-10-01):**
+    no publica `barcode`, así que un `sku` recortado, sólo dígitos, de 8/12/13/14
+    dígitos y GS1 válido se acepta como GTIN con procedencia `sku_gs1_valid`
+    (derivable: `ean == reference`). Un SKU no numérico o con check digit
+    inválido nunca produce GTIN. Ese GTIN sólo crea identidad si coincide con el
+    de otra cadena, respeta la regla 9 y no tiene conflicto material; además, una
+    marca contradictoria (ninguna aparece en el nombre del otro y no son
+    variantes ortográficas) excluye al miembro (`sku_gtin_brand_conflict`).
+    PriceSmart y Comisariato no exponen barcode.
+14. **Abreviaturas (v2.4).** Para detectar variantes se separan palabras
+    pegadas ("AlmendVainiSinAzucar") y se expande una tabla cerrada de
+    abreviaturas observadas (`vaini`→vainilla, `meloctn`→melocotón, `s azu`/
+    `sugar free`→sin azúcar…). "S/A" no se expande (choca con "S.A.").
 
 ## Casos iniciales
 

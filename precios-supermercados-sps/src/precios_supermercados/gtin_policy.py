@@ -36,6 +36,11 @@ RESTRICTED_GTIN13_PREFIX_RANGES: tuple[tuple[int, int, str], ...] = (
 RESTRICTED_GTIN8_FIRST_DIGITS = frozenset({"0", "2"})  # RCN-8
 RESTRICTED_GTIN14_INDICATORS = frozenset({"9"})  # unidad comercial de medida variable
 
+# Cadenas cuyo ``ean`` proviene del SKU fuente validado por GS1 y no de un
+# barcode explícito. Su GTIN es evidencia fuerte, pero en grupos exactos el
+# conflicto de marca también bloquea (además de presentación, tipo y variante).
+SKU_DERIVED_GTIN_SUPERMARKETS: frozenset[str] = frozenset({"colonial"})
+
 SHARED_PRODUCT_MASTERS: dict[str, frozenset[str]] = {
     "walmart_cam": frozenset({"walmart", "paiz"}),
 }

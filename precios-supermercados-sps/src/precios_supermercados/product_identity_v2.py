@@ -23,7 +23,11 @@ from difflib import SequenceMatcher
 from functools import lru_cache
 from typing import Iterable
 
-from .gtin_policy import restricted_circulation_reason, restricted_gtin_master_partition
+from .gtin_policy import (
+    SKU_DERIVED_GTIN_SUPERMARKETS,
+    restricted_circulation_reason,
+    restricted_gtin_master_partition,
+)
 from .identifiers import generate_gtin_product_id
 from .product_homologation import (
     ExactGtinGroup,
@@ -802,9 +806,80 @@ def _name_similarity(left: ProductProfile, right: ProductProfile) -> Decimal:
     return (jaccard * Decimal("0.6") + sequence * Decimal("0.4")).quantize(Decimal("0.0001"))
 
 
+# Palabras pegadas de catálogos abreviados (Colonial): "AlmendVainiSinAzucar946ml"
+# → "Almend Vaini Sin Azucar 946 ml". Idea portada de la estandarización del
+# motor probabilístico (rama rpi/homolog-engine), sin compartir módulo.
+_GLUED_CAMEL_RE = re.compile(r"(?<=[a-záéíóúñü])(?=[A-ZÁÉÍÓÚÑÜ])")
+_GLUED_LETTERS_DIGIT_RE = re.compile(r"(?<=[A-Za-záéíóúñÁÉÍÓÚÑ]{3})(?=\d)")
+_GLUED_DIGIT_LETTERS_RE = re.compile(r"(?<=\d)(?=[A-Za-záéíóúñÁÉÍÓÚÑ]{2})")
+
+# Abreviaturas observadas en nombres Colonial cuyo GTIN coincide con Walmart/Paiz
+# (captura 2026-08-30). Sólo se usan para detectar variantes declaradas; cada
+# entrada expande un token completo, nunca un prefijo libre.
+NAME_ABBREVIATIONS: dict[str, str] = {
+    "arand": "arandano",
+    "arandan": "arandano",
+    "bana": "banano",
+    "banan": "banano",
+    "blueb": "blueberry",
+    "bluebery": "blueberry",
+    "camar": "camaron",
+    "choc": "chocolate",
+    "choco": "chocolate",
+    "chocol": "chocolate",
+    "fres": "fresa",
+    "lavan": "lavanda",
+    "ligth": "light",
+    "limo": "limon",
+    "manz": "manzana",
+    "mazana": "manzana",
+    "meloc": "melocoton",
+    "meloct": "melocoton",
+    "meloctn": "melocoton",
+    "naran": "naranja",
+    "naranj": "naranja",
+    "rasberry": "raspberry",
+    "stranwberry": "strawberry",
+    "strawb": "strawberry",
+    "vain": "vainilla",
+    "vaini": "vainilla",
+    "vainil": "vainilla",
+    "vainila": "vainilla",
+    "vanila": "vainilla",
+    "watermelo": "watermelon",
+    "zanah": "zanahoria",
+    "zanaho": "zanahoria",
+}
+# Frases (ya plegadas) equivalentes a "sin azucar": "S/Azu", "Sugar Free", "Unsw".
+NAME_PHRASE_ABBREVIATIONS: dict[str, str] = {
+    "s azu": "sin azucar",
+    "s azuc": "sin azucar",
+    "s azucar": "sin azucar",
+    "sugar free": "sin azucar",
+    "no sugar": "sin azucar",
+    "unsw": "sin azucar",
+    "unsweetened": "sin azucar",
+}
+
+
+def split_glued_words(name: str) -> str:
+    text = _GLUED_CAMEL_RE.sub(" ", name)
+    text = _GLUED_LETTERS_DIGIT_RE.sub(" ", text)
+    return _GLUED_DIGIT_LETTERS_RE.sub(" ", text)
+
+
+def normalize_variant_text(name: str | None) -> str:
+    """Texto plegado para detectar variantes, con palabras pegadas y abreviaturas."""
+
+    text = fold_text(split_glued_words(name or "")) or ""
+    for phrase, expansion in NAME_PHRASE_ABBREVIATIONS.items():
+        text = re.sub(rf"(?<!\w){re.escape(phrase)}(?!\w)", expansion, text)
+    return " ".join(NAME_ABBREVIATIONS.get(token, token) for token in text.split())
+
+
 @lru_cache(maxsize=131_072)
 def _variant_labels(profile: ProductProfile) -> frozenset[str]:
-    text = fold_text(profile.record.source_name) or ""
+    text = normalize_variant_text(profile.record.source_name)
     # "Zero Alcohol" (enjuague bucal) no es la formulación "zero" sin azúcar.
     text = re.sub(r"(?<!\w)zero\s+alcohol(?!\w)", "sin_alcohol", text)
     labels: set[str] = set()
@@ -941,8 +1016,15 @@ def one_sided_variant_conflicts(left: ProductProfile, right: ProductProfile) -> 
     left_labels = _variant_labels(left)
     right_labels = _variant_labels(right)
     conflicts: set[str] = set()
-    left_flavors = any(item.startswith("flavor:") for item in left_labels)
-    right_flavors = any(item.startswith("flavor:") for item in right_labels)
+    # El sustantivo del tipo no es una variante: "Chocolate Ferrero Rocher" no
+    # declara sabor chocolate frente a "FERRERO ROCHER Chocolates".
+    type_nouns = {
+        f"flavor:{fold_text(profile.taxonomy.product_type)}"
+        for profile in (left, right)
+        if profile.taxonomy.product_type is not None
+    }
+    left_flavors = any(item.startswith("flavor:") and item not in type_nouns for item in left_labels)
+    right_flavors = any(item.startswith("flavor:") and item not in type_nouns for item in right_labels)
     if left_flavors != right_flavors:
         conflicts.add("one_sided_flavor_declared")
     left_group = _formulation_group(left_labels)
@@ -1046,12 +1128,43 @@ def _gtin_pair_conflicts(left: ProductProfile, right: ProductProfile) -> set[str
     """Conflictos materiales entre dos miembros de cadenas distintas con igual GTIN."""
 
     reasons: set[str] = set(one_sided_variant_conflicts(left, right))
+    sku_derived = (
+        left.record.supermarket_id in SKU_DERIVED_GTIN_SUPERMARKETS
+        or right.record.supermarket_id in SKU_DERIVED_GTIN_SUPERMARKETS
+    )
     for reason in _hard_conflicts(left, right):
         if reason == "presentation_conflict":
             reasons.add("cross_source_presentation_conflict")
+        elif reason == "brand_conflict" and sku_derived and _sku_gtin_brand_contradiction(left, right):
+            # Un GTIN derivado de SKU no basta frente a una marca contradictoria.
+            reasons.add("sku_gtin_brand_conflict")
         elif reason not in _GTIN_PAIR_IGNORED_REASONS:
             reasons.add(reason)
     return reasons
+
+
+def _squashed(value: str | None) -> str:
+    return (fold_text(value) or "").replace(" ", "")
+
+
+def _sku_gtin_brand_contradiction(left: ProductProfile, right: ProductProfile) -> bool:
+    """Contradicción de marca suficiente para invalidar un GTIN derivado de SKU.
+
+    La marca resuelta mezcla fabricante y línea ("Frito Lay" vs "Cheetos",
+    "Hormel" vs "Spam") y errores tipográficos ("Marisela" vs "Marinela"). Sólo
+    hay contradicción cuando ninguna marca aparece en el nombre del otro lado, no
+    comparten las primeras cuatro letras y su similitud es baja.
+    """
+
+    left_brand = _squashed(left.normalized_brand)
+    right_brand = _squashed(right.normalized_brand)
+    if not left_brand or not right_brand or left_brand == right_brand:
+        return False
+    if left_brand in _squashed(right.record.source_name) or right_brand in _squashed(left.record.source_name):
+        return False
+    if left_brand[:4] == right_brand[:4]:
+        return False
+    return SequenceMatcher(None, left_brand, right_brand).ratio() < 0.75
 
 
 def _member_intrinsic_conflicts(member: ProductProfile) -> set[str]:
