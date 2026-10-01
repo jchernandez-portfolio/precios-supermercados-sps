@@ -246,6 +246,9 @@ def parse_products(
                 "source_name": name,
                 "brand": brand.strip() if isinstance(brand, str) and brand.strip() else None,
                 "reference": code,
+                # El catálogo público no expone barcode/GTIN. `code` es un código de
+                # material interno (`0001-` + 15 dígitos, p. ej. 7400051 o 99001005224):
+                # nunca se reinterpreta como GTIN aunque quite ceros a la izquierda.
                 "ean": None,
                 "category": (
                     category.strip()

@@ -12,6 +12,8 @@ from html.parser import HTMLParser
 from urllib.parse import urlparse
 from xml.etree import ElementTree as ET
 
+from ..identifiers import canonicalize_gtin
+
 ORIGIN = "https://supercolonial.com"
 SECTION = "template--25869947109668__banner"
 
@@ -32,6 +34,23 @@ def price(value: object, *, nullable: bool = False) -> str | None:
     except InvalidOperation as exc:
         raise ColonialError("price_invalid") from exc
     return format(number, ".2f")
+
+
+def declared_barcode(value: object) -> str | None:
+    """Conserva sólo un barcode Shopify explícito que supera el check digit GS1.
+
+    La captura completa 2026-08-30 tiene ``barcode=null`` en las 9,205 variantes;
+    el código tipo UPC/EAN vive en ``sku``. El SKU NO se reinterpreta como GTIN:
+    se conserva en ``reference``. Un barcode con espacios externos se recorta; uno
+    no numérico, de longitud no GS1 o con check digit inválido queda en ``None``.
+    Los ceros a la izquierda se conservan tal cual vienen de la fuente.
+    """
+    if not isinstance(value, str):
+        return None
+    candidate = value.strip()
+    if not candidate or canonicalize_gtin(candidate) is None:
+        return None
+    return candidate
 
 
 def _id(value: object) -> str:
@@ -80,7 +99,7 @@ def parse_products(raw: bytes) -> list[dict]:
             result.append({
                 "product_id": pid, "item_id": vid, "source_key_type": "item_id",
                 "source_key": vid, "source_name": name,
-                "reference": item.get("sku") or None, "ean": item.get("barcode") or None,
+                "reference": item.get("sku") or None, "ean": declared_barcode(item.get("barcode")),
                 "brand": product.get("vendor") or None,
                 "category": product.get("product_type") or None,
                 "presentation": None,  # opciones numéricas observadas no prueban presentación
