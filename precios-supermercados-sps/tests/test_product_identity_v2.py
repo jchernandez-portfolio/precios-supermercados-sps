@@ -343,11 +343,13 @@ def test_exact_gtin_brand_label_disagreement_is_measured_but_not_fragmented() ->
 
 
 def test_exact_gtin_taxonomy_gap_is_measured_but_not_fragmented() -> None:
+    # Barcode explícito (la_colonia): un GTIN derivado de SKU Colonial exigiría
+    # además acuerdo mínimo de nombre (ver test_colonial_sku_gtin_identity.py).
     result = homologate_products_v2(
         (
             product(
                 "a",
-                "colonial",
+                "la_colonia",
                 "Arroz Demo 1 lb",
                 brand="Demo",
                 barcode="012656001065",

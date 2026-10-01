@@ -140,3 +140,77 @@ def test_abbreviated_colonial_names_are_not_one_sided_variants(colonial: str, ot
 def test_real_one_sided_variants_from_colonial_stay_blocked(colonial: str, other: str) -> None:
     group = group_for(product("colonial:1", colonial), product("walmart:1", other))
     assert group.comparison_status == "review_required"
+
+
+# --- Acuerdo mínimo de nombre y número de tono/modelo (GTIN derivado de SKU) ---
+# Casos reales del spot-check 2026-10-01 sobre los 2,359 grupos con Colonial.
+
+
+@pytest.mark.parametrize(
+    ("colonial", "colonial_brand", "other", "other_brand", "reason"),
+    [
+        ("LOREAL Vol Blackest Black 200", "L'Oreal", "Máscara Para Pestañas L'Oréal Paris Lash Paradise Lavable - 8.5ml", "L'Oreal", "sku_gtin_name_disagreement"),
+        ("DIANA Favori Mix Criollo 128g", "Diana", "Chicharrón Diana con yuca - 128 g", "Diana", "sku_gtin_name_disagreement"),
+        ("D OLANCHO Chile Añejo 500ml", "D Olancho", "Salsa Riberenas Picante Inglesa - 500 ml", "Riberenas", "sku_gtin_name_disagreement"),
+        # Colonial reporta el placeholder "RMS" como vendor (dato real).
+        ("DEL RANCHO Chicharron Picosit 100g", "RMS", "Boquita Yummies Chicharrón Picante - 100 g", "Yummies", "sku_gtin_name_disagreement"),
+        ("MAYBELLINE Age Rewind Light 20", "Maybelline", "Corrector Maybelline NY Age Rewind Light Honey 120 -0.2 Oz", "Maybelline", "model_number_conflict"),
+    ],
+)
+def test_wrong_colonial_sku_code_is_excluded(colonial, colonial_brand, other, other_brand, reason) -> None:
+    group = group_for(
+        product("colonial:1", colonial, brand=colonial_brand),
+        product("walmart:1", other, brand=other_brand),
+        product("paiz:1", other, brand=other_brand),
+    )
+    assert group.comparison_status == "ready"
+    assert group.supermarket_ids == ("paiz", "walmart")
+    (excluded_id, reasons), = group.excluded_members
+    assert excluded_id == "colonial:1"
+    assert reason in reasons
+
+
+@pytest.mark.parametrize(
+    ("colonial", "colonial_brand", "other", "other_brand"),
+    [
+        ("Bic Boli Prec Suave 3 Negro", "Bic", "Bic Bol Precision Y Suavida Neg Bl 3e", "Bic"),
+        ("ORAL-B CepillloDentalCompl2und", "Oral-B", "Cepillo de Dientes Oral-B 5 Acciones Cerdas Suaves Inteligentes - 2 Uds", "Oral-B"),
+        ("PURINA Dog Show Beef&Chicken 100g", "Purina", "Comida húmeda para perro Purina Dog Chow con pollo y carne 100 g", "Purina"),
+        ("Trident Tibra Yerbabuena 30.6g", "Trident", "Goma De Mascar Trident Sabor Yerbabuena 18 unidades - 30.6 g", "Trident"),
+        ("LACTOLAC Dip Cebolla 230g", "Lactolac", "Queso Lactosa para untar con cebolla y hierbas - 230 g", "Lactolac"),
+        ("CARBONELL Olive Extra Virgen oil 500ml", "Carbonell", "Aceite Oliva Carbonell Xv Vidrio 500 Ml", "Carbonell"),
+        ("NUVYS EsmalteRosaExhuberan#002", "Nuvys", "Nuvys Esmalte Para Unas No 02 Rosa Fusia", "Nuvys"),
+    ],
+)
+def test_abbreviated_true_matches_pass_name_guard(colonial, colonial_brand, other, other_brand) -> None:
+    group = group_for(
+        product("colonial:1", colonial, brand=colonial_brand),
+        product("walmart:1", other, brand=other_brand),
+    )
+    assert group.comparison_status == "ready", group.conflict_reasons
+
+
+def test_name_guard_applies_only_to_sku_derived_gtins() -> None:
+    group = group_for(
+        product("la_colonia:1", "DIANA Favori Mix Criollo 128g", brand="Diana"),
+        product("walmart:1", "Chicharrón Diana con yuca - 128 g", brand="Diana"),
+    )
+    assert group.comparison_status == "ready"
+
+
+def test_colonial_name_without_significant_tokens_fails_closed() -> None:
+    group = group_for(
+        product("colonial:1", "ROYAL 80g", brand="Royal"),
+        product("walmart:1", "Gelatina Royal Sabor Cereza - 80g", brand="Royal"),
+    )
+    assert group.comparison_status == "review_required"
+    assert "sku_gtin_name_disagreement" in group.conflict_reasons
+
+
+def test_glued_colonial_quantity_is_parsed_and_can_conflict() -> None:
+    group = group_for(
+        product("colonial:1", "SAVILE ShampAguac&Sab550ml", brand="Savile"),
+        product("walmart:1", "Shampoo Savilé Aguacate y Sábila en Líquido - 510 ml", brand="Savile"),
+    )
+    assert group.comparison_status == "review_required"
+    assert "cross_source_presentation_conflict" in group.conflict_reasons

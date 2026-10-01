@@ -679,7 +679,9 @@ def _normalize_parser_text(
 ) -> str | None:
     if value is None:
         return None
-    text = " ".join(value.split())
+    # "ShampAguac&Sab550ml" → "ShampAguac&Sab 550ml": sin esto la cantidad pegada
+    # a una palabra (frecuente en Colonial) no se reconoce como presentación.
+    text = " ".join(_GLUED_LETTERS_DIGIT_RE.sub(" ", value).split())
     text = _FRACTION_WITH_UNIT_RE.sub(_replace_fraction_with_unit, text)
     text = _NATURAL_MULTIPACK_RE.sub(_replace_natural_multipack, text)
     text = _COMPACT_SLASH_MULTIPACK_RE.sub(_replace_natural_multipack, text)
@@ -1140,7 +1142,145 @@ def _gtin_pair_conflicts(left: ProductProfile, right: ProductProfile) -> set[str
             reasons.add("sku_gtin_brand_conflict")
         elif reason not in _GTIN_PAIR_IGNORED_REASONS:
             reasons.add(reason)
+    if sku_derived:
+        if not sku_gtin_name_agreement(left, right):
+            reasons.add("sku_gtin_name_disagreement")
+        if _model_number_conflict(left, right):
+            reasons.add("model_number_conflict")
     return reasons
+
+
+# --- Acuerdo mínimo de nombre para GTIN derivados de SKU (Colonial) -----------
+# Un SKU GS1 válido puede ser el código equivocado. Calibración 2026-10-01 sobre
+# los 2,359 grupos Colonial: exigir al menos un token significativo común y que
+# coincida al menos 1/3 de los tokens del lado más corto excluye "LOREAL Vol
+# Blackest Black" vs "Lash Paradise", "DIANA Favori Mix Criollo" vs "Chicharrón
+# con yuca", "D OLANCHO Chile Añejo" vs "Salsa Riberenas" y "DEL RANCHO
+# Chicharron Picosit" vs "Boquita Chicharrón Picante" (234 grupos, ~10%).
+SKU_NAME_MIN_OVERLAP = Decimal("0.34")
+_NAME_AGREEMENT_STOPWORDS = frozenset(
+    {
+        "a", "al", "and", "bandeja", "bolsa", "bote", "botella", "c", "caja", "cja", "con",
+        "cong", "ct", "de", "del", "doypack", "e", "ea", "el", "en", "frasco", "g", "gr",
+        "gramos", "grms", "grs", "indicado", "kg", "l", "la", "las", "lata", "lb", "lbs",
+        "los", "lt", "lts", "ltrs", "marca", "mas", "mg", "ml", "new", "nuevo", "o", "of",
+        "onz", "oz", "p", "pack", "paquete", "para", "pet", "piezas", "pk", "plus", "por",
+        "precio", "presentacion", "pz", "pzas", "pzs", "s", "sabor", "sin", "sobre", "the",
+        "tipo", "u", "ud", "uds", "un", "und", "unid", "unidad", "unidades", "vidrio",
+        "with", "x", "y",
+    }
+)
+# Traducciones inglés→español observadas en nombres Colonial frente a Walmart/Paiz.
+_NAME_AGREEMENT_TRANSLATIONS = {
+    "almond": "almendra", "almonds": "almendra", "beef": "carne", "black": "negro",
+    "bread": "pan", "cheese": "queso", "chicken": "pollo", "coffee": "cafe",
+    "cookie": "galleta", "cookies": "galleta", "corn": "maiz", "cream": "crema",
+    "dientes": "dental", "grape": "uva", "green": "verde", "honey": "miel",
+    "juice": "jugo", "milk": "leche", "oil": "aceite", "olive": "oliva",
+    "onion": "cebolla", "red": "rojo", "rice": "arroz", "sauce": "salsa",
+    "soap": "jabon", "sugar": "azucar", "tea": "te", "water": "agua", "white": "blanco",
+}
+
+
+def _agreement_tokens(name: str, brand_tokens: frozenset[str]) -> list[str]:
+    tokens: list[str] = []
+    for token in normalize_variant_text(name).split():
+        if (
+            len(token) < 3
+            or token in _NAME_AGREEMENT_STOPWORDS
+            or token in brand_tokens
+            or any(character.isdigit() for character in token)
+        ):
+            continue
+        token = _NAME_AGREEMENT_TRANSLATIONS.get(token, token)
+        token = fold_text(_FLAVOR_ALIASES.get(token, token)) or token
+        if token not in tokens:
+            tokens.append(token)
+    return tokens
+
+
+def _agreement_token_match(left: str, right: str) -> bool:
+    """Igualdad tolerante a abreviaturas: prefijo común o alta similitud."""
+
+    if left == right:
+        return True
+    common = 0
+    for a, b in zip(left, right):
+        if a != b:
+            break
+        common += 1
+    shorter = min(len(left), len(right))
+    if common >= 3 and (common == shorter or common >= 4):
+        return True
+    return shorter >= 5 and SequenceMatcher(None, left, right).ratio() >= 0.8
+
+
+def sku_gtin_name_agreement(left: ProductProfile, right: ProductProfile) -> bool:
+    """Acuerdo mínimo de nombre sin marca ni tamaño (sólo GTIN derivado de SKU)."""
+
+    brand_tokens: set[str] = set()
+    for value in (
+        left.normalized_brand,
+        right.normalized_brand,
+        left.record.source_brand,
+        right.record.source_brand,
+    ):
+        folded = fold_text(value)
+        if folded:
+            brand_tokens.update(folded.split())
+            brand_tokens.add(folded.replace(" ", ""))
+    frozen = frozenset(brand_tokens)
+    left_tokens = _agreement_tokens(left.record.source_name, frozen)
+    right_tokens = _agreement_tokens(right.record.source_name, frozen)
+    if not left_tokens or not right_tokens:
+        return False
+    used: set[int] = set()
+    matched = 0
+    for token in left_tokens:
+        for index, other in enumerate(right_tokens):
+            if index not in used and _agreement_token_match(token, other):
+                used.add(index)
+                matched += 1
+                break
+    if matched == 0:
+        return False
+    return Decimal(matched) / Decimal(min(len(left_tokens), len(right_tokens))) >= SKU_NAME_MIN_OVERLAP
+
+
+# Cosméticos: un número de tono/modelo distinto ("Light 20" vs "Light Honey 120")
+# es otro artículo. Sólo se aplica cuando el nombre es de maquillaje/color.
+_COSMETIC_TERMS = frozenset(
+    {
+        "base", "corrector", "delineador", "esmalte", "labial", "lipstick", "maquillaje",
+        "mascara", "polvo", "rimel", "rubor", "sombra", "tono",
+    }
+)
+_MODEL_NUMBER_RE = re.compile(
+    r"(?<![\w.,/])#?\s*(?P<number>\d{1,4})(?![\d.,/])"
+    r"(?!\s*(?:%|x|mg|kg|grs?|g|ml|lts?|l|oz|onz|lbs?|un|und|unds|uds|ud|u|unid|unidades|pz|pzs|piezas|ct|s|spf|fps)(?![a-z]))",
+    re.IGNORECASE,
+)
+
+
+def _model_numbers(profile: ProductProfile) -> frozenset[str]:
+    return frozenset(
+        match.group("number").lstrip("0") or "0"
+        for match in _MODEL_NUMBER_RE.finditer(split_glued_words(profile.record.source_name))
+    )
+
+
+def _model_number_conflict(left: ProductProfile, right: ProductProfile) -> bool:
+    words = set(normalize_variant_text(left.record.source_name).split()) | set(
+        normalize_variant_text(right.record.source_name).split()
+    )
+    if not words & _COSMETIC_TERMS and "Tinte para cabello" not in {
+        left.taxonomy.product_type,
+        right.taxonomy.product_type,
+    }:
+        return False
+    left_numbers = _model_numbers(left)
+    right_numbers = _model_numbers(right)
+    return bool(left_numbers and right_numbers and not left_numbers & right_numbers)
 
 
 def _squashed(value: str | None) -> str:

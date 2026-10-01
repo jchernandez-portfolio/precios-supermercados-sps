@@ -100,6 +100,13 @@ confirman identidad por sí mismos.
     de otra cadena, respeta la regla 9 y no tiene conflicto material; además, una
     marca contradictoria (ninguna aparece en el nombre del otro y no son
     variantes ortográficas) excluye al miembro (`sku_gtin_brand_conflict`).
+    También exige acuerdo mínimo de nombre tras quitar marca, tamaño y
+    palabras de empaque y expandir abreviaturas/traducciones: al menos un token
+    significativo común y que coincida ≥1/3 de los tokens del lado más corto
+    (`sku_gtin_name_disagreement`; sin tokens significativos también falla). En
+    maquillaje y tinte, números de tono/modelo distintos ("Light 20" vs "Light
+    Honey 120") son `model_number_conflict`. Estas guardas no aplican a barcodes
+    explícitos.
     PriceSmart y Comisariato no exponen barcode.
 14. **Abreviaturas (v2.4).** Para detectar variantes se separan palabras
     pegadas ("AlmendVainiSinAzucar") y se expande una tabla cerrada de

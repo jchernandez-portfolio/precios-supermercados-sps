@@ -168,9 +168,12 @@ con la nueva versión. Política y casos en
   y GS1 válido pasa a `ean` (8,501 de 9,205); `reference` sigue siendo el SKU y
   la procedencia se deriva (`ean == reference` ⇒ `sku_gs1_valid`) porque el
   contrato de snapshot tiene llaves cerradas. Ese GTIN conserva todos los
-  conflictos del grupo y además una marca claramente contradictoria lo excluye
-  (`sku_gtin_brand_conflict`). PriceSmart (Bloomreach) y Comisariato (material
-  interno) no exponen barcode.
+  conflictos del grupo y, como un SKU GS1 válido puede ser el código
+  equivocado, además exige: marca no contradictoria (`sku_gtin_brand_conflict`),
+  acuerdo mínimo de nombre sin marca ni tamaño —al menos un token común y ≥1/3
+  de los tokens del lado más corto— (`sku_gtin_name_disagreement`) y, en
+  maquillaje/tinte, el mismo número de tono/modelo (`model_number_conflict`).
+  PriceSmart (Bloomreach) y Comisariato (material interno) no exponen barcode.
 - **GTIN restringidos GS1:** sólo forman identidad dentro de un maestro
   compartido (`walmart_cam` = Walmart + Paiz). En el corte 2026-09-21, las 315
   filas comparables TGU con GTIN restringido son Walmart+Paiz: 0 degradadas.
@@ -192,17 +195,20 @@ Medición (offline; el catálogo publicado sólo expone GTIN de filas comparable
 | Comparables publicados SPS / TGU | 7.1 % / 24.9 % | sin degradación por GTIN restringido; muestra de variante: 1 grupo SPS y 3 TGU de 246 con nombres visibles |
 | Falsos positivos confirmados en la muestra de 246 grupos | 2 | 0 |
 | Grupos Walmart+Paiz comparables (snapshots 2026-08-31/09-04) | 8,327 | 8,336 |
-| Colonial `sku`→GTIN (snapshots): grupos comparables / productos Colonial en ellos | 8,327 / 0 | 8,620 / 2,359 |
-| SPS estimado (Colonial+Walmart SPS sobre el corte 2026-09-21) | 7.1 % filas comparables; 0 % ofertas Colonial | ≈9.6 %; ≈23 % de ofertas Colonial |
+| Colonial `sku`→GTIN (snapshots): grupos comparables / productos Colonial en ellos | 8,327 / 0 | 8,579 / 2,100 |
+| SPS estimado (Colonial+Walmart SPS sobre el corte 2026-09-21) | 7.1 % filas comparables; 0 % ofertas Colonial | ≈9.3 %; ≈21 % de ofertas Colonial |
 
-Colonial: 2,153 grupos con Walmart SPS (926 nuevos, 1,227 amplían filas La
-Colonia+Walmart). Es cota inferior: no hay snapshot de La Colonia para medir
-Colonial+La Colonia sin Walmart. Spot-check de 2,359 grupos con Colonial: 30
-aleatorios correctos; en las colas (similitud baja, ratio de precio ≥2) quedan
-~6 sospechosos (p. ej. "D OLANCHO Chile Añejo" vs "Salsa Riberenas Picante
-Inglesa", "LOREAL Vol Blackest Black" vs "Lash Paradise", "EVENFLO Biberon
-Campestre" vs "Acuario"). Evidencia en el scratchpad de la sesión
-(`colonial_spotcheck.csv`).
+Colonial: 1,921 grupos con Walmart SPS (813 nuevos, 1,108 amplían filas La
+Colonia+Walmart). Es cota inferior: no hay snapshot de La Colonia. La guarda de
+nombre/modelo retiró 236 productos Colonial (de 2,359 a 2,123; 2,100 tras leer
+cantidades pegadas como "Sab550ml"). De la lista sospechosa del spot-check quedan
+excluidos L'Oréal Blackest Black, Diana Favori Criollo, D'Olancho Chile Añejo,
+Del Rancho Picosit y Maybelline Light 20; **Evenflo Campestre vs Acuario sigue
+agrupado**: excluirlo exige ≥0.51 de coincidencia y retiraría 285 grupos más,
+casi todos correctos. Muestras aleatorias: 27/30 de la anterior se conservan
+(se pierden Carozzi Espaghettini, Purina Beneful abreviado y Always Anti Bun) y
+en una nueva de 30 quedan 1-2 dudosos (Milpa Real tortilla maíz vs trigo, Pond's
+limpiadora vs pepino).
 
 ## Autoridad live y binding SPS
 
