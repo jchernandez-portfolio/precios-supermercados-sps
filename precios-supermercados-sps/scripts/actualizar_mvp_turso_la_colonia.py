@@ -203,6 +203,13 @@ def _mutation_steps(
     # incoming se materializa e indexa una sola vez. Dentro de la transacción se
     # materializa delta para no repetir la misma comparación current-vs-snapshot
     # en guardas, cierre y apertura de histórico.
+    #
+    # Optimización Turso (rows read): las guardas de cardinalidad usan
+    # `changes()` del INSERT inmediatamente anterior en vez de COUNT(*) sobre la
+    # tabla recién cargada (mismo valor, sin releer N filas), y la verificación
+    # final sólo busca en price_history los productos que cambiaron: los demás
+    # conservan el periodo current ya comparado en delta_load, porque close_history
+    # sólo toca `changed=1` dentro de la misma transacción.
     steps = [
         # Turso puede reutilizar la misma sesión Hrana aun después de `close`.
         # Limpiar staging residual evita que una segunda ubicación falle por
@@ -223,6 +230,11 @@ def _mutation_steps(
             (),
         ),
         (
+            "guard_table",
+            "CREATE TEMP TABLE guard_ok(value INTEGER NOT NULL CHECK(value=0)) STRICT",
+            (),
+        ),
+        (
             "incoming_load",
             """INSERT INTO incoming SELECT
                 json_extract(value,'$.source_key_type'),json_extract(value,'$.source_key'),
@@ -238,13 +250,9 @@ def _mutation_steps(
             (incoming,),
         ),
         (
-            "guard_table",
-            "CREATE TEMP TABLE guard_ok(value INTEGER NOT NULL CHECK(value=0)) STRICT",
-            (),
-        ),
-        (
+            # Debe ir inmediatamente después de incoming_load.
             "guard_incoming",
-            "INSERT INTO guard_ok SELECT CASE WHEN COUNT(*)=? THEN 0 ELSE 1 END FROM incoming",
+            "INSERT INTO guard_ok SELECT CASE WHEN changes()=? THEN 0 ELSE 1 END",
             (sku_count,),
         ),
         ("begin", "BEGIN IMMEDIATE", ()),
@@ -314,8 +322,9 @@ def _mutation_steps(
             (supermarket_id, supermarket_id, location_id),
         ),
         (
+            # Debe ir inmediatamente después de delta_load.
             "guard_delta",
-            "INSERT INTO guard_ok SELECT CASE WHEN COUNT(*)=? THEN 0 ELSE 1 END FROM delta",
+            "INSERT INTO guard_ok SELECT CASE WHEN changes()=? THEN 0 ELSE 1 END",
             (sku_count,),
         ),
         (
@@ -370,11 +379,12 @@ def _mutation_steps(
                 SELECT 1 FROM delta d
                 LEFT JOIN price_history ph ON ph.product_id=d.product_id
                  AND ph.supermarket_id=? AND ph.location_id=? AND ph.valid_to_utc IS NULL
-                WHERE ph.product_id IS NULL
+                WHERE d.changed=1 AND (
+                   ph.product_id IS NULL
                    OR ph.current_price_minor IS NOT d.current_price_minor
                    OR ph.reported_regular_price_minor IS NOT d.reported_regular_price_minor
                    OR ph.is_promotion IS NOT d.is_promotion
-                   OR ph.availability IS NOT d.availability
+                   OR ph.availability IS NOT d.availability)
                 ) THEN 1 ELSE 0 END""",
             (supermarket_id, location_id),
         ),

@@ -34,7 +34,7 @@ Auditoría estática del código (sin consultar Turso). Las cifras son estimacio
 
 Total estimado **25–35 M filas/día (~0,8–1 B/mes)** contra una cuota de 500 M/mes, coherente con el bloqueo del 22 de septiembre. El costo crece cada día porque `price_history` crece.
 
-Plan de optimización priorizado (pendiente de implementar):
+Plan de optimización priorizado (puntos 1–3 implementados y 4 parcialmente en la rama `rpi/turso`; ver [Optimización Turso](#optimización-turso-2026-09-30)):
 
 1. Paginar por comparación de tuplas o por contexto (`WHERE location_id = ? AND valid_to_utc IS NULL AND product_id > ?`), agregar `idx_price_history (location_id, product_id, valid_from_utc)` y no releer ofertas en TGU (ahorro ~20 M/día).
 2. Sacar `integrity_check`, `foreign_key_check` y `COUNT(*)` globales del camino diario: verificar sólo por `scrape_run_id`/contexto y mover las verificaciones completas a un workflow semanal o manual.
@@ -43,6 +43,26 @@ Plan de optimización priorizado (pendiente de implementar):
 5. Publicar desde artifacts del día y leer de Turso sólo el delta de historial.
 
 Con 1–4 la estimación baja a ~75–100 M/mes (15–20 % de la cuota).
+
+### Optimización Turso (2026-09-30)
+
+Cambios de la rama `rpi/turso` (sin cambiar resultados: los exportadores producen los mismos archivos byte a byte, cubierto por `tests/test_turso_rows_read_optimization.py`):
+
+- **Exportadores** (`exportar_consumer_catalog_core.py`, `exportar_modelo_analitico.py`): las ofertas current se paginan por contexto exacto (`supermarket_id=? AND location_id=? AND valid_to_utc IS NULL AND product_id>?`) sobre `idx_price_history_current` y se reordenan en Python por `(product_id, location_id)`; cada fila current se lee una vez. El histórico se pagina por contexto con `(product_id, valid_from_utc) > (?, ?)` sobre el índice nuevo `idx_ph_loc_hist`; si el índice aún no existe usa el keyset de fila `(product_id, location_id, valid_from_utc) > (?, ?, ?)` sobre la PK (una pasada lineal).
+- **Índice nuevo** `idx_ph_loc_hist ON price_history(location_id, product_id, valid_from_utc)`: definido junto al esquema (`generar_mvp_sqlite_la_colonia.HISTORY_INDEX_SQL`, fuera de `create_schema` para no alterar las huellas congeladas de Walmart/PriceSmart) y creado de forma idempotente por `migrar_mvp_paiz.py` (SQLite y Turso). Su creación en Turso lee `price_history` una sola vez.
+- **TGU** (`exportar_consumer_catalog_tgu.py`): reutiliza la misma lectura de ofertas para los conteos por contexto y para el export.
+- **Migración Paiz diaria** (`migrar_mvp_paiz.py --turso`): si el esquema, los contextos y el índice ya están aplicados es un no-op que sólo lee `sqlite_master` y las filas Paiz; los `COUNT(*)`, `integrity_check` y `foreign_key_check` quedan sólo para una migración estructural real.
+- **Workflow diario** (`la-colonia-mvp-update`): conserva como sanity check barato la confirmación de runs y los conteos current por contexto; los periodos abiertos duplicados globales, `foreign_key_check` e `integrity_check` pasaron al workflow semanal **`precios-supermercados-sps-turso-weekly-integrity.yml`** (domingo 04:23 Honduras + manual, `scripts/verificar_integridad_turso.py`, sólo lectura, secrets `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN`).
+- **Homologación** (`backfill_homologacion_turso.py`): ya no lee `price_history` ni corre `integrity_check`/`foreign_key_check` global; verifica FK sólo de `product_homologation_profiles`. El `--dry-run` remoto ya no corre en el refresco diario encadenado (`workflow_run`), sólo en ejecuciones manuales o por solicitud.
+- **Persistencia por SKU** (`actualizar_mvp_turso_la_colonia.py`, ya set-based): las guardas de cardinalidad usan `changes()` del INSERT anterior en vez de `COUNT(*)` sobre la tabla recién cargada y la verificación final sólo busca en `price_history` los productos que cambiaron (~3 de ~13 lecturas por SKU menos).
+
+Estimación: los exportadores pasan de leer ~páginas × filas del scope (cuadrático) a leer cada fila del scope una vez; en un sintético a escala (~35 k filas) el trabajo de la VM baja 4–5× con 2000 filas/página y crece con el número de páginas en producción. Las verificaciones globales diarias (≈4 M/día) y la mitad de la homologación (dry-run) desaparecen del ciclo diario.
+
+TODO (no implementado por riesgo semántico):
+
+- Homologación incremental real (sólo `product_id` cuyos datos fuente cambiaron, con bandera de corrida completa): `products` no tiene marca de modificación, así que hoy se releen `products` y perfiles completos (≈2×P filas/día, ya sin `price_history`).
+- Publicar desde los artifacts del día y leer de Turso sólo el delta de historial.
+- `fetch_products` de los exportadores sigue recorriendo `products` por PK (lineal) sin filtrar por cadena con índice.
 
 ## Frecuencia de actualización
 
@@ -54,7 +74,7 @@ La información se actualiza **una sola vez al día**:
 | Persistencia en Turso | 1 (sólo cuando todas las cadenas tienen handoff aceptado) |
 | Homologación + publicación RPI + `portfolio-data` | 1, encadenadas por `workflow_run`; los intentos fallidos sólo generan ejecuciones `skipped` |
 
-No existen otros crons de este proyecto que hagan scraping o lean Turso. Los crons `17 11` y `30 12` que aparecían en el monorepo pertenecen al proyecto Mundial 2026.
+Además, `precios-supermercados-sps-turso-weekly-integrity.yml` lee Turso una vez por semana (domingo 04:23 de Honduras, `23 10 * * 0`) para las verificaciones completas de integridad. No existen otros crons de este proyecto que hagan scraping o lean Turso. Los crons `17 11` y `30 12` que aparecían en el monorepo pertenecen al proyecto Mundial 2026.
 
 Evidencia del esquema de recuperación (#455 + #461 + #462): entre el **12 y el 21 de septiembre** hubo **10 cortes programados aceptados seguidos**. Sólo 3 pasaron en el primer intento; 6 necesitaron la primera recuperación y 1 la segunda. El mecanismo funciona, y a la vez muestra que el intento inicial falla con frecuencia por inestabilidad de las fuentes.
 
@@ -195,7 +215,7 @@ La publicación pública incluye Consumer Mart v2, Consumer Catalog v3 por ciuda
 - Ramas: sólo `main` y `portfolio-data`. El historial completo de ramas del monorepo permanece en `jchernandez-portfolio/Portafolio`.
 - Las referencias a `Jchernand3z19/Portafolio` (gates `github.repository`, OIDC de Cloudflare, URLs raw de `portfolio-data`, tests) se cambiaron a `jchernandez-portfolio/precios-supermercados-sps`.
 - **Pendiente para reanudar la operación en el repo nuevo:**
-  - volver a crear los secrets y environments (Turso, Cloudflare, BigQuery, Google Sheets, `la-colonia-live`, `cloudflare-probe`); GitHub no los copia entre repos;
+  - volver a crear los secrets; GitHub no los copia entre repos. Para la operación diaria sólo se necesitan **`TURSO_DATABASE_URL`** y **`TURSO_AUTH_TOKEN`** (también los usan la homologación, la publicación RPI y la integridad semanal). `CLOUDFLARE_PROBE_GATEWAY_URL` y `CLOUDFLARE_PROBE_OBSERVABILITY_TOKEN` (environment `cloudflare-probe`) son sólo para la sonda manual; el environment `la-colonia-live` es manual. Este proyecto **no** usa BigQuery ni Google Sheets: sus workflows (`*-bigquery-first-load.yml`, `*-google-sheets-storage.yml`) pertenecían a otro proyecto y se eliminaron;
   - actualizar en Cloudflare la confianza OIDC y redesplegar el Worker de `edge/cloudflare` con el nuevo nombre del repo;
   - habilitar notificaciones de Actions para este repo.
 - Hasta completar esos pasos, las corridas programadas del repo nuevo fallarán por falta de credenciales.
@@ -211,6 +231,6 @@ La publicación pública incluye Consumer Mart v2, Consumer Catalog v3 por ciuda
 ## Próximos pasos
 
 1. Configurar secrets/environments y Cloudflare en el repo nuevo.
-2. Reducir lecturas de Turso (plan de optimización) o ampliar el plan.
+2. Revisar y fusionar la [Optimización Turso](#optimización-turso-2026-09-30); tras el primer ciclo diario confirmar en Turso que existe `idx_ph_loc_hist` y vigilar las filas leídas del mes. Pendiente: homologación incremental.
 3. Con autorización explícita, diagnosticar y corregir el extractor de Colonial (`card_shape_invalid`).
 4. Revisar la homologación entre supermercados (cobertura de identidades comparables y prácticas de matching).

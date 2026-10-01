@@ -4,6 +4,14 @@
 No consulta supermercados. La carga usa una tabla staging permanente y sólo
 modifica la tabla derivada `product_homologation_profiles` después de validar
 cobertura completa.
+
+Optimización Turso (rows read): el refresco diario sólo lee `products`, los
+perfiles derivados y `scrape_runs`. Ya no ejecuta COUNT(*) sobre `price_history`,
+`PRAGMA integrity_check`, `foreign_key_check` global ni el GROUP BY de periodos
+abiertos duplicados: este job nunca escribe `price_history` y esas verificaciones
+de toda la base corren en el workflow semanal de integridad Turso. La integridad
+referencial de la tabla derivada se sigue comprobando con
+`pragma_foreign_key_check('product_homologation_profiles')`.
 """
 from __future__ import annotations
 
@@ -351,6 +359,11 @@ WHERE {TABLE_NAME}.profile_hash <> excluded.profile_hash
 
 
 
+# FK sólo de la tabla derivada: lee perfiles + búsquedas por PK en products,
+# nunca price_history.
+PROFILE_FK_CHECK_SQL = f"SELECT COUNT(*) FROM pragma_foreign_key_check('{TABLE_NAME}')"
+
+
 def _source_preflight(url: str, token: str) -> dict[str, int]:
     table_rows = _query(
         url,
@@ -361,7 +374,6 @@ def _source_preflight(url: str, token: str) -> dict[str, int]:
     target_exists = any(str(row[0]) == TABLE_NAME for row in table_rows)
     state = {
         "products": _scalar(url, token, "SELECT COUNT(*) FROM products"),
-        "price_history": _scalar(url, token, "SELECT COUNT(*) FROM price_history"),
         "scrape_runs": _scalar(url, token, "SELECT COUNT(*) FROM scrape_runs"),
         "profiles": (
             _scalar(url, token, f"SELECT COUNT(*) FROM {TABLE_NAME}")
@@ -369,14 +381,8 @@ def _source_preflight(url: str, token: str) -> dict[str, int]:
             else 0
         ),
     }
-    foreign_keys = _scalar(url, token, "SELECT COUNT(*) FROM pragma_foreign_key_check")
-    duplicate_current = _scalar(
-        url,
-        token,
-        "SELECT COUNT(*) FROM (SELECT product_id,location_id FROM price_history WHERE valid_to_utc IS NULL GROUP BY product_id,location_id HAVING COUNT(*)>1)",
-    )
-    integrity = _query(url, token, "PRAGMA integrity_check")
-    if foreign_keys != 0 or duplicate_current != 0 or integrity != [["ok"]]:
+    foreign_keys = _scalar(url, token, PROFILE_FK_CHECK_SQL) if target_exists else 0
+    if foreign_keys != 0:
         raise SnapshotError("homologation_source_preflight_integrity_failed")
     return state
 
@@ -384,7 +390,6 @@ def _source_preflight(url: str, token: str) -> dict[str, int]:
 def _preflight(url: str, token: str) -> dict[str, int]:
     return {
         "products": _scalar(url, token, "SELECT COUNT(*) FROM products"),
-        "price_history": _scalar(url, token, "SELECT COUNT(*) FROM price_history"),
         "scrape_runs": _scalar(url, token, "SELECT COUNT(*) FROM scrape_runs"),
         "profiles": _scalar(url, token, f"SELECT COUNT(*) FROM {TABLE_NAME}"),
     }
@@ -462,11 +467,10 @@ def _apply_stage(
         ("begin", "BEGIN IMMEDIATE", ()),
         ("guard_stage", f"INSERT INTO homologation_guard SELECT CASE WHEN COUNT(*)=? THEN 0 ELSE 1 END FROM {STAGE_TABLE}", (staged_expected,)),
         ("guard_products_before", "INSERT INTO homologation_guard SELECT CASE WHEN COUNT(*)=? THEN 0 ELSE 1 END FROM products", (before["products"],)),
-        ("guard_history_before", "INSERT INTO homologation_guard SELECT CASE WHEN COUNT(*)=? THEN 0 ELSE 1 END FROM price_history", (before["price_history"],)),
         ("guard_runs_before", "INSERT INTO homologation_guard SELECT CASE WHEN COUNT(*)=? THEN 0 ELSE 1 END FROM scrape_runs", (before["scrape_runs"],)),
         ("upsert_profiles", _TARGET_UPSERT, ()),
         ("guard_profile_count", f"INSERT INTO homologation_guard SELECT CASE WHEN COUNT(*)=? THEN 0 ELSE 1 END FROM {TABLE_NAME}", (profile_expected,)),
-        ("guard_fk", "INSERT INTO homologation_guard SELECT COUNT(*) FROM pragma_foreign_key_check", ()),
+        ("guard_fk", f"INSERT INTO homologation_guard {PROFILE_FK_CHECK_SQL}", ()),
         ("commit", "COMMIT", ()),
     ]
     _run_batch(url, token, steps)
@@ -476,20 +480,12 @@ def _postflight(url: str, token: str, before: dict[str, int], expected: int) -> 
     after = _preflight(url, token)
     if after["products"] != before["products"]:
         raise SnapshotError("homologation_products_mutated")
-    if after["price_history"] != before["price_history"]:
-        raise SnapshotError("homologation_price_history_mutated")
     if after["scrape_runs"] != before["scrape_runs"]:
         raise SnapshotError("homologation_scrape_runs_mutated")
     if after["profiles"] != expected:
         raise SnapshotError("homologation_profile_coverage_incomplete")
-    fk = _scalar(url, token, "SELECT COUNT(*) FROM pragma_foreign_key_check")
-    duplicate_current = _scalar(
-        url,
-        token,
-        "SELECT COUNT(*) FROM (SELECT product_id,location_id FROM price_history WHERE valid_to_utc IS NULL GROUP BY product_id,location_id HAVING COUNT(*)>1)",
-    )
-    integrity = _query(url, token, "PRAGMA integrity_check")
-    if fk != 0 or duplicate_current != 0 or integrity != [["ok"]]:
+    fk = _scalar(url, token, PROFILE_FK_CHECK_SQL)
+    if fk != 0:
         raise SnapshotError("homologation_postflight_integrity_failed")
     statuses = _query(
         url,
@@ -502,10 +498,9 @@ def _postflight(url: str, token: str, before: dict[str, int], expected: int) -> 
         "comparison_status": {str(status): int(count) for status, count in statuses},
         "classified_product_type": classified,
         "foreign_key_violations": fk,
-        "duplicate_open_periods": duplicate_current,
-        "integrity_check": "ok",
+        "foreign_key_check_scope": TABLE_NAME,
+        "database_integrity_check": "weekly_turso_integrity_workflow",
         "products_unchanged": True,
-        "price_history_unchanged": True,
         "scrape_runs_unchanged": True,
     }
 
@@ -566,7 +561,6 @@ def backfill_turso(
             "staging_written": False,
             "comparison_status": dict(sorted(status_counts.items())),
             "products_unchanged": True,
-            "price_history_unchanged": True,
             "scrape_runs_unchanged": True,
         }
 

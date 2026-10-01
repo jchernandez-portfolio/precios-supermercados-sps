@@ -1,0 +1,47 @@
+name: Precios SPS - Integridad semanal Turso
+
+# Chequeos que recorren toda la base Turso (integrity_check, foreign_key_check
+# global, periodos abiertos duplicados y COUNT(*) por tabla). Se movieron aquí
+# desde la actualización diaria para no consumir rows read cada día.
+
+on:
+  schedule:
+    - cron: "23 10 * * 0" # domingo 04:23 America/Tegucigalpa, después del ciclo diario
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: precios-sps-turso-weekly-integrity
+  cancel-in-progress: false
+
+jobs:
+  integrity:
+    if: ${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: precios-supermercados-sps
+    env:
+      PYTHONPATH: ${{ github.workspace }}/precios-supermercados-sps/src
+
+    steps:
+      - name: Descargar revisión inmutable
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Configurar Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Verificar integridad completa de Turso (sólo lectura)
+        shell: bash
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: python scripts/verificar_integridad_turso.py

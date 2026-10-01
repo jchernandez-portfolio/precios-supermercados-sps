@@ -134,6 +134,18 @@ def load_snapshot(path: Path) -> dict:
     return data
 
 
+# Índice de lectura histórica por contexto (Optimización Turso 2026-09-30).
+# No forma parte de `create_schema`: las migraciones Walmart/PriceSmart congelan
+# su huella del esquema base. Se aplica de forma idempotente desde
+# `migrar_mvp_paiz.py` (SQLite y Turso) igual que `idx_price_history_current`
+# se recrea en cada migración.
+HISTORY_INDEX_NAME = "idx_ph_loc_hist"
+HISTORY_INDEX_SQL = (
+    "CREATE INDEX IF NOT EXISTS idx_ph_loc_hist "
+    "ON price_history(location_id, product_id, valid_from_utc)"
+)
+
+
 def create_schema(con: sqlite3.Connection) -> None:
     con.executescript(
         """

@@ -156,53 +156,99 @@ def _scope_predicate(scope: ComparisonScope) -> tuple[str, tuple[object, ...]]:
     return " OR ".join(clauses), tuple(args)
 
 
+def scope_contexts(scope: object) -> tuple[tuple[str, str], ...]:
+    """Contextos ``(supermarket_id, location_id)`` únicos en el orden del scope."""
+    return tuple(dict.fromkeys((str(s), str(l)) for s, l in getattr(scope, "locations")))
+
+
+CURRENT_PAGE_SIZE = 2000
+
+
+def fetch_current_rows_by_location(
+    backend: QueryBackend,
+    scope: object,
+    *,
+    select_sql: str,
+    location_index: int,
+    invalid_code: str,
+    page_size: int,
+) -> list[tuple[object, ...]]:
+    """Lee filas current por contexto exacto y las devuelve en orden global.
+
+    Cada contexto se pagina con ``location_id=? AND product_id>?`` sobre
+    ``idx_price_history_current(location_id, product_id) WHERE valid_to_utc IS NULL``:
+    cada fila current del scope se lee una sola vez. El keyset histórico
+    ``product_id>? OR (product_id=? AND location_id>?)`` no es un rango indexable y
+    hacía que cada página volviera a recorrer el índice desde el inicio.
+
+    ``select_sql`` debe exponer ``h`` como alias de ``price_history`` y devolver
+    ``h.product_id`` en la columna 0. El resultado se ordena por
+    ``(product_id, location_id)`` para reproducir exactamente el orden anterior.
+    """
+    collected: list[tuple[object, ...]] = []
+    for supermarket_id, location_id in scope_contexts(scope):
+        cursor = -1
+        while True:
+            rows = backend.query(
+                f"""
+                {select_sql}
+                WHERE h.valid_to_utc IS NULL
+                  AND h.supermarket_id=? AND h.location_id=?
+                  AND h.product_id>?
+                ORDER BY h.product_id
+                LIMIT {int(page_size)}
+                """,
+                (supermarket_id, location_id, cursor),
+            )
+            if not rows:
+                break
+            for row in rows:
+                if type(row[0]) is not int or not isinstance(row[location_index], str):
+                    raise ExportError(invalid_code)
+            collected.extend(rows)
+            cursor = int(rows[-1][0])
+            if len(rows) < page_size:
+                break
+    collected.sort(key=lambda row: (row[0], row[location_index]))
+    return collected
+
+
 def fetch_current_observations(
     backend: QueryBackend,
     scope: ComparisonScope,
 ) -> tuple[CurrentPriceObservation, ...]:
-    predicate, scope_args = _scope_predicate(scope)
-    cursor_product = -1
-    cursor_location = ""
     result: list[CurrentPriceObservation] = []
     seen: set[tuple[str, str]] = set()
-    while True:
-        rows = backend.query(
-            f"""
-            SELECT h.product_id,h.supermarket_id,h.location_id,h.current_price_minor,h.availability
-            FROM price_history AS h
-            WHERE h.valid_to_utc IS NULL
-              AND ({predicate})
-              AND (h.product_id>? OR (h.product_id=? AND h.location_id>?))
-            ORDER BY h.product_id,h.location_id
-            LIMIT 2000
-            """,
-            (*scope_args, cursor_product, cursor_product, cursor_location),
-        )
-        if not rows:
-            break
-        for product_id, supermarket_id, location_id, current_price_minor, availability in rows:
-            if type(product_id) is not int or not isinstance(supermarket_id, str) or not isinstance(location_id, str):
-                raise ExportError("current_price_row_identity_invalid")
-            if current_price_minor is not None and type(current_price_minor) is not int:
-                raise ExportError("current_price_minor_invalid")
-            source_record_id = f"{supermarket_id}:{product_id}"
-            key = (source_record_id, location_id)
-            if key in seen:
-                raise ExportError("current_price_row_duplicate")
-            seen.add(key)
-            result.append(
-                CurrentPriceObservation(
-                    source_record_id=source_record_id,
-                    supermarket_id=supermarket_id,
-                    location_id=location_id,
-                    price_minor=current_price_minor,
-                    availability=availability if isinstance(availability, str) else None,
-                )
+    rows = fetch_current_rows_by_location(
+        backend,
+        scope,
+        select_sql=(
+            "SELECT h.product_id,h.supermarket_id,h.location_id,h.current_price_minor,h.availability\n"
+            "                FROM price_history AS h"
+        ),
+        location_index=2,
+        invalid_code="current_price_row_identity_invalid",
+        page_size=CURRENT_PAGE_SIZE,
+    )
+    for product_id, supermarket_id, location_id, current_price_minor, availability in rows:
+        if type(product_id) is not int or not isinstance(supermarket_id, str) or not isinstance(location_id, str):
+            raise ExportError("current_price_row_identity_invalid")
+        if current_price_minor is not None and type(current_price_minor) is not int:
+            raise ExportError("current_price_minor_invalid")
+        source_record_id = f"{supermarket_id}:{product_id}"
+        key = (source_record_id, location_id)
+        if key in seen:
+            raise ExportError("current_price_row_duplicate")
+        seen.add(key)
+        result.append(
+            CurrentPriceObservation(
+                source_record_id=source_record_id,
+                supermarket_id=supermarket_id,
+                location_id=location_id,
+                price_minor=current_price_minor,
+                availability=availability if isinstance(availability, str) else None,
             )
-        cursor_product = int(rows[-1][0])
-        cursor_location = str(rows[-1][2])
-        if len(rows) < 2000:
-            break
+        )
     return tuple(result)
 
 

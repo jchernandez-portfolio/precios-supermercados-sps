@@ -154,7 +154,10 @@ def _patch_base_for_tgu() -> None:
 
 
 def _context_counts(backend, scope) -> dict[tuple[str, str], int]:
-    offers = base.fetch_visible_offers(backend, scope)
+    return _context_counts_from_offers(base.fetch_visible_offers(backend, scope))
+
+
+def _context_counts_from_offers(offers: Iterable[base.VisibleOffer]) -> dict[tuple[str, str], int]:
     counts = {context: 0 for context in TGU_SCOPE}
     for offer in offers:
         context = (offer.supermarket_id, offer.location_id)
@@ -222,18 +225,33 @@ def export_tgu_catalog(
 ) -> dict[str, object]:
     _patch_base_for_tgu()
     scope = CityCatalogScope(TGU_SCOPE)
-    counts = _context_counts(backend, scope)
+    # Una sola lectura de ofertas current: los conteos por contexto y el export
+    # reutilizan exactamente la misma tupla en vez de releer Turso.
+    fetch_visible = base.fetch_visible_offers
+    offers = fetch_visible(backend, scope)
+    counts = _context_counts_from_offers(offers)
     if require_products and any(count <= 0 for count in counts.values()):
         missing = [f"{s}:{l}" for (s, l), count in counts.items() if count <= 0]
         raise ExportError(f"consumer_catalog_tgu_missing_context:{','.join(missing)}")
-    manifest = base.export_consumer_catalog(
-        backend,
-        scope,
-        output,
-        as_of_utc=as_of_utc,
-        freshness_window=freshness_window,
-        require_products=False,
-    )
+
+    def reuse_visible(current_backend, current_scope):
+        if current_backend is backend and current_scope is scope:
+            return offers
+        return fetch_visible(current_backend, current_scope)
+
+    base.fetch_visible_offers = reuse_visible
+    try:
+        manifest = base.export_consumer_catalog(
+            backend,
+            scope,
+            output,
+            as_of_utc=as_of_utc,
+            freshness_window=freshness_window,
+            require_products=False,
+        )
+    finally:
+        base.fetch_visible_offers = fetch_visible
+        base._core.fetch_visible_offers = fetch_visible
     return _rewrite_public_metadata(output, manifest, counts)
 
 
