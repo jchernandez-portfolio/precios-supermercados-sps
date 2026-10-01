@@ -22,7 +22,7 @@ def test_source_sample_preserves_identity_price_vendor_and_unknown_stock():
     assert rows[0]["current_price"] == "234.99"
     assert rows[0]["brand"] == "RMS"  # vendor fuente, no inferir marca desde nombre
     assert rows[0]["reference"] == "894700010144"
-    assert rows[0]["ean"] is None  # SKU numérico no demuestra barcode
+    assert rows[0]["ean"] == "894700010144"  # barcode null: SKU GS1 válido (aprobado 2026-10-01)
     assert all(row["availability"] == "unknown" for row in rows)
 
 

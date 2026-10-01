@@ -15,6 +15,7 @@ reemplaza el motor persistido hasta que una muestra real demuestre su precisión
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from decimal import Decimal, ROUND_HALF_UP
@@ -22,6 +23,11 @@ from difflib import SequenceMatcher
 from functools import lru_cache
 from typing import Iterable
 
+from .gtin_policy import (
+    SKU_DERIVED_GTIN_SUPERMARKETS,
+    restricted_circulation_reason,
+    restricted_gtin_master_partition,
+)
 from .identifiers import generate_gtin_product_id
 from .product_homologation import (
     ExactGtinGroup,
@@ -40,7 +46,7 @@ from .product_homologation import (
     resolve_presentation,
 )
 
-IDENTITY_NORMALIZATION_VERSION = "product-homologation-v2.3"
+IDENTITY_NORMALIZATION_VERSION = "product-homologation-v2.4"
 
 _GENERIC_BRANDS = frozenset(
     {
@@ -104,8 +110,14 @@ _FRACTION_WITH_UNIT_RE = re.compile(
     r"(?=\s*(?:mg|kg|grs?|gramos?|g|lbs?|libras?|oz|onzas?|ml|lts?|litros?|l)(?!\w))",
     re.IGNORECASE,
 )
+# Envases contables que, seguidos de "de/x <cantidad>", declaran la cantidad por
+# envase: "12 latas de 355 ml", "6 botellas x 600 ml", "10 sobres de 25 g".
+_CONTAINER_ALIASES = (
+    r"latas?|botellas?|botellitas?|bolsitas?|sobres?|sachets?|cajitas?|vasitos?|"
+    r"tarritos?|frascos?|barras?"
+)
 _NATURAL_MULTIPACK_RE = re.compile(
-    rf"(?<!\w)(?P<count>\d{{1,3}})\s*(?:{_COUNT_ALIASES})\s*"
+    rf"(?<!\w)(?P<count>\d{{1,3}})\s*(?:{_COUNT_ALIASES}|{_CONTAINER_ALIASES})\s*"
     r"(?:de|x)\s*(?P<amount>\d+(?:[.,]\d+)?)\s*"
     r"(?P<unit>mg|kg|grs?|gramos?|g|lbs?|libras?|oz|onzas?|ml|lts?|litros?|l)(?!\w)",
     re.IGNORECASE,
@@ -115,6 +127,34 @@ _COMPACT_SLASH_MULTIPACK_RE = re.compile(
     r"(?P<unit>mg|kg|grs?|gramos?|g|lbs?|libras?|oz|onzas?|ml|lts?|litros?|l)(?!\w)",
     re.IGNORECASE,
 )
+
+# Combos, kits y promociones multi-producto no son comparables con el producto
+# individual. Se detectan sobre el nombre fuente sin plegar porque "+" importa.
+_BUNDLE_TERMS_RE = re.compile(
+    r"(?<!\w)(?:combo|combos|kit|gratis|obsequio|incluye|incluyen)(?!\w)",
+    re.IGNORECASE,
+)
+_PROMO_MULTIBUY_RE = re.compile(r"(?<![\w/.,])(?P<take>[2-4])\s*[x×]\s*(?P<pay>[1-3])(?![\w/.,])", re.IGNORECASE)
+_QUANTITY_PLUS_RE = re.compile(
+    r"\d+(?:[.,]\d+)?\s*(?:mg|kg|grs?|gramos?|g|lbs?|libras?|oz|onzas?|ml|lts?|litros?|l|%)\s*\+"
+    r"|(?<=\s)\+\s*\d+(?:[.,]\d+)?\s*(?:mg|kg|grs?|gramos?|g|lbs?|libras?|oz|onzas?|ml|lts?|litros?|l|%)(?!\w)",
+    re.IGNORECASE,
+)
+
+
+def is_bundle_name(name: str | None) -> bool:
+    """Combo/kit/promoción multi-producto declarado en el nombre fuente."""
+
+    if not name:
+        return False
+    text = unicodedata.normalize("NFKC", name)
+    if _BUNDLE_TERMS_RE.search(text) or _QUANTITY_PLUS_RE.search(text):
+        return True
+    return any(
+        int(match.group("take")) > int(match.group("pay"))
+        for match in _PROMO_MULTIBUY_RE.finditer(text)
+    )
+
 
 _EGG_FALSE_CONTEXT = frozenset(
     {"tallarin", "tallarines", "fideo", "fideos", "mayonesa", "kinder", "toro"}
@@ -128,6 +168,8 @@ _VARIANT_GROUPS = (
     frozenset({"descremada", "descremado"}),
     frozenset({"semidescremada", "semidescremado"}),
 )
+# Índices de _VARIANT_GROUPS que son una formulación distinta de la estándar.
+_NON_DEFAULT_FORMULATION_GROUPS = frozenset({1, 2})
 _FLAVOR_ALIASES = {
     "apple": "manzana",
     "arandano": "arándano",
@@ -637,7 +679,9 @@ def _normalize_parser_text(
 ) -> str | None:
     if value is None:
         return None
-    text = " ".join(value.split())
+    # "ShampAguac&Sab550ml" → "ShampAguac&Sab 550ml": sin esto la cantidad pegada
+    # a una palabra (frecuente en Colonial) no se reconoce como presentación.
+    text = " ".join(_GLUED_LETTERS_DIGIT_RE.sub(" ", value).split())
     text = _FRACTION_WITH_UNIT_RE.sub(_replace_fraction_with_unit, text)
     text = _NATURAL_MULTIPACK_RE.sub(_replace_natural_multipack, text)
     text = _COMPACT_SLASH_MULTIPACK_RE.sub(_replace_natural_multipack, text)
@@ -764,9 +808,82 @@ def _name_similarity(left: ProductProfile, right: ProductProfile) -> Decimal:
     return (jaccard * Decimal("0.6") + sequence * Decimal("0.4")).quantize(Decimal("0.0001"))
 
 
+# Palabras pegadas de catálogos abreviados (Colonial): "AlmendVainiSinAzucar946ml"
+# → "Almend Vaini Sin Azucar 946 ml". Idea portada de la estandarización del
+# motor probabilístico (rama rpi/homolog-engine), sin compartir módulo.
+_GLUED_CAMEL_RE = re.compile(r"(?<=[a-záéíóúñü])(?=[A-ZÁÉÍÓÚÑÜ])")
+_GLUED_LETTERS_DIGIT_RE = re.compile(r"(?<=[A-Za-záéíóúñÁÉÍÓÚÑ]{3})(?=\d)")
+_GLUED_DIGIT_LETTERS_RE = re.compile(r"(?<=\d)(?=[A-Za-záéíóúñÁÉÍÓÚÑ]{2})")
+
+# Abreviaturas observadas en nombres Colonial cuyo GTIN coincide con Walmart/Paiz
+# (captura 2026-08-30). Sólo se usan para detectar variantes declaradas; cada
+# entrada expande un token completo, nunca un prefijo libre.
+NAME_ABBREVIATIONS: dict[str, str] = {
+    "arand": "arandano",
+    "arandan": "arandano",
+    "bana": "banano",
+    "banan": "banano",
+    "blueb": "blueberry",
+    "bluebery": "blueberry",
+    "camar": "camaron",
+    "choc": "chocolate",
+    "choco": "chocolate",
+    "chocol": "chocolate",
+    "fres": "fresa",
+    "lavan": "lavanda",
+    "ligth": "light",
+    "limo": "limon",
+    "manz": "manzana",
+    "mazana": "manzana",
+    "meloc": "melocoton",
+    "meloct": "melocoton",
+    "meloctn": "melocoton",
+    "naran": "naranja",
+    "naranj": "naranja",
+    "rasberry": "raspberry",
+    "stranwberry": "strawberry",
+    "strawb": "strawberry",
+    "vain": "vainilla",
+    "vaini": "vainilla",
+    "vainil": "vainilla",
+    "vainila": "vainilla",
+    "vanila": "vainilla",
+    "watermelo": "watermelon",
+    "zanah": "zanahoria",
+    "zanaho": "zanahoria",
+}
+# Frases (ya plegadas) equivalentes a "sin azucar": "S/Azu", "Sugar Free", "Unsw".
+NAME_PHRASE_ABBREVIATIONS: dict[str, str] = {
+    "s azu": "sin azucar",
+    "s azuc": "sin azucar",
+    "s azucar": "sin azucar",
+    "sugar free": "sin azucar",
+    "no sugar": "sin azucar",
+    "unsw": "sin azucar",
+    "unsweetened": "sin azucar",
+}
+
+
+def split_glued_words(name: str) -> str:
+    text = _GLUED_CAMEL_RE.sub(" ", name)
+    text = _GLUED_LETTERS_DIGIT_RE.sub(" ", text)
+    return _GLUED_DIGIT_LETTERS_RE.sub(" ", text)
+
+
+def normalize_variant_text(name: str | None) -> str:
+    """Texto plegado para detectar variantes, con palabras pegadas y abreviaturas."""
+
+    text = fold_text(split_glued_words(name or "")) or ""
+    for phrase, expansion in NAME_PHRASE_ABBREVIATIONS.items():
+        text = re.sub(rf"(?<!\w){re.escape(phrase)}(?!\w)", expansion, text)
+    return " ".join(NAME_ABBREVIATIONS.get(token, token) for token in text.split())
+
+
 @lru_cache(maxsize=131_072)
 def _variant_labels(profile: ProductProfile) -> frozenset[str]:
-    text = fold_text(profile.record.source_name) or ""
+    text = normalize_variant_text(profile.record.source_name)
+    # "Zero Alcohol" (enjuague bucal) no es la formulación "zero" sin azúcar.
+    text = re.sub(r"(?<!\w)zero\s+alcohol(?!\w)", "sin_alcohol", text)
     labels: set[str] = set()
     for group in _VARIANT_GROUPS:
         for label in group:
@@ -785,6 +902,8 @@ def _variant_labels(profile: ProductProfile) -> frozenset[str]:
         for alias, canonical in aliases.items():
             if _phrase_present(text, alias):
                 labels.add(f"{attribute}:{canonical}")
+    if is_bundle_name(profile.record.source_name):
+        labels.add("bundle:declared")
     egg_size = canonical_egg_size(profile.record, profile.taxonomy)
     if egg_size is not None:
         labels.add(f"egg_size:{fold_text(egg_size)}")
@@ -830,6 +949,8 @@ def _hard_conflicts(left: ProductProfile, right: ProductProfile) -> tuple[str, .
 
     left_labels = _variant_labels(left)
     right_labels = _variant_labels(right)
+    if ("bundle:declared" in left_labels) != ("bundle:declared" in right_labels):
+        conflicts.add("bundle_vs_single_conflict")
     left_sizes = {item for item in left_labels if item.startswith("egg_size:")}
     right_sizes = {item for item in right_labels if item.startswith("egg_size:")}
     if left_sizes and right_sizes and left_sizes != right_sizes:
@@ -875,6 +996,45 @@ def _hard_conflicts(left: ProductProfile, right: ProductProfile) -> tuple[str, .
     right_group = formulation_group(right_labels)
     if left_group is not None and right_group is not None and left_group != right_group:
         conflicts.add("variant_conflict")
+    return tuple(sorted(conflicts))
+
+
+def _formulation_group(labels: frozenset[str]) -> int | None:
+    for index, group in enumerate(_VARIANT_GROUPS):
+        if any(label in labels for label in group):
+            return index
+    return None
+
+
+def one_sided_variant_conflicts(left: ProductProfile, right: ProductProfile) -> tuple[str, ...]:
+    """Variante declarada sólo por un lado; bloquea identidad automática.
+
+    Un sabor/aroma ("fresa", "lavanda", "pollo") o una formulación no estándar
+    ("zero", "sin azúcar", "light", "diet") presente en un nombre y ausente en el
+    otro no se presume equivalente aunque compartan GTIN. Para candidatos sin GTIN
+    no es un conflicto duro: siguen como revisión y nunca reciben STRONG.
+    """
+
+    left_labels = _variant_labels(left)
+    right_labels = _variant_labels(right)
+    conflicts: set[str] = set()
+    # El sustantivo del tipo no es una variante: "Chocolate Ferrero Rocher" no
+    # declara sabor chocolate frente a "FERRERO ROCHER Chocolates".
+    type_nouns = {
+        f"flavor:{fold_text(profile.taxonomy.product_type)}"
+        for profile in (left, right)
+        if profile.taxonomy.product_type is not None
+    }
+    left_flavors = any(item.startswith("flavor:") and item not in type_nouns for item in left_labels)
+    right_flavors = any(item.startswith("flavor:") and item not in type_nouns for item in right_labels)
+    if left_flavors != right_flavors:
+        conflicts.add("one_sided_flavor_declared")
+    left_group = _formulation_group(left_labels)
+    right_group = _formulation_group(right_labels)
+    if (left_group in _NON_DEFAULT_FORMULATION_GROUPS and right_group is None) or (
+        right_group in _NON_DEFAULT_FORMULATION_GROUPS and left_group is None
+    ):
+        conflicts.add("one_sided_variant_declared")
     return tuple(sorted(conflicts))
 
 
@@ -963,6 +1123,270 @@ def profile_product_v2(
     return replace(provisional, matching_tokens=_matching_tokens(provisional))
 
 
+_GTIN_PAIR_IGNORED_REASONS = frozenset({"brand_conflict", "different_valid_gtin", "presentation_missing"})
+
+
+def _gtin_pair_conflicts(left: ProductProfile, right: ProductProfile) -> set[str]:
+    """Conflictos materiales entre dos miembros de cadenas distintas con igual GTIN."""
+
+    reasons: set[str] = set(one_sided_variant_conflicts(left, right))
+    sku_derived = (
+        left.record.supermarket_id in SKU_DERIVED_GTIN_SUPERMARKETS
+        or right.record.supermarket_id in SKU_DERIVED_GTIN_SUPERMARKETS
+    )
+    for reason in _hard_conflicts(left, right):
+        if reason == "presentation_conflict":
+            reasons.add("cross_source_presentation_conflict")
+        elif reason == "brand_conflict" and sku_derived and _sku_gtin_brand_contradiction(left, right):
+            # Un GTIN derivado de SKU no basta frente a una marca contradictoria.
+            reasons.add("sku_gtin_brand_conflict")
+        elif reason not in _GTIN_PAIR_IGNORED_REASONS:
+            reasons.add(reason)
+    if sku_derived:
+        if not sku_gtin_name_agreement(left, right):
+            reasons.add("sku_gtin_name_disagreement")
+        if _model_number_conflict(left, right):
+            reasons.add("model_number_conflict")
+    return reasons
+
+
+# --- Acuerdo mínimo de nombre para GTIN derivados de SKU (Colonial) -----------
+# Un SKU GS1 válido puede ser el código equivocado. Calibración 2026-10-01 sobre
+# los 2,359 grupos Colonial: exigir al menos un token significativo común y que
+# coincida al menos 1/3 de los tokens del lado más corto excluye "LOREAL Vol
+# Blackest Black" vs "Lash Paradise", "DIANA Favori Mix Criollo" vs "Chicharrón
+# con yuca", "D OLANCHO Chile Añejo" vs "Salsa Riberenas" y "DEL RANCHO
+# Chicharron Picosit" vs "Boquita Chicharrón Picante" (234 grupos, ~10%).
+SKU_NAME_MIN_OVERLAP = Decimal("0.34")
+_NAME_AGREEMENT_STOPWORDS = frozenset(
+    {
+        "a", "al", "and", "bandeja", "bolsa", "bote", "botella", "c", "caja", "cja", "con",
+        "cong", "ct", "de", "del", "doypack", "e", "ea", "el", "en", "frasco", "g", "gr",
+        "gramos", "grms", "grs", "indicado", "kg", "l", "la", "las", "lata", "lb", "lbs",
+        "los", "lt", "lts", "ltrs", "marca", "mas", "mg", "ml", "new", "nuevo", "o", "of",
+        "onz", "oz", "p", "pack", "paquete", "para", "pet", "piezas", "pk", "plus", "por",
+        "precio", "presentacion", "pz", "pzas", "pzs", "s", "sabor", "sin", "sobre", "the",
+        "tipo", "u", "ud", "uds", "un", "und", "unid", "unidad", "unidades", "vidrio",
+        "with", "x", "y",
+    }
+)
+# Traducciones inglés→español observadas en nombres Colonial frente a Walmart/Paiz.
+_NAME_AGREEMENT_TRANSLATIONS = {
+    "almond": "almendra", "almonds": "almendra", "beef": "carne", "black": "negro",
+    "bread": "pan", "cheese": "queso", "chicken": "pollo", "coffee": "cafe",
+    "cookie": "galleta", "cookies": "galleta", "corn": "maiz", "cream": "crema",
+    "dientes": "dental", "grape": "uva", "green": "verde", "honey": "miel",
+    "juice": "jugo", "milk": "leche", "oil": "aceite", "olive": "oliva",
+    "onion": "cebolla", "red": "rojo", "rice": "arroz", "sauce": "salsa",
+    "soap": "jabon", "sugar": "azucar", "tea": "te", "water": "agua", "white": "blanco",
+}
+
+
+def _agreement_tokens(name: str, brand_tokens: frozenset[str]) -> list[str]:
+    tokens: list[str] = []
+    for token in normalize_variant_text(name).split():
+        if (
+            len(token) < 3
+            or token in _NAME_AGREEMENT_STOPWORDS
+            or token in brand_tokens
+            or any(character.isdigit() for character in token)
+        ):
+            continue
+        token = _NAME_AGREEMENT_TRANSLATIONS.get(token, token)
+        token = fold_text(_FLAVOR_ALIASES.get(token, token)) or token
+        if token not in tokens:
+            tokens.append(token)
+    return tokens
+
+
+def _agreement_token_match(left: str, right: str) -> bool:
+    """Igualdad tolerante a abreviaturas: prefijo común o alta similitud."""
+
+    if left == right:
+        return True
+    common = 0
+    for a, b in zip(left, right):
+        if a != b:
+            break
+        common += 1
+    shorter = min(len(left), len(right))
+    if common >= 3 and (common == shorter or common >= 4):
+        return True
+    return shorter >= 5 and SequenceMatcher(None, left, right).ratio() >= 0.8
+
+
+def sku_gtin_name_agreement(left: ProductProfile, right: ProductProfile) -> bool:
+    """Acuerdo mínimo de nombre sin marca ni tamaño (sólo GTIN derivado de SKU)."""
+
+    brand_tokens: set[str] = set()
+    for value in (
+        left.normalized_brand,
+        right.normalized_brand,
+        left.record.source_brand,
+        right.record.source_brand,
+    ):
+        folded = fold_text(value)
+        if folded:
+            brand_tokens.update(folded.split())
+            brand_tokens.add(folded.replace(" ", ""))
+    frozen = frozenset(brand_tokens)
+    left_tokens = _agreement_tokens(left.record.source_name, frozen)
+    right_tokens = _agreement_tokens(right.record.source_name, frozen)
+    if not left_tokens or not right_tokens:
+        return False
+    used: set[int] = set()
+    matched = 0
+    for token in left_tokens:
+        for index, other in enumerate(right_tokens):
+            if index not in used and _agreement_token_match(token, other):
+                used.add(index)
+                matched += 1
+                break
+    if matched == 0:
+        return False
+    return Decimal(matched) / Decimal(min(len(left_tokens), len(right_tokens))) >= SKU_NAME_MIN_OVERLAP
+
+
+# Cosméticos: un número de tono/modelo distinto ("Light 20" vs "Light Honey 120")
+# es otro artículo. Sólo se aplica cuando el nombre es de maquillaje/color.
+_COSMETIC_TERMS = frozenset(
+    {
+        "base", "corrector", "delineador", "esmalte", "labial", "lipstick", "maquillaje",
+        "mascara", "polvo", "rimel", "rubor", "sombra", "tono",
+    }
+)
+_MODEL_NUMBER_RE = re.compile(
+    r"(?<![\w.,/])#?\s*(?P<number>\d{1,4})(?![\d.,/])"
+    r"(?!\s*(?:%|x|mg|kg|grs?|g|ml|lts?|l|oz|onz|lbs?|un|und|unds|uds|ud|u|unid|unidades|pz|pzs|piezas|ct|s|spf|fps)(?![a-z]))",
+    re.IGNORECASE,
+)
+
+
+def _model_numbers(profile: ProductProfile) -> frozenset[str]:
+    return frozenset(
+        match.group("number").lstrip("0") or "0"
+        for match in _MODEL_NUMBER_RE.finditer(split_glued_words(profile.record.source_name))
+    )
+
+
+def _model_number_conflict(left: ProductProfile, right: ProductProfile) -> bool:
+    words = set(normalize_variant_text(left.record.source_name).split()) | set(
+        normalize_variant_text(right.record.source_name).split()
+    )
+    if not words & _COSMETIC_TERMS and "Tinte para cabello" not in {
+        left.taxonomy.product_type,
+        right.taxonomy.product_type,
+    }:
+        return False
+    left_numbers = _model_numbers(left)
+    right_numbers = _model_numbers(right)
+    return bool(left_numbers and right_numbers and not left_numbers & right_numbers)
+
+
+def _squashed(value: str | None) -> str:
+    return (fold_text(value) or "").replace(" ", "")
+
+
+def _sku_gtin_brand_contradiction(left: ProductProfile, right: ProductProfile) -> bool:
+    """Contradicción de marca suficiente para invalidar un GTIN derivado de SKU.
+
+    La marca resuelta mezcla fabricante y línea ("Frito Lay" vs "Cheetos",
+    "Hormel" vs "Spam") y errores tipográficos ("Marisela" vs "Marinela"). Sólo
+    hay contradicción cuando ninguna marca aparece en el nombre del otro lado, no
+    comparten las primeras cuatro letras y su similitud es baja.
+    """
+
+    left_brand = _squashed(left.normalized_brand)
+    right_brand = _squashed(right.normalized_brand)
+    if not left_brand or not right_brand or left_brand == right_brand:
+        return False
+    if left_brand in _squashed(right.record.source_name) or right_brand in _squashed(left.record.source_name):
+        return False
+    if left_brand[:4] == right_brand[:4]:
+        return False
+    return SequenceMatcher(None, left_brand, right_brand).ratio() < 0.75
+
+
+def _member_intrinsic_conflicts(member: ProductProfile) -> set[str]:
+    reasons: set[str] = set()
+    if member.presentation_status == "conflict":
+        reasons.add("source_presentation_conflict")
+    if member.presentation_status == "ambiguous_multipack":
+        reasons.add("ambiguous_multipack_presentation")
+    return reasons
+
+
+def _resolve_gtin_members(
+    gtin: str,
+    members: list[ProductProfile],
+) -> tuple[list[ProductProfile], dict[str, set[str]], set[str]]:
+    """Separa miembros comparables de los que tienen un conflicto atribuible.
+
+    Orden fail-closed: (1) GTIN restringido fuera del maestro compartido, (2)
+    colisión por cadena (se excluyen todos los registros de esa cadena: no se
+    elige uno), (3) conflicto intrínseco del miembro, (4) conflictos por pareja.
+    En (4) se retiran, en rondas, todos los miembros con el mayor número de
+    conflictos; un empate retira a todos los empatados, porque la evidencia no
+    permite atribuir el error a uno solo. Devuelve (restantes, excluidos, motivos
+    de grupo cuando no es posible conservar un núcleo).
+    """
+
+    excluded: dict[str, set[str]] = {}
+    group_reasons: set[str] = set()
+
+    def exclude(member: ProductProfile, reasons: Iterable[str]) -> None:
+        excluded.setdefault(member.record.source_record_id, set()).update(reasons)
+
+    remaining = list(members)
+    if restricted_circulation_reason(gtin) is not None:
+        allowed, _ = restricted_gtin_master_partition(
+            member.record.supermarket_id for member in remaining
+        )
+        for member in remaining:
+            if allowed is None or member.record.supermarket_id not in allowed:
+                exclude(member, ("restricted_gtin_outside_shared_master",))
+        remaining = [member for member in remaining if member.record.source_record_id not in excluded]
+
+    per_retailer: dict[str, int] = defaultdict(int)
+    for member in remaining:
+        per_retailer[member.record.supermarket_id] += 1
+    for member in remaining:
+        if per_retailer[member.record.supermarket_id] > 1:
+            exclude(member, ("retailer_collision",))
+    remaining = [member for member in remaining if member.record.source_record_id not in excluded]
+
+    for member in remaining:
+        intrinsic = _member_intrinsic_conflicts(member)
+        if intrinsic:
+            exclude(member, intrinsic)
+    remaining = [member for member in remaining if member.record.source_record_id not in excluded]
+
+    while True:
+        degree: dict[str, int] = defaultdict(int)
+        pair_reasons: dict[str, set[str]] = defaultdict(set)
+        for index, left in enumerate(remaining):
+            for right in remaining[index + 1 :]:
+                reasons = _gtin_pair_conflicts(left, right)
+                if not reasons:
+                    continue
+                for member in (left, right):
+                    degree[member.record.source_record_id] += 1
+                    pair_reasons[member.record.source_record_id].update(reasons)
+        if not degree:
+            break
+        highest = max(degree.values())
+        for member in remaining:
+            source_id = member.record.source_record_id
+            if degree.get(source_id) == highest:
+                exclude(member, pair_reasons[source_id])
+        remaining = [member for member in remaining if member.record.source_record_id not in excluded]
+
+    if len({member.record.supermarket_id for member in remaining}) < 2:
+        for reasons in excluded.values():
+            group_reasons.update(reasons)
+    return remaining, excluded, group_reasons
+
+
 def _exact_groups(profiles: tuple[ProductProfile, ...]) -> tuple[ExactGtinGroup, ...]:
     index: dict[str, list[ProductProfile]] = defaultdict(list)
     for profile in profiles:
@@ -973,40 +1397,32 @@ def _exact_groups(profiles: tuple[ProductProfile, ...]) -> tuple[ExactGtinGroup,
         supermarkets = sorted({member.record.supermarket_id for member in members})
         if len(supermarkets) < 2:
             continue
-        conflicts: set[str] = set()
-        if any(member.presentation_status == "conflict" for member in members):
-            conflicts.add("source_presentation_conflict")
-        if any(member.presentation_status == "ambiguous_multipack" for member in members):
-            conflicts.add("ambiguous_multipack_presentation")
-        types = {
-            member.taxonomy.product_type
-            for member in members
-            if member.taxonomy.product_type is not None
-        }
-        if len(types) > 1:
-            conflicts.add("product_type_conflict")
-        for idx, left in enumerate(members):
-            for right in members[idx + 1 :]:
-                if left.record.supermarket_id == right.record.supermarket_id:
-                    continue
-                pair_conflicts = _hard_conflicts(left, right)
-                for reason in pair_conflicts:
-                    if reason == "presentation_conflict":
-                        conflicts.add("cross_source_presentation_conflict")
-                    elif reason not in {
-                        "brand_conflict",
-                        "different_valid_gtin",
-                        "presentation_missing",
-                    }:
-                        conflicts.add(reason)
+        remaining, excluded, group_reasons = _resolve_gtin_members(gtin, members)
+        remaining_supermarkets = sorted({member.record.supermarket_id for member in remaining})
+        if len(remaining_supermarkets) >= 2:
+            groups.append(
+                ExactGtinGroup(
+                    canonical_gtin=gtin,
+                    canonical_product_id=generate_gtin_product_id(gtin),
+                    source_record_ids=tuple(member.record.source_record_id for member in remaining),
+                    supermarket_ids=tuple(remaining_supermarkets),
+                    comparison_status="ready",
+                    conflict_reasons=(),
+                    excluded_members=tuple(
+                        (source_id, tuple(sorted(reasons)))
+                        for source_id, reasons in sorted(excluded.items())
+                    ),
+                )
+            )
+            continue
         groups.append(
             ExactGtinGroup(
                 canonical_gtin=gtin,
                 canonical_product_id=generate_gtin_product_id(gtin),
                 source_record_ids=tuple(member.record.source_record_id for member in members),
                 supermarket_ids=tuple(supermarkets),
-                comparison_status="review_required" if conflicts else "ready",
-                conflict_reasons=tuple(sorted(conflicts)),
+                comparison_status="review_required",
+                conflict_reasons=tuple(sorted(group_reasons)),
             )
         )
     return tuple(groups)

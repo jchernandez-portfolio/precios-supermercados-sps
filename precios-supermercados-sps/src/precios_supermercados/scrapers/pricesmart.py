@@ -127,6 +127,10 @@ def parse_documents(documents: list[dict], club: str) -> tuple[list[dict], dict[
                 "source_name": title.strip(),
                 "brand": brand or None,
                 "reference": sku,
+                # Bloomreach no expone barcode/GTIN/UPC en los campos `fl` usados ni en
+                # las fixtures. Las variantes `<pid>-<13 dígitos>` superan el check digit
+                # GS1, pero son SKU fuente y en la captura completa 2026-09-02 no
+                # coinciden con ningún GTIN de Walmart/Paiz/Colonial: no se reinterpretan.
                 "ean": None,
                 "category": CATEGORY_NAME,
                 "presentation": None,

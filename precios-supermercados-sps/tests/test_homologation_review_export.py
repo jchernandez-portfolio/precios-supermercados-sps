@@ -106,7 +106,7 @@ def test_review_v2_exposes_raw_canonical_fields_and_before_after_metrics() -> No
     )
 
     assert queue["before_after"]["before_engine"] == "product-homologation-v1"
-    assert queue["before_after"]["after_engine"] == "product-homologation-v2.3"
+    assert queue["before_after"]["after_engine"] == "product-homologation-v2.4"
     assert "normalized_brand" in queue["before_after"]["before"]
     assert "normalized_brand" in queue["before_after"]["after"]
     candidate = queue["review_candidates"]["rows"][0]

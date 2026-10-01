@@ -178,6 +178,25 @@ def build_review_queue(
 
     exact_conflicts = []
     for group in result.exact_gtin_groups:
+        if group.excluded_members:
+            exact_conflicts.append(
+                {
+                    "canonical_gtin": group.canonical_gtin,
+                    "canonical_product_id": group.canonical_product_id,
+                    "conflict_reasons": sorted(
+                        {reason for _, reasons in group.excluded_members for reason in reasons}
+                    ),
+                    "products": [
+                        {
+                            **_product_payload(profiles[source_id]),
+                            "excluded_reasons": list(reasons),
+                        }
+                        for source_id, reasons in group.excluded_members
+                    ],
+                    "ready_members": list(group.source_record_ids),
+                    "recommended_action": "verify_member_excluded_from_ready_gtin_group",
+                }
+            )
         if group.comparison_status != "review_required":
             continue
         exact_conflicts.append(
@@ -235,6 +254,7 @@ def build_review_queue(
         "without_valid_gtin": without_gtin,
         "exact_gtin_groups_ready": ready_groups,
         "exact_gtin_groups_needing_review": review_groups,
+        "exact_gtin_members_excluded": sum(len(group.excluded_members) for group in result.exact_gtin_groups),
         "review_candidates_total": len(result.candidates),
         "fuzzy_review_candidates_total": len(result.candidates),
         "taxonomy_gaps_total": len(gaps),

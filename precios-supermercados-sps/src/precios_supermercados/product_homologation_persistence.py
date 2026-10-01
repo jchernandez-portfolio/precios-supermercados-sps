@@ -205,6 +205,13 @@ def build_homologation_rows(
                 group.comparison_status,
                 group.conflict_reasons,
             )
+        # Un miembro excluido no bloquea al resto del grupo: queda en revisión
+        # con sus motivos y nunca entra al grupo comparable de su GTIN.
+        for source_record_id, reasons in group.excluded_members:
+            group_by_source[source_record_id] = (
+                "review_required",
+                tuple(sorted({"member_excluded_from_ready_group", *reasons})),
+            )
 
     rows: list[ProductHomologationRow] = []
     for product_id, record in sorted(entries, key=lambda item: item[0]):

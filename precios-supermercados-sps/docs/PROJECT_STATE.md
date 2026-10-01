@@ -175,6 +175,61 @@ Avances posteriores al 2026-09-10:
 
 La cola privada de revisión (#460) materializa, bajo ejecución manual y read-only, candidatos fuzzy `review_required`, conflictos entre registros con el mismo GTIN y productos sin taxonomía suficiente. No se publica en Compra Inteligente ni modifica precios por sí sola.
 
+## Homologación — mejoras rápidas 2026-09-30
+
+Rama `rpi/homolog-quick` (no fusionada). Motor `product-homologation-v2.4`; al
+fusionarse, el refresh diario de homologación reescribe los perfiles derivados
+con la nueva versión. Política y casos en
+[`homologation/product-identity-standard-v1.md`](homologation/product-identity-standard-v1.md) (reglas 8–14).
+
+- **Captura de GTIN:** Colonial no publica `barcode` (null en las 9,205
+  variantes de 2026-08-30); el UPC/EAN vive en `sku`. Con aprobación del
+  usuario (2026-10-01), un `sku` recortado, todo dígitos, de 8/12/13/14 dígitos
+  y GS1 válido pasa a `ean` (8,501 de 9,205); `reference` sigue siendo el SKU y
+  la procedencia se deriva (`ean == reference` ⇒ `sku_gs1_valid`) porque el
+  contrato de snapshot tiene llaves cerradas. Ese GTIN conserva todos los
+  conflictos del grupo y, como un SKU GS1 válido puede ser el código
+  equivocado, además exige: marca no contradictoria (`sku_gtin_brand_conflict`),
+  acuerdo mínimo de nombre sin marca ni tamaño —al menos un token común y ≥1/3
+  de los tokens del lado más corto— (`sku_gtin_name_disagreement`) y, en
+  maquillaje/tinte, el mismo número de tono/modelo (`model_number_conflict`).
+  PriceSmart (Bloomreach) y Comisariato (material interno) no exponen barcode.
+- **GTIN restringidos GS1:** sólo forman identidad dentro de un maestro
+  compartido (`walmart_cam` = Walmart + Paiz). En el corte 2026-09-21, las 315
+  filas comparables TGU con GTIN restringido son Walmart+Paiz: 0 degradadas.
+- **Exclusión por miembro:** el miembro en conflicto sale del grupo; el resto
+  sigue comparable si conserva dos cadenas sin colisión.
+- **Parser:** métrica preferida en etiquetas duales, multipacks invertidos y por
+  envase, "1 Pack" no ambiguo, combos/kits como bundle no comparable.
+- **Variante de un solo lado:** bloquea la identidad automática por GTIN.
+  Elimina el falso positivo Gwaltney (TGU: sale La Colonia, Walmart+Paiz
+  siguen) y uno nuevo (Glade Lavender vs Sweet Citrus, SPS). Para nombres
+  abreviados (Colonial) se separan palabras pegadas y se expande una tabla de
+  abreviaturas (`Vaini`, `Meloctn`, `S/Azu`, `Sugar Free`…); el sustantivo del
+  tipo ("Chocolate Ferrero") no cuenta como sabor.
+
+Medición (offline; el catálogo publicado sólo expone GTIN de filas comparables):
+
+| Medida | Antes | Después |
+| --- | --- | --- |
+| Comparables publicados SPS / TGU | 7.1 % / 24.9 % | sin degradación por GTIN restringido; muestra de variante: 1 grupo SPS y 3 TGU de 246 con nombres visibles |
+| Falsos positivos confirmados en la muestra de 246 grupos | 2 | 0 |
+| Grupos Walmart+Paiz comparables (snapshots 2026-08-31/09-04) | 8,327 | 8,336 |
+| Colonial `sku`→GTIN (snapshots): grupos comparables / productos Colonial en ellos | 8,327 / 0 | 8,579 / 2,100 |
+| SPS estimado (Colonial+Walmart SPS sobre el corte 2026-09-21) | 7.1 % filas comparables; 0 % ofertas Colonial | ≈9.3 %; ≈21 % de ofertas Colonial |
+
+Colonial: 1,921 grupos con Walmart SPS (813 nuevos, 1,108 amplían filas La
+Colonia+Walmart). Es cota inferior: no hay snapshot de La Colonia. La guarda de
+nombre/modelo retiró 236 productos Colonial (de 2,359 a 2,123; 2,100 tras leer
+cantidades pegadas como "Sab550ml"). De la lista sospechosa del spot-check quedan
+excluidos L'Oréal Blackest Black, Diana Favori Criollo, D'Olancho Chile Añejo,
+Del Rancho Picosit y Maybelline Light 20; **Evenflo Campestre vs Acuario sigue
+agrupado**: excluirlo exige ≥0.51 de coincidencia y retiraría 285 grupos más,
+casi todos correctos. Muestras aleatorias: 27/30 de la anterior se conservan
+(se pierden Carozzi Espaghettini, Purina Beneful abreviado y Always Anti Bun) y
+en una nueva de 30 quedan 1-2 dudosos (Milpa Real tortilla maíz vs trigo, Pond's
+limpiadora vs pepino).
+
 ## Autoridad live y binding SPS
 
 La evidencia histórica o una autorización temporal consumida **no se interpreta como autorización abierta**. Cualquier nueva observación live fuera de los workflows productivos ya autorizados por su ejecución recurrente **requiere autorización humana explícita vigente** para ese alcance.

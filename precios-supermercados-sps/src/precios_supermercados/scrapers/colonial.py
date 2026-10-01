@@ -12,6 +12,8 @@ from html.parser import HTMLParser
 from urllib.parse import urlparse
 from xml.etree import ElementTree as ET
 
+from ..identifiers import canonicalize_gtin
+
 ORIGIN = "https://supercolonial.com"
 SECTION = "template--25869947109668__banner"
 # Botón de acción de la tarjeta. `addtocart-btn` es el markup previo al
@@ -36,6 +38,67 @@ def price(value: object, *, nullable: bool = False) -> str | None:
     except InvalidOperation as exc:
         raise ColonialError("price_invalid") from exc
     return format(number, ".2f")
+
+
+EAN_SOURCES = ("barcode", "sku_gs1_valid")
+
+
+def declared_barcode(value: object) -> str | None:
+    """Conserva sólo un barcode Shopify explícito que supera el check digit GS1.
+
+    Un barcode con espacios externos se recorta; uno no numérico, de longitud no
+    GS1 o con check digit inválido queda en ``None``. Los ceros a la izquierda se
+    conservan tal cual vienen de la fuente.
+    """
+    if not isinstance(value, str):
+        return None
+    candidate = value.strip()
+    if not candidate or canonicalize_gtin(candidate) is None:
+        return None
+    return candidate
+
+
+def gtin_from_sku(value: object) -> str | None:
+    """SKU Colonial aceptado como GTIN (aprobado 2026-10-01) sólo si es GS1 válido.
+
+    La captura completa 2026-08-30 tiene ``barcode=null`` en las 9,205 variantes y
+    el código UPC/EAN vive en ``sku``: 8,501 SKU pasan el check digit (al azar
+    pasaría ~10%). Se acepta sólo un SKU recortado, todo dígitos, de longitud
+    8/12/13/14 y con check digit válido; cualquier otro SKU nunca produce GTIN.
+    """
+    if not isinstance(value, str):
+        return None
+    candidate = value.strip()
+    if not candidate.isdigit() or len(candidate) not in {8, 12, 13, 14}:
+        return None
+    return candidate if canonicalize_gtin(candidate) is not None else None
+
+
+def ean_with_source(barcode: object, sku: object) -> tuple[str | None, str | None]:
+    """Devuelve ``(ean, ean_source)``; el barcode explícito tiene prioridad."""
+    explicit = declared_barcode(barcode)
+    if explicit is not None:
+        return explicit, "barcode"
+    derived = gtin_from_sku(sku)
+    if derived is not None:
+        return derived, "sku_gs1_valid"
+    return None, None
+
+
+def ean_source(row: dict) -> str | None:
+    """Procedencia de ``ean`` reconstruida desde una fila del snapshot.
+
+    El contrato de snapshot/persistencia tiene un conjunto cerrado de llaves, así
+    que la procedencia no viaja como columna: en Colonial ``ean == reference`` (el
+    SKU recortado) identifica un GTIN derivado del SKU.
+    """
+    ean = row.get("ean")
+    if ean is None:
+        return None
+    reference = row.get("reference")
+    if isinstance(reference, str) and reference.strip() == ean:
+        return "sku_gs1_valid"
+    return "barcode"
 
 
 def _id(value: object) -> str:
@@ -84,7 +147,7 @@ def parse_products(raw: bytes) -> list[dict]:
             result.append({
                 "product_id": pid, "item_id": vid, "source_key_type": "item_id",
                 "source_key": vid, "source_name": name,
-                "reference": item.get("sku") or None, "ean": item.get("barcode") or None,
+                "reference": item.get("sku") or None, "ean": ean_with_source(item.get("barcode"), item.get("sku"))[0],
                 "brand": product.get("vendor") or None,
                 "category": product.get("product_type") or None,
                 "presentation": None,  # opciones numéricas observadas no prueban presentación
