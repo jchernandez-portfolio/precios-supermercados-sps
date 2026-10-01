@@ -46,7 +46,7 @@ from .product_homologation import (
     resolve_presentation,
 )
 
-IDENTITY_NORMALIZATION_VERSION = "product-homologation-v2.4"
+IDENTITY_NORMALIZATION_VERSION = "product-homologation-v2.5"
 
 _GENERIC_BRANDS = frozenset(
     {

@@ -49,7 +49,8 @@ confirman identidad por sí mismos.
 3. Un conflicto explícito de marca, tipo, presentación, variante, sabor o empaque
    bloquea la unión. Un dato ausente no constituye conflicto.
 4. `oz` no se convierte automáticamente a mililitros: debe demostrarse que el
-   empaque declara `fl oz`.
+   empaque declara `fl oz`. Desde v2.5 sí se convierte a gramos (onza de peso)
+   cuando el tipo de producto es sólido (regla 15).
 5. Una equivalencia sin GTIN requiere decisión revisada, evidencia citada,
    producto maestro explícito y huellas vigentes de ambos registros.
 6. Si cambia cualquiera de los registros fuente o la versión del motor, la
@@ -112,6 +113,62 @@ confirman identidad por sí mismos.
     pegadas ("AlmendVainiSinAzucar") y se expande una tabla cerrada de
     abreviaturas observadas (`vaini`→vainilla, `meloctn`→melocotón, `s azu`/
     `sugar free`→sin azúcar…). "S/A" no se expande (choca con "S.A.").
+
+15. **Presentación (v2.5).**
+    - *Separador de miles:* `1,400 ml`, `1.750 ml`, `1,230 g`, `1.000 unidades`
+      son miles cuando la parte entera tiene 1–3 dígitos sin empezar en 0, el
+      separador va seguido de **exactamente 3 dígitos** y la unidad es pequeña
+      (ml, cc, mg, g/gr/gramos o conteo). Con l/kg/lb/oz el separador es
+      decimal (`1.892 L`, `2.268 Kg`, `3.125 oz`); `1,5 L` (un dígito) y
+      `0.946 ml` (parte entera 0) tampoco cambian. Ambiguo residual: un `1.500 g`
+      que de verdad fuera 1.5 g (azafrán) se leería 1500 g; no se observó en el
+      catálogo. Una presentación fuente idéntica a la lectura decimal errónea
+      del nombre (`1.4 ml` para `1,400 ml`) no es evidencia independiente.
+    - *Imperial vs métrico:* con libras y gramos en el mismo texto
+      (`623.7 g / 1.37 lb`) la métrica explícita es canónica; si difieren más de
+      8 % no se resuelve. Una fuente que repite la conversión imperial de una
+      etiqueta dual coherente se acepta (`1.3 kg / 3 lb` con fuente 1360.8 g).
+      Sólo-libras se convierte a gramos (1 lb = 453.59237 g); sólo-onzas, a
+      gramos (28.3495 g) **únicamente** en tipos sólidos (arroz, avena, azúcar,
+      café, cereal, chocolate, frijol, galleta, gelatina, harinas, leche en
+      polvo, mantequilla(s), margarina, pan, pasta, pasta de tomate, queso, sal,
+      sardina, atún, yogurt). En cualquier otro tipo la onza queda como `oz`:
+      sin conversión no crea conflictos nuevos contra fuentes en ml.
+    - *Tolerancia imperial:* una cantidad derivada de libras/onzas es compatible
+      con una métrica hasta 2 % (redondeo del fabricante: `1 lb` ≈ `450 g`);
+      entre dos etiquetas métricas sigue 0.5 % o 1.5 unidades.
+    - *Display:* se redondea a 2 decimales (3 cifras significativas bajo 1);
+      el total canónico exacto se conserva para comparar.
+16. **Marca desde el nombre (v2.5).** Sólo cuando la fuente no envía marca (o
+    envía un placeholder). El léxico son las marcas fuente de todas las cadenas,
+    con alias por forma compacta (la grafía más frecuente gana: `loreal`/`l
+    oreal`, `kelloggs`/`kellogg s`, `ORALB`) y posesivo unido. Nunca se extraen
+    palabras comunes de una lista cerrada (`original`, `premium`, `pan`, `sin`,
+    `xl`…); una marca-palabra que aparece ≥10 veces y ≥3× más en nombres de
+    otras marcas que como marca propia sólo vale como primera palabra y sin otra
+    marca. Con varias marcas gana la que abre el nombre; si ninguna abre, queda
+    ausente. Una marca fuente sólo se anula (`source_conflict`) si el nombre
+    contiene una única marca, no genérica, que no es de la misma familia
+    (contención o prefijo de 4 letras). Procedencia: `brand_resolution_source`
+    = `name_known_brand`.
+17. **Marca inferida en guardas (v2.5).** `brand_conflict` entre candidatos no
+    aplica cuando una de las marcas salió del nombre y cualquiera de las dos
+    aparece en el otro nombre (fabricante vs línea: Nestlé vs Nesquik). En el
+    acuerdo de nombre de un GTIN derivado de SKU (regla 13) siempre se excluyen
+    las marcas declaradas; una marca inferida se acepta excluida o como token.
+18. **Tipo de producto (v2.5).** Un tipo alimenticio asignado por palabra clave
+    se retira (o pasa al tipo no alimenticio correcto) ante contexto
+    contradictorio: aceite de motor (`20W50`, `ATF`, moto), pintura/esmalte,
+    aceite cosmético (argán, cabello, bebé), pasta dental (`Pasta Repara`,
+    Colgate → Pasta dental), alimento de mascota con sabor (Felix atún →
+    Alimento para gato; no aplica a bebidas: "Vino Gato Negro"), objeto o color
+    café antes del sustantivo, gel para cabello, sal de baño, leche corporal o
+    de magnesia. "S/Azúcar"/"Zero Azúcar" no es Azúcar. Si el departamento de la
+    ruta fuente es General/Hogar/Limpieza/Cuidado personal, un tipo alimenticio
+    por nombre se descarta (Salud y temporada no cuentan). Sin tipo por nombre,
+    una palabra clave al inicio de la **hoja** de la ruta tipa como evidencia
+    débil (`taxonomy_rule_id = source_category_keyword`): nunca genera
+    `product_type_conflict`; si no hay tipo, el departamento llena la categoría.
 
 ## Casos iniciales
 

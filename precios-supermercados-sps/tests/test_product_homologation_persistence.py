@@ -245,7 +245,7 @@ def test_v23_persists_raw_and_canonical_brand_and_presentation_fields() -> None:
     )
 
     row = rows[0]
-    assert row.normalization_version == "product-homologation-v2.4"
+    assert row.normalization_version == "product-homologation-v2.5"
     assert row.raw_brand == "RMS"
     assert row.source_brand_role == "retailer_placeholder"
     assert row.normalized_brand == "bonovo"
