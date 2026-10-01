@@ -155,6 +155,41 @@ Avances posteriores al 2026-09-10:
 
 La cola privada de revisión (#460) materializa, bajo ejecución manual y read-only, candidatos fuzzy `review_required`, conflictos entre registros con el mismo GTIN y productos sin taxonomía suficiente. No se publica en Compra Inteligente ni modifica precios por sí sola.
 
+## Homologación — mejoras rápidas 2026-09-30
+
+Rama `rpi/homolog-quick` (no fusionada). Motor `product-homologation-v2.4`; al
+fusionarse, el refresh diario de homologación reescribe los perfiles derivados
+con la nueva versión. Política y casos en
+[`homologation/product-identity-standard-v1.md`](homologation/product-identity-standard-v1.md) (reglas 8–13).
+
+- **Captura de GTIN:** Colonial valida `barcode` con check digit GS1. La causa de
+  0 GTIN Colonial no es la normalización: `barcode` es null en las 9,205
+  variantes; el código tipo UPC/EAN está en `sku` (92 % pasa el check digit) y
+  no se reinterpreta como GTIN. PriceSmart (Bloomreach) y Comisariato
+  (material interno) no exponen barcode.
+- **GTIN restringidos GS1:** sólo forman identidad dentro de un maestro
+  compartido (`walmart_cam` = Walmart + Paiz). En el corte 2026-09-21, las 315
+  filas comparables TGU con GTIN restringido son Walmart+Paiz: 0 degradadas.
+- **Exclusión por miembro:** el miembro en conflicto sale del grupo; el resto
+  sigue comparable si conserva dos cadenas sin colisión.
+- **Parser:** métrica preferida en etiquetas duales, multipacks invertidos y por
+  envase, "1 Pack" no ambiguo, combos/kits como bundle no comparable.
+- **Variante de un solo lado:** bloquea la identidad automática por GTIN.
+  Elimina el falso positivo Gwaltney (TGU: sale La Colonia, Walmart+Paiz
+  siguen) y uno nuevo (Glade Lavender vs Sweet Citrus, SPS).
+
+Medición (offline; el catálogo publicado sólo expone GTIN de filas comparables):
+
+| Medida | Antes | Después |
+| --- | --- | --- |
+| Comparables publicados SPS / TGU | 7.1 % / 24.9 % | sin degradación por GTIN restringido; muestra de variante: 1 grupo SPS y 3 TGU de 246 con nombres visibles |
+| Falsos positivos confirmados en la muestra de 246 grupos | 2 | 0 |
+| Grupos Walmart+Paiz comparables (snapshots 2026-08-31/09-04) | 8,327 | 8,336 |
+| Hipótesis Colonial `sku`→GTIN (no activada): grupos comparables / productos Colonial | 8,135 / 2,463 | 8,611 / 2,214 |
+
+La palanca grande para SPS sigue siendo el GTIN de Colonial: requiere una
+decisión explícita sobre usar su `sku` como GTIN.
+
 ## Autoridad live y binding SPS
 
 La evidencia histórica o una autorización temporal consumida **no se interpreta como autorización abierta**. Cualquier nueva observación live fuera de los workflows productivos ya autorizados por su ejecución recurrente **requiere autorización humana explícita vigente** para ese alcance.

@@ -58,6 +58,44 @@ confirman identidad por sí mismos.
    materiales deben ser compatibles y estar respaldadas.
 8. No puede haber dos productos fuente del mismo supermercado dentro de una
    identidad publicada sin resolver primero cuál variante/oferta representa.
+   Desde v2.4 los registros en colisión se excluyen todos (no se elige uno) y
+   el resto del grupo puede seguir comparable (regla 11).
+9. **GTIN de circulación restringida (v2.4).** Un GTIN válido por check digit
+   en un rango RCN de GS1 no es global: EAN-8 que empieza con 0 o 2, prefijos
+   GTIN-13 020–029 y 040–049 (UPC-A 2… y 4…), 200–299 (peso variable / uso en
+   tienda), 980–999 (devoluciones y cupones) y GTIN-14 con indicador 9. Sólo
+   sostiene `prod_gtin_*` entre cadenas que comparten maestro de productos:
+   `walmart_cam` = Walmart + Paiz (mismo catálogo VTEX de Walmart
+   Centroamérica). La Colonia SPS/TGU es un único `supermarket_id`. Fuera del
+   maestro la pareja queda `UNRESOLVED` (`restricted_gtin_outside_shared_master`).
+   Política en `gtin_policy.py`, espejo en `identity-policy-v1.yaml`.
+10. **Variante declarada de un solo lado (v2.4).** Un sabor/aroma (`fresa`,
+    `lavanda`, `pollo`) o una formulación no estándar (`zero`, `sin azúcar`,
+    `light`, `diet`) presente en un nombre y ausente en el otro impide la
+    identidad automática aunque compartan GTIN (`one_sided_flavor_declared`,
+    `one_sided_variant_declared`). Sin GTIN la pareja sigue como candidato de
+    revisión y nunca recibe confianza STRONG.
+11. **Exclusión por miembro (v2.4).** En un grupo GTIN, un conflicto atribuible
+    a un miembro lo retira (`member_excluded_from_ready_group`) y el resto sigue
+    `ready` si conserva dos o más cadenas y ninguna colisión. Orden: GTIN
+    restringido fuera del maestro, colisión por cadena, conflicto intrínseco
+    (presentación en conflicto, multipack ambiguo) y conflictos por pareja; en
+    estos se retiran por rondas los miembros con más conflictos y un empate
+    retira a todos los empatados. Sin núcleo de dos cadenas, todo el grupo queda
+    en revisión.
+12. **Presentación (v2.4).** Con etiqueta dual (`16 oz (454 g)`) la firma canónica
+    es la métrica declarada por el propio envase; las onzas se conservan como
+    evidencia auxiliar y sólo se comparan contra onzas (regla 4 intacta). Si las
+    dos etiquetas difieren más de 8 % la presentación no se resuelve. Multipacks
+    (`6x355ml`, `355 ml x 6`, `12 latas de 355 ml`) exponen conteo y total; un
+    multipack nunca equivale a la unidad. Combos, kits, "gratis", `2x1` y
+    "cantidad + cantidad" son bundles: `bundle_vs_single_conflict` frente a un
+    individual.
+13. **Captura de GTIN por fuente.** `ean` sólo recibe un barcode explícito de la
+    fuente que supera el check digit GS1. Colonial no publica `barcode` (null en
+    las 9,205 variantes de la captura 2026-08-30) y su `sku` —aunque 92 % pase el
+    check digit— no se reinterpreta como GTIN; PriceSmart y Comisariato no
+    exponen barcode.
 
 ## Casos iniciales
 
@@ -70,6 +108,11 @@ confirman identidad por sí mismos.
   el segundo producto declara otra variante.
 - **Classic vs Light:** `CONFLICT`; no se fusiona aunque marca y contenido sean
   iguales.
+- **Gwaltney GTIN 785331778506 (v2.4):** "Salchichas Tradicional" (Walmart/Paiz)
+  vs "Salchicha … De Pollo Bun Size" (La Colonia), ratio de precio 2.4: el sabor
+  declarado sólo por La Colonia la excluye; Walmart+Paiz siguen comparables.
+- **Croissant `0000000001083` (v2.4):** PLU interno (RCN-8). Walmart+Paiz es
+  `EXACT_TRADE_ITEM`; con La Colonia queda `UNRESOLVED`.
 
 ## Despliegue
 
