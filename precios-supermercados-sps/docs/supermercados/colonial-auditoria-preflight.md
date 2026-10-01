@@ -77,6 +77,8 @@ No hay un batch de stock más eficiente demostrado en el reconocimiento acotado.
   `previous_price` sigue perteneciendo al periodo histórico anterior.
 - Shopify JSON/JS puede decir `available=true` mientras el botón propio del
   comercio muestra **Agotado**, con `cp-sold-out` y `disabled`. Ese botón determina
+  (desde 2026-09-24 el habilitado usa `add_to_cart_btn_cls` en vez de `addtocart-btn`
+  y el regular viene en `<s class="lc-pcard__price-was">`; se aceptan ambos markups)
   `out_of_stock`; el botón habilitado determina `in_stock`; evidencia ambigua,
   `unknown`. No se infiere cantidad ni inventario de una sucursal física.
 - Hay seis productos con dos variantes. El stock del botón se asigna sólo a su

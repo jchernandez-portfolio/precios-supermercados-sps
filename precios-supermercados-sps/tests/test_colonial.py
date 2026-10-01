@@ -122,3 +122,35 @@ def test_missing_grid_or_total_is_not_empty_catalog():
         parse_cards(b"<html>Access denied</html>")
     with pytest.raises(ColonialError):
         parse_cards(b"9199 productos")
+
+
+def test_cards_markup_2026_09_30_add_to_cart_and_sold_out_buttons():
+    # Desde 2026-09-24 el botón disponible ya no usa `addtocart-btn` y el regular
+    # se publica en <s class="lc-pcard__price-was">; antes cada tarjeta fallaba
+    # con card_shape_invalid y la cadena completa quedaba sin handoff.
+    total, cards = parse_cards((FIXTURES / "collection-section-2026-09-30.html").read_bytes())
+    assert total == 9137
+    assert [c["availability"] for c in cards] == ["in_stock", "in_stock", "in_stock", "out_of_stock", "out_of_stock"]
+    assert [c["current_price"] for c in cards] == ["26.99", "129.99", "1029.50", "9.99", "34.50"]
+    assert [c["reported_regular_price"] for c in cards] == [None, "169.99", None, "15.99", None]
+    assert cards[0] == {"item_id": "52017827610916", "handle": "123-deterg-maxi-efecto-425g",
+                        "availability": "in_stock", "current_price": "26.99", "reported_regular_price": None}
+
+
+@pytest.mark.parametrize("mutation", ["no_button", "two_buttons", "sold_out_not_disabled"])
+def test_cards_markup_2026_09_30_still_fail_closed(mutation):
+    raw = (FIXTURES / "collection-section-2026-09-30.html").read_text()
+    button = 'class="lc-btn lc-btn--primary ripple-btn add_to_cart_btn_cls notifi-cart"'
+    if mutation == "no_button":
+        raw = raw.replace(button, 'class="lc-btn lc-btn--primary"', 1)
+    elif mutation == "two_buttons":
+        raw = raw.replace("</form>", '<button class="cp-sold-out" disabled aria-disabled="true"></button></form>', 1)
+    else:
+        raw = raw.replace('class="lc-btn lc-btn--disabled cp-sold-out" disabled', 'class="lc-btn lc-btn--disabled cp-sold-out"', 1)
+    if mutation == "sold_out_not_disabled":
+        # Agotado sin `disabled`: no se infiere stock.
+        _, cards = parse_cards(raw.encode())
+        assert cards[3]["availability"] == "unknown"
+        return
+    with pytest.raises(ColonialError, match="card_shape_invalid"):
+        parse_cards(raw.encode())
