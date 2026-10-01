@@ -86,8 +86,10 @@ def test_tied_conflict_excludes_both_sides_and_fails_closed_when_one_retailer_le
             product("la_colonia:1", "la_colonia", "Jugo Jumex 1 L"),
         )
     )
+    # Mango/Durazno chocan entre sí y cada uno declara sabor frente al nombre sin
+    # sabor: empate de grado 2 en los tres, todos se retiran.
     assert group.comparison_status == "review_required"
-    assert group.conflict_reasons == ("flavor_conflict",)
+    assert group.conflict_reasons == ("flavor_conflict", "one_sided_flavor_declared")
 
 
 def test_tied_conflict_keeps_untouched_core_with_two_retailers() -> None:

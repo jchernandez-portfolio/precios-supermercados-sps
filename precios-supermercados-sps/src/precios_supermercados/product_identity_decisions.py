@@ -17,7 +17,11 @@ from typing import Iterable, Mapping
 
 from .gtin_policy import restricted_gtin_shared_master_ok
 from .product_homologation import ProductProfile, fold_text
-from .product_identity_v2 import IDENTITY_NORMALIZATION_VERSION, explain_candidate
+from .product_identity_v2 import (
+    IDENTITY_NORMALIZATION_VERSION,
+    explain_candidate,
+    one_sided_variant_conflicts,
+)
 
 
 DECISION_SCHEMA = "precios-sps-product-identity-decisions/v1"
@@ -328,6 +332,9 @@ def assess_product_relation(
             (),
         )
     if left.canonical_gtin is not None and left.canonical_gtin == right.canonical_gtin:
+        one_sided = one_sided_variant_conflicts(left, right)
+        if one_sided:
+            return ProductRelationAssessment(pair_id, "UNRESOLVED", "review_required", None, (), one_sided)
         if not _restricted_gtin_pair_ok(left, right):
             return ProductRelationAssessment(
                 pair_id,

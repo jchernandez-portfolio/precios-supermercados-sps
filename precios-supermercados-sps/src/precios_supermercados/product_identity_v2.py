@@ -164,6 +164,8 @@ _VARIANT_GROUPS = (
     frozenset({"descremada", "descremado"}),
     frozenset({"semidescremada", "semidescremado"}),
 )
+# Índices de _VARIANT_GROUPS que son una formulación distinta de la estándar.
+_NON_DEFAULT_FORMULATION_GROUPS = frozenset({1, 2})
 _FLAVOR_ALIASES = {
     "apple": "manzana",
     "arandano": "arándano",
@@ -803,6 +805,8 @@ def _name_similarity(left: ProductProfile, right: ProductProfile) -> Decimal:
 @lru_cache(maxsize=131_072)
 def _variant_labels(profile: ProductProfile) -> frozenset[str]:
     text = fold_text(profile.record.source_name) or ""
+    # "Zero Alcohol" (enjuague bucal) no es la formulación "zero" sin azúcar.
+    text = re.sub(r"(?<!\w)zero\s+alcohol(?!\w)", "sin_alcohol", text)
     labels: set[str] = set()
     for group in _VARIANT_GROUPS:
         for label in group:
@@ -918,6 +922,38 @@ def _hard_conflicts(left: ProductProfile, right: ProductProfile) -> tuple[str, .
     return tuple(sorted(conflicts))
 
 
+def _formulation_group(labels: frozenset[str]) -> int | None:
+    for index, group in enumerate(_VARIANT_GROUPS):
+        if any(label in labels for label in group):
+            return index
+    return None
+
+
+def one_sided_variant_conflicts(left: ProductProfile, right: ProductProfile) -> tuple[str, ...]:
+    """Variante declarada sólo por un lado; bloquea identidad automática.
+
+    Un sabor/aroma ("fresa", "lavanda", "pollo") o una formulación no estándar
+    ("zero", "sin azúcar", "light", "diet") presente en un nombre y ausente en el
+    otro no se presume equivalente aunque compartan GTIN. Para candidatos sin GTIN
+    no es un conflicto duro: siguen como revisión y nunca reciben STRONG.
+    """
+
+    left_labels = _variant_labels(left)
+    right_labels = _variant_labels(right)
+    conflicts: set[str] = set()
+    left_flavors = any(item.startswith("flavor:") for item in left_labels)
+    right_flavors = any(item.startswith("flavor:") for item in right_labels)
+    if left_flavors != right_flavors:
+        conflicts.add("one_sided_flavor_declared")
+    left_group = _formulation_group(left_labels)
+    right_group = _formulation_group(right_labels)
+    if (left_group in _NON_DEFAULT_FORMULATION_GROUPS and right_group is None) or (
+        right_group in _NON_DEFAULT_FORMULATION_GROUPS and left_group is None
+    ):
+        conflicts.add("one_sided_variant_declared")
+    return tuple(sorted(conflicts))
+
+
 def _has_asymmetric_strong_attribute(
     left: ProductProfile,
     right: ProductProfile,
@@ -1009,7 +1045,7 @@ _GTIN_PAIR_IGNORED_REASONS = frozenset({"brand_conflict", "different_valid_gtin"
 def _gtin_pair_conflicts(left: ProductProfile, right: ProductProfile) -> set[str]:
     """Conflictos materiales entre dos miembros de cadenas distintas con igual GTIN."""
 
-    reasons: set[str] = set()
+    reasons: set[str] = set(one_sided_variant_conflicts(left, right))
     for reason in _hard_conflicts(left, right):
         if reason == "presentation_conflict":
             reasons.add("cross_source_presentation_conflict")

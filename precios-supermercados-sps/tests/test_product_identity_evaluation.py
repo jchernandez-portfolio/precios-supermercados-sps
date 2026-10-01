@@ -15,10 +15,10 @@ def test_golden_identity_evaluation_has_no_false_positive() -> None:
     )
     assert report["schema"] == SCHEMA
     assert report["summary"] == {
-        "cases": 5,
-        "passed": 5,
+        "cases": 8,
+        "passed": 8,
         "failed": 0,
-        "identity_true_positive": 1,
+        "identity_true_positive": 2,
         "identity_false_positive": 0,
         "identity_false_negative": 0,
         "identity_precision": 1.0,
