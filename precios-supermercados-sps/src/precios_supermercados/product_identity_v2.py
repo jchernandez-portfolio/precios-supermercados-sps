@@ -87,8 +87,10 @@ _BRAND_ALIASES = {
 # distancia difusa para marcas: cada alias debe incorporarse con evidencia.
 _BRAND_CANONICAL_ALIASES = {
     "buchanan s": "buchanan",
+    "buchanans": "buchanan",
     "elmigo": "el migo",
     "mott s": "mott",
+    "motts": "mott",
     "wrigleys": "wrigley",
 }
 
@@ -507,19 +509,136 @@ def _phrase_present(text: str, phrase: str) -> bool:
     return re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", text) is not None
 
 
-def build_brand_lexicon(records: Iterable[SourceProductRecord]) -> frozenset[str]:
-    """Crea un vocabulario de marcas ya observadas como marcas fuente reales."""
-    values = {
-        brand
-        for record in records
-        if (brand := canonicalize_brand_key(record.source_brand)) is not None
+# Marcas reportadas por alguna cadena que también son palabras comunes de un
+# nombre de producto ("Original", "Premium", "Pan", "Sin"...). Nunca se extraen
+# del nombre: sólo cuentan cuando la fuente las envía como marca.
+BRAND_NAME_STOPLIST = frozenset(
+    {
+        "active", "agave", "all natural", "ambar", "apple", "aqua", "arena", "aroma", "baby", "big",
+        "black white", "care", "chao", "classic", "clasico", "clasica", "cross", "de maiz",
+        "de oro", "dorada", "eco", "escolar", "essentials", "estrella", "expert",
+        "extra", "family", "fiesta", "free", "fresca", "fresh", "frozen", "fruit",
+        "gold", "gourmet", "hawaiian", "home", "intense", "italian", "italiana",
+        "jack", "kids", "kit", "kiwi", "light", "max", "maria", "margarita", "mas", "mega",
+        "mini", "natural", "new york", "oro", "original", "pan", "petit", "plata",
+        "plus", "pop", "popular", "power", "premium", "pro", "profesional",
+        "professional", "pulp", "real", "red", "rose", "rubio", "select", "simply", "sin",
+        "sistema", "sky", "soft", "sport", "suave", "super", "superior", "tropical",
+        "ultra", "universal", "xl", "xtra", "zero", "contraste", "party",
     }
+)
+# Una marca-palabra es "genérica" en los datos cuando aparece en nombres de
+# productos de OTRAS marcas fuente al menos 10 veces y 3 veces más que como
+# marca propia. Sólo se acepta desde el nombre si es la primera palabra y no hay
+# otra marca no genérica en el nombre ("Ideal aceite..." → Ideal).
+_GENERIC_MIN_FOREIGN = 10
+_GENERIC_FOREIGN_RATIO = 3
+_SQUASH_MIN_LENGTH = 4
+_POSSESSIVE_RE = re.compile(r"(?<=\w\w) s(?!\w)")
+
+
+class BrandLexicon(frozenset):
+    """Vocabulario de marcas fuente con alias compactos y marcas-palabra comunes.
+
+    Sigue siendo un ``frozenset`` de claves canónicas (compatibilidad con los
+    llamadores existentes); además expone:
+
+    - ``aliases``: clave → clave canónica para grafías con la misma forma
+      compacta ("loreal"/"l oreal", "kelloggs"/"kellogg s", "magiablanca");
+    - ``squashed``: forma compacta → clave canónica (nombres pegados "ORALB");
+    - ``generic``: marcas-palabra que sólo cuentan como primera palabra.
+    """
+
+    aliases: dict[str, str]
+    squashed: dict[str, str]
+    generic: frozenset[str]
+
+    def __new__(
+        cls,
+        values: Iterable[str],
+        *,
+        aliases: dict[str, str] | None = None,
+        squashed: dict[str, str] | None = None,
+        generic: Iterable[str] = (),
+    ) -> "BrandLexicon":
+        instance = super().__new__(cls, values)
+        instance.aliases = dict(aliases or {})
+        instance.squashed = dict(squashed or {})
+        instance.generic = frozenset(generic)
+        return instance
+
+
+def _squash(value: str) -> str:
+    return value.replace(" ", "")
+
+
+def _name_phrases(name: str, maximum_words: int) -> list[tuple[int, int, str]]:
+    tokens = name.split()
+    result: list[tuple[int, int, str]] = []
+    for width in range(1, min(maximum_words, len(tokens)) + 1):
+        for start in range(0, len(tokens) - width + 1):
+            result.append((start, width, " ".join(tokens[start : start + width])))
+    return result
+
+
+def build_brand_lexicon(records: Iterable[SourceProductRecord]) -> BrandLexicon:
+    """Crea un vocabulario de marcas ya observadas como marcas fuente reales.
+
+    Determinista dado el universo de registros: alias por forma compacta (la
+    grafía más frecuente gana) y marcas-palabra genéricas medidas sobre los
+    nombres de productos de otras marcas.
+    """
+
+    records = tuple(records)
+    own: dict[str, int] = defaultdict(int)
+    for record in records:
+        brand = canonicalize_brand_key(record.source_brand)
+        if brand is not None:
+            own[brand] += 1
+    values = set(own)
     values.update(_BRAND_ALIASES.values())
-    return frozenset(values)
+    by_squash: dict[str, list[str]] = defaultdict(list)
+    for value in values:
+        squashed_value = _squash(value)
+        if len(squashed_value) >= _SQUASH_MIN_LENGTH:
+            by_squash[squashed_value].append(value)
+    aliases: dict[str, str] = {}
+    squashed: dict[str, str] = {}
+    for squashed_value, spellings in by_squash.items():
+        canonical = min(spellings, key=lambda value: (-own.get(value, 0), value))
+        squashed[squashed_value] = canonical
+        for spelling in spellings:
+            if spelling != canonical:
+                aliases[spelling] = canonical
+    maximum_words = max((len(value.split()) for value in values), default=1)
+    foreign: dict[str, int] = defaultdict(int)
+    for record in records:
+        brand = canonicalize_brand_key(record.source_brand)
+        if brand is None:
+            continue
+        name = fold_text(record.source_name) or ""
+        for _, _, phrase in _name_phrases(name, maximum_words):
+            if phrase in values and phrase != brand and phrase not in brand and brand not in phrase:
+                foreign[phrase] += 1
+    generic = {
+        value
+        for value in values
+        if value.isdigit()
+        or len(_squash(value)) < 3
+        or (
+            foreign.get(value, 0) >= _GENERIC_MIN_FOREIGN
+            and foreign.get(value, 0) >= _GENERIC_FOREIGN_RATIO * own.get(value, 0)
+        )
+    }
+    return BrandLexicon(values, aliases=aliases, squashed=squashed, generic=generic)
 
 
 def canonicalize_brand_key(value: str | None) -> str | None:
-    """Normaliza sólo alias de marca respaldados por evidencia del catálogo."""
+    """Normaliza sólo alias de marca respaldados por evidencia del catálogo.
+
+    El posesivo inglés se une a su palabra ("Kellogg's" → "kelloggs", igual que
+    "Kelloggs"); "L'Oréal" conserva "l oreal" (la letra suelta no es posesivo).
+    """
 
     folded = fold_text(value)
     if folded is None or folded in _GENERIC_BRANDS:
@@ -527,6 +646,7 @@ def canonicalize_brand_key(value: str | None) -> str | None:
     brand = normalize_brand(value)
     if brand is None:
         return None
+    brand = _POSSESSIVE_RE.sub("s", brand)
     return _BRAND_CANONICAL_ALIASES.get(brand, brand)
 
 
@@ -541,22 +661,99 @@ def source_brand_role(value: str | None) -> str:
     return "retailer_reported_brand"
 
 
-def _brands_in_name(name: str, brand_lexicon: frozenset[str]) -> set[str]:
-    """Busca frases de marca en tiempo acotado por longitud del nombre.
+def _brand_hits(name: str, brand_lexicon: frozenset[str]) -> list[tuple[int, int, str]]:
+    """Frases de marca del nombre como ``(inicio, ancho, clave canónica)``.
 
-    Recorrer todo el vocabulario para cada producto era cuadrático en catálogos
-    reales. Los n-gramas conservan la misma evidencia léxica y escalan linealmente.
+    Recorre n-gramas del nombre (lineal en su longitud). Con un ``BrandLexicon``
+    también acepta grafías compactas ("ORALB", "KELLOGGS") y aplica alias.
     """
 
-    tokens = name.split()
+    aliases = getattr(brand_lexicon, "aliases", {})
+    squashed = getattr(brand_lexicon, "squashed", {})
     maximum_words = max((len(value.split()) for value in brand_lexicon), default=1)
-    matches: set[str] = set()
-    for width in range(1, min(maximum_words, len(tokens)) + 1):
-        for start in range(0, len(tokens) - width + 1):
-            phrase = " ".join(tokens[start : start + width])
-            if phrase in brand_lexicon:
-                matches.add(phrase)
-    return matches
+    hits: list[tuple[int, int, str]] = []
+    for start, width, phrase in _name_phrases(name, max(maximum_words, 3)):
+        if phrase in brand_lexicon and width <= maximum_words:
+            hits.append((start, width, aliases.get(phrase, phrase)))
+            continue
+        compact = _squash(phrase)
+        # "Limpio x LB" no es la marca "limpiox": unidades/conectores no se pegan.
+        if width > 1 and any(token in _MATCH_STOPWORDS for token in phrase.split()):
+            continue
+        if len(compact) >= _SQUASH_MIN_LENGTH and compact in squashed:
+            hits.append((start, width, squashed[compact]))
+    for alias, canonical in (*_BRAND_ALIASES.items(), *_BRAND_CANONICAL_ALIASES.items()):
+        for match in re.finditer(rf"(?<!\w){re.escape(alias)}(?!\w)", name):
+            hits.append((len(name[: match.start()].split()), len(alias.split()), canonical))
+    return hits
+
+
+def _brands_in_name(name: str, brand_lexicon: frozenset[str]) -> set[str]:
+    return {brand for _, _, brand in _brand_hits(name, brand_lexicon)}
+
+
+def _name_brand_candidates(
+    hits: list[tuple[int, int, str]],
+    *,
+    use_stoplist: bool = True,
+) -> dict[str, tuple[int, int]]:
+    """Marcas del nombre sin frases anidadas en otra más larga (y sin palabras comunes)."""
+
+    spans: dict[str, tuple[int, int]] = {}
+    for start, width, brand in hits:
+        if use_stoplist and brand in BRAND_NAME_STOPLIST:
+            continue
+        current = spans.get(brand)
+        if current is None or (start, -width) < (current[0], -current[1]):
+            spans[brand] = (start, width)
+
+    def nested(brand: str) -> bool:
+        start, width = spans[brand]
+        return any(
+            other != brand
+            and other_start <= start
+            and start + width <= other_start + other_width
+            and other_width > width
+            for other, (other_start, other_width) in spans.items()
+        )
+
+    return {brand: span for brand, span in spans.items() if not nested(brand)}
+
+
+def _brands_overlap(left: str, right: str) -> bool:
+    """Misma familia de marca: "johnsons" ⊂ "johnsons baby", "koleston perfect"."""
+
+    left_squashed, right_squashed = _squash(left), _squash(right)
+    return (
+        left_squashed in right_squashed
+        or right_squashed in left_squashed
+        or left_squashed[:4] == right_squashed[:4]
+    )
+
+
+def _select_name_brand(
+    hits: list[tuple[int, int, str]],
+    generic: frozenset[str],
+) -> tuple[str | None, bool]:
+    """Marca única del nombre y si es una marca-palabra genérica en primera posición.
+
+    Orden: (1) se descartan frases anidadas en otra más larga; (2) nunca se usa
+    la lista de palabras comunes; (3) una sola marca no genérica gana; si hay
+    varias, sólo gana la que abre el nombre; (4) sin marcas no genéricas, una
+    marca-palabra genérica sólo cuenta si es la primera palabra.
+    """
+
+    candidates = _name_brand_candidates(hits)
+    specific = {brand: span for brand, span in candidates.items() if brand not in generic}
+    if len(specific) == 1:
+        return next(iter(specific)), False
+    if len(specific) > 1:
+        leading = [brand for brand, (start, _) in specific.items() if start == 0]
+        return (leading[0], False) if len(leading) == 1 else (None, False)
+    leading_generic = [brand for brand, (start, _) in candidates.items() if start == 0]
+    if len(leading_generic) == 1:
+        return leading_generic[0], True
+    return None, False
 
 
 def resolve_brand(
@@ -564,34 +761,40 @@ def resolve_brand(
     *,
     brand_lexicon: frozenset[str],
 ) -> BrandResolution:
+    aliases = getattr(brand_lexicon, "aliases", {})
+    generic = getattr(brand_lexicon, "generic", frozenset())
     source_brand = canonicalize_brand_key(record.source_brand)
-    name = fold_text(record.source_name) or ""
-    matches = _brands_in_name(name, brand_lexicon)
-
-    for alias, canonical in _BRAND_ALIASES.items():
-        if _phrase_present(name, alias):
-            matches.add(canonical)
-    for alias, canonical in _BRAND_CANONICAL_ALIASES.items():
-        if _phrase_present(name, alias):
-            matches.add(canonical)
-
-    # Preferimos el match de frase más larga cuando todos los matches son
-    # anidados (p. ej. una marca de dos palabras que contiene otra corta).
-    if len(matches) > 1:
-        longest = max(matches, key=len)
-        if all(candidate == longest or _phrase_present(longest, candidate) for candidate in matches):
-            matches = {longest}
-
-    name_brand = next(iter(matches)) if len(matches) == 1 else None
     if source_brand is not None:
-        if name_brand is not None and name_brand != source_brand:
-            return BrandResolution(
-                canonical_brand=None,
-                source="source_conflict",
-                source_brand=source_brand,
-                name_brand=name_brand,
-                conflict=True,
-            )
+        source_brand = aliases.get(source_brand, source_brand)
+    name = fold_text(record.source_name) or ""
+    hits = _brand_hits(name, brand_lexicon)
+    if not hits:
+        # Nombres pegados de catálogos abreviados: "MagiaBlanca Desinf".
+        split_name = fold_text(split_glued_words(record.source_name)) or ""
+        if split_name != name:
+            hits = _brand_hits(split_name, brand_lexicon)
+    name_brand, _ = _select_name_brand(hits, generic)
+    if source_brand is not None:
+        # Contradicción sólo con evidencia inequívoca: UNA sola marca en todo el
+        # nombre (incluidas palabras comunes, como antes: "Lays Max" con fuente
+        # "Frito Lay" sigue siendo ambiguo), no genérica, distinta de la fuente y
+        # de otra familia. La preferencia por posición y la lista de palabras
+        # comunes sólo completan marcas ausentes; nunca anulan una marca fuente.
+        strict = _name_brand_candidates(hits, use_stoplist=False)
+        if source_brand not in {brand for _, _, brand in hits} and len(strict) == 1:
+            (only,) = strict
+            if (
+                only not in generic
+                and only not in BRAND_NAME_STOPLIST
+                and not _brands_overlap(only, source_brand)
+            ):
+                return BrandResolution(
+                    canonical_brand=None,
+                    source="source_conflict",
+                    source_brand=source_brand,
+                    name_brand=only,
+                    conflict=True,
+                )
         return BrandResolution(source_brand, "source", source_brand, name_brand)
     if name_brand is not None:
         return BrandResolution(name_brand, "name_known_brand", None, name_brand)
@@ -956,6 +1159,7 @@ NAME_ABBREVIATIONS: dict[str, str] = {
     "vainila": "vainilla",
     "vanila": "vainilla",
     "watermelo": "watermelon",
+    "xtra": "extra",
     "zanah": "zanahoria",
     "zanaho": "zanahoria",
 }
@@ -1035,6 +1239,28 @@ def _variant_labels(profile: ProductProfile) -> frozenset[str]:
     return frozenset(labels)
 
 
+def _brand_from_name(profile: ProductProfile) -> bool:
+    source = canonicalize_brand_key(profile.record.source_brand)
+    return source is None or _squash(source) != _squash(profile.normalized_brand or "")
+
+
+def _name_brand_line_overlap(left: ProductProfile, right: ProductProfile) -> bool:
+    """Fabricante vs línea con una marca extraída del nombre ("Nestle" vs "Nesquik").
+
+    Si alguna marca salió del nombre y cualquiera de las dos marcas aparece en el
+    nombre del otro lado, no es una contradicción de marca: ambos nombres citan
+    la misma marca. Dos marcas fuente distintas siguen en conflicto.
+    """
+
+    if not (_brand_from_name(left) or _brand_from_name(right)):
+        return False
+    left_brand = _squash(left.normalized_brand or "")
+    right_brand = _squash(right.normalized_brand or "")
+    left_name = _squash(fold_text(left.record.source_name) or "")
+    right_name = _squash(fold_text(right.record.source_name) or "")
+    return bool(left_brand and right_brand) and (left_brand in right_name or right_brand in left_name)
+
+
 def _hard_conflicts(left: ProductProfile, right: ProductProfile) -> tuple[str, ...]:
     conflicts: set[str] = set()
     if left.canonical_gtin is not None and right.canonical_gtin is not None and left.canonical_gtin != right.canonical_gtin:
@@ -1045,7 +1271,12 @@ def _hard_conflicts(left: ProductProfile, right: ProductProfile) -> tuple[str, .
         and left.taxonomy.product_type != right.taxonomy.product_type
     ):
         conflicts.add("product_type_conflict")
-    if left.normalized_brand and right.normalized_brand and left.normalized_brand != right.normalized_brand:
+    if (
+        left.normalized_brand
+        and right.normalized_brand
+        and left.normalized_brand != right.normalized_brand
+        and not _name_brand_line_overlap(left, right)
+    ):
         conflicts.add("brand_conflict")
     if (
         left.presentation is not None
@@ -1322,16 +1553,13 @@ def _agreement_token_match(left: str, right: str) -> bool:
     return shorter >= 5 and SequenceMatcher(None, left, right).ratio() >= 0.8
 
 
-def sku_gtin_name_agreement(left: ProductProfile, right: ProductProfile) -> bool:
-    """Acuerdo mínimo de nombre sin marca ni tamaño (sólo GTIN derivado de SKU)."""
-
+def _name_agreement_with_brands(
+    left: ProductProfile,
+    right: ProductProfile,
+    brands: Iterable[str | None],
+) -> bool:
     brand_tokens: set[str] = set()
-    for value in (
-        left.normalized_brand,
-        right.normalized_brand,
-        left.record.source_brand,
-        right.record.source_brand,
-    ):
+    for value in brands:
         folded = fold_text(value)
         if folded:
             brand_tokens.update(folded.split())
@@ -1352,6 +1580,30 @@ def sku_gtin_name_agreement(left: ProductProfile, right: ProductProfile) -> bool
     if matched == 0:
         return False
     return Decimal(matched) / Decimal(min(len(left_tokens), len(right_tokens))) >= SKU_NAME_MIN_OVERLAP
+
+
+def sku_gtin_name_agreement(left: ProductProfile, right: ProductProfile) -> bool:
+    """Acuerdo mínimo de nombre sin marca ni tamaño (sólo GTIN derivado de SKU).
+
+    Siempre se excluyen las marcas declaradas por la fuente. Una marca inferida
+    del nombre por el léxico es ambigua (¿marca o palabra del nombre?): el
+    acuerdo se acepta si se cumple excluyéndola o tratándola como token, para no
+    depender de la cobertura del léxico (calibración 2026-10-01 sin léxico ampliado).
+    """
+
+    declared = [
+        *(profile.normalized_brand for profile in (left, right) if not _brand_from_name(profile)),
+        left.record.source_brand,
+        right.record.source_brand,
+    ]
+    inferred = [
+        profile.normalized_brand
+        for profile in (left, right)
+        if profile.normalized_brand and _brand_from_name(profile)
+    ]
+    if _name_agreement_with_brands(left, right, declared):
+        return True
+    return bool(inferred) and _name_agreement_with_brands(left, right, (*declared, *inferred))
 
 
 # Cosméticos: un número de tono/modelo distinto ("Light 20" vs "Light Honey 120")

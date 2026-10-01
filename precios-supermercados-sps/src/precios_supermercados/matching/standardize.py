@@ -294,6 +294,8 @@ class Standardizer:
         name_tokens = [self.synonyms.get(token, token) for token in name.split()]
         brand = profile.normalized_brand
         source_brand = canonicalize_brand_key(record.source_brand)
+        if source_brand is not None:
+            source_brand = getattr(self.brand_lexicon, "aliases", {}).get(source_brand, source_brand)
         if brand is None:
             brand_source = "source_conflict" if source_brand is not None else "missing"
         elif source_brand == brand:
