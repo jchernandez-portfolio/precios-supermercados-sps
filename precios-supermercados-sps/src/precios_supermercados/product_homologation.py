@@ -144,6 +144,13 @@ class PresentationSignature:
     # las onzas declaradas por unidad se conservan sólo como evidencia auxiliar
     # para seguir siendo comparable con fuentes que sólo publican onzas.
     declared_ounces: Decimal | None = None
+    # Cantidad derivada de una unidad imperial (libras, u onzas convertidas a
+    # gramos por contexto sólido). Los fabricantes redondean la conversión
+    # ("1 lb" ≈ "450 g"), así que la compatibilidad usa una tolerancia imperial.
+    imperial_derived: bool = False
+    # El texto declara a la vez una etiqueta imperial y una métrica coherentes
+    # ("623.7 g / 1.37 lb", "16 oz (454 g)"): la métrica es la evidencia explícita.
+    dual_label: bool = False
 
     def __post_init__(self) -> None:
         if self.dimension not in {"mass_g", "volume_ml", "count", "ounce"}:
@@ -478,6 +485,10 @@ _AMBIGUOUS_PACK_RE = re.compile(
     r"(?<!\w)(?:(?P<before>\d+)\s*(?:pack|pk)|(?:pack|pk)\s*(?P<after>\d+))(?!\w)",
     re.IGNORECASE,
 )
+_IMPERIAL_MASS_UNITS = frozenset({"lb", "lbs"})
+# Conversión imperial redondeada por el fabricante ("1 lb" ≈ "450 g", "8 oz" ≈
+# "225 g"): 2 % frente al 0.5 % de dos etiquetas métricas.
+_IMPERIAL_RELATIVE_TOLERANCE = Decimal("0.02")
 _OUNCE_TO_GRAMS = Decimal("28.349523125")
 _FLUID_OUNCE_TO_ML = Decimal("29.5735295625")
 # Tolerancia entre etiquetas duales del mismo envase (redondeo de fabricante:
@@ -529,6 +540,7 @@ def _signature(
         return None
     dimension, factor = unit_info
     unit_amount = amount * factor
+    imperial = " ".join(unit_text.casefold().split()) in _IMPERIAL_MASS_UNITS
     if dimension == "count":
         if pack_count != 1 or amount != amount.to_integral_value():
             return None
@@ -544,6 +556,29 @@ def _signature(
         total_base=unit_amount * pack_count,
         pack_count=pack_count,
         unit_amount_base=unit_amount,
+        imperial_derived=imperial,
+    )
+
+
+def ounces_as_mass(signature: PresentationSignature | None) -> PresentationSignature | None:
+    """Convierte una firma sólo-onzas a gramos (onza de peso, 28.3495 g).
+
+    Sólo debe usarse cuando el contexto del producto es sólido (arroz, queso,
+    galletas...). Las onzas declaradas por unidad se conservan como evidencia
+    para seguir siendo compatibles con fuentes que publican sólo onzas.
+    """
+
+    if signature is None or signature.dimension != "ounce":
+        return signature
+    unit_ounces = signature.unit_amount_base or signature.total_base / signature.pack_count
+    unit_grams = unit_ounces * _OUNCE_TO_GRAMS
+    return PresentationSignature(
+        dimension="mass_g",
+        total_base=unit_grams * signature.pack_count,
+        pack_count=signature.pack_count,
+        unit_amount_base=unit_grams,
+        declared_ounces=unit_ounces,
+        imperial_derived=True,
     )
 
 
@@ -615,34 +650,59 @@ def _unit_dimension(match: re.Match[str]) -> str | None:
     return None if info is None else info[0]
 
 
-def _prefer_metric_single(singles: list[re.Match[str]]) -> PresentationSignature | None:
-    """Con etiqueta dual onzas + métrica, la métrica es canónica.
+def _is_imperial_mass(match: re.Match[str]) -> bool:
+    return " ".join(match.group("unit").casefold().split()) in _IMPERIAL_MASS_UNITS
 
-    "16 oz (454 g)", "240 g o 8 oz" y "420 g / 14 oz" producen la misma firma
-    métrica sin importar el orden. Las onzas se conservan como evidencia auxiliar
-    cuando ambas etiquetas son coherentes (como peso o como volumen); si no lo
-    son, la presentación no se resuelve (fail-closed).
+
+def _prefer_metric_single(singles: list[re.Match[str]]) -> PresentationSignature | None:
+    """Con etiqueta dual imperial + métrica, la métrica es canónica.
+
+    "16 oz (454 g)", "240 g o 8 oz", "420 g / 14 oz" y "623.7 g / 1.37 lb"
+    producen la misma firma métrica sin importar el orden. Las onzas se
+    conservan como evidencia auxiliar cuando ambas etiquetas son coherentes
+    (como peso o como volumen); si no lo son, la presentación no se resuelve
+    (fail-closed). Las libras sólo se contrastan contra gramos.
     """
 
     ounces = [match for match in singles if _unit_dimension(match) == "ounce"]
-    metric = [match for match in singles if _unit_dimension(match) in {"mass_g", "volume_ml"}]
-    if not ounces or not metric:
+    pounds = [match for match in singles if _is_imperial_mass(match)]
+    metric = [
+        match
+        for match in singles
+        if _unit_dimension(match) in {"mass_g", "volume_ml"} and not _is_imperial_mass(match)
+    ]
+    if not metric or not (ounces or pounds):
         match = singles[-1]
         return _signature(match.group("amount"), match.group("unit"))
     signature = _signature(metric[-1].group("amount"), metric[-1].group("unit"))
-    ounce_value = _decimal(ounces[-1].group("amount"))
-    if signature is None or ounce_value is None:
+    if signature is None:
         return None
-    factor = _OUNCE_TO_GRAMS if signature.dimension == "mass_g" else _FLUID_OUNCE_TO_ML
-    converted = ounce_value * factor
-    if abs(converted - signature.total_base) / signature.total_base > _DUAL_LABEL_TOLERANCE:
-        return None
+    declared_ounces: Decimal | None = None
+    if ounces:
+        ounce_value = _decimal(ounces[-1].group("amount"))
+        if ounce_value is None:
+            return None
+        factor = _OUNCE_TO_GRAMS if signature.dimension == "mass_g" else _FLUID_OUNCE_TO_ML
+        converted = ounce_value * factor
+        if abs(converted - signature.total_base) / signature.total_base > _DUAL_LABEL_TOLERANCE:
+            return None
+        declared_ounces = ounce_value
+    if pounds:
+        pound_signature = _signature(pounds[-1].group("amount"), pounds[-1].group("unit"))
+        if (
+            pound_signature is None
+            or signature.dimension != "mass_g"
+            or abs(pound_signature.total_base - signature.total_base) / signature.total_base
+            > _DUAL_LABEL_TOLERANCE
+        ):
+            return None
     return PresentationSignature(
         dimension=signature.dimension,
         total_base=signature.total_base,
         pack_count=signature.pack_count,
         unit_amount_base=signature.unit_amount_base,
-        declared_ounces=ounce_value,
+        declared_ounces=declared_ounces,
+        dual_label=True,
     )
 
 
@@ -672,20 +732,60 @@ def presentations_compatible(
         return left.total_base == right.total_base
     larger = max(left.total_base, right.total_base)
     difference = abs(left.total_base - right.total_base)
-    return difference <= Decimal("1.5") or difference / larger <= Decimal("0.005")
+    relative_limit = (
+        _IMPERIAL_RELATIVE_TOLERANCE
+        if left.imperial_derived or right.imperial_derived
+        else Decimal("0.005")
+    )
+    return difference <= Decimal("1.5") or difference / larger <= relative_limit
+
+
+def _dual_label_source_compatible(
+    source: PresentationSignature,
+    dual: PresentationSignature,
+) -> bool:
+    """La fuente describe la misma etiqueta dual (métrica o su conversión imperial).
+
+    Se usa la misma tolerancia que ya aceptó la coherencia entre las dos etiquetas
+    del nombre: "1.3 kg / 3 lb" con fuente 1360.8 g (= 3 lb) es una sola etiqueta.
+    """
+
+    if source.dimension != dual.dimension or source.pack_count != dual.pack_count:
+        return False
+    if source.dimension not in {"mass_g", "volume_ml"}:
+        return False
+    larger = max(source.total_base, dual.total_base)
+    return abs(source.total_base - dual.total_base) / larger <= _DUAL_LABEL_TOLERANCE
 
 
 def resolve_presentation(
     record: SourceProductRecord,
+    *,
+    ounce_as_mass: bool = False,
 ) -> tuple[PresentationSignature | None, str]:
+    """Firma de presentación con su estado de evidencia.
+
+    ``ounce_as_mass`` sólo lo activa la capa v2 cuando el tipo de producto es
+    sólido: entonces una presentación sólo-onzas se compara en gramos.
+    """
+
     source, source_ambiguous = _parse_presentation_text(record.source_presentation)
     name, name_ambiguous = _parse_presentation_text(record.source_name)
+    if ounce_as_mass:
+        source = ounces_as_mass(source)
+        name = ounces_as_mass(name)
 
     if name_ambiguous:
         return None, "ambiguous_multipack"
 
     if source is not None and name is not None:
+        if name.dual_label and _dual_label_source_compatible(source, name):
+            # La fuente suele repetir la conversión imperial ("24 lb" → 10886.2 g)
+            # de una etiqueta dual cuyo valor métrico explícito es 10.8 kg.
+            return name, "confirmed"
         if presentations_compatible(source, name):
+            if source.imperial_derived and not name.imperial_derived:
+                return name, "confirmed"
             return source, "confirmed"
         if record.supermarket_id == "paiz":
             return name, "name_preferred_source_conflict"

@@ -104,7 +104,21 @@ _EGG_COUNT_RE = re.compile(
 _MG_RE = re.compile(r"(?<!\w)(?P<amount>\d+(?:[.,]\d+)?)\s*mg(?!\w)", re.IGNORECASE)
 _LIBRA_RE = re.compile(r"(?<!\w)(?P<amount>\d+(?:[.,]\d+)?)\s*libras?(?!\w)", re.IGNORECASE)
 _GRAMOS_RE = re.compile(r"(?<!\w)(?P<amount>\d+(?:[.,]\d+)?)\s*grs?(?:\.)?(?!\w)", re.IGNORECASE)
-_LITROS_RE = re.compile(r"(?<!\w)(?P<amount>\d+(?:[.,]\d+)?)\s*lts?(?:\.)?(?!\w)", re.IGNORECASE)
+_LITROS_RE = re.compile(r"(?<!\w)(?P<amount>\d+(?:[.,]\d+)?)\s*lt(?:rs?|s)?(?:\.)?(?!\w)", re.IGNORECASE)
+# Separador de miles en unidades pequeñas: "1,400 ml", "1.750 ml", "1,230 g",
+# "1.000 unidades". Regla (documentada en el estándar de identidad):
+#   - parte entera de 1 a 3 dígitos que no empieza en 0, separador "." o ",",
+#     y EXACTAMENTE 3 dígitos después, sin más separadores;
+#   - la unidad es pequeña (ml, cc, mg, g/gr/gramos o conteo): nadie publica
+#     "1.400 ml" queriendo decir 1.4 ml en un supermercado.
+# Unidades grandes (l, kg, lb, oz) conservan el decimal: "1.892 L", "2.268 Kg",
+# "3.125 oz" y "1,5 L" siguen siendo 1.892 L, 2.268 kg, 3.125 oz y 1.5 L. "0.946 ml"
+# (parte entera 0) tampoco cambia.
+_THOUSANDS_SMALL_UNIT_RE = re.compile(
+    r"(?<![\d.,])(?P<integer>[1-9]\d{0,2})[.,](?P<group>\d{3})(?![\d.,])"
+    r"(?P<unit>\s*(?:ml|cc|mg|grs?|gramos?|g|unidades|unidad|unds?|unids?|uds?)(?!\w))",
+    re.IGNORECASE,
+)
 _FRACTION_WITH_UNIT_RE = re.compile(
     r"(?<![\d/])(?P<fraction>1\s*/\s*2|1\s*/\s*4|3\s*/\s*4)"
     r"(?=\s*(?:mg|kg|grs?|gramos?|g|lbs?|libras?|oz|onzas?|ml|lts?|litros?|l)(?!\w))",
@@ -672,6 +686,30 @@ def _replace_natural_multipack(match: re.Match[str]) -> str:
     return f"{match.group('count')} x {match.group('amount')} {match.group('unit')}"
 
 
+def normalize_thousands_separators(value: str) -> str:
+    """"1,400 ml" → "1400 ml"; "1,5 L" y "1.892 L" no cambian (ver regla)."""
+
+    return _THOUSANDS_SMALL_UNIT_RE.sub(
+        lambda match: f"{match.group('integer')}{match.group('group')}{match.group('unit')}",
+        value,
+    )
+
+
+def _thousands_misreadings(value: str | None) -> set[tuple[Decimal, str]]:
+    """Lecturas decimales erróneas de un separador de miles del nombre.
+
+    Algunas fuentes (y scrapers previos) derivaron la presentación del nombre
+    leyendo "1,400 ml" como 1.4 ml. Si la presentación fuente coincide con esa
+    lectura no es evidencia independiente: describe la misma etiqueta.
+    """
+
+    result: set[tuple[Decimal, str]] = set()
+    for match in _THOUSANDS_SMALL_UNIT_RE.finditer(value or ""):
+        amount = Decimal(f"{match.group('integer')}.{match.group('group')}")
+        result.add((amount.normalize(), match.group("unit").strip().casefold()))
+    return result
+
+
 def _normalize_parser_text(
     value: str | None,
     *,
@@ -682,6 +720,7 @@ def _normalize_parser_text(
     # "ShampAguac&Sab550ml" → "ShampAguac&Sab 550ml": sin esto la cantidad pegada
     # a una palabra (frecuente en Colonial) no se reconoce como presentación.
     text = " ".join(_GLUED_LETTERS_DIGIT_RE.sub(" ", value).split())
+    text = normalize_thousands_separators(text)
     text = _FRACTION_WITH_UNIT_RE.sub(_replace_fraction_with_unit, text)
     text = _NATURAL_MULTIPACK_RE.sub(_replace_natural_multipack, text)
     text = _COMPACT_SLASH_MULTIPACK_RE.sub(_replace_natural_multipack, text)
@@ -696,22 +735,92 @@ def _normalize_parser_text(
     return text
 
 
+# Tipos cuyo contenido neto en onzas es peso (NET WT), no volumen: sólo en ellos
+# una presentación sólo-onzas se convierte a gramos. En cualquier otro tipo (o
+# sin tipo) la onza queda como dimensión "ounce": sin conversión, no crea
+# conflictos nuevos contra fuentes en ml ni confirma igualdad dudosa.
+OUNCE_MASS_PRODUCT_TYPES = frozenset(
+    {
+        "Arroz",
+        "Atún",
+        "Avena",
+        "Azúcar",
+        "Café",
+        "Cereal",
+        "Chocolate",
+        "Frijol",
+        "Galleta",
+        "Gelatina",
+        "Harina de maíz",
+        "Harina de trigo",
+        "Leche en polvo",
+        "Mantequilla",
+        "Mantequilla de maní",
+        "Margarina",
+        "Pan",
+        "Pan de molde",
+        "Pasta",
+        "Pasta de tomate",
+        "Queso",
+        "Sal",
+        "Sardina",
+        "Yogurt",
+    }
+)
+
+
+def _drop_misread_source(name: str, source: str | None) -> str | None:
+    """Descarta una presentación fuente que sólo repite la lectura errónea."""
+
+    if source is None:
+        return None
+    misreadings = _thousands_misreadings(name)
+    if not misreadings:
+        return source
+    folded = " ".join(source.casefold().split())
+    for amount, unit in misreadings:
+        for rendered in {format(amount, "f"), format(amount, "f").replace(".", ",")}:
+            if re.fullmatch(rf"{re.escape(rendered)}0*\s*{re.escape(unit)}\.?", folded):
+                return None
+    return source
+
+
 def resolve_presentation_v2(
     record: SourceProductRecord,
     taxonomy: TaxonomyAssignment | None = None,
 ) -> tuple[PresentationSignature | None, str]:
     taxonomy = taxonomy or assign_taxonomy_v2(record)
     shell_egg = is_shell_egg(record, taxonomy)
+    source_presentation = _drop_misread_source(record.source_name, record.source_presentation)
     normalized = SourceProductRecord(
         source_record_id=record.source_record_id,
         supermarket_id=record.supermarket_id,
         source_name=_normalize_parser_text(record.source_name, shell_egg=shell_egg) or record.source_name,
         source_brand=record.source_brand,
-        source_presentation=_normalize_parser_text(record.source_presentation, shell_egg=shell_egg),
+        source_presentation=_normalize_parser_text(source_presentation, shell_egg=shell_egg),
         source_category=record.source_category,
         barcode=record.barcode,
     )
-    return resolve_presentation(normalized)
+    return resolve_presentation(
+        normalized,
+        ounce_as_mass=taxonomy.product_type in OUNCE_MASS_PRODUCT_TYPES,
+    )
+
+
+def display_quantity(value: Decimal) -> str:
+    """Cantidad legible: máximo 2 decimales (3 cifras significativas bajo 1).
+
+    Sólo para mostrar: el valor canónico exacto (p. ej. 907.18474 g para 2 lb)
+    se conserva en ``canonical_total`` y en la firma de comparación.
+    """
+
+    if value >= 1:
+        rounded = value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    else:
+        exponent = value.adjusted() - 2
+        rounded = value.quantize(Decimal(1).scaleb(exponent), rounding=ROUND_HALF_UP)
+    rendered = format(rounded.normalize(), "f")
+    return "0" if rendered in {"", "-0"} else rendered
 
 
 def canonical_presentation_fields(
@@ -738,12 +847,10 @@ def canonical_presentation_fields(
         display = f"{int(signature.total_base)} unidades"
     elif signature.pack_count > 1 and signature.unit_amount_base is not None:
         normalized_pack_count = signature.pack_count
-        display = (
-            f"{signature.pack_count} × {format(signature.unit_amount_base.normalize(), 'f')} {unit}"
-        )
+        display = f"{signature.pack_count} × {display_quantity(signature.unit_amount_base)} {unit}"
     else:
         normalized_pack_count = signature.pack_count
-        display = f"{format(signature.total_base.normalize(), 'f')} {unit}"
+        display = f"{display_quantity(signature.total_base)} {unit}"
     return CanonicalPresentation(
         raw_presentation=raw,
         normalized_quantity=quantity,
