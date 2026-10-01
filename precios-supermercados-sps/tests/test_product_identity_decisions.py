@@ -151,7 +151,7 @@ def test_registry_rejects_unknown_fields_and_duplicate_candidates(tmp_path: Path
 
 
 def test_decision_requires_current_contract_versions() -> None:
-    assert IDENTITY_NORMALIZATION_VERSION == "product-homologation-v2.3"
+    assert IDENTITY_NORMALIZATION_VERSION == "product-homologation-v2.4"
     assert IDENTITY_POLICY_VERSION == "precios-sps-product-identity-policy/v1"
 
 

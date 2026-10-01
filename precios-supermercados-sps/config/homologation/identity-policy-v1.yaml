@@ -1,5 +1,5 @@
 schema: precios-sps-product-identity-policy/v1
-engine_version: product-homologation-v2.3
+engine_version: product-homologation-v2.4
 
 relations:
   identity:
@@ -29,6 +29,24 @@ automatic_identity:
     - image_similarity_only
     - llm_assertion_only
     - one_brand_plus_type_plus_size
+
+# GS1 Restricted Circulation Numbers: válidos por check digit pero no globales.
+# Copia declarativa de precios_supermercados.gtin_policy (un test exige igualdad).
+restricted_gtin:
+  policy_version: gs1-restricted-circulation-v1
+  rule: identity_only_within_shared_product_master
+  gtin8_first_digits: ["0", "2"]
+  gtin13_prefix_ranges:
+    - {low: 20, high: 29, reason: rcn_upc_variable_measure}
+    - {low: 40, high: 49, reason: rcn_upc_company_internal}
+    - {low: 200, high: 299, reason: rcn_in_store}
+    - {low: 980, high: 999, reason: coupon_or_refund}
+  gtin14_indicators: ["9"]
+  shared_product_masters:
+    # Walmart y Paiz publican el mismo catálogo VTEX de Walmart Centroamérica.
+    walmart_cam: [paiz, walmart]
+  # La Colonia SPS/TGU comparten supermarket_id: nunca forman grupo consigo misma.
+  outside_master_status: review_required
 
 hard_conflicts:
   - different_valid_gtin

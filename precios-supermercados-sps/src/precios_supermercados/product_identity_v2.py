@@ -22,6 +22,7 @@ from difflib import SequenceMatcher
 from functools import lru_cache
 from typing import Iterable
 
+from .gtin_policy import restricted_gtin_shared_master_ok
 from .identifiers import generate_gtin_product_id
 from .product_homologation import (
     ExactGtinGroup,
@@ -40,7 +41,7 @@ from .product_homologation import (
     resolve_presentation,
 )
 
-IDENTITY_NORMALIZATION_VERSION = "product-homologation-v2.3"
+IDENTITY_NORMALIZATION_VERSION = "product-homologation-v2.4"
 
 _GENERIC_BRANDS = frozenset(
     {
@@ -985,6 +986,8 @@ def _exact_groups(profiles: tuple[ProductProfile, ...]) -> tuple[ExactGtinGroup,
         }
         if len(types) > 1:
             conflicts.add("product_type_conflict")
+        if not restricted_gtin_shared_master_ok(gtin, supermarkets):
+            conflicts.add("restricted_gtin_outside_shared_master")
         for idx, left in enumerate(members):
             for right in members[idx + 1 :]:
                 if left.record.supermarket_id == right.record.supermarket_id:

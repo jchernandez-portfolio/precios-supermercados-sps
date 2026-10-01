@@ -25,6 +25,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from difflib import SequenceMatcher
 from typing import Iterable
 
+from .gtin_policy import restricted_gtin_shared_master_ok
 from .identifiers import canonicalize_gtin, generate_gtin_product_id
 
 
@@ -721,6 +722,12 @@ def _gtin_group_conflicts(members: list[ProductProfile]) -> tuple[str, ...]:
     }
     if len(types) > 1:
         reasons.add("product_type_conflict")
+    gtins = {member.canonical_gtin for member in members}
+    if len(gtins) == 1 and not restricted_gtin_shared_master_ok(
+        next(iter(gtins)),
+        (member.record.supermarket_id for member in members),
+    ):
+        reasons.add("restricted_gtin_outside_shared_master")
     return tuple(sorted(reasons))
 
 

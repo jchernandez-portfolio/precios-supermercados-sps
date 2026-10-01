@@ -245,7 +245,7 @@ def test_candidate_graph_does_not_create_transitive_canonical_identity() -> None
 
 
 def test_identity_v2_is_versioned_without_changing_persisted_v1() -> None:
-    assert IDENTITY_NORMALIZATION_VERSION == "product-homologation-v2.3"
+    assert IDENTITY_NORMALIZATION_VERSION == "product-homologation-v2.4"
 
 
 def test_canonical_presentation_fields_preserve_raw_and_separate_pack() -> None:
