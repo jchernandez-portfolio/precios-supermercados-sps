@@ -1,0 +1,298 @@
+schema: precios-sps-matching-engine-config/v1
+engine_version: matching-engine-v1
+mode: shadow
+
+# Blocking: unión de llaves deterministas + recuperación MinHash-LSH sobre
+# n-gramas de caracteres del nombre núcleo; los vecinos se re-rankean por
+# coseno TF-IDF y se conservan top-k por cadena contraria.
+blocking:
+  rules:
+    - brand_size        # marca canónica + bucket logarítmico de tamaño (±1)
+    - type_size         # tipo de producto + bucket de tamaño (±1)
+    - brand_token       # marca + primer token significativo
+    - lead_tokens       # dos primeros tokens significativos ordenados + dimensión
+  max_block_size: 250
+  size_bucket_log_step: 0.05
+  minhash:
+    num_perm: 48
+    bands: 16
+    shingle_size: 3
+    max_bucket_size: 300
+    seed: 20260930
+  top_k_per_retailer: 6
+  min_similarity: 0.15
+
+comparison:
+  name_levels: [0.88, 0.74, 0.60, 0.45]
+  size:
+    exact_relative: 0.005
+    exact_absolute: 1.5
+    close_relative: 0.02
+    near_relative: 0.06
+    ounce_bridge_relative: 0.03
+  price_ratio_levels: [1.3, 2.0, 3.0]
+  # Token "raro" (distintivo) si aparece en ≤ 0.5 % de los registros de la ciudad.
+  rare_token_share: 0.005
+
+model:
+  laplace: 1.0
+  u_random_pairs: 120000
+  seed: 20260930
+  em_iterations: 40
+  # El precio es evidencia débil: su peso absoluto queda acotado.
+  weight_caps_bits:
+    price: 1.0
+
+thresholds:
+  target_precision: 0.98
+  min_support: 50
+  # Criterio: límite inferior de Wilson (z = 1.645, 95 % unilateral) ≥ objetivo,
+  # por par de supermercados. Evita elegir un umbral optimista por azar.
+  confidence_z: 1.645
+  # Banda de revisión: probabilidad mínima cuya precisión acumulada (silver,
+  # calibración) siga ≥ review_min_precision; nunca por debajo del piso.
+  review_min_precision: 0.5
+  review_floor_probability: 0.05
+  # Máximo de candidatos en cola por registro y cadena contraria.
+  review_top_k_per_record: 2
+  fallback_auto_probability: 0.995
+  fallback_review_probability: 0.5
+
+clustering:
+  linkage: complete
+  max_cluster_size: 8
+
+# Atributos de variante por familia. Dos valores distintos de la misma familia
+# son conflicto; un valor declarado de un solo lado limita la pareja a revisión,
+# salvo los valores implícitos por defecto (``implicit_defaults``).
+implicit_defaults:
+  sugar_line: [original]
+  fat: [whole]
+  # El envase declarado de un solo lado es muy frecuente ("Lata", "Doypack");
+  # sólo dos envases distintos declarados son conflicto.
+  packaging: [can, bottle, bag, doypack, box, glass, tetra]
+
+# Sinónimos/abreviaturas de catálogo aplicados a tokens del nombre núcleo.
+token_synonyms:
+  gaseosa: refresco
+  gaseosas: refresco
+  soda: refresco
+  refrescos: refresco
+  deterg: detergente
+  detergent: detergente
+  pvo: polvo
+  liq: liquido
+  acondi: acondicionador
+  acond: acondicionador
+  shampo: shampoo
+  champu: shampoo
+  desod: desodorante
+  yoghurt: yogurt
+  yogur: yogurt
+  catsup: ketchup
+  ltr: litro
+  ltrs: litro
+
+variant_vocabulary:
+  sugar_line:
+    clasico: original
+    clasica: original
+    classic: original
+    original: original
+    regular: original
+    tradicional: original
+    light: light
+    lite: light
+    diet: light
+    ligera: light
+    zero: zero
+    sin azucar: zero
+    cero azucar: zero
+  fat:
+    descremada: skim
+    descremado: skim
+    semidescremada: semi_skim
+    semidescremado: semi_skim
+    semi descremada: semi_skim
+    entera: whole
+    entero: whole
+    bajo en grasa: low_fat
+  lactose:
+    deslactosada: lactose_free
+    deslactosado: lactose_free
+    sin lactosa: lactose_free
+  grain:
+    integral: wholegrain
+  diet_claims:
+    sin gluten: gluten_free
+    sin sal: no_salt
+    bajo en sodio: low_sodium
+  organic:
+    organico: organic
+    organica: organic
+  spice:
+    picante: spicy
+    extra picante: extra_spicy
+    con chile: spicy
+  pulp:
+    con pulpa: with_pulp
+    c pulpa: with_pulp
+    sin pulpa: without_pulp
+    s pulpa: without_pulp
+  packaging:
+    lata: can
+    botella: bottle
+    bote: bottle
+    bolsa: bag
+    doypack: doypack
+    doy pack: doypack
+    caja: box
+    vidrio: glass
+    tetra pack: tetra
+    tetrapack: tetra
+  protein:
+    pollo: pollo
+    res: res
+    cerdo: cerdo
+    camaron: camaron
+    jamon: jamon
+    tocino: tocino
+    atun: atun
+    pavo: pavo
+  flavor:
+    fresa: fresa
+    strawberry: fresa
+    chocolate: chocolate
+    cacao: chocolate
+    vainilla: vainilla
+    vanilla: vainilla
+    limon: limon
+    lemon: limon
+    lima: lima
+    lime: lima
+    naranja: naranja
+    orange: naranja
+    manzana: manzana
+    apple: manzana
+    uva: uva
+    grape: uva
+    pina: pina
+    pineapple: pina
+    mango: mango
+    coco: coco
+    coconut: coco
+    cereza: cereza
+    cherry: cereza
+    durazno: melocoton
+    melocoton: melocoton
+    peach: melocoton
+    mora: mora
+    blackberry: mora
+    frambuesa: frambuesa
+    raspberry: frambuesa
+    guayaba: guayaba
+    banano: banano
+    banana: banano
+    maracuya: maracuya
+    sandia: sandia
+    tamarindo: tamarindo
+    canela: canela
+    menta: menta
+    caramelo: caramelo
+    cafe: cafe
+    mani: mani
+    almendra: almendra
+    nuez: nuez
+    miel: miel
+    tomate: tomate
+    queso: queso
+    cebolla: cebolla
+    ajo: ajo
+    jalapeno: jalapeno
+    habanero: habanero
+    barbacoa: barbacoa
+    bbq: barbacoa
+    ranch: ranch
+    mostaza: mostaza
+    mandarina: mandarina
+    kiwi: kiwi
+    pera: pera
+    pear: pera
+    toronja: toronja
+    grapefruit: toronja
+    guanabana: guanabana
+    jamaica: jamaica
+    ciruela: ciruela
+    tutti frutti: tutti_frutti
+  scent:
+    lavanda: lavanda
+    lavender: lavanda
+    floral: floral
+    manzanilla: manzanilla
+    aloe: aloe
+    eucalipto: eucalipto
+    jazmin: jazmin
+    rosas: rosas
+    citrico: citrico
+    citrus: citrico
+    fresh: fresh
+    brisa: brisa
+    talco: talco
+    sabila: aloe
+    karite: karite
+    argan: argan
+    keratina: keratina
+    carbon: carbon
+  color:
+    negro: negro
+    negros: negro
+    negra: negro
+    blanco: blanco
+    blancos: blanco
+    blanca: blanco
+    rojo: rojo
+    rojos: rojo
+    roja: rojo
+    azul: azul
+    verde: verde
+    amarillo: amarillo
+    rosado: rosa
+    rosa: rosa
+    morado: morado
+    dorado: dorado
+    plateado: plateado
+    pinto: pinto
+    pintos: pinto
+    moreno: moreno
+    morena: moreno
+  audience:
+    nino: kids
+    ninos: kids
+    nina: kids
+    kids: kids
+    infantil: baby
+    junior: kids
+    adulto: adult
+    adultos: adult
+    hombre: men
+    men: men
+    caballero: men
+    mujer: women
+    women: women
+    dama: women
+    cachorro: puppy
+    cachorros: puppy
+    puppy: puppy
+    senior: senior
+    bebe: baby
+    baby: baby
+  size_word:
+    jumbo: jumbo
+    extra grande: extra_grande
+    xl: extra_grande
+    grande: grande
+    grandes: grande
+    mediano: mediano
+    medianos: mediano
+    pequeno: pequeno
+    pequenos: pequeno
