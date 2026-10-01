@@ -15,6 +15,7 @@ reemplaza el motor persistido hasta que una muestra real demuestre su precisión
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from decimal import Decimal, ROUND_HALF_UP
@@ -105,8 +106,14 @@ _FRACTION_WITH_UNIT_RE = re.compile(
     r"(?=\s*(?:mg|kg|grs?|gramos?|g|lbs?|libras?|oz|onzas?|ml|lts?|litros?|l)(?!\w))",
     re.IGNORECASE,
 )
+# Envases contables que, seguidos de "de/x <cantidad>", declaran la cantidad por
+# envase: "12 latas de 355 ml", "6 botellas x 600 ml", "10 sobres de 25 g".
+_CONTAINER_ALIASES = (
+    r"latas?|botellas?|botellitas?|bolsitas?|sobres?|sachets?|cajitas?|vasitos?|"
+    r"tarritos?|frascos?|barras?"
+)
 _NATURAL_MULTIPACK_RE = re.compile(
-    rf"(?<!\w)(?P<count>\d{{1,3}})\s*(?:{_COUNT_ALIASES})\s*"
+    rf"(?<!\w)(?P<count>\d{{1,3}})\s*(?:{_COUNT_ALIASES}|{_CONTAINER_ALIASES})\s*"
     r"(?:de|x)\s*(?P<amount>\d+(?:[.,]\d+)?)\s*"
     r"(?P<unit>mg|kg|grs?|gramos?|g|lbs?|libras?|oz|onzas?|ml|lts?|litros?|l)(?!\w)",
     re.IGNORECASE,
@@ -116,6 +123,34 @@ _COMPACT_SLASH_MULTIPACK_RE = re.compile(
     r"(?P<unit>mg|kg|grs?|gramos?|g|lbs?|libras?|oz|onzas?|ml|lts?|litros?|l)(?!\w)",
     re.IGNORECASE,
 )
+
+# Combos, kits y promociones multi-producto no son comparables con el producto
+# individual. Se detectan sobre el nombre fuente sin plegar porque "+" importa.
+_BUNDLE_TERMS_RE = re.compile(
+    r"(?<!\w)(?:combo|combos|kit|gratis|obsequio|incluye|incluyen)(?!\w)",
+    re.IGNORECASE,
+)
+_PROMO_MULTIBUY_RE = re.compile(r"(?<![\w/.,])(?P<take>[2-4])\s*[x×]\s*(?P<pay>[1-3])(?![\w/.,])", re.IGNORECASE)
+_QUANTITY_PLUS_RE = re.compile(
+    r"\d+(?:[.,]\d+)?\s*(?:mg|kg|grs?|gramos?|g|lbs?|libras?|oz|onzas?|ml|lts?|litros?|l|%)\s*\+"
+    r"|(?<=\s)\+\s*\d+(?:[.,]\d+)?\s*(?:mg|kg|grs?|gramos?|g|lbs?|libras?|oz|onzas?|ml|lts?|litros?|l|%)(?!\w)",
+    re.IGNORECASE,
+)
+
+
+def is_bundle_name(name: str | None) -> bool:
+    """Combo/kit/promoción multi-producto declarado en el nombre fuente."""
+
+    if not name:
+        return False
+    text = unicodedata.normalize("NFKC", name)
+    if _BUNDLE_TERMS_RE.search(text) or _QUANTITY_PLUS_RE.search(text):
+        return True
+    return any(
+        int(match.group("take")) > int(match.group("pay"))
+        for match in _PROMO_MULTIBUY_RE.finditer(text)
+    )
+
 
 _EGG_FALSE_CONTEXT = frozenset(
     {"tallarin", "tallarines", "fideo", "fideos", "mayonesa", "kinder", "toro"}
@@ -786,6 +821,8 @@ def _variant_labels(profile: ProductProfile) -> frozenset[str]:
         for alias, canonical in aliases.items():
             if _phrase_present(text, alias):
                 labels.add(f"{attribute}:{canonical}")
+    if is_bundle_name(profile.record.source_name):
+        labels.add("bundle:declared")
     egg_size = canonical_egg_size(profile.record, profile.taxonomy)
     if egg_size is not None:
         labels.add(f"egg_size:{fold_text(egg_size)}")
@@ -831,6 +868,8 @@ def _hard_conflicts(left: ProductProfile, right: ProductProfile) -> tuple[str, .
 
     left_labels = _variant_labels(left)
     right_labels = _variant_labels(right)
+    if ("bundle:declared" in left_labels) != ("bundle:declared" in right_labels):
+        conflicts.add("bundle_vs_single_conflict")
     left_sizes = {item for item in left_labels if item.startswith("egg_size:")}
     right_sizes = {item for item in right_labels if item.startswith("egg_size:")}
     if left_sizes and right_sizes and left_sizes != right_sizes:

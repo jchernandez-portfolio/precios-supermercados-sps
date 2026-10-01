@@ -140,6 +140,10 @@ class PresentationSignature:
     total_base: Decimal
     pack_count: int
     unit_amount_base: Decimal | None = None
+    # Etiqueta dual ("16 oz (454 g)"): la presentación canónica es la métrica y
+    # las onzas declaradas por unidad se conservan sólo como evidencia auxiliar
+    # para seguir siendo comparable con fuentes que sólo publican onzas.
+    declared_ounces: Decimal | None = None
 
     def __post_init__(self) -> None:
         if self.dimension not in {"mass_g", "volume_ml", "count", "ounce"}:
@@ -148,6 +152,10 @@ class PresentationSignature:
             raise ProductHomologationError("presentation_value_invalid")
         if self.unit_amount_base is not None and self.unit_amount_base <= 0:
             raise ProductHomologationError("presentation_unit_value_invalid")
+        if self.declared_ounces is not None and (
+            self.declared_ounces <= 0 or self.dimension not in {"mass_g", "volume_ml"}
+        ):
+            raise ProductHomologationError("presentation_declared_ounces_invalid")
 
 
 @dataclass(frozen=True, slots=True)
@@ -323,7 +331,7 @@ _TAXONOMY_RULES = (
     _TaxonomyRule("sopa", "Alimentos", "Sopas", "Sopa", any_terms=("sopa",)),
     _TaxonomyRule("pan_molde", "Alimentos", "Panadería", "Pan de molde", ("pan",), ("molde", "sandwich")),
     _TaxonomyRule("pan", "Alimentos", "Panadería", "Pan", any_terms=("pan",), forbidden_terms=("panal", "pantalon")),
-    _TaxonomyRule("azucar", "Alimentos", "Azúcar y endulzantes", "Azúcar", any_terms=("azucar",)),
+    _TaxonomyRule("azucar", "Alimentos", "Azúcar y endulzantes", "Azúcar", any_terms=("azucar",), forbidden_terms=("sin azucar", "bajo en azucar", "cero azucar", "menos azucar")),
     _TaxonomyRule("sal", "Alimentos", "Condimentos", "Sal", any_terms=("sal",), forbidden_terms=("salsa", "salmon")),
     _TaxonomyRule("chocolate", "Alimentos", "Dulces y chocolates", "Chocolate", any_terms=("chocolate",)),
     _TaxonomyRule("aceite", "Alimentos", "Aceites y grasas", "Aceite comestible", any_terms=("aceite",), forbidden_terms=("motor", "cabello", "corporal", "esencial", "desodorante", "shampoo", "micelar", "crema")),
@@ -446,6 +454,18 @@ _EXPLICIT_MULTIPACK_RE = re.compile(
     rf"(?<!\w)(?P<count>\d+)\s*[x×]\s*(?P<amount>\d+(?:[.,]\d+)?)\s*(?P<unit>{_UNIT_PATTERN})(?!\w)",
     re.IGNORECASE,
 )
+_MEASURE_UNIT_PATTERN = "|".join(
+    re.escape(unit)
+    for unit in sorted(_UNIT_FACTORS, key=len, reverse=True)
+    if _UNIT_FACTORS[unit][0] != "count"
+)
+# "355 ml x 6", "50 g X 3 Unidades": cantidad primero y conteo después. El
+# conteo no puede ir seguido de otra unidad de medida ("10 cm x 20 cm").
+_REVERSE_MULTIPACK_RE = re.compile(
+    rf"(?<!\w)(?P<amount>\d+(?:[.,]\d+)?)\s*(?P<unit>{_UNIT_PATTERN})\s*[x×]\s*(?P<count>\d{{1,3}})"
+    rf"(?![\d.,])(?!\s*(?:{_MEASURE_UNIT_PATTERN}|cm|mm|m|plg|pulg)(?!\w))",
+    re.IGNORECASE,
+)
 _SLASH_MULTIPACK_RE = re.compile(
     rf"(?<!\w)(?P<count>\d+)\s*(?:unidades?|uds?|und|ud)\s*/\s*(?P<amount>\d+(?:[.,]\d+)?)\s*(?P<unit>{_UNIT_PATTERN})(?!\w)",
     re.IGNORECASE,
@@ -455,9 +475,15 @@ _SINGLE_RE = re.compile(
     re.IGNORECASE,
 )
 _AMBIGUOUS_PACK_RE = re.compile(
-    r"(?<!\w)(?:\d+\s*(?:pack|pk)|(?:pack|pk)\s*\d+)(?!\w)",
+    r"(?<!\w)(?:(?P<before>\d+)\s*(?:pack|pk)|(?:pack|pk)\s*(?P<after>\d+))(?!\w)",
     re.IGNORECASE,
 )
+_OUNCE_TO_GRAMS = Decimal("28.349523125")
+_FLUID_OUNCE_TO_ML = Decimal("29.5735295625")
+# Tolerancia entre etiquetas duales del mismo envase (redondeo de fabricante:
+# "240 g o 8 oz" difiere 5.8%). Por encima, las dos etiquetas no describen la
+# misma cantidad y la presentación queda sin resolver.
+_DUAL_LABEL_TOLERANCE = Decimal("0.08")
 _STOPWORDS = frozenset(
     {
         "de", "del", "la", "el", "los", "las", "y", "con", "para", "en", "por",
@@ -540,6 +566,18 @@ def _parse_presentation_text(
             False,
         )
 
+    reverse = list(_REVERSE_MULTIPACK_RE.finditer(value))
+    if reverse:
+        match = reverse[-1]
+        return (
+            _signature(
+                match.group("amount"),
+                match.group("unit"),
+                pack_count=int(match.group("count")),
+            ),
+            False,
+        )
+
     slash = list(_SLASH_MULTIPACK_RE.finditer(value))
     if slash:
         match = slash[-1]
@@ -559,20 +597,75 @@ def _parse_presentation_text(
         "",
         value,
     )
-    if _AMBIGUOUS_PACK_RE.search(pack_scan_value):
+    # "1 Pack" es una sola unidad y no introduce ambigüedad.
+    if any(
+        int(match.group("before") or match.group("after")) != 1
+        for match in _AMBIGUOUS_PACK_RE.finditer(pack_scan_value)
+    ):
         return None, True
 
     singles = list(_SINGLE_RE.finditer(value))
     if not singles:
         return None, False
-    match = singles[-1]
-    return _signature(match.group("amount"), match.group("unit")), False
+    return _prefer_metric_single(singles), False
+
+
+def _unit_dimension(match: re.Match[str]) -> str | None:
+    info = _UNIT_FACTORS.get(" ".join(match.group("unit").casefold().split()))
+    return None if info is None else info[0]
+
+
+def _prefer_metric_single(singles: list[re.Match[str]]) -> PresentationSignature | None:
+    """Con etiqueta dual onzas + métrica, la métrica es canónica.
+
+    "16 oz (454 g)", "240 g o 8 oz" y "420 g / 14 oz" producen la misma firma
+    métrica sin importar el orden. Las onzas se conservan como evidencia auxiliar
+    cuando ambas etiquetas son coherentes (como peso o como volumen); si no lo
+    son, la presentación no se resuelve (fail-closed).
+    """
+
+    ounces = [match for match in singles if _unit_dimension(match) == "ounce"]
+    metric = [match for match in singles if _unit_dimension(match) in {"mass_g", "volume_ml"}]
+    if not ounces or not metric:
+        match = singles[-1]
+        return _signature(match.group("amount"), match.group("unit"))
+    signature = _signature(metric[-1].group("amount"), metric[-1].group("unit"))
+    ounce_value = _decimal(ounces[-1].group("amount"))
+    if signature is None or ounce_value is None:
+        return None
+    factor = _OUNCE_TO_GRAMS if signature.dimension == "mass_g" else _FLUID_OUNCE_TO_ML
+    converted = ounce_value * factor
+    if abs(converted - signature.total_base) / signature.total_base > _DUAL_LABEL_TOLERANCE:
+        return None
+    return PresentationSignature(
+        dimension=signature.dimension,
+        total_base=signature.total_base,
+        pack_count=signature.pack_count,
+        unit_amount_base=signature.unit_amount_base,
+        declared_ounces=ounce_value,
+    )
+
+
+def _ounce_label_compatible(
+    left: PresentationSignature,
+    right: PresentationSignature,
+) -> bool:
+    """Onzas-sólo vs etiqueta dual: compara contra las onzas declaradas."""
+
+    ounce, metric = (left, right) if left.dimension == "ounce" else (right, left)
+    if ounce.dimension != "ounce" or metric.declared_ounces is None:
+        return False
+    if ounce.pack_count != metric.pack_count:
+        return False
+    return ounce.total_base == metric.declared_ounces * metric.pack_count
 
 
 def presentations_compatible(
     left: PresentationSignature,
     right: PresentationSignature,
 ) -> bool:
+    if _ounce_label_compatible(left, right):
+        return True
     if left.dimension != right.dimension or left.pack_count != right.pack_count:
         return False
     if left.dimension in {"count", "ounce"}:

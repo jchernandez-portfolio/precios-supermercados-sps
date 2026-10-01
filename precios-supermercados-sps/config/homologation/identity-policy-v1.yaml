@@ -56,6 +56,7 @@ hard_conflicts:
   - variant_conflict
   - flavor_conflict
   - packaging_conflict
+  - bundle_vs_single_conflict
 
 reviewed_equivalence:
   required:
