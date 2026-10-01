@@ -16,34 +16,31 @@ El **web scraping** sigue siendo una capacidad técnica importante y demostrable
 
 ## Producto público actual
 
-Compra Inteligente permite navegar precios publicados para cinco contextos SPS:
+Compra Inteligente permite navegar precios publicados en dos ciudades:
 
-- La Colonia;
-- Supermercados Colonial;
-- Walmart;
-- PriceSmart;
-- Comisariato Los Andes.
+- **San Pedro Sula:** La Colonia, Supermercados Colonial, Walmart, PriceSmart y Comisariato Los Andes.
+- **Tegucigalpa:** La Colonia, Walmart FFAA, Walmart El Sauce, PriceSmart Florencia, Paiz Multiplaza y Paiz Próceres.
 
-La publicación Consumer Catalog v3 verificada el **2026-09-10** contiene, como snapshot medido y no como cifra permanente:
+La publicación Consumer Catalog v3 verificada el **2026-09-21** contiene, como snapshot medido y no como cifra permanente:
 
-| Métrica | Valor observado |
-| --- | ---: |
-| Filas visibles | 44,042 |
-| Ofertas fuente | 46,680 |
-| Filas comparables | 2,638 |
-| `single_source` | 11,846 |
-| Ofertas individuales | 29,558 |
-| Particiones públicas | 484 |
-| Máximo por partición | 250 filas |
-| Ofertas con resumen histórico | 45,420 |
+| Métrica | San Pedro Sula | Tegucigalpa |
+| --- | ---: | ---: |
+| Filas visibles | 36,886 | 33,370 |
+| Ofertas fuente | 39,498 | 59,786 |
+| Filas comparables | 2,612 | 8,321 |
+| `single_source` | 10,242 | 17,504 |
+| Ofertas individuales | 24,032 | 7,545 |
+| Particiones públicas | 453 | 384 |
+| Máximo por partición | 250 filas | 250 filas |
+| Ofertas con resumen histórico | 39,362 | 57,826 |
 
-El payload inicial del catálogo medido en ese corte es 37,796 bytes sin comprimir / 4,957 bytes gzip y dos requests iniciales. Los índices/particiones se cargan bajo demanda.
+El payload inicial de SPS medido en ese corte es 37,203 bytes sin comprimir / 4,947 bytes gzip con dos requests iniciales. Los índices y particiones se cargan bajo demanda. La pestaña **Análisis** resume promociones, movimientos de precio y liderazgo por categoría de cada ciudad.
 
 ## Qué puede hacer el usuario
 
 - filtrar por categoría, producto, marca y presentación;
 - buscar productos;
-- revisar una matriz de cinco supermercados;
+- elegir ciudad y revisar la matriz de supermercados/sucursales;
 - elegir manualmente la oferta exacta que quiere comprar;
 - indicar cantidades;
 - agregar varios productos por lote;
@@ -98,7 +95,7 @@ No se infieren impuestos, ISV, delivery, service fees o membership fees. Los pre
 
 ## Evidencia técnica
 
-La plataforma conserva seis cadenas / once contextos productivos en el pipeline recurrente general, mientras el producto B2C público está deliberadamente limitado a cinco contextos SPS.
+La plataforma conserva seis cadenas / once contextos productivos en el pipeline recurrente general, y el producto B2C público cubre cinco contextos en San Pedro Sula y seis en Tegucigalpa.
 
 El portafolio puede enlazar:
 
@@ -164,7 +161,7 @@ El valor a comunicar es la transformación completa de información pública dis
 1. Presentar primero el producto y el valor, luego la tecnología.
 2. Usar `Retail Price Intelligence` / `Compra Inteligente` como identidad principal.
 3. Mostrar web scraping como capacidad, no como límite del proyecto.
-4. Cualquier cifra debe incluir o derivar de un corte aceptado; las cifras anteriores son el snapshot publicado del 2026-09-10.
+4. Cualquier cifra debe incluir o derivar de un corte aceptado; las cifras anteriores son el snapshot publicado del 2026-09-21.
 5. Distinguir “visible” de “comparable”.
 6. No inventar ahorro, impuestos, tiempo real ni disponibilidad.
 7. No publicar secretos, RAW, cookies, tokens o colas de revisión.

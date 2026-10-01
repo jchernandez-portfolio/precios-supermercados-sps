@@ -127,7 +127,10 @@ No publica secretos, RAW, colas de revisión ni grupos ambiguos.
 
 `rpi-consumer-catalog/v3` es el contrato público de navegación de gran volumen. Está separado del Consumer Mart para que **visibilidad no implique comparabilidad**.
 
-Alcance vigente: cinco contextos SPS — La Colonia, Colonial, Walmart, PriceSmart y Comisariato Los Andes.
+Alcance vigente: un catálogo por ciudad, enumeradas en `rpi-consumer-city-index/v1` (`v3/cities.json`).
+
+- **San Pedro Sula** (predeterminada): La Colonia, Colonial, Walmart, PriceSmart y Comisariato Los Andes.
+- **Tegucigalpa**: La Colonia, Walmart FFAA, Walmart El Sauce, PriceSmart Florencia, Paiz Multiplaza y Paiz Próceres. Las sucursales de una misma cadena se mantienen separadas.
 
 Una fila puede ser:
 
@@ -141,12 +144,24 @@ El catálogo se sirve como manifest, facetas, índices bajo demanda y particione
 
 `is_promotion=null` significa promoción desconocida; no debe mostrarse como `false`.
 
+## Análisis B2C
+
+`rpi-consumer-analysis/v1` publica un archivo por ciudad, calculado en Python sobre el mismo corte que el catálogo (el `as_of` debe coincidir). Incluye:
+
+- resumen;
+- cobertura y mejores precios por supermercado;
+- oportunidades: bajadas, subidas, promociones y mínimos recientes;
+- liderazgo por categoría.
+
+La pestaña **Análisis** lo muestra sin recalcular identidades.
+
 ## Flujo de Compra Inteligente
 
 La aplicación responsive permite:
 
 - navegación por facetas dependientes y búsqueda;
-- matriz de cinco supermercados en escritorio y tarjetas adaptativas en móvil;
+- selector de ciudad;
+- matriz de supermercados/sucursales de la ciudad en escritorio y tarjetas adaptativas en móvil;
 - selección manual exacta de oferta;
 - cantidades positivas;
 - alta por lote con confirmación de conflictos;
