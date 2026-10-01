@@ -14,6 +14,10 @@ from xml.etree import ElementTree as ET
 
 ORIGIN = "https://supercolonial.com"
 SECTION = "template--25869947109668__banner"
+# Botón de acción de la tarjeta. `addtocart-btn` es el markup previo al
+# 2026-09-24; desde entonces el botón disponible usa `add_to_cart_btn_cls` y el
+# agotado sólo `cp-sold-out` (deshabilitado). Cada tarjeta debe tener uno solo.
+ACTION_BUTTON_CLASSES = frozenset({"addtocart-btn", "add_to_cart_btn_cls", "cp-sold-out"})
 
 
 class ColonialError(ValueError):
@@ -121,9 +125,9 @@ class _Cards(HTMLParser):
             self.card["ids"].append(a.get("value"))
         if "cp_product_price" in classes:
             self.capture = (tag, "price")
-        if tag == "del":
+        if tag == "del" or (tag == "s" and "lc-pcard__price-was" in classes):
             self.capture = (tag, "regular")
-        if tag == "button" and "addtocart-btn" in classes:
+        if tag == "button" and ACTION_BUTTON_CLASSES.intersection(classes):
             self.card["buttons"].append(("cp-sold-out" in classes, "disabled" in a, a.get("aria-disabled")))
 
     def handle_data(self, data: str) -> None:
