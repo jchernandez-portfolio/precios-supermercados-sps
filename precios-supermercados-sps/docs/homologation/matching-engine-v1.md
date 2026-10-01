@@ -107,6 +107,12 @@ GTIN y mide lo que el motor aporta donde no hay código.
   GTIN). Estimar `u` dentro de la población bloqueada corrige la correlación
   marca–nombre entre no-matches de un mismo bloque. El `u` clásico de Splink
   (parejas aleatorias) se guarda como diagnóstico.
+- Paiz–Walmart (misma plataforma, nombres idénticos) aporta ~75 % de las
+  etiquetas. Se evaluó ponderarlas para que cada par de cadenas aporte lo
+  mismo (`model.balance_retailer_pairs`): ganó 2–3 pts de recall en pares con
+  La Colonia/Colonial pero perdió 1.5 pts de precisión en prueba y cuadruplicó
+  la banda de revisión, así que queda desactivado. Los umbrales por par de
+  cadenas compensan la mezcla en la decisión.
 - `λ` = EM sobre todas las parejas candidatas con m/u fijos. También se entrena
   una variante con EM completo de `m` (`model-em.json`) para comparar.
 - Peso = log2(λ/(1−λ)) + Σ log2(m/u); probabilidad = 2^w/(1+2^w). Cada fila de la

@@ -96,6 +96,7 @@ class MatchingEngine:
         self.laplace = float(model_section.get("laplace", 1.0))
         self.em_iterations = int(model_section.get("em_iterations", 40))
         self.weight_caps = {str(k): float(v) for k, v in dict(model_section.get("weight_caps_bits") or {}).items()}
+        self.balance_retailer_pairs = bool(model_section.get("balance_retailer_pairs", False))
         clustering = config.section("clustering")
         self.linkage = str(clustering.get("linkage", "complete"))
         self.max_cluster_size = int(clustering.get("max_cluster_size", 8))
@@ -196,6 +197,10 @@ class MatchingEngine:
             labels[key] = SilverLabel(False, split_for_key(gtins[0]), gtins)
         return positives, labels
 
+    @staticmethod
+    def _group(run: CityRun, key: tuple[str, str]) -> str:
+        return retailer_pair(run.by_id[key[0]].supermarket_id, run.by_id[key[1]].supermarket_id)
+
     def _near_duplicate(self, a: StandardizedRecord, b: StandardizedRecord) -> bool:
         labels = compare(a, b, self.comparison).as_labels()
         return (
@@ -242,30 +247,38 @@ class MatchingEngine:
         for run in runs:
             share = max(1000, round(self.u_pairs * len(run.records) / total_records))
             random_rows.extend(self.random_pair_vectors(run, share, rng))
-        negative_rows = [
-            run.vectors[key].levels
+        negatives = [
+            (run.vectors[key].levels, self._group(run, key))
             for run in runs
             for key, label in run.labels.items()
             if not label.is_match and label.split == "train" and key in run.vectors
         ]
-        m_rows = [
-            vector.levels
+        positives = [
+            (vector.levels, self._group(run, key))
             for run in runs
             for key, vector in run.silver_positive_vectors.items()
             if run.labels[key].split == "train"
         ]
+        if self.balance_retailer_pairs:
+            negative_rows, negative_weights = _balanced(negatives)
+            m_rows, m_weights = _balanced(positives)
+        else:
+            negative_rows, negative_weights = [levels for levels, _ in negatives], None
+            m_rows, m_weights = [levels for levels, _ in positives], None
         model = FellegiSunterModel(laplace=self.laplace, weight_caps_bits=dict(self.weight_caps))
         random_model = FellegiSunterModel(laplace=self.laplace)
         random_model.fit_u(random_rows)
         if len(negative_rows) >= 1000:
-            model.fit_u(negative_rows)
+            model.fit_u(negative_rows, negative_weights)
             model.training["u_source"] = "silver_negative_candidate_pairs"
         else:
             model.fit_u(random_rows)
             model.training["u_source"] = "random_cross_retailer_pairs"
         model.training["u_random_pairs"] = len(random_rows)
         model.training["u_random"] = random_model.u
-        model.fit_m(m_rows)
+        model.fit_m(m_rows, m_weights)
+        model.training["pair_weighting"] = "balanced_by_retailer_pair" if self.balance_retailer_pairs else "observed"
+        model.training["train_positive_pairs_by_retailer_pair"] = dict(sorted(Counter(group for _, group in positives).items()))
         candidate_rows = [vector.levels for run in runs for vector in run.vectors.values() if not vector.same_retailer]
         model.prior = 1e-2
         model.fit_prior_em(candidate_rows, iterations=self.em_iterations)
@@ -689,6 +702,21 @@ class MatchingEngine:
                 ),
             },
         }
+
+
+def _balanced(rows: Sequence[tuple[tuple[int, ...], str]]) -> tuple[list[tuple[int, ...]], list[float]]:
+    """Pondera para que cada par de cadenas aporte lo mismo a m/u.
+
+    Sin esto, Paiz–Walmart (misma plataforma, nombres idénticos) domina las
+    etiquetas y el modelo castiga similitudes de nombre "altas" que son típicas
+    entre cadenas con estilos de nombre distintos.
+    """
+
+    counts = Counter(group for _, group in rows)
+    if not counts:
+        return [], []
+    per_group = len(rows) / len(counts)
+    return [levels for levels, _ in rows], [per_group / counts[group] for _, group in rows]
 
 
 def _group_by(items: Iterable[StandardizedRecord], key) -> dict[str, list[StandardizedRecord]]:  # type: ignore[no-untyped-def]

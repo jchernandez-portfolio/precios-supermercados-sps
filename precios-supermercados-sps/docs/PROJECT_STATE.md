@@ -214,3 +214,35 @@ La publicación pública incluye Consumer Mart v2, Consumer Catalog v3 por ciuda
 2. Reducir lecturas de Turso (plan de optimización) o ampliar el plan.
 3. Con autorización explícita, diagnosticar y corregir el extractor de Colonial (`card_shape_invalid`).
 4. Revisar la homologación entre supermercados (cobertura de identidades comparables y prácticas de matching).
+
+## Motor de homologación (shadow) 2026-09-30
+
+Motor de resolución de entidades probabilístico en **modo shadow** (no cambia la
+comparabilidad publicada ni corre en el workflow diario). Diseño y referencias
+(Fellegi–Sunter, Splink, Dedupe, GS1, MinHash-LSH): [`homologation/matching-engine-v1.md`](homologation/matching-engine-v1.md).
+CLI manual: `scripts/homologacion_motor_shadow.py` (`run`, `evaluate-golden`, `import-review`).
+
+Corrida offline sobre el corte publicado **2026-09-21** (registros reconstruidos
+desde el catálogo v3 + snapshots de retailers; salidas privadas, no versionadas):
+
+| Métrica | SPS | TGU |
+| --- | ---: | ---: |
+| Registros fuente / parejas candidatas | 39 498 / 304 835 | 59 786 / 482 194 |
+| Parejas silver (GTIN compartido) | 4 999 | 37 376 |
+| Nuevas parejas auto-match vs publicado | 413 | 2 348 |
+| Nuevas parejas a revisión (cola top-2) | 8 272 | 6 318 |
+| Registros en identidad multi-cadena: actual → auto | 13,2 % → 14,4 % | 58,1 % → 61,5 % |
+| Cota si la cola revisada se confirmara | 30,2 % | 65,5 % |
+
+- Prueba silver ciega al GTIN (split 20 %): auto-match precisión **0,987**
+  (Wilson 95 % ≥ 0,984), recall 0,669; recall del blocking 0,976. Por par:
+  Paiz–Walmart 0,988, La Colonia–Walmart 0,982, La Colonia–Paiz 0,981,
+  Colonial–La Colonia 0,971; Colonial–Walmart queda sin auto-match (no llega a
+  0,98).
+- Comisariato y PriceSmart no tienen GTIN: sin auto-match hasta etiquetar el
+  golden set (`golden-set.csv`, 600 parejas estratificadas).
+- Hallazgo: el campo `reference` de Colonial es un GTIN válido en ~92 % de los
+  productos y coincide con EAN de Walmart en ~2,9 k casos; hoy no se persiste.
+- Pendiente para cualquier promoción: etiquetar ≥ 500 parejas golden, correr
+  `--turso` para huellas vigentes, revisar la cola y cambiar la política en un
+  PR explícito.

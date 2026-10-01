@@ -39,6 +39,11 @@ model:
   u_random_pairs: 120000
   seed: 20260930
   em_iterations: 40
+  # Ponderar etiquetas para que cada par de cadenas aporte lo mismo se evaluó
+  # en el corte 2026-09-21: +2–3 pts de recall en pares con La Colonia/Colonial,
+  # pero −1.5 pts de precisión en prueba y una banda de revisión 4× mayor.
+  # Se mantiene la distribución observada.
+  balance_retailer_pairs: false
   # El precio es evidencia débil: su peso absoluto queda acotado.
   weight_caps_bits:
     price: 1.0

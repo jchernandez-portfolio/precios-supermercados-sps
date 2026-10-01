@@ -227,3 +227,19 @@ def test_wilson_criterion_and_disabled_segments() -> None:
     disabled = segmented.for_group("colonial|walmart")
     assert disabled.auto == AUTO_DISABLED and disabled.source == "auto_disabled_precision_below_target"
     assert segmented.band(0.99, auto_eligible=True, hard_conflict=False, group="colonial|walmart") == "review"
+
+
+def test_training_weights_balance_retailer_pairs() -> None:
+    from precios_supermercados.matching.pipeline import _balanced
+
+    rows = [((0,), "paiz|walmart")] * 90 + [((1,), "colonial|walmart")] * 10
+    levels, weights = _balanced(rows)
+    assert len(levels) == 100
+    assert sum(weight for (_, group), weight in zip(rows, weights) if group == "paiz|walmart") == pytest.approx(50)
+    assert sum(weight for (_, group), weight in zip(rows, weights) if group == "colonial|walmart") == pytest.approx(50)
+    assert _balanced([]) == ([], [])
+    model = FellegiSunterModel()
+    good = _row(brand="exact")
+    bad = _row(brand="conflict")
+    model.fit_m([good, bad], [3.0, 1.0])
+    assert model.m["brand"][dict(FIELDS)["brand"].index("exact")] > model.m["brand"][dict(FIELDS)["brand"].index("conflict")]

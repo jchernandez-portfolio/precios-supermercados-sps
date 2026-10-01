@@ -36,13 +36,17 @@ def _normalize(counts: Sequence[float], laplace: float) -> list[float]:
     return [value / total for value in smoothed]
 
 
-def _count_levels(level_rows: Iterable[tuple[int, ...]]) -> tuple[list[list[float]], int]:
+def _count_levels(
+    level_rows: Iterable[tuple[int, ...]],
+    weights: Sequence[float] | None = None,
+) -> tuple[list[list[float]], int]:
     counts = [[0.0] * len(levels) for _, levels in FIELDS]
     total = 0
-    for row in level_rows:
+    for position, row in enumerate(level_rows):
+        weight = 1.0 if weights is None else float(weights[position])
         total += 1
         for index, level in enumerate(row):
-            counts[index][level] += 1
+            counts[index][level] += weight
     return counts, total
 
 
@@ -56,16 +60,16 @@ class FellegiSunterModel:
     training: dict[str, object] = field(default_factory=dict)
 
     # -- estimación -------------------------------------------------------
-    def fit_u(self, level_rows: Iterable[tuple[int, ...]]) -> int:
-        counts, total = _count_levels(level_rows)
+    def fit_u(self, level_rows: Iterable[tuple[int, ...]], weights: Sequence[float] | None = None) -> int:
+        counts, total = _count_levels(level_rows, weights)
         if total == 0:
             raise FellegiSunterError("u_sample_empty")
         self.u = {name: _normalize(counts[index], self.laplace) for index, name in enumerate(FIELD_NAMES)}
         self.training["u_pairs"] = total
         return total
 
-    def fit_m(self, level_rows: Iterable[tuple[int, ...]]) -> int:
-        counts, total = _count_levels(level_rows)
+    def fit_m(self, level_rows: Iterable[tuple[int, ...]], weights: Sequence[float] | None = None) -> int:
+        counts, total = _count_levels(level_rows, weights)
         if total == 0:
             raise FellegiSunterError("m_sample_empty")
         self.m = {name: _normalize(counts[index], self.laplace) for index, name in enumerate(FIELD_NAMES)}
