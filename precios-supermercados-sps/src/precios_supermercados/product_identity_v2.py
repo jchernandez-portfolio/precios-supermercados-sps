@@ -22,7 +22,7 @@ from difflib import SequenceMatcher
 from functools import lru_cache
 from typing import Iterable
 
-from .gtin_policy import restricted_gtin_shared_master_ok
+from .gtin_policy import restricted_circulation_reason, restricted_gtin_master_partition
 from .identifiers import generate_gtin_product_id
 from .product_homologation import (
     ExactGtinGroup,
@@ -964,6 +964,101 @@ def profile_product_v2(
     return replace(provisional, matching_tokens=_matching_tokens(provisional))
 
 
+_GTIN_PAIR_IGNORED_REASONS = frozenset({"brand_conflict", "different_valid_gtin", "presentation_missing"})
+
+
+def _gtin_pair_conflicts(left: ProductProfile, right: ProductProfile) -> set[str]:
+    """Conflictos materiales entre dos miembros de cadenas distintas con igual GTIN."""
+
+    reasons: set[str] = set()
+    for reason in _hard_conflicts(left, right):
+        if reason == "presentation_conflict":
+            reasons.add("cross_source_presentation_conflict")
+        elif reason not in _GTIN_PAIR_IGNORED_REASONS:
+            reasons.add(reason)
+    return reasons
+
+
+def _member_intrinsic_conflicts(member: ProductProfile) -> set[str]:
+    reasons: set[str] = set()
+    if member.presentation_status == "conflict":
+        reasons.add("source_presentation_conflict")
+    if member.presentation_status == "ambiguous_multipack":
+        reasons.add("ambiguous_multipack_presentation")
+    return reasons
+
+
+def _resolve_gtin_members(
+    gtin: str,
+    members: list[ProductProfile],
+) -> tuple[list[ProductProfile], dict[str, set[str]], set[str]]:
+    """Separa miembros comparables de los que tienen un conflicto atribuible.
+
+    Orden fail-closed: (1) GTIN restringido fuera del maestro compartido, (2)
+    colisión por cadena (se excluyen todos los registros de esa cadena: no se
+    elige uno), (3) conflicto intrínseco del miembro, (4) conflictos por pareja.
+    En (4) se retiran, en rondas, todos los miembros con el mayor número de
+    conflictos; un empate retira a todos los empatados, porque la evidencia no
+    permite atribuir el error a uno solo. Devuelve (restantes, excluidos, motivos
+    de grupo cuando no es posible conservar un núcleo).
+    """
+
+    excluded: dict[str, set[str]] = {}
+    group_reasons: set[str] = set()
+
+    def exclude(member: ProductProfile, reasons: Iterable[str]) -> None:
+        excluded.setdefault(member.record.source_record_id, set()).update(reasons)
+
+    remaining = list(members)
+    if restricted_circulation_reason(gtin) is not None:
+        allowed, _ = restricted_gtin_master_partition(
+            member.record.supermarket_id for member in remaining
+        )
+        for member in remaining:
+            if allowed is None or member.record.supermarket_id not in allowed:
+                exclude(member, ("restricted_gtin_outside_shared_master",))
+        remaining = [member for member in remaining if member.record.source_record_id not in excluded]
+
+    per_retailer: dict[str, int] = defaultdict(int)
+    for member in remaining:
+        per_retailer[member.record.supermarket_id] += 1
+    for member in remaining:
+        if per_retailer[member.record.supermarket_id] > 1:
+            exclude(member, ("retailer_collision",))
+    remaining = [member for member in remaining if member.record.source_record_id not in excluded]
+
+    for member in remaining:
+        intrinsic = _member_intrinsic_conflicts(member)
+        if intrinsic:
+            exclude(member, intrinsic)
+    remaining = [member for member in remaining if member.record.source_record_id not in excluded]
+
+    while True:
+        degree: dict[str, int] = defaultdict(int)
+        pair_reasons: dict[str, set[str]] = defaultdict(set)
+        for index, left in enumerate(remaining):
+            for right in remaining[index + 1 :]:
+                reasons = _gtin_pair_conflicts(left, right)
+                if not reasons:
+                    continue
+                for member in (left, right):
+                    degree[member.record.source_record_id] += 1
+                    pair_reasons[member.record.source_record_id].update(reasons)
+        if not degree:
+            break
+        highest = max(degree.values())
+        for member in remaining:
+            source_id = member.record.source_record_id
+            if degree.get(source_id) == highest:
+                exclude(member, pair_reasons[source_id])
+        remaining = [member for member in remaining if member.record.source_record_id not in excluded]
+
+    if len({member.record.supermarket_id for member in remaining}) < 2:
+        for reasons in excluded.values():
+            group_reasons.update(reasons)
+    return remaining, excluded, group_reasons
+
+
 def _exact_groups(profiles: tuple[ProductProfile, ...]) -> tuple[ExactGtinGroup, ...]:
     index: dict[str, list[ProductProfile]] = defaultdict(list)
     for profile in profiles:
@@ -974,42 +1069,32 @@ def _exact_groups(profiles: tuple[ProductProfile, ...]) -> tuple[ExactGtinGroup,
         supermarkets = sorted({member.record.supermarket_id for member in members})
         if len(supermarkets) < 2:
             continue
-        conflicts: set[str] = set()
-        if any(member.presentation_status == "conflict" for member in members):
-            conflicts.add("source_presentation_conflict")
-        if any(member.presentation_status == "ambiguous_multipack" for member in members):
-            conflicts.add("ambiguous_multipack_presentation")
-        types = {
-            member.taxonomy.product_type
-            for member in members
-            if member.taxonomy.product_type is not None
-        }
-        if len(types) > 1:
-            conflicts.add("product_type_conflict")
-        if not restricted_gtin_shared_master_ok(gtin, supermarkets):
-            conflicts.add("restricted_gtin_outside_shared_master")
-        for idx, left in enumerate(members):
-            for right in members[idx + 1 :]:
-                if left.record.supermarket_id == right.record.supermarket_id:
-                    continue
-                pair_conflicts = _hard_conflicts(left, right)
-                for reason in pair_conflicts:
-                    if reason == "presentation_conflict":
-                        conflicts.add("cross_source_presentation_conflict")
-                    elif reason not in {
-                        "brand_conflict",
-                        "different_valid_gtin",
-                        "presentation_missing",
-                    }:
-                        conflicts.add(reason)
+        remaining, excluded, group_reasons = _resolve_gtin_members(gtin, members)
+        remaining_supermarkets = sorted({member.record.supermarket_id for member in remaining})
+        if len(remaining_supermarkets) >= 2:
+            groups.append(
+                ExactGtinGroup(
+                    canonical_gtin=gtin,
+                    canonical_product_id=generate_gtin_product_id(gtin),
+                    source_record_ids=tuple(member.record.source_record_id for member in remaining),
+                    supermarket_ids=tuple(remaining_supermarkets),
+                    comparison_status="ready",
+                    conflict_reasons=(),
+                    excluded_members=tuple(
+                        (source_id, tuple(sorted(reasons)))
+                        for source_id, reasons in sorted(excluded.items())
+                    ),
+                )
+            )
+            continue
         groups.append(
             ExactGtinGroup(
                 canonical_gtin=gtin,
                 canonical_product_id=generate_gtin_product_id(gtin),
                 source_record_ids=tuple(member.record.source_record_id for member in members),
                 supermarket_ids=tuple(supermarkets),
-                comparison_status="review_required" if conflicts else "ready",
-                conflict_reasons=tuple(sorted(conflicts)),
+                comparison_status="review_required",
+                conflict_reasons=tuple(sorted(group_reasons)),
             )
         )
     return tuple(groups)

@@ -171,6 +171,9 @@ class ExactGtinGroup:
     supermarket_ids: tuple[str, ...]
     comparison_status: str = "ready"
     conflict_reasons: tuple[str, ...] = ()
+    # Miembros retirados de un grupo ``ready`` por un conflicto atribuible sólo a
+    # ellos: ``(source_record_id, motivos)``. Nunca participan en la comparación.
+    excluded_members: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
