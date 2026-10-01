@@ -1,74 +1,41 @@
 {
   "comparison_policy": "fail_closed_strong_identity_and_commercial_consistency",
   "currency": "HNL",
-  "published_at_utc": "2026-09-21T19:57:55Z",
+  "published_at_utc": "2026-10-01T18:13:34Z",
   "row_count": 10,
   "rows": [
     {
-      "best_price": "350.00",
+      "best_price": "179.00",
       "best_supermarket_id": "walmart",
-      "canonical_gtin": "07501199413242",
-      "canonical_product_id": "prod_gtin_07501199413242",
-      "highest_price": "433.15",
+      "canonical_gtin": "07891150103115",
+      "canonical_product_id": "prod_gtin_07891150103115",
+      "highest_price": "241.95",
       "offers": [
         {
-          "current_price": "433.15",
+          "current_price": "241.95",
           "is_best_price": false,
           "location_id": "la_colonia_sps",
-          "source_brand": "Mas Color",
-          "source_category": "Limpieza",
-          "source_name": "Detergente Líquido Mas Color Cuidado&Renovación 4.65 Lt",
-          "source_presentation": "4.65 Lt",
-          "source_record_id": "la_colonia:7329",
+          "source_brand": "Dove",
+          "source_category": "Cuidado personal",
+          "source_name": "Acondicionador Dove Nutrición+Tri Oleos 370 Ml",
+          "source_presentation": "370 Ml",
+          "source_record_id": "la_colonia:59606",
           "supermarket_id": "la_colonia"
         },
         {
-          "current_price": "350.00",
+          "current_price": "179.00",
           "is_best_price": true,
           "location_id": "walmart_sps",
-          "source_brand": "MAS COLOR",
-          "source_category": "Limpieza",
-          "source_name": "Detergente líquido Más Color cuidado y renovación - 4.65 L",
+          "source_brand": "DOVE",
+          "source_category": "Cuidado personal",
+          "source_name": "Acondicionador Dove nutrición tri-óleos - 370 ml",
           "source_presentation": null,
-          "source_record_id": "walmart:23281",
+          "source_record_id": "walmart:30385",
           "supermarket_id": "walmart"
         }
       ],
-      "savings_vs_highest": "83.15",
-      "savings_vs_highest_pct": "19.20"
-    },
-    {
-      "best_price": "390.36",
-      "best_supermarket_id": "la_colonia",
-      "canonical_gtin": "00099176231837",
-      "canonical_product_id": "prod_gtin_00099176231837",
-      "highest_price": "456.10",
-      "offers": [
-        {
-          "current_price": "390.36",
-          "is_best_price": true,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Suavitel",
-          "source_category": "Limpieza",
-          "source_name": "Suavizante de Telas Suavitel Complete Fresca Primavera 5 L",
-          "source_presentation": "5 L",
-          "source_record_id": "la_colonia:3869",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "456.10",
-          "is_best_price": false,
-          "location_id": "walmart_sps",
-          "source_brand": "SUAVITEL",
-          "source_category": "Limpieza",
-          "source_name": "Suavizante de Telas Suavitel Complete Fresca Primavera - 5 L",
-          "source_presentation": null,
-          "source_record_id": "walmart:23047",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "65.74",
-      "savings_vs_highest_pct": "14.41"
+      "savings_vs_highest": "62.95",
+      "savings_vs_highest_pct": "26.02"
     },
     {
       "best_price": "200.00",
@@ -104,103 +71,70 @@
       "savings_vs_highest_pct": "22.59"
     },
     {
-      "best_price": "190.82",
-      "best_supermarket_id": "la_colonia",
-      "canonical_gtin": "07500435155847",
-      "canonical_product_id": "prod_gtin_07500435155847",
-      "highest_price": "246.00",
+      "best_price": "435.00",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "00099176231837",
+      "canonical_product_id": "prod_gtin_00099176231837",
+      "highest_price": "487.95",
       "offers": [
         {
-          "current_price": "190.82",
-          "is_best_price": true,
+          "current_price": "487.95",
+          "is_best_price": false,
           "location_id": "la_colonia_sps",
-          "source_brand": "Pantene",
-          "source_category": "Cuidado personal",
-          "source_name": "Shampoo Pantene Pro-V Bambu Nutre Y Crece 400 Ml",
-          "source_presentation": "400 Ml",
-          "source_record_id": "la_colonia:2543",
+          "source_brand": "Suavitel",
+          "source_category": "Limpieza",
+          "source_name": "Suavizante de Telas Suavitel Complete Fresca Primavera 5 L",
+          "source_presentation": "5 L",
+          "source_record_id": "la_colonia:3869",
           "supermarket_id": "la_colonia"
         },
         {
-          "current_price": "246.00",
-          "is_best_price": false,
+          "current_price": "435.00",
+          "is_best_price": true,
           "location_id": "walmart_sps",
-          "source_brand": "PANTENE",
-          "source_category": "Cuidado personal",
-          "source_name": "Shampoo Pantene Pro-V Bambú Nutre Crece - 400 ml",
+          "source_brand": "SUAVITEL",
+          "source_category": "Limpieza",
+          "source_name": "Suavizante de Telas Suavitel Complete Fresca Primavera - 5 L",
           "source_presentation": null,
-          "source_record_id": "walmart:19217",
+          "source_record_id": "walmart:23047",
           "supermarket_id": "walmart"
         }
       ],
-      "savings_vs_highest": "55.18",
-      "savings_vs_highest_pct": "22.43"
+      "savings_vs_highest": "52.95",
+      "savings_vs_highest_pct": "10.85"
     },
     {
-      "best_price": "190.82",
-      "best_supermarket_id": "la_colonia",
-      "canonical_gtin": "07500435155922",
-      "canonical_product_id": "prod_gtin_07500435155922",
-      "highest_price": "233.80",
+      "best_price": "162.00",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "07421001641338",
+      "canonical_product_id": "prod_gtin_07421001641338",
+      "highest_price": "200.95",
       "offers": [
         {
-          "current_price": "190.82",
-          "is_best_price": true,
+          "current_price": "200.95",
+          "is_best_price": false,
           "location_id": "la_colonia_sps",
-          "source_brand": "Pantene",
-          "source_category": "Cuidado personal",
-          "source_name": "Acondicionador Pantene Pro-V Bambu Nutre Y Crece 400 Ml",
-          "source_presentation": "400 Ml",
-          "source_record_id": "la_colonia:1962",
+          "source_brand": "Limpiox",
+          "source_category": "Limpieza",
+          "source_name": "Desinfectante Limpiox Lavanda 5 Lt",
+          "source_presentation": "5 Lt",
+          "source_record_id": "la_colonia:4848",
           "supermarket_id": "la_colonia"
         },
         {
-          "current_price": "233.80",
-          "is_best_price": false,
-          "location_id": "walmart_sps",
-          "source_brand": "PANTENE",
-          "source_category": "Cuidado personal",
-          "source_name": "Acondicionador Pantene Pro-V Bambú Nutre & Crece -400 ml",
-          "source_presentation": null,
-          "source_record_id": "walmart:19221",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "42.98",
-      "savings_vs_highest_pct": "18.38"
-    },
-    {
-      "best_price": "197.56",
-      "best_supermarket_id": "la_colonia",
-      "canonical_gtin": "00041331011051",
-      "canonical_product_id": "prod_gtin_00041331011051",
-      "highest_price": "233.40",
-      "offers": [
-        {
-          "current_price": "197.56",
+          "current_price": "162.00",
           "is_best_price": true,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Goya",
-          "source_category": "Alimentos",
-          "source_name": "Aceite Goya Oliva Extra Virgen 250 ml",
-          "source_presentation": "250 ml",
-          "source_record_id": "la_colonia:2868",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "233.40",
-          "is_best_price": false,
           "location_id": "walmart_sps",
-          "source_brand": "GOYA",
-          "source_category": "Alimentos",
-          "source_name": "Goya Aceite Oliva Extra Virgen 250 Ml",
+          "source_brand": "LIMPIOX",
+          "source_category": "Limpieza",
+          "source_name": "Desinfectante Limpiox Lavanda - 5000 ml",
           "source_presentation": null,
-          "source_record_id": "walmart:20760",
+          "source_record_id": "walmart:31901",
           "supermarket_id": "walmart"
         }
       ],
-      "savings_vs_highest": "35.84",
-      "savings_vs_highest_pct": "15.36"
+      "savings_vs_highest": "38.95",
+      "savings_vs_highest_pct": "19.38"
     },
     {
       "best_price": "270.10",
@@ -269,6 +203,39 @@
       "savings_vs_highest_pct": "9.54"
     },
     {
+      "best_price": "203.89",
+      "best_supermarket_id": "la_colonia",
+      "canonical_gtin": "07401063400029",
+      "canonical_product_id": "prod_gtin_07401063400029",
+      "highest_price": "232.00",
+      "offers": [
+        {
+          "current_price": "203.89",
+          "is_best_price": true,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Fido",
+          "source_category": "Cuidado personal",
+          "source_name": "Shampoo Para Perro Fido 480 Ml",
+          "source_presentation": "480 Ml",
+          "source_record_id": "la_colonia:8210",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "232.00",
+          "is_best_price": false,
+          "location_id": "walmart_sps",
+          "source_brand": "FIDO",
+          "source_category": "Cuidado personal",
+          "source_name": "Shampoo Fido Para Perro - 480 ml",
+          "source_presentation": null,
+          "source_record_id": "walmart:31532",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "28.11",
+      "savings_vs_highest_pct": "12.12"
+    },
+    {
       "best_price": "53.00",
       "best_supermarket_id": "walmart",
       "canonical_gtin": "07421000811640",
@@ -302,37 +269,70 @@
       "savings_vs_highest_pct": "33.04"
     },
     {
-      "best_price": "77.90",
+      "best_price": "100.50",
       "best_supermarket_id": "walmart",
-      "canonical_gtin": "00884394002495",
-      "canonical_product_id": "prod_gtin_00884394002495",
-      "highest_price": "101.00",
+      "canonical_gtin": "07500435183697",
+      "canonical_product_id": "prod_gtin_07500435183697",
+      "highest_price": "125.90",
       "offers": [
         {
-          "current_price": "101.00",
+          "current_price": "125.90",
           "is_best_price": false,
           "location_id": "la_colonia_sps",
-          "source_brand": "Okf",
-          "source_category": "Alimentos",
-          "source_name": "Bebida Okf Aloe Vera Sin Azúcar 1.5 Lt",
-          "source_presentation": "1.5 Lt",
-          "source_record_id": "la_colonia:5455",
+          "source_brand": "Old Spice",
+          "source_category": "Cuidado personal",
+          "source_name": "Desodorante Barra Old Spice Mar Profundo 85 Gr",
+          "source_presentation": "85 Gr",
+          "source_record_id": "la_colonia:2122",
           "supermarket_id": "la_colonia"
         },
         {
-          "current_price": "77.90",
+          "current_price": "100.50",
           "is_best_price": true,
           "location_id": "walmart_sps",
-          "source_brand": "OKF",
-          "source_category": "Alimentos",
-          "source_name": "Bebida Okf Aloe Vera Sin Azucar - 1500 ml",
+          "source_brand": "OLD SPICE",
+          "source_category": "Cuidado personal",
+          "source_name": "Barra Desodorante Old Spice Mar Profundo - 85 g",
           "source_presentation": null,
-          "source_record_id": "walmart:26824",
+          "source_record_id": "walmart:21717",
           "supermarket_id": "walmart"
         }
       ],
-      "savings_vs_highest": "23.10",
-      "savings_vs_highest_pct": "22.87"
+      "savings_vs_highest": "25.40",
+      "savings_vs_highest_pct": "20.17"
+    },
+    {
+      "best_price": "87.96",
+      "best_supermarket_id": "la_colonia",
+      "canonical_gtin": "07509546076195",
+      "canonical_product_id": "prod_gtin_07509546076195",
+      "highest_price": "111.00",
+      "offers": [
+        {
+          "current_price": "87.96",
+          "is_best_price": true,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Axion",
+          "source_category": "Limpieza",
+          "source_name": "Lavaplatos Líquido Axion Aloe y Vitamina E 640 ml",
+          "source_presentation": "640 ml",
+          "source_record_id": "la_colonia:3776",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "111.00",
+          "is_best_price": false,
+          "location_id": "walmart_sps",
+          "source_brand": "AXION",
+          "source_category": "Limpieza",
+          "source_name": "Lavaplatos Axion Aloe y Vitamina E Líquido - 640 ml",
+          "source_presentation": "Líquido",
+          "source_record_id": "walmart:19846",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "23.04",
+      "savings_vs_highest_pct": "20.76"
     }
   ],
   "schema": "precios-sps-safe-portfolio-sample/v1",
@@ -347,8 +347,8 @@
     }
   ],
   "selection_rule": "highest_absolute_savings_within_safe_common_comparable_universe",
-  "source_as_of": "2026-09-21T19:55:52.213891Z",
-  "source_head_sha": "524e041489459f640b4e1d1e5d23304fa738f292",
+  "source_as_of": "2026-10-01T18:11:55.481494Z",
+  "source_head_sha": "9fda6b5999ccefdedaf462222077918013d6fa01",
   "source_schema": "rpi-consumer-mart/v2",
-  "source_workflow_run_id": 35647841027
+  "source_workflow_run_id": 36905008738
 }

@@ -1,1 +1,1 @@
-{"category":null,"row_count":1,"rows":[{"brand":"Bic","partition":"catalog/sin-categoria-dbb734de/search-4b/part-001.json","presentation":null,"product_name":"4 Bolígrafos Bic Up+ 1 Gratis","row_id":"product-8f7123ece49b95f42e7526cc"}],"schema":"rpi-consumer-index/v3","search_prefix":"4b"}
+{"category":null,"row_count":1,"rows":[{"brand":"Bic","partition":"catalog/sin-categoria-dbb734de/search-4b/part-001.json","presentation":null,"product_name":"4 Bolígrafos Bic Up+ 1 Gratis","row_id":"source-4bdc0530dea6c1e1dbc5af09"}],"schema":"rpi-consumer-index/v3","search_prefix":"4b"}
