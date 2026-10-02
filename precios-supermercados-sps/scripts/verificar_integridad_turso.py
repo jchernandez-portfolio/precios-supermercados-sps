@@ -31,7 +31,7 @@ from actualizar_mvp_turso_la_colonia import (  # noqa: E402
 )
 
 COUNTED_TABLES = ("supermarkets", "locations", "products", "scrape_runs", "price_history")
-OPTIONAL_COUNTED_TABLES = ("product_homologation_profiles",)
+OPTIONAL_COUNTED_TABLES = ("product_homologation_profiles", "catalog_unpriced_observations")
 DUPLICATE_OPEN_PERIODS_SQL = (
     "SELECT COUNT(*) FROM (SELECT product_id,location_id FROM price_history "
     "WHERE valid_to_utc IS NULL GROUP BY product_id,location_id HAVING COUNT(*)>1)"

@@ -111,6 +111,30 @@ Después de persistir se verifican, según el flujo:
 
 Un HTTP 200 del backend no sustituye estas verificaciones.
 
+# Observaciones sin precio agotadas
+
+`catalog_unpriced_observations` (STRICT, derivada/opcional; regla 2026-10-02)
+registra SKU que un retailer lista **sin precio y agotados** ("NO DISPONIBLE"):
+lanzamientos, primer precio y métricas de disponibilidad. No crea `products` ni
+`price_history` (que exigen precio).
+
+| Columna | Significado |
+| --- | --- |
+| `supermarket_id`, `location_id` | contexto exacto (FK a `locations`) |
+| `source_key_type`, `source_key` | identidad fuente (misma que `products`) |
+| `source_catalog_product_id`, `name`, `brand`, `category`, `presentation`, `ean` | descriptores fuente del último avistamiento |
+| `first_seen_utc` | primera vez vista sin precio en ese contexto |
+| `last_seen_utc` | último snapshot aceptado que la listó sin precio |
+| `priced_since_utc` | primer snapshot posterior en que apareció con precio; `NULL` mientras siga pendiente |
+
+PK `(supermarket_id, location_id, source_key_type, source_key)` e índice parcial
+`idx_catalog_unpriced_pending(supermarket_id, location_id) WHERE priced_since_utc IS NULL`.
+La persistencia diaria hace upsert sólo de las entradas del snapshot (≤2 % del
+catálogo) y marca `priced_since_utc` recorriendo sólo las pendientes del contexto.
+Si la oferta vuelve a quedar sin precio se reabre el episodio (`priced_since_utc =
+NULL`, `first_seen_utc` se conserva). Si un producto con periodo current con precio
+se lista hoy sin precio y agotado, ese periodo se cierra sin abrir uno nuevo.
+
 # Homologación derivada
 
 `product_homologation_profiles` es una proyección reconstruible de `products`; no altera la fuente comercial.
