@@ -251,3 +251,50 @@ def test_delta_v2_distinguishes_carried_subsumed_drift_revived_and_new() -> None
         "NEW_UNIQUE": ("new",),
         "OPEN_CURRENT": ("open",),
     }
+
+
+def test_v2_zero_matching_branches_is_valid_empty_audit(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    legacy, audit_v2, delta_v2 = _modules()
+    monkeypatch.setattr(legacy, "_git", lambda *args, **kwargs: SimpleNamespace(returncode=0))
+    monkeypatch.setattr(legacy, "_ref_sha", lambda ref: "f" * 40)
+    monkeypatch.setattr(legacy, "_branches", lambda remote, pattern: [])
+    loaded: list[Path] = []
+
+    def fake_load(path, *, legacy_overrides, main_ref):
+        loaded.append(path)
+        return "a" * 40, {"feature/precios-sps-old": audit_v2.HistoricalDecision(
+            branch="feature/precios-sps-old", tip_sha="c" * 40, unique_patch_count=1, reason="old"
+        )}
+
+    monkeypatch.setattr(audit_v2, "load_decisions", fake_load)
+    common = {
+        "main_ref": "origin/main",
+        "remote_prefix": "origin",
+        "pattern": "precios-sps",
+        "decisions_path": tmp_path / "decisions.json",
+        "legacy_overrides": tmp_path / "legacy.json",
+    }
+
+    assert audit_v2.audit(**common, inspect_only=True) == ("f" * 40, None, [], ())
+    assert loaded == []
+    # Estricto: valida el archivo de decisiones, pero no hay ramas a las que aplicarlo.
+    assert audit_v2.audit(**common, inspect_only=False) == ("f" * 40, "a" * 40, [], ())
+    assert loaded == [tmp_path / "decisions.json"]
+
+    # Un archivo de decisiones inválido sigue fallando cerrado sin ramas.
+    monkeypatch.setattr(
+        audit_v2,
+        "load_decisions",
+        lambda *args, **kwargs: (_ for _ in ()).throw(legacy.AuditError("historical decision v2 shape invalid")),
+    )
+    with pytest.raises(legacy.AuditError, match="shape invalid"):
+        audit_v2.audit(**common, inspect_only=False)
+
+    groups = delta_v2.classify_delta([], fake_load(None, legacy_overrides=None, main_ref=None)[1])
+    assert groups["MISSING"] == ("feature/precios-sps-old",)
+    assert not any(values for name, values in groups.items() if name != "MISSING")
+    rendered = delta_v2._markdown(groups, reviewed_main="a" * 40, current_main="f" * 40, empty_inventory=True)
+    assert legacy.NO_HISTORICAL_BRANCHES in rendered
