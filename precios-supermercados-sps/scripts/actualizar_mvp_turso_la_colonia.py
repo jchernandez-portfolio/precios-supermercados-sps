@@ -35,8 +35,9 @@ from precios_supermercados.unpriced_unavailable import (  # noqa: E402
 
 EXPECTED_TABLES = {"supermarkets", "locations", "products", "price_history", "scrape_runs"}
 # Tablas derivadas que la persistencia diaria tolera sin tocarlas: perfiles de
-# homologación, producto maestro (docs/homologation/product-master-v1.md) y
-# observaciones de productos listados sin precio y no disponibles.
+# homologación, producto maestro (docs/homologation/product-master-v1.md),
+# observaciones de productos listados sin precio y no disponibles, y
+# especificaciones PriceSmart (las escribe sólo el workflow semanal).
 OPTIONAL_DERIVED_TABLES = {
     "product_homologation_profiles",
     "master_products",
@@ -45,6 +46,7 @@ OPTIONAL_DERIVED_TABLES = {
     "master_sync_state",
     "master_sync_dirty",
     "catalog_unpriced_observations",
+    "pricesmart_product_specs",
 }
 
 

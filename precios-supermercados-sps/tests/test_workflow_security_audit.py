@@ -69,6 +69,19 @@ base.ALLOWED_SECRET_REFERENCES[base.TURSO_WEEKLY_INTEGRITY_WORKFLOW] = {
     base.TURSO_DATABASE_URL_SECRET,
     base.TURSO_AUTH_TOKEN_SECRET,
 }
+base.PRICESMART_SPECS_WORKFLOW = "precios-supermercados-sps-pricesmart-specs-weekly.yml"
+base.PRICESMART_SPECS_AUTHORIZATION = (
+    "precios-supermercados-sps/.automation/pricesmart-specs-capture-authorization.json"
+)
+base.EXPECTED_PERMISSIONS[base.PRICESMART_SPECS_WORKFLOW] = {
+    "actions": "read",
+    "contents": "read",
+}
+base.EXPECTED_TRIGGERS[base.PRICESMART_SPECS_WORKFLOW] = {"schedule", "workflow_dispatch"}
+base.ALLOWED_SECRET_REFERENCES[base.PRICESMART_SPECS_WORKFLOW] = {
+    base.TURSO_DATABASE_URL_SECRET,
+    base.TURSO_AUTH_TOKEN_SECRET,
+}
 
 
 def _checkout_identity_with_derived_workflows() -> None:
@@ -568,3 +581,64 @@ def test_turso_weekly_integrity_is_scheduled_read_only_and_owns_full_scans() -> 
         assert "PRAGMA integrity_check" not in daily_raw
         assert "pragma_foreign_key_check" not in daily_raw
         assert "SELECT COUNT(*) FROM price_history" not in daily_raw
+
+
+def test_pricesmart_specs_weekly_is_authorized_bounded_and_least_privilege() -> None:
+    import json
+
+    path = base.WORKFLOW_DIR / base.PRICESMART_SPECS_WORKFLOW
+    workflow = base.load_workflow(path)
+    assert workflow["permissions"] == {"actions": "read", "contents": "read"}
+    triggers = workflow["on"]
+    assert set(triggers) == {"schedule", "workflow_dispatch"}
+    assert triggers["schedule"] == [{"cron": "37 11 * * 6"}]
+    assert triggers["workflow_dispatch"]["inputs"]["force"]["type"] == "boolean"
+    assert triggers["workflow_dispatch"]["inputs"]["force"]["default"] == "false"
+    assert workflow["concurrency"] == {
+        "group": "precios-sps-pricesmart-specs-weekly",
+        "cancel-in-progress": "false",
+    }
+    workflow_jobs = base.jobs(workflow)
+    assert set(workflow_jobs) == {"specs"}
+    job = workflow_jobs["specs"]
+    assert job["if"] == (
+        "${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' "
+        "&& github.ref == 'refs/heads/main' }}"
+    )
+    assert "permissions" not in job
+    assert "environment" not in job
+    assert job["timeout-minutes"] == "150"
+
+    raw = path.read_text(encoding="utf-8")
+    # Autorización registrada, validada antes de cualquier tráfico.
+    assert ".automation/pricesmart-specs-capture-authorization.json" in raw
+    assert "load_authorization" in raw
+    assert "--live-read-only" in raw
+    assert "--delay-seconds 2.0" in raw
+    assert "--max-requests 1200" in raw
+    assert "--max-items 900" in raw
+    # Entrada: sólo el handoff PriceSmart de la última corrida diaria exitosa.
+    assert "--workflow precios-supermercados-sps-la-colonia-mvp-update.yml" in raw
+    assert "--status success" in raw
+    assert '--pattern "daily-acquisition-pricesmart-${run_id}-attempt-*"' in raw
+    assert "GH_TOKEN: ${{ github.token }}" in raw
+    assert "daily_successful_run_too_old" in raw
+    # Persistencia barata y artifact.
+    assert "persistir_especificaciones_pricesmart_turso.py state" in raw
+    assert "persistir_especificaciones_pricesmart_turso.py apply" in raw
+    assert "actions/upload-artifact@" in raw
+    # El cron no se cruza con el corte diario ni con la integridad semanal.
+    assert "43 7 * * *" not in raw and "23 10 * * 0" not in raw
+    for forbidden in (
+        "pull_request:", "pull_request_target:", "issue_comment:", "id-token",
+        "contents: write", "actions: write", "vars.", "${{ inputs.force }}",
+    ):
+        assert forbidden not in raw, forbidden
+
+    authorization = json.loads((base.REPO_ROOT / base.PRICESMART_SPECS_AUTHORIZATION).read_text(encoding="utf-8"))
+    assert authorization["schema"] == "precios-sps-pricesmart-specs-authorization/v1"
+    assert authorization["live_read_only_authorized"] is True
+    assert authorization["approved_by"] == "project_owner"
+    assert authorization["max_requests_per_run"] >= 1200
+    assert authorization["min_delay_seconds"] <= 2.0
+    assert authorization["concurrency"] == 1

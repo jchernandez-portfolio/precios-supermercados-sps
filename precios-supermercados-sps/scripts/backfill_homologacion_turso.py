@@ -62,8 +62,13 @@ from precios_supermercados.product_homologation_persistence import (  # noqa: E4
     TABLE_NAME,
     ProductHomologationPersistenceError,
     ProductHomologationRow,
+    apply_source_spec_attributes,
     build_homologation_rows,
     records_from_product_rows,
+)
+from precios_supermercados.pricesmart_specs_persistence import (  # noqa: E402
+    PROFILE_ATTRIBUTES_SQL,
+    TABLE_NAME as PRICESMART_SPECS_TABLE,
 )
 
 STAGE_TABLE = "product_homologation_profiles_stage"
@@ -284,6 +289,24 @@ def _fetch_products(url: str, token: str) -> tuple[tuple[int, object], ...]:
 
 
 
+def _fetch_pricesmart_spec_attributes(url: str, token: str) -> dict[int, tuple[str | None, str | None]]:
+    """Marca/presentación de especificaciones PriceSmart (tabla semanal opcional).
+
+    Recorre sólo los products PriceSmart por su índice UNIQUE y busca cada
+    especificación por PK: ≈ 2 × productos PriceSmart filas leídas.
+    """
+
+    result: dict[int, tuple[str | None, str | None]] = {}
+    for product_id, brand, hint in _query(url, token, PROFILE_ATTRIBUTES_SQL):
+        if type(product_id) is not int or product_id <= 0:
+            raise SnapshotError("homologation_pricesmart_spec_row_invalid")
+        result[int(product_id)] = (
+            None if brand is None else str(brand),
+            None if hint is None else str(hint),
+        )
+    return result
+
+
 def _fetch_profile_state(url: str, token: str) -> dict[int, tuple[str, str]]:
     expected = _scalar(url, token, f"SELECT COUNT(*) FROM {TABLE_NAME}")
     result: dict[int, tuple[str, str]] = {}
@@ -400,6 +423,7 @@ def _source_preflight(url: str, token: str) -> dict[str, int]:
     )
     _validate_table_names(str(row[0]) for row in table_rows)
     target_exists = any(str(row[0]) == TABLE_NAME for row in table_rows)
+    specs_exist = any(str(row[0]) == PRICESMART_SPECS_TABLE for row in table_rows)
     state = {
         "products": _scalar(url, token, "SELECT COUNT(*) FROM products"),
         "scrape_runs": _scalar(url, token, "SELECT COUNT(*) FROM scrape_runs"),
@@ -412,6 +436,8 @@ def _source_preflight(url: str, token: str) -> dict[str, int]:
     foreign_keys = _scalar(url, token, PROFILE_FK_CHECK_SQL) if target_exists else 0
     if foreign_keys != 0:
         raise SnapshotError("homologation_source_preflight_integrity_failed")
+    if specs_exist:
+        state["pricesmart_specs_table"] = 1
     return state
 
 
@@ -609,9 +635,15 @@ def backfill_turso(
         raise ProductHomologationPersistenceError("turso_credentials_missing")
     timestamp = updated_at_utc or _utc_now()
     before = _source_preflight(database_url, auth_token)
+    specs_table = bool(before.pop("pricesmart_specs_table", 0))
     products = _fetch_products(database_url, auth_token)
     if len(products) != before["products"]:
         raise SnapshotError("homologation_source_changed_during_read")
+    spec_enrichment = {"brand": 0, "presentation": 0}
+    if specs_table:
+        products, spec_enrichment = apply_source_spec_attributes(
+            products, _fetch_pricesmart_spec_attributes(database_url, auth_token)
+        )
     derived = build_homologation_rows(
         products,
         updated_at_utc=timestamp,
@@ -659,6 +691,7 @@ def backfill_turso(
     if not apply:
         return {
             "normalization_version": NORMALIZATION_VERSION,
+            "pricesmart_spec_enrichment": spec_enrichment,
             "processed": len(derived),
             "inserted": inserted,
             "updated": updated,
@@ -676,6 +709,7 @@ def backfill_turso(
         post = _postflight(database_url, auth_token, before, len(derived))
         return {
             "normalization_version": NORMALIZATION_VERSION,
+            "pricesmart_spec_enrichment": spec_enrichment,
             "processed": len(derived),
             "inserted": 0,
             "updated": 0,
@@ -714,6 +748,7 @@ def backfill_turso(
         _drop_stage(database_url, auth_token)
     return {
         "normalization_version": NORMALIZATION_VERSION,
+        "pricesmart_spec_enrichment": spec_enrichment,
         "processed": len(derived),
         "no_op": False,
         "staging_written": True,

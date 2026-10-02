@@ -1,0 +1,170 @@
+name: Precios SPS - Especificaciones PriceSmart semanal
+
+# Captura read-only semanal de especificaciones públicas de las fichas de
+# producto PriceSmart HN (sin GTIN: el "Número de ítem" es interno). Autorizada
+# por el responsable del proyecto en
+# precios-supermercados-sps/.automation/pricesmart-specs-capture-authorization.json.
+# Lee el catálogo de la última corrida diaria exitosa (artifact de handoff
+# PriceSmart), descarga sólo ítems nuevos o verificados hace >= 28 días y
+# persiste en Turso únicamente filas nuevas/cambiadas de pricesmart_product_specs.
+
+on:
+  schedule:
+    - cron: "37 11 * * 6" # sábado 05:37 America/Tegucigalpa, después del corte diario 01:43
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Re-descargar también ítems verificados hace menos de 28 días
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: precios-sps-pricesmart-specs-weekly
+  cancel-in-progress: false
+
+jobs:
+  specs:
+    if: ${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    defaults:
+      run:
+        working-directory: precios-supermercados-sps
+    env:
+      PYTHONPATH: ${{ github.workspace }}/precios-supermercados-sps/src
+
+    steps:
+      - name: Descargar revisión inmutable
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Configurar Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Validar autorización registrada del responsable
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p run-artifacts/pricesmart-specs
+          python - <<'PY'
+          import json
+          import sys
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          sys.path.insert(0, 'scripts')
+          from obtener_especificaciones_pricesmart import load_authorization
+
+          document = load_authorization(
+              Path('.automation/pricesmart-specs-capture-authorization.json'),
+              now=datetime.now(timezone.utc),
+              delay=2.0,
+              max_requests=1200,
+          )
+          print(json.dumps({
+              'authorization_id': document['authorization_id'],
+              'operation': document['operation'],
+              'cadence': document['cadence'],
+          }, sort_keys=True))
+          PY
+
+      - name: Descargar el handoff PriceSmart de la última corrida diaria exitosa
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow precios-supermercados-sps-la-colonia-mvp-update.yml \
+            --branch main \
+            --status success \
+            --limit 1 \
+            --json databaseId,createdAt > run-artifacts/pricesmart-specs/daily-run.json
+          run_id="$(python - <<'PY'
+          import json
+          from datetime import datetime, timedelta, timezone
+          from pathlib import Path
+
+          runs = json.loads(Path('run-artifacts/pricesmart-specs/daily-run.json').read_text(encoding='utf-8'))
+          if len(runs) != 1:
+              raise SystemExit('daily_successful_run_not_found')
+          run = runs[0]
+          created = datetime.fromisoformat(run['createdAt'].replace('Z', '+00:00'))
+          if datetime.now(timezone.utc) - created > timedelta(days=8):
+              raise SystemExit('daily_successful_run_too_old')
+          if not isinstance(run['databaseId'], int) or run['databaseId'] < 1:
+              raise SystemExit('daily_run_id_invalid')
+          print(run['databaseId'])
+          PY
+          )"
+          gh run download "$run_id" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "daily-acquisition-pricesmart-${run_id}-attempt-*" \
+            --dir run-artifacts/daily-handoffs
+          echo "DAILY_RUN_ID=${run_id}" >> "$GITHUB_ENV"
+
+      - name: Leer estado incremental en Turso (sólo llaves frescas)
+        shell: bash
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          python scripts/persistir_especificaciones_pricesmart_turso.py state \
+            --output run-artifacts/pricesmart-specs/state.json
+
+      - name: Capturar especificaciones (read-only, una conexión)
+        shell: bash
+        env:
+          FORCE_CAPTURE: ${{ github.event_name == 'workflow_dispatch' && inputs.force == true }}
+        run: |
+          set -euo pipefail
+          extra=()
+          if [ "$FORCE_CAPTURE" = "true" ]; then
+            extra+=(--force)
+          fi
+          python scripts/obtener_especificaciones_pricesmart.py \
+            --live-read-only \
+            --authorization .automation/pricesmart-specs-capture-authorization.json \
+            --daily-artifact-dir run-artifacts/daily-handoffs \
+            --daily-run-id "$DAILY_RUN_ID" \
+            --state run-artifacts/pricesmart-specs/state.json \
+            --output run-artifacts/pricesmart-specs/specs.json \
+            --raw-directory run-artifacts/pricesmart-specs/raw \
+            --checkpoint run-artifacts/pricesmart-specs/checkpoint.jsonl \
+            --delay-seconds 2.0 \
+            --max-requests 1200 \
+            --max-items 900 \
+            --deadline-seconds 6000 \
+            --github-run-id "$GITHUB_RUN_ID" \
+            "${extra[@]}"
+
+      - name: Persistir sólo filas nuevas o cambiadas en Turso
+        shell: bash
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          python scripts/persistir_especificaciones_pricesmart_turso.py apply \
+            --artifact run-artifacts/pricesmart-specs/specs.json \
+            | tee run-artifacts/pricesmart-specs/persist.json
+
+      - name: Publicar artifact de especificaciones
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: pricesmart-specs-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: precios-supermercados-sps/run-artifacts/pricesmart-specs/
+          if-no-files-found: warn
+          retention-days: 30

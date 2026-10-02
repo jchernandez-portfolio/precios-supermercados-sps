@@ -86,7 +86,7 @@ La información se actualiza **una sola vez al día**:
 | Persistencia en Turso | 1 (sólo cuando todas las cadenas tienen handoff aceptado) |
 | Homologación + publicación RPI + `portfolio-data` | 1, encadenadas por `workflow_run`; los intentos fallidos sólo generan ejecuciones `skipped` |
 
-Además, `precios-supermercados-sps-turso-weekly-integrity.yml` lee Turso una vez por semana (domingo 04:23 de Honduras, `23 10 * * 0`) para las verificaciones completas de integridad. No existen otros crons de este proyecto que hagan scraping o lean Turso. Los crons `17 11` y `30 12` que aparecían en el monorepo pertenecen al proyecto Mundial 2026.
+Además, `precios-supermercados-sps-turso-weekly-integrity.yml` lee Turso una vez por semana (domingo 04:23 de Honduras, `23 10 * * 0`) para las verificaciones completas de integridad, y `precios-supermercados-sps-pricesmart-specs-weekly.yml` (rama `rpi/pricesmart-specs`) captura especificaciones de fichas PriceSmart una vez por semana (sábado 05:37 de Honduras, `37 11 * * 6`; ver [Especificaciones PriceSmart](#especificaciones-pricesmart-semanal-2026-10-01)). No existen otros crons de este proyecto que hagan scraping o lean Turso. Los crons `17 11` y `30 12` que aparecían en el monorepo pertenecen al proyecto Mundial 2026.
 
 Evidencia del esquema de recuperación (#455 + #461 + #462): entre el **12 y el 21 de septiembre** hubo **10 cortes programados aceptados seguidos**. Sólo 3 pasaron en el primer intento; 6 necesitaron la primera recuperación y 1 la segunda. El mecanismo funciona, y a la vez muestra que el intento inicial falla con frecuencia por inestabilidad de las fuentes.
 
@@ -352,6 +352,30 @@ nombre mínimo, tono/modelo y conflictos de tamaño/variante/tipo (como Colonial
 Se agregó la traducción `bacon`→`tocino` al acuerdo de nombre. Sin snapshot
 completo de Comisariato en el repositorio, el impacto en grupos comparables se
 mide tras el primer refresh.
+
+## Especificaciones PriceSmart (semanal, 2026-10-01)
+
+Rama `rpi/pricesmart-specs` (no fusionada, sin corrida real). Detalle:
+[`supermercados/pricesmart-especificaciones.md`](supermercados/pricesmart-especificaciones.md).
+
+- **Cadencia semanal aprobada por el responsable** (registro en
+  `.automation/pricesmart-specs-capture-authorization.json`): sábado 05:37
+  Honduras + manual; read-only, una conexión, 2 s entre requests, ≤ 1200
+  requests/≤ 900 ítems por corrida, aborta ante 429/403 repetido/anti-bot.
+- Entrada: handoff PriceSmart de la última corrida diaria exitosa; cada pid una
+  vez (SPS y TGU comparten catálogo); sólo ítems nuevos o verificados hace ≥ 28
+  días.
+- Captura de la ficha pública `/es-hn/producto/<slug>/<pid>`: marca, breadcrumb,
+  peso/volumen neto (canónico g/ml), peso unitario, conteo, importado/nacional,
+  origen, almacenamiento, alérgenos y crudo. **Sin GTIN**: el "Número de ítem" es
+  interno; un GTIN sólo se registraría si apareciera en JSON y superara GS1.
+- Fail-closed por página; la corrida falla si > 20 % de páginas no parsean.
+- Turso: tabla derivada STRICT `pricesmart_product_specs` con upsert de filas
+  cambiadas; aceptada como tabla opcional por las guardas de esquema.
+- Homologación: completa marca/presentación faltantes de perfiles PriceSmart
+  (`source_only`); no crea comparables.
+- Pendiente: primera corrida real para endurecer el parser con el HTML crudo
+  guardado (el fixture actual es sintético).
 
 ## Producto maestro v1 (2026-10-01)
 
