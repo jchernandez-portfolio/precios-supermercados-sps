@@ -1,1 +1,1 @@
-{"category":null,"row_count":1,"rows":[{"brand":"Red","partition":"catalog/sin-categoria-dbb734de/search-5g/part-001.json","presentation":"750 ml","product_name":"5 generacion red 750 ml","row_id":"source-dfb84ca00e653116a82c3420"}],"schema":"rpi-consumer-index/v3","search_prefix":"5g"}
+{"category":null,"row_count":1,"rows":[{"brand":null,"partition":"catalog/sin-categoria-dbb734de/search-5g/part-001.json","presentation":"750 ml","product_name":"5 generacion red 750 ml","row_id":"source-dfb84ca00e653116a82c3420"}],"schema":"rpi-consumer-index/v3","search_prefix":"5g"}

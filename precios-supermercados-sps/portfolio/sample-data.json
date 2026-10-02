@@ -1,9 +1,42 @@
 {
   "comparison_policy": "fail_closed_strong_identity_and_commercial_consistency",
   "currency": "HNL",
-  "published_at_utc": "2026-10-01T18:13:34Z",
+  "published_at_utc": "2026-10-02T21:57:54Z",
   "row_count": 10,
   "rows": [
+    {
+      "best_price": "350.00",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "07501199413242",
+      "canonical_product_id": "prod_gtin_07501199413242",
+      "highest_price": "433.15",
+      "offers": [
+        {
+          "current_price": "433.15",
+          "is_best_price": false,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Mas Color",
+          "source_category": "Limpieza",
+          "source_name": "Detergente Líquido Mas Color Cuidado&Renovación 4.65 Lt",
+          "source_presentation": "4.65 Lt",
+          "source_record_id": "la_colonia:7329",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "350.00",
+          "is_best_price": true,
+          "location_id": "walmart_sps",
+          "source_brand": "MAS COLOR",
+          "source_category": "Limpieza",
+          "source_name": "Detergente líquido Más Color cuidado y renovación - 4.65 L",
+          "source_presentation": null,
+          "source_record_id": "walmart:23281",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "83.15",
+      "savings_vs_highest_pct": "19.20"
+    },
     {
       "best_price": "179.00",
       "best_supermarket_id": "walmart",
@@ -203,39 +236,6 @@
       "savings_vs_highest_pct": "9.54"
     },
     {
-      "best_price": "203.89",
-      "best_supermarket_id": "la_colonia",
-      "canonical_gtin": "07401063400029",
-      "canonical_product_id": "prod_gtin_07401063400029",
-      "highest_price": "232.00",
-      "offers": [
-        {
-          "current_price": "203.89",
-          "is_best_price": true,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Fido",
-          "source_category": "Cuidado personal",
-          "source_name": "Shampoo Para Perro Fido 480 Ml",
-          "source_presentation": "480 Ml",
-          "source_record_id": "la_colonia:8210",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "232.00",
-          "is_best_price": false,
-          "location_id": "walmart_sps",
-          "source_brand": "FIDO",
-          "source_category": "Cuidado personal",
-          "source_name": "Shampoo Fido Para Perro - 480 ml",
-          "source_presentation": null,
-          "source_record_id": "walmart:31532",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "28.11",
-      "savings_vs_highest_pct": "12.12"
-    },
-    {
       "best_price": "53.00",
       "best_supermarket_id": "walmart",
       "canonical_gtin": "07421000811640",
@@ -302,37 +302,37 @@
       "savings_vs_highest_pct": "20.17"
     },
     {
-      "best_price": "87.96",
+      "best_price": "420.95",
       "best_supermarket_id": "la_colonia",
-      "canonical_gtin": "07509546076195",
-      "canonical_product_id": "prod_gtin_07509546076195",
-      "highest_price": "111.00",
+      "canonical_gtin": "04022025811030",
+      "canonical_product_id": "prod_gtin_04022025811030",
+      "highest_price": "443.80",
       "offers": [
         {
-          "current_price": "87.96",
+          "current_price": "420.95",
           "is_best_price": true,
           "location_id": "la_colonia_sps",
-          "source_brand": "Axion",
-          "source_category": "Limpieza",
-          "source_name": "Lavaplatos Líquido Axion Aloe y Vitamina E 640 ml",
-          "source_presentation": "640 ml",
-          "source_record_id": "la_colonia:3776",
+          "source_brand": "Blue Nun",
+          "source_category": "Bebidas",
+          "source_name": "Vino Tinto Blue Nun Merlot 750 Ml",
+          "source_presentation": "750 Ml",
+          "source_record_id": "la_colonia:6857",
           "supermarket_id": "la_colonia"
         },
         {
-          "current_price": "111.00",
+          "current_price": "443.80",
           "is_best_price": false,
           "location_id": "walmart_sps",
-          "source_brand": "AXION",
-          "source_category": "Limpieza",
-          "source_name": "Lavaplatos Axion Aloe y Vitamina E Líquido - 640 ml",
-          "source_presentation": "Líquido",
-          "source_record_id": "walmart:19846",
+          "source_brand": "BLUE NUN",
+          "source_category": "Bebidas",
+          "source_name": "Vino Blue Nun Tinto Merlot - 750 ml",
+          "source_presentation": null,
+          "source_record_id": "walmart:28213",
           "supermarket_id": "walmart"
         }
       ],
-      "savings_vs_highest": "23.04",
-      "savings_vs_highest_pct": "20.76"
+      "savings_vs_highest": "22.85",
+      "savings_vs_highest_pct": "5.15"
     }
   ],
   "schema": "precios-sps-safe-portfolio-sample/v1",
@@ -347,8 +347,8 @@
     }
   ],
   "selection_rule": "highest_absolute_savings_within_safe_common_comparable_universe",
-  "source_as_of": "2026-10-01T18:11:55.481494Z",
-  "source_head_sha": "9fda6b5999ccefdedaf462222077918013d6fa01",
+  "source_as_of": "2026-10-02T21:56:22.710509Z",
+  "source_head_sha": "58dfee9644f2f51cbf64b5ff65079b175a1329dd",
   "source_schema": "rpi-consumer-mart/v2",
-  "source_workflow_run_id": 36905008738
+  "source_workflow_run_id": 37069708402
 }
