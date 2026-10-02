@@ -28,7 +28,16 @@ from actualizar_mvp_sqlite_la_colonia import (  # noqa: E402
 )
 
 EXPECTED_TABLES = {"supermarkets", "locations", "products", "price_history", "scrape_runs"}
-OPTIONAL_DERIVED_TABLES = {"product_homologation_profiles"}
+# Tablas derivadas que la persistencia diaria tolera sin tocarlas: perfiles de
+# homologación y producto maestro (docs/homologation/product-master-v1.md).
+OPTIONAL_DERIVED_TABLES = {
+    "product_homologation_profiles",
+    "master_products",
+    "master_product_links",
+    "master_link_rejections",
+    "master_sync_state",
+    "master_sync_dirty",
+}
 
 
 def _validate_table_names(names: object) -> None:
