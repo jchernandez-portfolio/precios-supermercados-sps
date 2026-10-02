@@ -46,7 +46,7 @@ from .product_homologation import (
     resolve_presentation,
 )
 
-IDENTITY_NORMALIZATION_VERSION = "product-homologation-v2.5"
+IDENTITY_NORMALIZATION_VERSION = "product-homologation-v2.6"
 
 _GENERIC_BRANDS = frozenset(
     {
@@ -1734,7 +1734,7 @@ def _gtin_pair_conflicts(left: ProductProfile, right: ProductProfile) -> set[str
     return reasons
 
 
-# --- Acuerdo mínimo de nombre para GTIN derivados de SKU (Colonial) -----------
+# --- Acuerdo mínimo de nombre para GTIN derivados de SKU (Colonial, Comisariato)
 # Un SKU GS1 válido puede ser el código equivocado. Calibración 2026-10-01 sobre
 # los 2,359 grupos Colonial: exigir al menos un token significativo común y que
 # coincida al menos 1/3 de los tokens del lado más corto excluye "LOREAL Vol
@@ -1754,10 +1754,11 @@ _NAME_AGREEMENT_STOPWORDS = frozenset(
         "with", "x", "y",
     }
 )
-# Traducciones inglés→español observadas en nombres Colonial frente a Walmart/Paiz.
+# Traducciones inglés→español observadas en nombres Colonial/Comisariato frente
+# a Walmart/Paiz ("Delicia Bacon 397g" vs "Tocino Delicia - 397 g").
 _NAME_AGREEMENT_TRANSLATIONS = {
-    "almond": "almendra", "almonds": "almendra", "beef": "carne", "black": "negro",
-    "bread": "pan", "cheese": "queso", "chicken": "pollo", "coffee": "cafe",
+    "almond": "almendra", "almonds": "almendra", "bacon": "tocino", "beef": "carne",
+    "black": "negro", "bread": "pan", "cheese": "queso", "chicken": "pollo", "coffee": "cafe",
     "cookie": "galleta", "cookies": "galleta", "corn": "maiz", "cream": "crema",
     "dientes": "dental", "grape": "uva", "green": "verde", "honey": "miel",
     "juice": "jugo", "milk": "leche", "oil": "aceite", "olive": "oliva",

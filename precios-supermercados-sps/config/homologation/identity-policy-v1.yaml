@@ -1,5 +1,5 @@
 schema: precios-sps-product-identity-policy/v1
-engine_version: product-homologation-v2.5
+engine_version: product-homologation-v2.6
 
 relations:
   identity:
@@ -46,9 +46,12 @@ restricted_gtin:
     # Walmart y Paiz publican el mismo catálogo VTEX de Walmart Centroamérica.
     walmart_cam: [paiz, walmart]
   # La Colonia SPS/TGU comparten supermarket_id: nunca forman grupo consigo misma.
-  # Colonial: ean derivado del sku GS1 válido (aprobado 2026-10-01). En grupos
-  # exactos su marca contradictoria también bloquea (sku_gtin_brand_conflict).
-  sku_derived_gtin_supermarkets: [colonial]
+  # Colonial: ean derivado del sku GS1 válido (aprobado 2026-10-01).
+  # Comisariato Los Andes: ean = code sin ceros + dígito de control GS1 (aprobado
+  # 2026-10-01). En grupos exactos aplican además las guardas de marca, nombre y
+  # tono/modelo (sku_gtin_brand_conflict, sku_gtin_name_disagreement,
+  # model_number_conflict).
+  sku_derived_gtin_supermarkets: [colonial, comisariato_los_andes]
   outside_master_status: review_required
 
 hard_conflicts:

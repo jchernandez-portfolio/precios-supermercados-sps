@@ -1,4 +1,4 @@
-"""Captura de GTIN por fuente: sólo barcodes explícitos y válidos llegan a ``ean``.
+"""Captura de GTIN por fuente: barcodes explícitos válidos o códigos fuente aprobados.
 
 Hallazgos 2026-09-30 sobre fixtures y capturas versionadas en ``reports/``:
 
@@ -8,7 +8,9 @@ Hallazgos 2026-09-30 sobre fixtures y capturas versionadas en ``reports/``:
   sigue en ``reference`` y la procedencia se deriva (``ean == reference``).
 - PriceSmart: Bloomreach no expone barcode/GTIN/UPC; las variantes ``<pid>-<dígitos>``
   son SKU fuente (y no coinciden con GTIN de otras cadenas).
-- Comisariato Los Andes: ``code`` es un código de material interno.
+- Comisariato Los Andes: desde 2026-10-01 (aprobado) ``code`` = ``0001-`` + GTIN
+  sin dígito de control con ceros a la izquierda; ``ean`` es la reconstrucción
+  (casos en ``test_comisariato_gtin_identity.py``).
 """
 from __future__ import annotations
 
@@ -25,7 +27,10 @@ from precios_supermercados.scrapers.colonial import (
     gtin_from_sku,
     parse_products,
 )
-from precios_supermercados.scrapers.comisariato_los_andes import parse_catalog_page
+from precios_supermercados.scrapers.comisariato_los_andes import (
+    ean_provenance as comisariato_ean_provenance,
+    parse_catalog_page,
+)
 from precios_supermercados.scrapers.pricesmart import parse_documents
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -114,11 +119,25 @@ def test_pricesmart_composite_sku_suffix_is_not_promoted_to_ean() -> None:
     assert all(row["ean"] is None for row in rows)
 
 
-def test_comisariato_internal_material_code_is_never_ean() -> None:
+def test_comisariato_fixture_codes_reconstruct_gtin_except_internal() -> None:
     payload = json.loads(
         (FIXTURES / "comisariato_los_andes/catalog_page_sample.json").read_text(encoding="utf-8")
     )
     parsed = parse_catalog_page(payload, expected_skip=0, take=6)
-    assert parsed["rows"]
-    assert all(row["ean"] is None for row in parsed["rows"])
-    assert all(row["reference"].startswith("0001-") for row in parsed["rows"])
+    by_reference = {row["reference"]: row for row in parsed["rows"]}
+    # 5 de 6 códigos del fixture (2026-09-04) reconstruyen EAN-8; 4 de ellos
+    # son el mismo GTIN que Paiz publica para el mismo pastel Marinela.
+    assert {reference: row["ean"] for reference, row in by_reference.items()} == {
+        "0001-000099001005224": None,  # interno `99…`
+        "0001-000000007400051": "74000517",
+        "0001-000000007400065": "74000654",  # Paiz 0000074000654 Submarino Vainilla 64 g
+        "0001-000000007400066": "74000661",  # Paiz 0000074000661 Submarino Fresa 64 g
+        "0001-000000007400068": "74000685",  # Paiz 0000074000685 Pinguino 80 g
+        "0001-000000007400070": "74000708",  # Paiz 0000074000708 Gansito 50 g
+    }
+    assert all(row["source_key"] == row["reference"] for row in parsed["rows"])
+    assert {comisariato_ean_provenance(row) for row in parsed["rows"]} == {
+        None,
+        "sku_reconstructed_check_digit",
+    }
+    assert all("ean_source" not in row for row in parsed["rows"])  # snapshot cerrado

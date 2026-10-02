@@ -11,6 +11,11 @@ Esta capa endurece únicamente la frontera de decisiones manuales:
 * una rama decidida que reaparece con PR abierto falla cerrado;
 * las razones históricas v1 se conservan por referencia a su archivo versionado.
 
+Sin ramas históricas que coincidan con el patrón (repositorio separado del
+monorepo el 2026-09-30) el resultado es un inventario vacío válido: en modo
+estricto el archivo de decisiones se sigue validando, pero no hay ramas a las
+que aplicarlo y el cierre termina en 0.
+
 No borra, fusiona ni modifica ramas y no realiza tráfico hacia supermercados.
 """
 
@@ -215,7 +220,15 @@ def audit(
     main_sha = legacy._ref_sha(main_ref)
     branches = legacy._branches(remote_prefix, pattern)
     if not branches:
-        raise legacy.AuditError(f"no remote branches matched {pattern!r}")
+        if inspect_only:
+            return main_sha, None, [], ()
+        # Se valida el archivo versionado aunque no haya ramas a las que aplicarlo.
+        reviewed_main, _decisions = load_decisions(
+            decisions_path,
+            legacy_overrides=legacy_overrides,
+            main_ref=main_ref,
+        )
+        return main_sha, reviewed_main, [], ()
     rows = [legacy._classify(main_ref, remote_prefix, branch) for branch in branches]
     if inspect_only:
         return main_sha, None, rows, ()
@@ -260,6 +273,7 @@ def main() -> int:
         main_sha=main_sha,
         json_output=args.json_output,
         markdown_output=args.markdown_output,
+        pattern=args.pattern,
     )
     if reviewed_main is not None:
         print(f"reviewed_main={reviewed_main}")

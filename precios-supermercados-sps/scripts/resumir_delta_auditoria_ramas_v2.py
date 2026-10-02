@@ -94,7 +94,13 @@ def classify_delta(
     }
 
 
-def _markdown(groups: dict[str, tuple[str, ...]], *, reviewed_main: str, current_main: str) -> str:
+def _markdown(
+    groups: dict[str, tuple[str, ...]],
+    *,
+    reviewed_main: str,
+    current_main: str,
+    empty_inventory: bool = False,
+) -> str:
     lines = [
         "# Delta de auditoría histórica v2",
         "",
@@ -102,6 +108,9 @@ def _markdown(groups: dict[str, tuple[str, ...]], *, reviewed_main: str, current
         f"Main actual: `{current_main}`",
         "",
     ]
+    if empty_inventory:
+        # Repositorio separado del monorepo (2026-09-30): las decisiones quedan MISSING.
+        lines.extend([f"Inventario vacío: {legacy.NO_HISTORICAL_BRANCHES}.", ""])
     for name in (
         "CARRIED_EXACT",
         "SUBSUMED",
@@ -142,7 +151,12 @@ def main() -> int:
         raise legacy.AuditError("current main argument does not match main ref")
     rows = _load_rows(args.automatic_audit)
     groups = classify_delta(rows, decisions)
-    rendered = _markdown(groups, reviewed_main=reviewed_main, current_main=current_main)
+    rendered = _markdown(
+        groups,
+        reviewed_main=reviewed_main,
+        current_main=current_main,
+        empty_inventory=not rows,
+    )
     args.output.write_text(rendered, encoding="utf-8")
     print(rendered)
     return 0

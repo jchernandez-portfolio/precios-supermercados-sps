@@ -108,7 +108,8 @@ confirman identidad por sí mismos.
     maquillaje y tinte, números de tono/modelo distintos ("Light 20" vs "Light
     Honey 120") son `model_number_conflict`. Estas guardas no aplican a barcodes
     explícitos.
-    PriceSmart y Comisariato no exponen barcode.
+    PriceSmart no expone barcode; Comisariato reconstruye el GTIN desde su
+    código fuente (regla 19).
 14. **Abreviaturas (v2.4).** Para detectar variantes se separan palabras
     pegadas ("AlmendVainiSinAzucar") y se expande una tabla cerrada de
     abreviaturas observadas (`vaini`→vainilla, `meloctn`→melocotón, `s azu`/
@@ -169,6 +170,25 @@ confirman identidad por sí mismos.
     una palabra clave al inicio de la **hoja** de la ruta tipa como evidencia
     débil (`taxonomy_rule_id = source_category_keyword`): nunca genera
     `product_type_conflict`; si no hay tipo, el departamento llena la categoría.
+
+19. **Comisariato: `code` = GTIN sin dígito de control (v2.6, aprobado
+    2026-10-01).** El `code` fuente (`0001-` + 15 dígitos) es el GTIN sin su
+    dígito de control, rellenado con ceros. Se quita `0001-` y los ceros, y según
+    la longitud de la base se agrega el dígito de control GS1: 7 → EAN-8;
+    10 → UPC-A cuyo 0 inicial también se quitó (se rellena a 11:
+    `7107203054` → `071072030547`); 11 → UPC-A; 12 → EAN-13
+    (`0001-000744102955677` → `7441029556773`). Exclusiones: bases de otras
+    longitudes (3–4, 8–9 dígitos), bases que empiezan con `99` (códigos
+    internos, p. ej. `99001005224`) y cualquier resultado en rango GS1
+    restringido de la regla 9 (peso variable/PLU en tienda como `24153000000`
+    "Delicia jamon pollo lb plu 133" o `29801000000` "Pan molido libra"): en
+    esos casos `ean` queda nulo. `reference` conserva el código fuente y la
+    procedencia se deriva (`ean == gtin_from_code(reference)` ⇒
+    `sku_reconstructed_check_digit`) sin llaves nuevas en el snapshot. El GTIN
+    reconstruido se trata igual que un GTIN derivado de SKU Colonial (regla 13):
+    sólo crea identidad si coincide con el GTIN de otra cadena y supera las
+    guardas de marca, acuerdo mínimo de nombre, tono/modelo y los conflictos de
+    tamaño/variante/tipo. La marca placeholder `Marca COMANDES` nunca contradice.
 
 ## Casos iniciales
 

@@ -12,14 +12,16 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import actualizar_mvp_turso_comisariato_los_andes as persistence  # noqa: E402
 
 
-def product(key: str, *, promo: bool = False) -> tuple[dict[str, object], dict[str, object]]:
+def product(
+    key: str, *, promo: bool = False, ean: str | None = None
+) -> tuple[dict[str, object], dict[str, object]]:
     current = "90.00" if promo else "100.00"
     row = {
         "availability": "unknown",
         "brand": "Marca COMANDES",
         "category": "ABARROTES",
         "current_price": current,
-        "ean": None,
+        "ean": ean,
         "is_promotion": promo,
         "item_id": key,
         "presentation": "UN",
@@ -54,8 +56,8 @@ def product(key: str, *, promo: bool = False) -> tuple[dict[str, object], dict[s
     return row, detail
 
 
-def snapshot_bytes() -> bytes:
-    pairs = [product("0001-1"), product("0001-2", promo=True)]
+def snapshot_bytes(pairs: list[tuple[dict[str, object], dict[str, object]]] | None = None) -> bytes:
+    pairs = pairs or [product("0001-1"), product("0001-2", promo=True)]
     rows = [pair[0] for pair in pairs]
     details = {pair[0]["source_key"]: pair[1] for pair in pairs}
     keys = sorted(str(row["source_key"]) for row in rows)
@@ -110,6 +112,8 @@ def test_los_andes_snapshot_validator_accepts_proven_contract() -> None:
         (lambda d: d["source_details"]["0001-1"].__setitem__("source_list_price", 0), "source_semantics_invalid"),
         (lambda d: d["source_details"]["0001-2"].__setitem__("source_discount", 9), "promotion_invalid"),
         (lambda d: d.__setitem__("membership_sha256", "0" * 64), "membership_hash_invalid"),
+        # `ean` sólo puede ser la reconstrucción del `code`; "0001-1" no tiene GTIN.
+        (lambda d: d["products"][0].__setitem__("ean", "7441029556773"), "product_identity_invalid"),
     ],
 )
 def test_los_andes_snapshot_validator_fails_closed(mutation, reason) -> None:
@@ -117,6 +121,25 @@ def test_los_andes_snapshot_validator_fails_closed(mutation, reason) -> None:
     mutation(data)
     with pytest.raises(persistence.SnapshotError, match=reason):
         persistence.validate_snapshot_bytes(json.dumps(data).encode())
+
+
+GTIN_CODE = "0001-000744102955677"  # Bimbo Pan Blanco 720 g → 7441029556773
+
+
+def test_los_andes_snapshot_validator_accepts_reconstructed_gtin() -> None:
+    raw = snapshot_bytes([product(GTIN_CODE, ean="7441029556773"), product("0001-2", promo=True)])
+    data = persistence.validate_snapshot_bytes(raw)
+    assert {row["reference"]: row["ean"] for row in data["products"]} == {
+        GTIN_CODE: "7441029556773",
+        "0001-2": None,
+    }
+
+
+@pytest.mark.parametrize("ean", [None, "744102955677", "07441029556773", "7441029556774"])
+def test_los_andes_snapshot_validator_rejects_ean_other_than_reconstruction(ean) -> None:
+    raw = snapshot_bytes([product(GTIN_CODE, ean=ean), product("0001-2", promo=True)])
+    with pytest.raises(persistence.SnapshotError, match="product_identity_invalid"):
+        persistence.validate_snapshot_bytes(raw)
 
 
 def test_persist_snapshot_uses_los_andes_scope_and_is_idempotent(monkeypatch) -> None:

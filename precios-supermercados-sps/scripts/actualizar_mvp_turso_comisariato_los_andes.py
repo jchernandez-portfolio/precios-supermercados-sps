@@ -25,6 +25,7 @@ from actualizar_mvp_turso_la_colonia import (  # noqa: E402
     _stmt,
     _validate_table_names,
 )
+from precios_supermercados.scrapers.comisariato_los_andes import gtin_from_code  # noqa: E402
 
 SUPERMARKET_ID = "comisariato_los_andes"
 SUPERMARKET_NAME = "Comisariato Los Andes"
@@ -124,7 +125,8 @@ def validate_snapshot_bytes(raw: bytes) -> dict[str, Any]:
             or row.get("product_id") != key
             or row.get("item_id") != key
             or row.get("reference") != key
-            or row.get("ean") is not None
+            # `ean` sólo puede ser el GTIN reconstruido desde el `code` (regla 19).
+            or row.get("ean") != gtin_from_code(key)
             or not isinstance(row.get("source_name"), str)
             or not row["source_name"].strip()
             or row.get("availability") != "unknown"

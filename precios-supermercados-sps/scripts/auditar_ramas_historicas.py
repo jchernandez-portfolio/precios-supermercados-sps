@@ -19,6 +19,14 @@ reclasificar candidatos UNIQUE_UNMERGED del snapshot exacto de main auditado.
 ``--inspect-only`` conserva la clasificación automática antes de aplicar
 excepciones manuales. Sirve para producir evidencia revisable sobre un snapshot
 nuevo de ``main`` sin rebajar el cierre fail-closed del modo normal.
+
+Repositorio separado (2026-09-30): este repositorio se separó del monorepo
+Portafolio y las ramas históricas ``precios-sps`` no existen aquí (sólo ``main``,
+``portfolio-data`` y ramas ``rpi/*``). Si ningún ref remoto coincide con el
+patrón, la auditoría produce un inventario vacío válido (JSON ``[]`` y Markdown
+"no historical branches in this repository") y termina en 0: sin ramas no hay
+candidatos UNIQUE_UNMERGED ni excepciones que aplicar. Cualquier rama que
+coincida vuelve a la clasificación fail-closed habitual.
 """
 
 from __future__ import annotations
@@ -339,7 +347,10 @@ def _short(values: tuple[str, ...], limit: int = 12) -> str:
     return rendered or "—"
 
 
-def _markdown(rows: list[BranchAudit], *, main_sha: str) -> str:
+NO_HISTORICAL_BRANCHES = "no historical branches in this repository"
+
+
+def _markdown(rows: list[BranchAudit], *, main_sha: str, pattern: str | None = None) -> str:
     counts = {category: 0 for category in sorted(CATEGORIES)}
     for row in rows:
         counts[row.category] += 1
@@ -350,6 +361,15 @@ def _markdown(rows: list[BranchAudit], *, main_sha: str) -> str:
         f"Total: **{len(rows)}**",
         "",
     ]
+    if not rows:
+        matched = f" coincide con `{pattern}`" if pattern else " coincide con el patrón"
+        lines.extend(
+            [
+                f"Sin ramas históricas: {NO_HISTORICAL_BRANCHES} (ningún ref remoto{matched};",
+                "el repositorio se separó del monorepo Portafolio el 2026-09-30).",
+                "",
+            ]
+        )
     lines.extend(f"- {category}: **{counts[category]}**" for category in sorted(counts))
     candidates = [row for row in rows if row.category != "MERGED_OR_SUBSUMED"]
     lines.extend(["", "## Ramas no clasificadas como merged/subsumed", ""])
@@ -399,12 +419,13 @@ def _write_outputs(
     main_sha: str,
     json_output: Path,
     markdown_output: Path,
+    pattern: str | None = None,
 ) -> None:
     json_output.write_text(
         json.dumps([asdict(row) for row in rows], indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    markdown = _markdown(rows, main_sha=main_sha)
+    markdown = _markdown(rows, main_sha=main_sha, pattern=pattern)
     markdown_output.write_text(markdown, encoding="utf-8")
     print(markdown)
 
@@ -424,7 +445,15 @@ def main() -> int:
     main_sha = _ref_sha(args.main_ref)
     branches = _branches(args.remote_prefix, args.pattern)
     if not branches:
-        raise AuditError(f"no remote branches matched {args.pattern!r}")
+        # Inventario vacío válido: no hay candidatos ni excepciones aplicables.
+        _write_outputs(
+            [],
+            main_sha=main_sha,
+            json_output=args.json_output,
+            markdown_output=args.markdown_output,
+            pattern=args.pattern,
+        )
+        return 0
 
     rows = [_classify(args.main_ref, args.remote_prefix, branch) for branch in branches]
     if args.inspect_only:

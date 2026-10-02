@@ -8,11 +8,15 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 from collections import Counter
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
+
+from ..gtin_policy import restricted_circulation_reason
+from ..identifiers import canonicalize_gtin
 
 SUPERMARKET_ID = "comisariato_los_andes"
 LOCATION_ID = "comisariato_los_andes_sps"
@@ -45,6 +49,70 @@ class LosAndesError(ValueError):
 def require(value: object, reason: str) -> None:
     if not value:
         raise LosAndesError(reason)
+
+
+# `code` = `0001-` + 15 dígitos. Aprobado 2026-10-01: los 15 dígitos son el GTIN
+# del producto SIN su dígito de control, rellenado con ceros a la izquierda
+# (`0001-000744102955677` → `744102955677` → `7441029556773`, Bimbo Pan Blanco
+# 720 g, igual GTIN en Colonial/La Colonia/Paiz). Longitud de la base sin ceros
+# → ancho del cuerpo GTIN antes del dígito de control:
+#   7 → EAN-8; 10 → UPC-A cuyo 0 inicial también se quitó (`7107203054` →
+#   `071072030547`); 11 → UPC-A; 12 → EAN-13. Otras longitudes (3–4, 8–9 dígitos)
+#   no se interpretan.
+CODE_PATTERN = re.compile(r"0001-(\d{15})")
+GTIN_BODY_WIDTH_BY_BASE_LENGTH = {7: 7, 10: 11, 11: 11, 12: 12}
+INTERNAL_CODE_PREFIX = "99"  # códigos internos (`99001005224`), nunca GTIN
+EAN_PROVENANCE = "sku_reconstructed_check_digit"
+
+
+def gs1_check_digit(body: str) -> str:
+    """Dígito de control GS1 (módulo 10, pesos 3/1 desde la derecha)."""
+    require(isinstance(body, str) and body.isdigit(), "gtin_body_invalid")
+    total = sum(
+        int(digit) * (3 if position % 2 == 0 else 1)
+        for position, digit in enumerate(reversed(body))
+    )
+    return str((10 - total % 10) % 10)
+
+
+def gtin_from_code(code: object) -> str | None:
+    """Reconstruye el GTIN de un `code` Comisariato o devuelve ``None``.
+
+    Sólo `0001-` + 15 dígitos cuya base sin ceros tiene 7, 10, 11 o 12 dígitos y
+    no empieza con `99`. Un resultado en rango GS1 de circulación restringida
+    (peso variable `2…`, PLU en tienda como `24153000000`, uso interno `04…`,
+    cupones) se descarta: no es global y además la reconstrucción no se pudo
+    contrastar con otra cadena.
+    """
+    if not isinstance(code, str):
+        return None
+    match = CODE_PATTERN.fullmatch(code.strip())
+    if match is None:
+        return None
+    base = match.group(1).lstrip("0")
+    if base.startswith(INTERNAL_CODE_PREFIX):
+        return None
+    width = GTIN_BODY_WIDTH_BY_BASE_LENGTH.get(len(base))
+    if width is None:
+        return None
+    body = base.zfill(width)
+    gtin = body + gs1_check_digit(body)
+    if canonicalize_gtin(gtin) is None or restricted_circulation_reason(gtin) is not None:
+        return None
+    return gtin
+
+
+def ean_provenance(row: dict[str, Any]) -> str | None:
+    """Procedencia de ``ean`` derivable de una fila sin llaves nuevas.
+
+    El snapshot tiene llaves cerradas: en Comisariato ``ean`` sólo puede ser la
+    reconstrucción determinista de ``reference`` (el `code` fuente). Un ``ean``
+    que no coincide con esa reconstrucción no tiene procedencia conocida.
+    """
+    ean = row.get("ean")
+    if ean is None:
+        return None
+    return EAN_PROVENANCE if ean == gtin_from_code(row.get("reference")) else None
 
 
 def _number(value: object, reason: str, *, allow_none: bool = False) -> Decimal | None:
@@ -246,10 +314,12 @@ def parse_products(
                 "source_name": name,
                 "brand": brand.strip() if isinstance(brand, str) and brand.strip() else None,
                 "reference": code,
-                # El catálogo público no expone barcode/GTIN. `code` es un código de
-                # material interno (`0001-` + 15 dígitos, p. ej. 7400051 o 99001005224):
-                # nunca se reinterpreta como GTIN aunque quite ceros a la izquierda.
-                "ean": None,
+                # El catálogo no expone barcode. `code` codifica el GTIN sin dígito
+                # de control (aprobado 2026-10-01): `gtin_from_code` lo reconstruye
+                # sólo para bases de 7/10/11/12 dígitos, nunca para internos `99…`
+                # ni rangos GS1 restringidos (peso variable/PLU). `reference`
+                # conserva el código fuente; procedencia: `ean_provenance(row)`.
+                "ean": gtin_from_code(code),
                 "category": (
                     category.strip()
                     if isinstance(category, str) and category.strip()

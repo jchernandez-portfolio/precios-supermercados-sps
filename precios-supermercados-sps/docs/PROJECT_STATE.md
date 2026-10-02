@@ -193,7 +193,8 @@ con la nueva versión. Política y casos en
   acuerdo mínimo de nombre sin marca ni tamaño —al menos un token común y ≥1/3
   de los tokens del lado más corto— (`sku_gtin_name_disagreement`) y, en
   maquillaje/tinte, el mismo número de tono/modelo (`model_number_conflict`).
-  PriceSmart (Bloomreach) y Comisariato (material interno) no exponen barcode.
+  PriceSmart (Bloomreach) y Comisariato no exponen barcode (Comisariato: el
+  GTIN se reconstruye desde `code` desde v2.6, ver sección 2026-10-01).
 - **GTIN restringidos GS1:** sólo forman identidad dentro de un maestro
   compartido (`walmart_cam` = Walmart + Paiz). En el corte 2026-09-21, las 315
   filas comparables TGU con GTIN restringido son Walmart+Paiz: 0 degradadas.
@@ -300,6 +301,45 @@ parejas pasan a revisión. Fuera de ese segmento los auto-match suben (+5 SPS,
 +23 TGU). Los "falsos positivos" silver nuevos son mayormente el mismo producto
 con GTIN distinto que ahora concuerda en tamaño ("Café Dorao 454 g" vs "Café
 Dorao Kraft 16 oz"). Sin GTIN nada de esto cambia la comparabilidad publicada.
+
+## Comisariato — GTIN desde el código (2026-10-01)
+
+Rama `rpi/comisariato-gtin` (no fusionada). Motor `product-homologation-v2.6`:
+al fusionarse, el refresh de homologación reescribe los perfiles derivados.
+Regla 19 en
+[`homologation/product-identity-standard-v1.md`](homologation/product-identity-standard-v1.md).
+
+Decisión aprobada por el responsable del proyecto: el `code` de Comisariato Los
+Andes (`0001-` + 15 dígitos) codifica el GTIN del producto **sin su dígito de
+control**, rellenado con ceros. Evidencia recogida live el 2026-10-01:
+
+- `0001-000744102955677` → `744102955677` → `7441029556773` (Bimbo Pan Blanco
+  720 g, el mismo GTIN que Colonial y La Colonia).
+- En una muestra aleatoria de 55 códigos del catálogo, 21 GTIN reconstruidos
+  coinciden con el GTIN de otra cadena con nombre concordante (Delicia Bacon
+  397 g `7421000915201`, Pringles `038000846731`, Pepsi 2 L `7421600300247`,
+  McCormick Mostaza `7411000204238`, Plenitud `7751493006446`, Olitalia
+  `8007150902996`…). El fixture versionado 2026-09-04 lo confirma offline: 4
+  de sus 5 códigos de 7 dígitos (Marinela Submarino Vainilla/Fresa, Pingüino,
+  Gansito) reconstruyen el mismo EAN-8 que publica Paiz.
+- Longitud de la base sin ceros en el catálogo completo (6,687 códigos): 10
+  dígitos 2,601; 11 dígitos 1,604; 12 dígitos 2,427; 7–9 dígitos ~47; 3–4
+  dígitos 8.
+- Patrones que no son GTIN: internos `99…` (`99001005224`, `9900500…`) y
+  códigos de peso variable en tienda (`24153000000` "Delicia jamon pollo lb plu
+  133", vendido por libra; `29801000000` "Pan molido libra").
+
+Implementación: `gtin_from_code` (scraper) reconstruye sólo bases de 7 (EAN-8),
+10 (UPC-A con 0 inicial), 11 (UPC-A) y 12 (EAN-13) dígitos, excluye `99…` y
+cualquier resultado en rango GS1 restringido; `reference` conserva el `code` y
+`ean_provenance(row)` devuelve `sku_reconstructed_check_digit` sin llaves nuevas.
+La persistencia Turso exige `ean == gtin_from_code(reference)`.
+`comisariato_los_andes` entra en `sku_derived_gtin_supermarkets`: el GTIN sólo
+crea identidad entre cadenas si coincide con otro y supera las guardas de marca,
+nombre mínimo, tono/modelo y conflictos de tamaño/variante/tipo (como Colonial).
+Se agregó la traducción `bacon`→`tocino` al acuerdo de nombre. Sin snapshot
+completo de Comisariato en el repositorio, el impacto en grupos comparables se
+mide tras el primer refresh.
 
 ## Autoridad live y binding SPS
 

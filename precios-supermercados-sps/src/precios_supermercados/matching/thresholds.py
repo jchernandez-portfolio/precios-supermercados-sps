@@ -211,7 +211,8 @@ class SegmentedThresholds:
     Un umbral global quedaría dominado por los pares fáciles (p. ej. Walmart y
     Paiz comparten plataforma y nombres). Cada par con soporte suficiente en
     calibración recibe su propio umbral; los pares sin etiquetas suficientes
-    (Comisariato, PriceSmart: sin GTIN) no tienen auto-match: su precisión no
+    (PriceSmart sin GTIN; Comisariato hasta acumular etiquetas con su GTIN
+    reconstruido) no tienen auto-match: su precisión no
     está medida. Sus parejas sobre el umbral más estricto observado
     (``unmeasured_auto``) van a revisión con prioridad hasta etiquetar el golden.
     """
