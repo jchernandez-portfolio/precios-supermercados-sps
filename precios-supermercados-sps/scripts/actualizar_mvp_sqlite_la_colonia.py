@@ -15,7 +15,12 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+if str(ROOT / "src") not in sys.path:
+    sys.path.append(str(ROOT / "src"))
 from generar_mvp_sqlite_la_colonia import create_schema  # noqa: E402
+from precios_supermercados.unpriced_unavailable import (  # noqa: E402
+    validate_unpriced_unavailable,
+)
 
 SUPERMARKET_ID = "la_colonia"
 LOCATIONS = {"la_colonia_sps": "San Pedro Sula", "la_colonia_tgu": "Tegucigalpa"}
@@ -119,6 +124,15 @@ def validate_snapshot_bytes(raw: bytes, *, supermarket_id: str = SUPERMARKET_ID)
             raise SnapshotError("snapshot_promotion_invalid")
         if row["availability"] not in {"in_stock", "out_of_stock", "unknown"}:
             raise SnapshotError("snapshot_availability_invalid")
+
+    # SKU listados sin precio y agotados viajan fuera de ``products`` (regla
+    # 2026-10-02). Cuentan para la completitud del catálogo, nunca para precios.
+    unpriced = validate_unpriced_unavailable(data, priced_rows=rows, error=SnapshotError)
+    if unpriced and supermarket_id in {"walmart", "pricesmart"}:
+        # Walmart/PriceSmart ya representan sus agotados sin precio dentro de
+        # ``products`` con evidencia fuente cerrada; no admiten la sección.
+        raise SnapshotError("snapshot_unpriced_unavailable_not_supported")
+    source_products.update(str(entry["product_id"]) for entry in unpriced)
 
     reported = data.get("catalog_products_reported")
     if (
@@ -361,6 +375,40 @@ def _apply_state(
     return 1, int(current is not None), 0
 
 
+def _close_unpriced_history(
+    con: sqlite3.Connection, entries: list[dict[str, Any]], location_id: str, observed_at: str,
+) -> int:
+    """Cierra el periodo current de un producto que hoy se lista sin precio y agotado.
+
+    No abre periodo nuevo (no hay precio que historizar): el estado con precio
+    anterior deja de ser current y la oferta vuelve por el camino normal cuando
+    reaparezca con precio.
+    """
+    closed = 0
+    for entry in entries:
+        found = con.execute(
+            "SELECT product_id FROM products WHERE supermarket_id=? AND source_key_type=? AND source_key=?",
+            (SUPERMARKET_ID, str(entry["source_key_type"]), str(entry["source_key"])),
+        ).fetchone()
+        if found is None:
+            continue
+        current = con.execute(
+            """SELECT valid_from_utc FROM price_history
+            WHERE product_id=? AND location_id=? AND valid_to_utc IS NULL""",
+            (int(found[0]), location_id),
+        ).fetchone()
+        if current is None:
+            continue
+        if _utc(observed_at) <= _utc(current[0]):
+            raise SnapshotError("snapshot_out_of_order")
+        con.execute(
+            "UPDATE price_history SET valid_to_utc=? WHERE product_id=? AND location_id=? AND valid_to_utc IS NULL",
+            (observed_at, int(found[0]), location_id),
+        )
+        closed += 1
+    return closed
+
+
 def apply_snapshot(
     database: Path, raw: bytes, *, run_id: str, source_artifact_id: str | None = None,
 ) -> dict[str, Any]:
@@ -376,6 +424,9 @@ def apply_snapshot(
         "replayed": False, "products_inserted": 0, "products_updated": 0,
         "history_opened": 0, "history_closed": 0, "history_unchanged": 0,
     }
+    if "unpriced_unavailable" in snapshot:
+        summary["unpriced_unavailable"] = len(snapshot["unpriced_unavailable"])
+        summary["history_closed_unpriced"] = 0
 
     con = sqlite3.connect(database)
     con.row_factory = sqlite3.Row
@@ -415,6 +466,10 @@ def apply_snapshot(
             summary["history_opened"] += opened
             summary["history_closed"] += closed
             summary["history_unchanged"] += unchanged
+        if "unpriced_unavailable" in snapshot:
+            summary["history_closed_unpriced"] = _close_unpriced_history(
+                con, snapshot["unpriced_unavailable"], location_id, observed_at
+            )
         if con.execute("PRAGMA foreign_key_check").fetchall():
             raise SnapshotError("database_foreign_key_check_failed")
         con.commit()

@@ -29,6 +29,9 @@ from precios_supermercados.scrapers.la_colonia_location import (  # noqa: E402
     LocationInitializationError,
     ensure_operational_city,
 )
+from precios_supermercados.unpriced_unavailable import (  # noqa: E402
+    split_unpriced_unavailable,
+)
 
 core = frontier.base
 full = core.full
@@ -225,6 +228,30 @@ def _process_page(
     if recovery:
         diagnostic["recovery_pages_completed"] += 1
     diagnostic["skus_extracted"] = len(unique_skus)
+
+
+def catalog_rows_fields(
+    all_products: Sequence[Mapping[str, Any]],
+    *,
+    observed_at_utc: str,
+) -> dict[str, Any]:
+    """Campos de filas/conteos del snapshot con la regla sin precio agotado.
+
+    Los SKU listados sin precio y agotados ("NO DISPONIBLE") salen de las filas
+    con precio a ``unpriced_unavailable``; los conteos ``skus_*`` describen sólo
+    ``products``. La validación del snapshot acota su volumen y exige que todos
+    estén agotados; un SKU sin precio no agotado queda en ``products`` y falla.
+    """
+    priced, unpriced = split_unpriced_unavailable(all_products, observed_at_utc=observed_at_utc)
+    with_price = sum(product.get("current_price") is not None for product in priced)
+    return {
+        "skus_extracted": len(priced),
+        "skus_with_price": with_price,
+        "skus_without_price": len(priced) - with_price,
+        "skus_unpriced_unavailable": len(unpriced),
+        "products": priced,
+        "unpriced_unavailable": unpriced,
+    }
 
 
 def _ensure_request_budget(diagnostic: dict[str, Any]) -> None:
@@ -635,6 +662,8 @@ def _run_catalog(*, page_size: int, delay_seconds: float) -> dict[str, Any]:
                 diagnostic=diagnostic,
             )
 
+            observed_at_utc = full._utc_text()
+            rows_fields = catalog_rows_fields(all_products, observed_at_utc=observed_at_utc)
             artifact = {
                 "schema_version": "7",
                 "result": "success",
@@ -683,16 +712,18 @@ def _run_catalog(*, page_size: int, delay_seconds: float) -> dict[str, Any]:
                 "recovery_duplicate_skus_ignored": diagnostic[
                     "recovery_duplicate_skus_ignored"
                 ],
-                "skus_extracted": len(unique_skus),
-                "skus_with_price": diagnostic["skus_with_price"],
-                "skus_without_price": len(unique_skus) - diagnostic["skus_with_price"],
+                "skus_extracted": rows_fields["skus_extracted"],
+                "skus_with_price": rows_fields["skus_with_price"],
+                "skus_without_price": rows_fields["skus_without_price"],
+                "skus_unpriced_unavailable": rows_fields["skus_unpriced_unavailable"],
                 "duplicate_skus_across_partitions": diagnostic[
                     "duplicate_skus_across_pages"
                 ],
                 "catalog_complete": True,
                 "validation_passed": True,
-                "observed_at_utc": full._utc_text(),
-                "products": all_products,
+                "observed_at_utc": observed_at_utc,
+                "products": rows_fields["products"],
+                "unpriced_unavailable": rows_fields["unpriced_unavailable"],
                 "raw_context_persisted": False,
                 "commercial_persistence": False,
                 "production_authority": False,
@@ -791,6 +822,7 @@ def main(argv: list[str] | None = None) -> int:
                 "product_requests_completed": artifact["product_requests_completed"],
                 "skus_extracted": artifact["skus_extracted"],
                 "skus_with_price": artifact["skus_with_price"],
+                "skus_unpriced_unavailable": artifact["skus_unpriced_unavailable"],
                 "catalog_complete": artifact["catalog_complete"],
                 "radiography_executed": False,
             },

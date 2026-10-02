@@ -127,6 +127,9 @@ jobs:
               snapshot = validate_snapshot_bytes(Path(f'run-artifacts/{city}/full-catalog.json').read_bytes())
               assert snapshot['catalog_complete'] is True
               assert snapshot['location_verified_same_run'] is True
+              # Regla 2026-10-02: SKU sin precio y agotados viajan fuera de
+              # products (validado: todos out_of_stock y <=2 % del catálogo).
+              print(f"la_colonia_{city}_unpriced_unavailable={snapshot.get('skus_unpriced_unavailable', 0)}")
 
           los_andes = validate_los_andes(Path('run-artifacts/los-andes/full-catalog.json').read_bytes())
           assert los_andes['catalog_complete'] is True

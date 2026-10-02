@@ -11,6 +11,18 @@ GitHub `main`, GitHub Actions, los artifacts productivos, Turso y la rama `portf
 | Operación diaria | **Detenida desde el 2026-09-22.** Nueve corridas programadas seguidas (22–30 sep) terminaron en `failure` tras sus tres intentos. Ver [Incidente vigente](#incidente-vigente--sin-cortes-aceptados-desde-el-2026-09-22). |
 | Repositorio | Desde el 2026-09-30 el proyecto vive en `jchernandez-portfolio/precios-supermercados-sps`, separado del antiguo monorepo `Jchernand3z19/Portafolio` con su historial. Ver [Migración de repositorio](#migración-de-repositorio-2026-09-30). |
 
+## Incidente 2026-10-02 — La Colonia lista productos sin precio
+
+La corrida diaria "La Colonia - Actualización MVP" falló dos veces en `acquire (la_colonia)` con `SnapshotError: snapshot_sku_count_mismatch`: La Colonia publicó productos nuevos **sin precio y agotados** ("NO DISPONIBLE"), y la validación exigía precio en todo SKU. SPS y TGU: Dove 18658/18659 y Rexona 18660/18661 (~9.600 SKU por ciudad); TGU intento 1 además Dubois 18302. Como la persistencia exige las seis cadenas, ese día no se publicó nada.
+
+Regla nueva (decisión del dueño):
+
+- **Adquisición/snapshot:** los SKU sin precio y `out_of_stock` salen de `products` a `unpriced_unavailable` (+ `skus_unpriced_unavailable`). Se aceptan si son ≤2 % del catálogo (`MAX_UNPRICED_UNAVAILABLE_RATIO`, `src/precios_supermercados/unpriced_unavailable.py`) y todos están agotados; un SKU sin precio `in_stock`/`unknown` sigue fallando cerrado. Aplica a La Colonia (SPS/TGU) y al validador compartido con Colonial; Walmart/PriceSmart/Paiz ya representaban sus agotados sin precio dentro de `products` y Los Andes publica siempre `unknown` (sin precio sigue fallando).
+- **Persistencia:** tabla STRICT `catalog_unpriced_observations` (first/last seen, `priced_since_utc`), creada de forma idempotente por la persistencia; sin `products`/`price_history` sin precio. Si el producto tenía un periodo current con precio, se cierra. Lecturas acotadas a las entradas del día (índices/PK) y a las pendientes del contexto (índice parcial).
+- **Comparaciones:** una oferta `out_of_stock` nunca compara (ranking, mejor precio, diferencia, análisis, Mi Compra); `unknown` sí. Un grupo sólo es `comparable` ese día con ≥2 cadenas con ofertas no agotadas con precio; si no, se publica `individual` con el mismo `row_id`. Ver `COMPARATOR-METHODOLOGY.md`.
+
+Impacto medido sobre el corte publicado del 2026-10-01 (`portfolio-data` 84722dc0): SPS 640 de 4.063 filas `comparable` pasan a `individual` (ya excluidas del `analysis`), 225 siguen comparables sin su oferta agotada; TGU 252 de 8.876 pasan a `individual`, 230 ofertas de dos sucursales de una misma cadena (Walmart 154, Paiz 76) pierden un ranking intra-cadena y `analysis` TGU baja de 8.739 a 8.624 productos comparables.
+
 ## Incidente vigente — sin cortes aceptados desde el 2026-09-22
 
 El diseño fail-closed funcionó: ninguna corrida fallida reemplazó el último estado válido, por eso el sitio sigue mostrando el corte del 21 de septiembre con su fecha. Las causas observadas en los logs de GitHub Actions son dos y se suman:

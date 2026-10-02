@@ -15,6 +15,8 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+if str(ROOT / "src") not in sys.path:
+    sys.path.append(str(ROOT / "src"))
 
 from actualizar_mvp_sqlite_la_colonia import (  # noqa: E402
     LOCATIONS,
@@ -26,10 +28,15 @@ from actualizar_mvp_sqlite_la_colonia import (  # noqa: E402
     _minor,
     validate_snapshot_bytes,
 )
+from precios_supermercados.unpriced_unavailable import (  # noqa: E402
+    UNPRICED_OBSERVATIONS_INDEX_SQL,
+    UNPRICED_OBSERVATIONS_TABLE_SQL,
+)
 
 EXPECTED_TABLES = {"supermarkets", "locations", "products", "price_history", "scrape_runs"}
 # Tablas derivadas que la persistencia diaria tolera sin tocarlas: perfiles de
-# homologación y producto maestro (docs/homologation/product-master-v1.md).
+# homologación, producto maestro (docs/homologation/product-master-v1.md) y
+# observaciones de productos listados sin precio y no disponibles.
 OPTIONAL_DERIVED_TABLES = {
     "product_homologation_profiles",
     "master_products",
@@ -37,6 +44,7 @@ OPTIONAL_DERIVED_TABLES = {
     "master_link_rejections",
     "master_sync_state",
     "master_sync_dirty",
+    "catalog_unpriced_observations",
 }
 
 
@@ -143,6 +151,128 @@ def _normalised_json(snapshot: dict[str, Any]) -> str:
     return json.dumps(rows, ensure_ascii=False, separators=(",", ":"))
 
 
+def _normalised_unpriced_json(snapshot: dict[str, Any]) -> str | None:
+    """Observaciones sin precio agotadas; ``None`` si el snapshot no declara la sección."""
+    if "unpriced_unavailable" not in snapshot:
+        return None
+    rows = [
+        {
+            "source_key_type": str(entry["source_key_type"]),
+            "source_key": str(entry["source_key"]),
+            "source_catalog_product_id": str(entry["product_id"]),
+            "name": entry["source_name"],
+            "brand": entry["brand"],
+            "category": entry["category"],
+            "presentation": entry["presentation"],
+            "ean": entry["ean"],
+        }
+        for entry in snapshot["unpriced_unavailable"]
+    ]
+    return json.dumps(rows, ensure_ascii=False, separators=(",", ":"))
+
+
+def _unpriced_steps(
+    unpriced_incoming: str,
+    *,
+    location_id: str,
+    observed_at: str,
+    supermarket_id: str,
+) -> tuple[list[tuple[str, str, tuple[object, ...]]], list[tuple[str, str, tuple[object, ...]]]]:
+    """Pasos (antes de BEGIN, antes de COMMIT) para SKU listados sin precio y agotados.
+
+    Coste Turso acotado al alcance afectado: búsquedas por PK/índice para las pocas
+    entradas sin precio (≤2 % del catálogo) y, para ``priced_since_utc``, sólo las
+    observaciones pendientes del contexto vía índice parcial. Nunca crea
+    ``products``/``price_history`` sin precio; si el producto tenía un periodo
+    current con precio, ese periodo se cierra (deja de ser oferta comparable).
+    """
+    count = len(json.loads(unpriced_incoming))
+    before_begin = [
+        ("drop_unpriced_table", "DROP TABLE IF EXISTS temp.unpriced_incoming", ()),
+        (
+            "unpriced_table",
+            """CREATE TEMP TABLE unpriced_incoming(
+                source_key_type TEXT NOT NULL, source_key TEXT NOT NULL,
+                source_catalog_product_id TEXT NOT NULL, name TEXT NOT NULL,
+                brand TEXT, category TEXT, presentation TEXT, ean TEXT,
+                UNIQUE(source_key_type, source_key)) STRICT""",
+            (),
+        ),
+        (
+            "unpriced_load",
+            """INSERT INTO unpriced_incoming SELECT
+                json_extract(value,'$.source_key_type'),json_extract(value,'$.source_key'),
+                json_extract(value,'$.source_catalog_product_id'),json_extract(value,'$.name'),
+                json_extract(value,'$.brand'),json_extract(value,'$.category'),
+                json_extract(value,'$.presentation'),json_extract(value,'$.ean')
+                FROM json_each(?)""",
+            (unpriced_incoming,),
+        ),
+        (
+            # Debe ir inmediatamente después de unpriced_load.
+            "guard_unpriced_incoming",
+            "INSERT INTO guard_ok SELECT CASE WHEN changes()=? THEN 0 ELSE 1 END",
+            (count,),
+        ),
+    ]
+    # CROSS JOIN fija el orden: recorre las pocas entradas sin precio y busca cada
+    # producto por su UNIQUE(supermarket_id,source_key_type,source_key), en vez de
+    # recorrer todos los productos del supermercado.
+    unpriced_products = """SELECT p.product_id FROM unpriced_incoming AS u
+                    CROSS JOIN products AS p ON p.supermarket_id=?
+                     AND p.source_key_type=u.source_key_type AND p.source_key=u.source_key"""
+    before_commit = [
+        ("unpriced_observations_table", UNPRICED_OBSERVATIONS_TABLE_SQL, ()),
+        ("unpriced_observations_index", UNPRICED_OBSERVATIONS_INDEX_SQL, ()),
+        (
+            "guard_unpriced_out_of_order",
+            f"""INSERT INTO guard_ok SELECT CASE WHEN EXISTS(
+                SELECT 1 FROM price_history
+                WHERE location_id=? AND valid_to_utc IS NULL
+                  AND product_id IN ({unpriced_products})
+                  AND julianday(?)<=julianday(valid_from_utc)
+                ) THEN 1 ELSE 0 END""",
+            (location_id, supermarket_id, observed_at),
+        ),
+        (
+            "close_unpriced_history",
+            f"""UPDATE price_history SET valid_to_utc=?
+                WHERE supermarket_id=? AND location_id=? AND valid_to_utc IS NULL
+                  AND product_id IN ({unpriced_products})""",
+            (observed_at, supermarket_id, location_id, supermarket_id),
+        ),
+        (
+            "upsert_unpriced_observations",
+            """INSERT INTO catalog_unpriced_observations(
+                supermarket_id,location_id,source_key_type,source_key,
+                source_catalog_product_id,name,brand,category,presentation,ean,
+                first_seen_utc,last_seen_utc,priced_since_utc)
+                SELECT ?,?,source_key_type,source_key,source_catalog_product_id,name,
+                  brand,category,presentation,ean,?,?,NULL
+                FROM unpriced_incoming WHERE 1
+                ON CONFLICT(supermarket_id,location_id,source_key_type,source_key) DO UPDATE SET
+                source_catalog_product_id=excluded.source_catalog_product_id,
+                name=excluded.name,brand=excluded.brand,category=excluded.category,
+                presentation=excluded.presentation,ean=excluded.ean,
+                last_seen_utc=excluded.last_seen_utc,priced_since_utc=NULL
+                WHERE julianday(excluded.last_seen_utc)>julianday(catalog_unpriced_observations.last_seen_utc)""",
+            (supermarket_id, location_id, observed_at, observed_at),
+        ),
+        (
+            "mark_unpriced_priced",
+            """UPDATE catalog_unpriced_observations SET priced_since_utc=?
+                WHERE supermarket_id=? AND location_id=? AND priced_since_utc IS NULL
+                  AND julianday(last_seen_utc)<julianday(?)
+                  AND EXISTS(SELECT 1 FROM incoming i
+                    WHERE i.source_key_type=catalog_unpriced_observations.source_key_type
+                      AND i.source_key=catalog_unpriced_observations.source_key
+                      AND i.current_price_minor IS NOT NULL)""",
+            (observed_at, supermarket_id, location_id, observed_at),
+        ),
+    ]
+    return before_begin, before_commit
+
+
 def _preflight(
     url: str, token: str, *, location_id: str, run_id: str, supermarket_id: str = SUPERMARKET_ID
 ) -> dict[str, object] | None:
@@ -208,6 +338,7 @@ def _mutation_steps(
     artifact_id: str | None,
     digest: str,
     supermarket_id: str = SUPERMARKET_ID,
+    unpriced_incoming: str | None = None,
 ) -> list[tuple[str, str, tuple[object, ...]]]:
     # incoming se materializa e indexa una sola vez. Dentro de la transacción se
     # materializa delta para no repetir la misma comparación current-vs-snapshot
@@ -427,6 +558,17 @@ def _mutation_steps(
                   AND l.city_name=? AND l.country_code='HN'
                   AND s.name=? AND s.country_code='HN'""", (location_id, supermarket_id, city, name)),
         ]
+    if unpriced_incoming is not None:
+        before_begin, before_commit = _unpriced_steps(
+            unpriced_incoming,
+            location_id=location_id,
+            observed_at=observed_at,
+            supermarket_id=supermarket_id,
+        )
+        begin = next(i for i, step in enumerate(steps) if step[0] == "begin")
+        steps[begin:begin] = before_begin
+        commit = next(i for i, step in enumerate(steps) if step[0] == "commit")
+        steps[commit:commit] = before_commit
     return steps
 
 
@@ -544,6 +686,7 @@ def persist_snapshot(
             }
         raise SnapshotError("run_id_conflict")
 
+    unpriced_incoming = _normalised_unpriced_json(snapshot)
     steps = _mutation_steps(
         _normalised_json(snapshot),
         location_id=location_id,
@@ -554,9 +697,16 @@ def persist_snapshot(
         artifact_id=source_artifact_id,
         digest=digest,
         supermarket_id=supermarket_id,
+        unpriced_incoming=unpriced_incoming,
     )
     results = _run_batch(database_url, auth_token, steps)
     opened = _affected(results, steps, "open_history")
+    # Las claves sin precio sólo aparecen cuando el snapshot declara la sección:
+    # los resúmenes de snapshots anteriores (evidencia congelada) no cambian.
+    unpriced_summary = {} if unpriced_incoming is None else {
+        "unpriced_unavailable": len(snapshot["unpriced_unavailable"]),
+        "history_closed_unpriced": _affected(results, steps, "close_unpriced_history"),
+    }
     return {
         "run_id": run_id,
         "location_id": location_id,
@@ -566,6 +716,7 @@ def persist_snapshot(
         "history_opened": opened,
         "history_closed": _affected(results, steps, "close_history"),
         "history_unchanged": len(snapshot["products"]) - opened,
+        **unpriced_summary,
     }
 
 

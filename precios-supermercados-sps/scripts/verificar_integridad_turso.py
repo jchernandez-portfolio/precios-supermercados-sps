@@ -36,6 +36,7 @@ OPTIONAL_COUNTED_TABLES = (
     "master_products",
     "master_product_links",
     "master_link_rejections",
+    "catalog_unpriced_observations",
 )
 DUPLICATE_OPEN_PERIODS_SQL = (
     "SELECT COUNT(*) FROM (SELECT product_id,location_id FROM price_history "

@@ -165,6 +165,14 @@ Una fila puede ser:
 
 **Visible no significa comparable.** La UI puede mostrar productos individuales, pero sólo las filas autorizadas por Python reciben ranking/recomendación relativa.
 
+`comparability` es **del día**: una identidad `comparable` sólo se publica así si
+hoy quedan ≥2 cadenas con ofertas no `out_of_stock` y con precio positivo; si no,
+la fila sale `individual` con el mismo `row_id`/`canonical_product_id`. Dentro de
+una fila `comparable`, cada oferta `out_of_stock` queda con
+`relative_price_state = "neutral"` y fuera de `analysis-*.json` (mejor precio,
+victorias, brecha) y de Mi Compra. `availability = "unknown"` sigue comparable.
+Ver `docs/COMPARATOR-METHODOLOGY.md` (regla 2026-10-02).
+
 ## Serving particionado
 
 La publicación contiene:
