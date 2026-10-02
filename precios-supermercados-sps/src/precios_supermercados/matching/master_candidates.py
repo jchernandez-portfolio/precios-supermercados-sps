@@ -27,7 +27,7 @@ import hashlib
 import math
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from typing import Iterable, Mapping, Sequence
+from typing import Callable, Iterable, Mapping, Sequence
 
 from ..product_master import GoldenRecord
 from .comparison import ComparisonSettings, compare, name_similarity
@@ -165,7 +165,14 @@ def build_master_index(
     return MasterIndex(views, members, dict(by_brand), dict(by_type_size), dict(by_token))
 
 
-def _candidate_masters(record: StandardizedRecord, index: MasterIndex, settings: MasterCandidateSettings) -> list[str]:
+def _candidate_masters(
+    record: StandardizedRecord,
+    index: MasterIndex,
+    settings: MasterCandidateSettings,
+    blocked: Callable[[str], bool] | None = None,
+) -> list[str]:
+    """Maestros candidatos por votos de bloques; ``blocked`` se filtra antes del tope."""
+
     votes: Counter[str] = Counter()
     bucket = _bucket(record.size, settings.size_bucket_step)
     if record.brand_squashed and record.brand_squashed in index.by_brand:
@@ -184,7 +191,10 @@ def _candidate_masters(record: StandardizedRecord, index: MasterIndex, settings:
         if 0 < len(block) <= settings.max_block:
             for master_id in block:
                 votes[master_id] += 1
-    ranked = sorted(votes, key=lambda master_id: (-votes[master_id], master_id))
+    ranked = sorted(
+        (master_id for master_id in votes if blocked is None or not blocked(master_id)),
+        key=lambda master_id: (-votes[master_id], master_id),
+    )
     return ranked[: settings.max_candidates_per_record]
 
 
@@ -311,15 +321,21 @@ def generate_master_candidates(
         diagnostics[f"candidates_from_{state}"] += 1
         state_of[record.source_record_id] = (state, own)
         scored: list[tuple[str, dict[str, object]]] = []
-        for master_id in _candidate_masters(record, index, settings):
+
+        def blocked(master_id: str, supermarket: str = record.supermarket_id, key: str = product_key) -> bool:
+            # Mismo maestro, rechazo humano o cadena ya presente en el maestro
+            # (≤ 1 vínculo activo por cadena): nunca ocupan un cupo de candidato.
             if master_id == own:
-                continue
-            if (product_key, master_id) in rejected:
+                return True
+            if (key, master_id) in rejected:
                 diagnostics["rejected_pairs_skipped"] += 1
-                continue
-            if record.supermarket_id in master_supermarkets.get(master_id, set()):
+                return True
+            if supermarket in master_supermarkets.get(master_id, set()):
                 diagnostics["retailer_slot_taken_skipped"] += 1
-                continue
+                return True
+            return False
+
+        for master_id in _candidate_masters(record, index, settings, blocked):
             result = score_against_master(record, master_id, index, comparison, settings)
             if result is None:
                 continue
