@@ -138,7 +138,8 @@ plataforma y nombres) como el menor umbral cuyo **límite inferior de Wilson**
 (z = 1.645, 95 % unilateral) de la precisión es ≥ 0.98 con soporte ≥ 50. Un par con etiquetas
 pero sin soporte suficiente prueba el umbral más estricto en sus propias
 etiquetas y, si no llega a 0.98, queda **sin auto-match** (todo a revisión).
-Los pares sin etiquetas (Comisariato, PriceSmart: sin GTIN) **no tienen
+Los pares sin etiquetas (PriceSmart sin GTIN; Comisariato hasta acumular
+etiquetas con su GTIN reconstruido desde v2.6) **no tienen
 auto-match** porque su precisión no está medida: sus parejas sobre el umbral más
 estricto observado se reportan como "alta confianza no medida" y van a revisión
 con prioridad hasta etiquetar el golden set. `t_review` es el menor umbral con precisión acumulada ≥ 0.5 (piso 0.05) y

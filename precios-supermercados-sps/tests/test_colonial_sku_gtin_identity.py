@@ -39,7 +39,7 @@ def group_for(*records: SourceProductRecord):
 
 def test_policy_declares_colonial_as_sku_derived_source() -> None:
     policy = yaml.safe_load(POLICY.read_text(encoding="utf-8"))["restricted_gtin"]
-    assert frozenset(policy["sku_derived_gtin_supermarkets"]) == SKU_DERIVED_GTIN_SUPERMARKETS == {"colonial"}
+    assert frozenset(policy["sku_derived_gtin_supermarkets"]) == SKU_DERIVED_GTIN_SUPERMARKETS >= {"colonial"}
 
 
 def test_sku_gtin_matches_other_retailer_without_conflict() -> None:
