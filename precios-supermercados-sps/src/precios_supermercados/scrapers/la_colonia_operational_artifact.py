@@ -16,6 +16,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from precios_supermercados.enums import AvailabilityStatus, RunStatus, SourceKeyType
+from precios_supermercados.unpriced_unavailable import validate_unpriced_unavailable
 
 _EXPECTED_METADATA = {
     "schema_version": "7",
@@ -64,6 +65,7 @@ class OperationalCatalogAssessment:
     in_stock: int
     out_of_stock: int
     promotion_rows: int
+    unpriced_unavailable: int = 0
 
     def __post_init__(self) -> None:
         if self.catalog_accepted is not False:
@@ -83,6 +85,12 @@ class OperationalCatalogAssessment:
         )
         if self.run_status is not expected_status:
             raise OperationalCatalogArtifactError("run_status_inconsistent")
+
+
+class _UnpricedBlocker(ValueError):
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code.removeprefix("snapshot_")
 
 
 def _text(value: object) -> str | None:
@@ -251,6 +259,20 @@ def assess_operational_catalog_artifact(
             # regular comparable; se conserva como advertencia, no se inventa uno.
             warnings.append("promotion_without_reported_regular_price")
 
+    # SKU listados sin precio y agotados viajan fuera de ``products``: cuentan
+    # para la completitud del catálogo, no como filas con precio.
+    unpriced_entries: list[Mapping[str, Any]] = []
+    try:
+        unpriced_entries = validate_unpriced_unavailable(
+            artifact, priced_rows=products, error=_UnpricedBlocker
+        )
+    except _UnpricedBlocker as exc:
+        blockers.append(exc.code)
+    for entry in unpriced_entries:
+        product_ids.add(str(entry["product_id"]).strip())
+    if unpriced_entries:
+        warnings.append("unpriced_unavailable_present")
+
     sku_rows = len(products)
     skus_extracted = _non_negative_int(artifact.get("skus_extracted"))
     skus_with_price = _non_negative_int(artifact.get("skus_with_price"))
@@ -316,4 +338,5 @@ def assess_operational_catalog_artifact(
         in_stock=in_stock,
         out_of_stock=out_of_stock,
         promotion_rows=promotion_rows,
+        unpriced_unavailable=len(unpriced_entries),
     )

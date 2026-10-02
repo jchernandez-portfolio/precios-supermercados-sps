@@ -29,6 +29,41 @@ La evidencia no es suficiente para comparar automáticamente. No participa en ah
 
 Existe una contradicción explícita. No participa en métricas de comparación.
 
+## Disponibilidad: agotado no compara (regla 2026-10-02)
+
+La identidad decide *qué* puede compararse; la disponibilidad del día decide *si*
+participa hoy.
+
+- Una oferta `out_of_stock` (con o sin precio) **nunca** entra a ranking
+  (`relative_price_state`), mejor precio, diferencia/ahorro, PCI, escenarios,
+  "Mejor precio seguro" ni recomendaciones de Mi Compra.
+- `unknown` sigue siendo comparable: muchas cadenas no publican stock.
+- Un grupo con identidad `comparable` sólo se publica como `comparable` ese día si
+  quedan **≥2 cadenas** con ofertas no agotadas y con precio positivo. Si no, la
+  fila se publica como `individual` conservando `row_id` y `canonical_product_id`
+  (Mi Compra y enlaces compartidos siguen resolviendo).
+- La oferta agotada sigue visible como información individual del día (catálogo
+  sin cambios de visibilidad) y permanece en el histórico/Turso.
+- Cuando vuelve `in_stock`/`unknown` con precio, participa de nuevo
+  automáticamente; no hay estado manual.
+
+Implementación única en Python: `price_analytics.CurrentPriceObservation.priced`
+(Business Mart v1 / Consumer Mart v2 / canasta común), `shopping_analytics`
+(`buyable`, escenarios) y `exportar_consumer_catalog_core._comparison_eligible` /
+`_comparability_today` (Consumer Catalog v3 SPS y TGU, `analysis-*.json`). El
+frontend sólo consume `comparability`, `availability` y `relative_price_state`.
+
+En TGU la regla cuenta cadenas, no sucursales: dos tiendas Walmart disponibles
+con La Colonia agotada no forman una comparación.
+
+## Productos listados sin precio
+
+Un SKU listado sin precio y declarado agotado ("NO DISPONIBLE") no tiene precio
+que comparar: no crea `products`/`price_history`, se registra en
+`catalog_unpriced_observations` y, si tenía un periodo current con precio en esa
+ubicación, ese periodo se cierra (deja de ser oferta current). Reaparece por el
+camino normal cuando vuelve a tener precio.
+
 ## Reglas de identidad
 
 La marca y la presentación nunca bastan por sí solas.
@@ -65,7 +100,7 @@ La canasta común utiliza la intersección de productos que cumplen simultáneam
 - grupo `comparable`;
 - exactamente un registro fuente por supermercado del alcance;
 - ubicación explícita por supermercado;
-- precio actual positivo disponible en cada ubicación.
+- precio actual positivo y no `out_of_stock` en cada ubicación.
 
 No se imputan precios y no se sustituyen productos ausentes por productos parecidos.
 
