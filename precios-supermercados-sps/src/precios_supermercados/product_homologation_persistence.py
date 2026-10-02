@@ -11,7 +11,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Iterable
+from typing import Iterable, Mapping
 
 from .product_homologation import SourceProductRecord
 from .product_identity_v2 import (
@@ -20,6 +20,7 @@ from .product_identity_v2 import (
     canonical_presentation_fields,
     homologate_products_v2,
     resolve_brand,
+    resolve_presentation_v2,
     source_brand_role,
 )
 
@@ -519,3 +520,58 @@ def records_from_product_rows(rows: Iterable[tuple[object, ...]]) -> tuple[tuple
             )
         )
     return tuple(result)
+
+
+SPEC_ENRICHED_SUPERMARKETS = frozenset({"pricesmart"})
+
+
+def apply_source_spec_attributes(
+    products: Iterable[tuple[int, SourceProductRecord]],
+    attributes: Mapping[int, tuple[str | None, str | None]],
+) -> tuple[tuple[tuple[int, SourceProductRecord], ...], dict[str, int]]:
+    """Completa marca/presentación faltantes con especificaciones de la ficha.
+
+    Sólo PriceSmart y sólo cuando falta el dato: la marca fuente vacía toma la
+    marca de especificaciones y, si el nombre no declara presentación (estado
+    ``missing``), la presentación de especificaciones entra como presentación
+    fuente (estado ``source_only``). Cualquier otro caso conserva el registro tal
+    cual. No toca el barcode: sin GTIN no se crea comparabilidad.
+    """
+
+    result: list[tuple[int, SourceProductRecord]] = []
+    counts = {"brand": 0, "presentation": 0}
+    for product_id, record in products:
+        spec = attributes.get(product_id)
+        if spec is None or record.supermarket_id not in SPEC_ENRICHED_SUPERMARKETS:
+            result.append((product_id, record))
+            continue
+        spec_brand, spec_presentation = spec
+        brand = record.source_brand
+        presentation = record.source_presentation
+        if brand is None and spec_brand and spec_brand.strip():
+            brand = spec_brand.strip()
+            counts["brand"] += 1
+        if (
+            presentation is None
+            and spec_presentation
+            and spec_presentation.strip()
+            and resolve_presentation_v2(record)[1] == "missing"
+        ):
+            presentation = spec_presentation.strip()
+            counts["presentation"] += 1
+        if brand is record.source_brand and presentation is record.source_presentation:
+            result.append((product_id, record))
+            continue
+        result.append((
+            product_id,
+            SourceProductRecord(
+                source_record_id=record.source_record_id,
+                supermarket_id=record.supermarket_id,
+                source_name=record.source_name,
+                source_brand=brand,
+                source_presentation=presentation,
+                source_category=record.source_category,
+                barcode=record.barcode,
+            ),
+        ))
+    return tuple(result), counts

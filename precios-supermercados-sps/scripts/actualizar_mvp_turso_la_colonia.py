@@ -28,7 +28,10 @@ from actualizar_mvp_sqlite_la_colonia import (  # noqa: E402
 )
 
 EXPECTED_TABLES = {"supermarkets", "locations", "products", "price_history", "scrape_runs"}
-OPTIONAL_DERIVED_TABLES = {"product_homologation_profiles"}
+# Tablas derivadas opcionales: no forman parte del histórico comercial y pueden
+# no existir todavía. `pricesmart_product_specs` la escribe sólo el workflow
+# semanal de especificaciones PriceSmart.
+OPTIONAL_DERIVED_TABLES = {"product_homologation_profiles", "pricesmart_product_specs"}
 
 
 def _validate_table_names(names: object) -> None:
