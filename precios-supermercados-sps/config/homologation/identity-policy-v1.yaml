@@ -81,3 +81,24 @@ publication:
   mode: shadow
   public_serving_allowed: false
   require_offline_precision_before_enable: true
+
+# Producto maestro (MDM / golden record). Ver docs/homologation/product-master-v1.md.
+# El refresco diario de homologación escribe maestros + vínculos de forma
+# incremental. Los vínculos GTIN reproducen exactamente la identidad vigente
+# (perfiles ready/single_source); engine_auto queda deshabilitado: el motor sólo
+# alimenta la cola de revisión contra maestros.
+product_master:
+  schema: precios-sps-product-master-policy/v1
+  enabled: true
+  link_methods:
+    gtin_exact: active
+    gtin_sku_derived: active
+    reviewed_decision: active
+    manual_review: active
+    engine_auto: disabled
+  # Vínculos curados que los exportadores superponen a la identidad GTIN para
+  # volver comparable una fila (decisión humana "Mismo" con evidencia). Lista
+  # vacía = los vínculos curados se guardan pero no cambian el catálogo.
+  serving_link_methods: [manual_review, reviewed_decision]
+  # Un single_source con otro GTIN válido nunca se vincula automáticamente.
+  different_valid_gtin: review_only

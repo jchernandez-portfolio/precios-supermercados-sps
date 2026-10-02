@@ -365,6 +365,41 @@ Rama `rpi/pricesmart-specs` (no fusionada, sin corrida real). Detalle:
 - Pendiente: primera corrida real para endurecer el parser con el HTML crudo
   guardado (el fixture actual es sintético).
 
+## Producto maestro v1 (2026-10-01)
+
+Rama `rpi/product-master` (no fusionada). Diseño, reglas de supervivencia,
+métodos de vínculo y flujo de revisión en
+[`homologation/product-master-v1.md`](homologation/product-master-v1.md);
+regla 20 del estándar de identidad.
+
+- **Modelo:** `master_products` (id estable `mp_*`, atributos golden con
+  procedencia, estado/merge/versión), `master_product_links` (método,
+  evidencia, autor, historial; 1 vínculo activo por producto y por cadena en
+  cada maestro) y `master_link_rejections` ("Distinto" humano). La
+  persistencia diaria y la integridad semanal toleran/cuentan las tablas.
+- **Refresco diario:** `backfill_homologacion_turso.py --apply` escribe
+  maestros + vínculos GTIN (`gtin_exact`/`gtin_sku_derived`, 1:1 con los
+  perfiles `ready`/`single_source`) reutilizando los perfiles en memoria. Sin
+  cambios lee ~15 filas; con cambios, ~3–5 filas por producto cambiado; la
+  lectura completa del estado maestro sólo ocurre la primera vez (tablas
+  vacías) o ante cambio de versión/política. Un error del maestro no bloquea
+  perfiles ni publicación. Sin cambios de workflow.
+- **Exportadores:** byte a byte idénticos mientras sólo existan vínculos
+  GTIN; un vínculo curado (`manual_review`/`reviewed_decision`) vuelve
+  comparable la fila (`serving_link_methods` en la política).
+- **Motor:** `engine_auto` deshabilitado. `exportar_cola_maestro.py` genera la
+  cola producto→maestro (otro GTIN válido = sólo revisión; rechazos nunca se
+  reproponen) e `importar_decisiones_maestro.py` importa el CSV
+  Mismo/Distinto del responsable.
+- **Medición offline (registros 2026-09-21):** 18,900 maestros (SPS 15,706, de
+  ellos 3,033 multi-cadena; TGU 14,240 / 8,503). Golden multi-cadena SPS:
+  marca 99.7 %, tamaño 97.7 %, tipo 61.7 % (filas miembro 97.8 / 93.6 /
+  51.9 %). Productos no homologados con candidato: SPS 5,109 de 27,006
+  (alta 1,194, media 2,480, baja 1,435), TGU 1,582 de 15,457; 34/40 de banda
+  alta revisados a mano son el mismo producto.
+- **Primer despliegue:** crea 5 tablas + 7 índices y escribe ~19–25 k
+  maestros y ~32–38 k vínculos en lotes de 1000 (una sola vez).
+
 ## Autoridad live y binding SPS
 
 La evidencia histórica o una autorización temporal consumida **no se interpreta como autorización abierta**. Cualquier nueva observación live fuera de los workflows productivos ya autorizados por su ejecución recurrente **requiere autorización humana explícita vigente** para ese alcance.
@@ -424,6 +459,7 @@ La publicación pública incluye Consumer Mart v2, Consumer Catalog v3 por ciuda
 2. Revisar y fusionar la [Optimización Turso](#optimización-turso-2026-09-30); tras el primer ciclo diario confirmar en Turso que existe `idx_ph_loc_hist` y vigilar las filas leídas del mes. Pendiente: homologación incremental.
 3. Con autorización explícita, diagnosticar y corregir el extractor de Colonial (`card_shape_invalid`).
 4. Revisar la homologación entre supermercados (cobertura de identidades comparables y prácticas de matching).
+5. Tras fusionar el producto maestro: confirmar en el primer refresco `product_master.mode = full` y luego `noop`/`incremental`, generar la cola contra maestros y empezar la revisión humana por la banda alta.
 
 ## Motor de homologación (shadow) 2026-09-30
 

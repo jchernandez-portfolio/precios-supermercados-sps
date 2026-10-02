@@ -12,6 +12,13 @@ abiertos duplicados: este job nunca escribe `price_history` y esas verificacione
 de toda la base corren en el workflow semanal de integridad Turso. La integridad
 referencial de la tabla derivada se sigue comprobando con
 `pragma_foreign_key_check('product_homologation_profiles')`.
+
+Producto maestro (``product_master``): con la política habilitada, el mismo
+proceso escribe maestros + vínculos de forma incremental reutilizando los
+perfiles ya calculados en memoria (no relee ``products`` ni perfiles). Lee sólo
+el estado de sincronización, los vínculos curados y, si hubo cambios, los
+vínculos/maestros de los productos cambiados por índice. Un error del maestro
+se reporta en la salida sin bloquear el refresco de perfiles (capa auxiliar).
 """
 from __future__ import annotations
 
@@ -34,6 +41,20 @@ from actualizar_mvp_turso_la_colonia import (  # noqa: E402
     _stmt,
     _validate_table_names,
 )
+from precios_supermercados.product_identity_decisions import (  # noqa: E402
+    ProductIdentityDecisionError,
+    load_reviewed_decisions,
+)
+from precios_supermercados.product_master import (  # noqa: E402
+    DEFAULT_POLICY_PATH,
+    MasterPolicy,
+    ProductMasterError,
+    load_master_policy,
+    member_profiles,
+    profile_state_digest,
+    reviewed_decision_links,
+    sync_product_master,
+)
 from precios_supermercados.product_homologation_persistence import (  # noqa: E402
     NORMALIZATION_VERSION,
     LEGACY_PROFILE_COLUMNS,
@@ -51,6 +72,7 @@ from precios_supermercados.pricesmart_specs_persistence import (  # noqa: E402
 )
 
 STAGE_TABLE = "product_homologation_profiles_stage"
+REVIEWED_DECISIONS_PATH = ROOT / "config" / "homologation" / "reviewed-decisions-v1.json"
 EXPECTED_COLUMNS = PROFILE_COLUMNS
 LEGACY_COLUMNS = LEGACY_PROFILE_COLUMNS
 
@@ -172,6 +194,12 @@ INDEX_STEPS = (
     ("index_brand", f"CREATE INDEX IF NOT EXISTS idx_product_homologation_brand ON {TABLE_NAME}(normalized_brand) WHERE normalized_brand IS NOT NULL", ()),
     ("index_comparison", f"CREATE INDEX IF NOT EXISTS idx_product_homologation_comparison ON {TABLE_NAME}(comparison_status, canonical_product_id)", ()),
 )
+
+
+def _utc_now() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _query(url: str, token: str, sql: str, args: tuple[object, ...] = ()) -> list[list[object]]:
@@ -531,15 +559,81 @@ def _postflight(url: str, token: str, before: dict[str, int], expected: int) -> 
     }
 
 
+class TursoMasterStore:
+    """Adaptador Turso del maestro: lecturas por ``_query`` y lotes ``_run_batch``."""
+
+    def __init__(self, url: str, token: str) -> None:
+        self.url = url
+        self.token = token
+        self.rows_read = 0
+
+    def query(self, sql: str, args: tuple[object, ...] = ()) -> list[tuple[object, ...]]:
+        rows = [tuple(row) for row in _query(self.url, self.token, sql, args)]
+        self.rows_read += len(rows)
+        return rows
+
+    def write(self, steps: list[tuple[str, str, tuple[object, ...]]]) -> None:
+        _run_batch(self.url, self.token, steps)
+
+
+def _sync_master(
+    database_url: str,
+    auth_token: str,
+    products: tuple[tuple[int, object], ...],
+    derived: tuple[ProductHomologationRow, ...],
+    existing_state: dict[int, tuple[str, str]],
+    changed: tuple[ProductHomologationRow, ...],
+    *,
+    timestamp: str,
+    apply: bool,
+    policy: MasterPolicy | None = None,
+    decisions_path: Path = REVIEWED_DECISIONS_PATH,
+) -> dict[str, object]:
+    try:
+        policy = policy or load_master_policy(DEFAULT_POLICY_PATH)
+        if not policy.enabled:
+            return {"enabled": False, "mode": "disabled"}
+        names = {product_id: record.source_name for product_id, record in products}  # type: ignore[attr-defined]
+        members = member_profiles(derived, names)
+        decisions = load_reviewed_decisions(decisions_path) if decisions_path.is_file() else ()
+        reviewed, reviewed_diagnostics = reviewed_decision_links(decisions, products, policy=policy)
+        result = sync_product_master(
+            TursoMasterStore(database_url, auth_token),
+            members,
+            policy=policy,
+            normalization_version=NORMALIZATION_VERSION,
+            now=timestamp,
+            prior_profile_digest=profile_state_digest(existing_state),
+            new_profile_digest=profile_state_digest(
+                {row.product_id: (row.profile_hash, row.normalization_version) for row in derived}
+            ),
+            changed_product_ids=[row.product_id for row in changed],
+            reviewed_links=reviewed,
+            apply=apply,
+        )
+        if reviewed_diagnostics:
+            result["reviewed_decisions"] = reviewed_diagnostics
+        result["status"] = "ok"
+        return result
+    except Exception as exc:  # noqa: BLE001 - capa auxiliar: nunca bloquea los perfiles
+        kind = type(exc).__name__
+        if not isinstance(exc, (ProductMasterError, ProductIdentityDecisionError, SnapshotError)):
+            kind = f"unexpected_{kind}"
+        print(f"product_master_sync_failed:{kind}:{exc}", file=sys.stderr)
+        return {"enabled": True, "status": "error", "error_type": kind, "error": str(exc)[:500]}
+
+
 def backfill_turso(
     database_url: str,
     auth_token: str,
     *,
     updated_at_utc: str | None = None,
     apply: bool = True,
+    master_policy: MasterPolicy | None = None,
 ) -> dict[str, object]:
     if not database_url.strip() or not auth_token.strip():
         raise ProductHomologationPersistenceError("turso_credentials_missing")
+    timestamp = updated_at_utc or _utc_now()
     before = _source_preflight(database_url, auth_token)
     specs_table = bool(before.pop("pricesmart_specs_table", 0))
     products = _fetch_products(database_url, auth_token)
@@ -552,7 +646,7 @@ def backfill_turso(
         )
     derived = build_homologation_rows(
         products,
-        updated_at_utc=updated_at_utc,
+        updated_at_utc=timestamp,
         normalization_version=NORMALIZATION_VERSION,
     )
     derived_state = {
@@ -581,6 +675,19 @@ def backfill_turso(
     status_counts: dict[str, int] = {}
     for row in derived:
         status_counts[row.comparison_status] = status_counts.get(row.comparison_status, 0) + 1
+    def master(applied: bool) -> dict[str, object]:
+        return _sync_master(
+            database_url,
+            auth_token,
+            products,
+            derived,
+            existing_state,
+            changed,
+            timestamp=timestamp,
+            apply=applied,
+            policy=master_policy,
+        )
+
     if not apply:
         return {
             "normalization_version": NORMALIZATION_VERSION,
@@ -595,6 +702,7 @@ def backfill_turso(
             "comparison_status": dict(sorted(status_counts.items())),
             "products_unchanged": True,
             "scrape_runs_unchanged": True,
+            "product_master": master(False),
         }
 
     if not changed:
@@ -610,6 +718,7 @@ def backfill_turso(
             "staging_written": False,
             "dry_run": False,
             **post,
+            "product_master": master(True),
         }
 
     _ensure_schema(database_url, auth_token)
@@ -646,6 +755,7 @@ def backfill_turso(
         "dry_run": False,
         **delta,
         **post,
+        "product_master": master(True),
     }
 
 

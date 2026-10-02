@@ -84,9 +84,12 @@ def identity_groups_exact_context(
     values = tuple(offers)
     candidates: dict[str, list[base.VisibleOffer]] = {}
     individual: list[base.VisibleOffer] = []
+    # Vínculos curados del producto maestro (vacío = identidad GTIN vigente).
+    promoted = {offer.master_group_key for offer in values if offer.master_group_key}
     for offer in values:
-        if offer.comparison_status == "ready" and offer.canonical_product_id:
-            candidates.setdefault(offer.canonical_product_id, []).append(offer)
+        key = base.master_group_key(offer, promoted)
+        if key:
+            candidates.setdefault(key, []).append(offer)
         else:
             individual.append(offer)
 
