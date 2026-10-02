@@ -1,5 +1,5 @@
 schema: precios-sps-product-identity-policy/v1
-engine_version: product-homologation-v2.4
+engine_version: product-homologation-v2.5
 
 relations:
   identity:

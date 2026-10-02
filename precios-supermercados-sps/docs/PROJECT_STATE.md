@@ -230,6 +230,77 @@ casi todos correctos. Muestras aleatorias: 27/30 de la anterior se conservan
 en una nueva de 30 quedan 1-2 dudosos (Milpa Real tortilla maíz vs trigo, Pond's
 limpiadora vs pepino).
 
+## Calidad de catálogo — parser, marca y tipo (2026-10-01)
+
+Rama `rpi/catalog-quality` (no fusionada). Motor `product-homologation-v2.5`:
+al fusionarse, el refresh de homologación reescribe los perfiles derivados.
+Reglas 15–18 en
+[`homologation/product-identity-standard-v1.md`](homologation/product-identity-standard-v1.md).
+La identidad entre cadenas sigue siendo sólo por GTIN; estos cambios mejoran
+los atributos públicos y las guardas, no crean comparables sin GTIN.
+
+- **Presentación:** separador de miles en unidades pequeñas ("Aceite Clover
+  Brand 1,400 ml" → 1400 ml, antes 1.4 ml; l/kg/lb/oz conservan el decimal),
+  `ltr`/`ltrs`, métrica explícita en etiquetas duales con libras ("623.7 g /
+  1.37 lb" → 623.7 g), onzas → gramos sólo en tipos sólidos (arroz, queso,
+  cereal…; en el resto la onza no se convierte), tolerancia imperial 2 % y
+  display redondeado (907.18474 g → 907.18 g) con total canónico exacto.
+- **Marca:** léxico de marcas fuente con alias compactos (`Kellogg's`/`Kelloggs`,
+  `ORALB`, `MagiaBlanca`), lista de palabras comunes que nunca son marca desde
+  el nombre (`Original`, `Premium`, `Pan`, `Sin`, `XL`…), marcas-palabra
+  genéricas medidas en datos (sólo como primera palabra) y preferencia por la
+  marca que abre el nombre. Procedencia interna en `brand_resolution_source`
+  (`source` / `name_known_brand`), sin llaves nuevas en filas públicas.
+- **Tipo:** contexto no alimenticio (aceite de motor 20W50/ATF, pintura,
+  aceite cosmético/argán, pasta dental, alimento de mascota, objetos color
+  café, gel para cabello, sal de baño, leche corporal); "S/Azúcar"/"Zero
+  Azúcar" no es Azúcar; un tipo alimenticio en un departamento fuente
+  General/Hogar/Limpieza/Cuidado personal se descarta; sin tipo por nombre, la
+  hoja de la ruta de categoría tipa como evidencia débil (nunca conflicto) y el
+  departamento llena la categoría pública.
+
+Medición offline (registros reconstruidos 2026-09-21, 52,974 productos fuente
+deduplicados como en Turso; una corrida para SPS+TGU; grupos comparables =
+`ready` con ≥2 cadenas y un contexto por tienda):
+
+| Medida | Antes (v2.4) | Después (v2.5) |
+| --- | ---: | ---: |
+| Grupos GTIN comparables SPS / TGU | 3,016 / 8,503 | 3,033 / 8,503 |
+| Grupos perdidos | — | 1 SPS (conflicto real: Clover Brand 2,750 ml vs 3 L) |
+| Ofertas en grupos comparables SPS / TGU | 7,009 / 19,381 | 7,059 / 19,382 |
+| Presentaciones distintas (productos) | — | 2,040: 1,029 sólo redondeo, 696 oz→g, 223 métrica dual (antes valor imperial), 81 `ltr(s)` antes sin parsear, 11 miles (antes 1.4 ml) |
+| Marca resuelta por nombre / ausente / conflicto fuente | 2,212 / 5,602 / 412 | 2,979 / 4,835 / 160 |
+| Filas publicadas SPS `individual` sin marca que obtienen marca | — | 1,221 de 4,064 con registro (4,158 en total) |
+| Filas publicadas con categoría SPS / TGU (de 33,815 / 31,706 con registro) | 10,122 / 9,452 | 19,778 / 18,449 |
+| Filas publicadas con tipo SPS / TGU | 10,122 / 9,452 | 9,957 / 9,229 (productos: 426 tipos alimenticios erróneos retirados, 54 corregidos —pasta dental, alimento de mascota—, +319 por hoja de ruta) |
+
+Muestras: marca extraída 56/60 exacta, 2 de familia ("Bakers Secrets" →
+Bakers) y 2 errores (Always Save → Always, Castillo de Adas → Castillo); tipos
+retirados por departamento 39/40 correctos (el error: un atún que Paiz cuelga
+de una ruta de cosméticos); tipos por hoja de ruta ≈85 % correctos (errores:
+productos mal ubicados por la cadena, p. ej. loción en "Jabón y gel corporal").
+Riesgo conocido: un miembro Colonial ("ZIBAS Anillitos") sale de su grupo porque la marca inferida
+(Zibas) contradice la declarada (Yummies) — fail-closed.
+
+Motor shadow (`homologacion_motor_shadow.py run`, mismos registros, offline):
+
+| Medida | Antes | Después |
+| --- | ---: | ---: |
+| Parejas candidatas SPS / TGU | 304,744 / 482,153 | 307,006 / 482,196 |
+| Auto-match nuevos SPS / TGU | 416 / 2,346 | 79 / 2,369 |
+| — sin Colonial–La Colonia | 74 / 2,346 | 79 / 2,369 |
+| Revisión SPS / TGU | 8,360 / 7,819 | 8,748 / 7,843 |
+| Recall del blocking (silver, ciego al GTIN) | 0.976 | 0.980 |
+| Auto-match prueba silver: precisión / recall | 0.987 / 0.667 | 0.986 / 0.673 |
+
+El segmento Colonial–La Colonia (342 auto-match SPS) sólo estaba habilitado por
+el umbral de soporte bajo (27 etiquetas, Wilson 95 % = 0.875); con una etiqueta
+silver más en contra (31, precisión 0.968) la política lo deshabilita y esas
+parejas pasan a revisión. Fuera de ese segmento los auto-match suben (+5 SPS,
++23 TGU). Los "falsos positivos" silver nuevos son mayormente el mismo producto
+con GTIN distinto que ahora concuerda en tamaño ("Café Dorao 454 g" vs "Café
+Dorao Kraft 16 oz"). Sin GTIN nada de esto cambia la comparabilidad publicada.
+
 ## Autoridad live y binding SPS
 
 La evidencia histórica o una autorización temporal consumida **no se interpreta como autorización abierta**. Cualquier nueva observación live fuera de los workflows productivos ya autorizados por su ejecución recurrente **requiere autorización humana explícita vigente** para ese alcance.

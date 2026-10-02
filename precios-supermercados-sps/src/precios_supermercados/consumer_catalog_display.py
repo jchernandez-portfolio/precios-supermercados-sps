@@ -10,6 +10,8 @@ import re
 import unicodedata
 from decimal import Decimal, InvalidOperation
 
+from .product_identity_v2 import display_quantity, normalize_thousands_separators
+
 
 _GENERIC_BRAND_KEYS = frozenset(
     {
@@ -117,7 +119,8 @@ def _decimal(value: object) -> Decimal | None:
 
 
 def _format_decimal(value: Decimal) -> str:
-    return format(value.normalize(), "f")
+    # Redondeo sólo de visualización: "907.18474 g" (2 lb) → "907.18 g".
+    return display_quantity(value)
 
 
 def _smart_brand_case(value: str) -> str:
@@ -228,6 +231,7 @@ def _from_text(value: object) -> str | None:
     text = _clean(value)
     if text is None:
         return None
+    text = normalize_thousands_separators(text)
     matches: list[tuple[int, str, re.Match[str]]] = []
     for regex, kind in (
         (_COUNT_RE, "count"),

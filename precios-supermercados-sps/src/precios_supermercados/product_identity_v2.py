@@ -46,7 +46,7 @@ from .product_homologation import (
     resolve_presentation,
 )
 
-IDENTITY_NORMALIZATION_VERSION = "product-homologation-v2.4"
+IDENTITY_NORMALIZATION_VERSION = "product-homologation-v2.5"
 
 _GENERIC_BRANDS = frozenset(
     {
@@ -87,8 +87,10 @@ _BRAND_ALIASES = {
 # distancia difusa para marcas: cada alias debe incorporarse con evidencia.
 _BRAND_CANONICAL_ALIASES = {
     "buchanan s": "buchanan",
+    "buchanans": "buchanan",
     "elmigo": "el migo",
     "mott s": "mott",
+    "motts": "mott",
     "wrigleys": "wrigley",
 }
 
@@ -104,7 +106,21 @@ _EGG_COUNT_RE = re.compile(
 _MG_RE = re.compile(r"(?<!\w)(?P<amount>\d+(?:[.,]\d+)?)\s*mg(?!\w)", re.IGNORECASE)
 _LIBRA_RE = re.compile(r"(?<!\w)(?P<amount>\d+(?:[.,]\d+)?)\s*libras?(?!\w)", re.IGNORECASE)
 _GRAMOS_RE = re.compile(r"(?<!\w)(?P<amount>\d+(?:[.,]\d+)?)\s*grs?(?:\.)?(?!\w)", re.IGNORECASE)
-_LITROS_RE = re.compile(r"(?<!\w)(?P<amount>\d+(?:[.,]\d+)?)\s*lts?(?:\.)?(?!\w)", re.IGNORECASE)
+_LITROS_RE = re.compile(r"(?<!\w)(?P<amount>\d+(?:[.,]\d+)?)\s*lt(?:rs?|s)?(?:\.)?(?!\w)", re.IGNORECASE)
+# Separador de miles en unidades pequeñas: "1,400 ml", "1.750 ml", "1,230 g",
+# "1.000 unidades". Regla (documentada en el estándar de identidad):
+#   - parte entera de 1 a 3 dígitos que no empieza en 0, separador "." o ",",
+#     y EXACTAMENTE 3 dígitos después, sin más separadores;
+#   - la unidad es pequeña (ml, cc, mg, g/gr/gramos o conteo): nadie publica
+#     "1.400 ml" queriendo decir 1.4 ml en un supermercado.
+# Unidades grandes (l, kg, lb, oz) conservan el decimal: "1.892 L", "2.268 Kg",
+# "3.125 oz" y "1,5 L" siguen siendo 1.892 L, 2.268 kg, 3.125 oz y 1.5 L. "0.946 ml"
+# (parte entera 0) tampoco cambia.
+_THOUSANDS_SMALL_UNIT_RE = re.compile(
+    r"(?<![\d.,])(?P<integer>[1-9]\d{0,2})[.,](?P<group>\d{3})(?![\d.,])"
+    r"(?P<unit>\s*(?:ml|cc|mg|grs?|gramos?|g|unidades|unidad|unds?|unids?|uds?)(?!\w))",
+    re.IGNORECASE,
+)
 _FRACTION_WITH_UNIT_RE = re.compile(
     r"(?<![\d/])(?P<fraction>1\s*/\s*2|1\s*/\s*4|3\s*/\s*4)"
     r"(?=\s*(?:mg|kg|grs?|gramos?|g|lbs?|libras?|oz|onzas?|ml|lts?|litros?|l)(?!\w))",
@@ -493,19 +509,136 @@ def _phrase_present(text: str, phrase: str) -> bool:
     return re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", text) is not None
 
 
-def build_brand_lexicon(records: Iterable[SourceProductRecord]) -> frozenset[str]:
-    """Crea un vocabulario de marcas ya observadas como marcas fuente reales."""
-    values = {
-        brand
-        for record in records
-        if (brand := canonicalize_brand_key(record.source_brand)) is not None
+# Marcas reportadas por alguna cadena que también son palabras comunes de un
+# nombre de producto ("Original", "Premium", "Pan", "Sin"...). Nunca se extraen
+# del nombre: sólo cuentan cuando la fuente las envía como marca.
+BRAND_NAME_STOPLIST = frozenset(
+    {
+        "active", "agave", "all natural", "ambar", "apple", "aqua", "arena", "aroma", "baby", "big",
+        "black white", "care", "chao", "classic", "clasico", "clasica", "cross", "de maiz",
+        "de oro", "dorada", "eco", "escolar", "essentials", "estrella", "expert",
+        "extra", "family", "fiesta", "free", "fresca", "fresh", "frozen", "fruit",
+        "gold", "gourmet", "hawaiian", "home", "intense", "italian", "italiana",
+        "jack", "kids", "kit", "kiwi", "light", "max", "maria", "margarita", "mas", "mega",
+        "mini", "natural", "new york", "oro", "original", "pan", "petit", "plata",
+        "plus", "pop", "popular", "power", "premium", "pro", "profesional",
+        "professional", "pulp", "real", "red", "rose", "rubio", "select", "simply", "sin",
+        "sistema", "sky", "soft", "sport", "suave", "super", "superior", "tropical",
+        "ultra", "universal", "xl", "xtra", "zero", "contraste", "party",
     }
+)
+# Una marca-palabra es "genérica" en los datos cuando aparece en nombres de
+# productos de OTRAS marcas fuente al menos 10 veces y 3 veces más que como
+# marca propia. Sólo se acepta desde el nombre si es la primera palabra y no hay
+# otra marca no genérica en el nombre ("Ideal aceite..." → Ideal).
+_GENERIC_MIN_FOREIGN = 10
+_GENERIC_FOREIGN_RATIO = 3
+_SQUASH_MIN_LENGTH = 4
+_POSSESSIVE_RE = re.compile(r"(?<=\w\w) s(?!\w)")
+
+
+class BrandLexicon(frozenset):
+    """Vocabulario de marcas fuente con alias compactos y marcas-palabra comunes.
+
+    Sigue siendo un ``frozenset`` de claves canónicas (compatibilidad con los
+    llamadores existentes); además expone:
+
+    - ``aliases``: clave → clave canónica para grafías con la misma forma
+      compacta ("loreal"/"l oreal", "kelloggs"/"kellogg s", "magiablanca");
+    - ``squashed``: forma compacta → clave canónica (nombres pegados "ORALB");
+    - ``generic``: marcas-palabra que sólo cuentan como primera palabra.
+    """
+
+    aliases: dict[str, str]
+    squashed: dict[str, str]
+    generic: frozenset[str]
+
+    def __new__(
+        cls,
+        values: Iterable[str],
+        *,
+        aliases: dict[str, str] | None = None,
+        squashed: dict[str, str] | None = None,
+        generic: Iterable[str] = (),
+    ) -> "BrandLexicon":
+        instance = super().__new__(cls, values)
+        instance.aliases = dict(aliases or {})
+        instance.squashed = dict(squashed or {})
+        instance.generic = frozenset(generic)
+        return instance
+
+
+def _squash(value: str) -> str:
+    return value.replace(" ", "")
+
+
+def _name_phrases(name: str, maximum_words: int) -> list[tuple[int, int, str]]:
+    tokens = name.split()
+    result: list[tuple[int, int, str]] = []
+    for width in range(1, min(maximum_words, len(tokens)) + 1):
+        for start in range(0, len(tokens) - width + 1):
+            result.append((start, width, " ".join(tokens[start : start + width])))
+    return result
+
+
+def build_brand_lexicon(records: Iterable[SourceProductRecord]) -> BrandLexicon:
+    """Crea un vocabulario de marcas ya observadas como marcas fuente reales.
+
+    Determinista dado el universo de registros: alias por forma compacta (la
+    grafía más frecuente gana) y marcas-palabra genéricas medidas sobre los
+    nombres de productos de otras marcas.
+    """
+
+    records = tuple(records)
+    own: dict[str, int] = defaultdict(int)
+    for record in records:
+        brand = canonicalize_brand_key(record.source_brand)
+        if brand is not None:
+            own[brand] += 1
+    values = set(own)
     values.update(_BRAND_ALIASES.values())
-    return frozenset(values)
+    by_squash: dict[str, list[str]] = defaultdict(list)
+    for value in values:
+        squashed_value = _squash(value)
+        if len(squashed_value) >= _SQUASH_MIN_LENGTH:
+            by_squash[squashed_value].append(value)
+    aliases: dict[str, str] = {}
+    squashed: dict[str, str] = {}
+    for squashed_value, spellings in by_squash.items():
+        canonical = min(spellings, key=lambda value: (-own.get(value, 0), value))
+        squashed[squashed_value] = canonical
+        for spelling in spellings:
+            if spelling != canonical:
+                aliases[spelling] = canonical
+    maximum_words = max((len(value.split()) for value in values), default=1)
+    foreign: dict[str, int] = defaultdict(int)
+    for record in records:
+        brand = canonicalize_brand_key(record.source_brand)
+        if brand is None:
+            continue
+        name = fold_text(record.source_name) or ""
+        for _, _, phrase in _name_phrases(name, maximum_words):
+            if phrase in values and phrase != brand and phrase not in brand and brand not in phrase:
+                foreign[phrase] += 1
+    generic = {
+        value
+        for value in values
+        if value.isdigit()
+        or len(_squash(value)) < 3
+        or (
+            foreign.get(value, 0) >= _GENERIC_MIN_FOREIGN
+            and foreign.get(value, 0) >= _GENERIC_FOREIGN_RATIO * own.get(value, 0)
+        )
+    }
+    return BrandLexicon(values, aliases=aliases, squashed=squashed, generic=generic)
 
 
 def canonicalize_brand_key(value: str | None) -> str | None:
-    """Normaliza sólo alias de marca respaldados por evidencia del catálogo."""
+    """Normaliza sólo alias de marca respaldados por evidencia del catálogo.
+
+    El posesivo inglés se une a su palabra ("Kellogg's" → "kelloggs", igual que
+    "Kelloggs"); "L'Oréal" conserva "l oreal" (la letra suelta no es posesivo).
+    """
 
     folded = fold_text(value)
     if folded is None or folded in _GENERIC_BRANDS:
@@ -513,6 +646,7 @@ def canonicalize_brand_key(value: str | None) -> str | None:
     brand = normalize_brand(value)
     if brand is None:
         return None
+    brand = _POSSESSIVE_RE.sub("s", brand)
     return _BRAND_CANONICAL_ALIASES.get(brand, brand)
 
 
@@ -527,22 +661,99 @@ def source_brand_role(value: str | None) -> str:
     return "retailer_reported_brand"
 
 
-def _brands_in_name(name: str, brand_lexicon: frozenset[str]) -> set[str]:
-    """Busca frases de marca en tiempo acotado por longitud del nombre.
+def _brand_hits(name: str, brand_lexicon: frozenset[str]) -> list[tuple[int, int, str]]:
+    """Frases de marca del nombre como ``(inicio, ancho, clave canónica)``.
 
-    Recorrer todo el vocabulario para cada producto era cuadrático en catálogos
-    reales. Los n-gramas conservan la misma evidencia léxica y escalan linealmente.
+    Recorre n-gramas del nombre (lineal en su longitud). Con un ``BrandLexicon``
+    también acepta grafías compactas ("ORALB", "KELLOGGS") y aplica alias.
     """
 
-    tokens = name.split()
+    aliases = getattr(brand_lexicon, "aliases", {})
+    squashed = getattr(brand_lexicon, "squashed", {})
     maximum_words = max((len(value.split()) for value in brand_lexicon), default=1)
-    matches: set[str] = set()
-    for width in range(1, min(maximum_words, len(tokens)) + 1):
-        for start in range(0, len(tokens) - width + 1):
-            phrase = " ".join(tokens[start : start + width])
-            if phrase in brand_lexicon:
-                matches.add(phrase)
-    return matches
+    hits: list[tuple[int, int, str]] = []
+    for start, width, phrase in _name_phrases(name, max(maximum_words, 3)):
+        if phrase in brand_lexicon and width <= maximum_words:
+            hits.append((start, width, aliases.get(phrase, phrase)))
+            continue
+        compact = _squash(phrase)
+        # "Limpio x LB" no es la marca "limpiox": unidades/conectores no se pegan.
+        if width > 1 and any(token in _MATCH_STOPWORDS for token in phrase.split()):
+            continue
+        if len(compact) >= _SQUASH_MIN_LENGTH and compact in squashed:
+            hits.append((start, width, squashed[compact]))
+    for alias, canonical in (*_BRAND_ALIASES.items(), *_BRAND_CANONICAL_ALIASES.items()):
+        for match in re.finditer(rf"(?<!\w){re.escape(alias)}(?!\w)", name):
+            hits.append((len(name[: match.start()].split()), len(alias.split()), canonical))
+    return hits
+
+
+def _brands_in_name(name: str, brand_lexicon: frozenset[str]) -> set[str]:
+    return {brand for _, _, brand in _brand_hits(name, brand_lexicon)}
+
+
+def _name_brand_candidates(
+    hits: list[tuple[int, int, str]],
+    *,
+    use_stoplist: bool = True,
+) -> dict[str, tuple[int, int]]:
+    """Marcas del nombre sin frases anidadas en otra más larga (y sin palabras comunes)."""
+
+    spans: dict[str, tuple[int, int]] = {}
+    for start, width, brand in hits:
+        if use_stoplist and brand in BRAND_NAME_STOPLIST:
+            continue
+        current = spans.get(brand)
+        if current is None or (start, -width) < (current[0], -current[1]):
+            spans[brand] = (start, width)
+
+    def nested(brand: str) -> bool:
+        start, width = spans[brand]
+        return any(
+            other != brand
+            and other_start <= start
+            and start + width <= other_start + other_width
+            and other_width > width
+            for other, (other_start, other_width) in spans.items()
+        )
+
+    return {brand: span for brand, span in spans.items() if not nested(brand)}
+
+
+def _brands_overlap(left: str, right: str) -> bool:
+    """Misma familia de marca: "johnsons" ⊂ "johnsons baby", "koleston perfect"."""
+
+    left_squashed, right_squashed = _squash(left), _squash(right)
+    return (
+        left_squashed in right_squashed
+        or right_squashed in left_squashed
+        or left_squashed[:4] == right_squashed[:4]
+    )
+
+
+def _select_name_brand(
+    hits: list[tuple[int, int, str]],
+    generic: frozenset[str],
+) -> tuple[str | None, bool]:
+    """Marca única del nombre y si es una marca-palabra genérica en primera posición.
+
+    Orden: (1) se descartan frases anidadas en otra más larga; (2) nunca se usa
+    la lista de palabras comunes; (3) una sola marca no genérica gana; si hay
+    varias, sólo gana la que abre el nombre; (4) sin marcas no genéricas, una
+    marca-palabra genérica sólo cuenta si es la primera palabra.
+    """
+
+    candidates = _name_brand_candidates(hits)
+    specific = {brand: span for brand, span in candidates.items() if brand not in generic}
+    if len(specific) == 1:
+        return next(iter(specific)), False
+    if len(specific) > 1:
+        leading = [brand for brand, (start, _) in specific.items() if start == 0]
+        return (leading[0], False) if len(leading) == 1 else (None, False)
+    leading_generic = [brand for brand, (start, _) in candidates.items() if start == 0]
+    if len(leading_generic) == 1:
+        return leading_generic[0], True
+    return None, False
 
 
 def resolve_brand(
@@ -550,34 +761,40 @@ def resolve_brand(
     *,
     brand_lexicon: frozenset[str],
 ) -> BrandResolution:
+    aliases = getattr(brand_lexicon, "aliases", {})
+    generic = getattr(brand_lexicon, "generic", frozenset())
     source_brand = canonicalize_brand_key(record.source_brand)
-    name = fold_text(record.source_name) or ""
-    matches = _brands_in_name(name, brand_lexicon)
-
-    for alias, canonical in _BRAND_ALIASES.items():
-        if _phrase_present(name, alias):
-            matches.add(canonical)
-    for alias, canonical in _BRAND_CANONICAL_ALIASES.items():
-        if _phrase_present(name, alias):
-            matches.add(canonical)
-
-    # Preferimos el match de frase más larga cuando todos los matches son
-    # anidados (p. ej. una marca de dos palabras que contiene otra corta).
-    if len(matches) > 1:
-        longest = max(matches, key=len)
-        if all(candidate == longest or _phrase_present(longest, candidate) for candidate in matches):
-            matches = {longest}
-
-    name_brand = next(iter(matches)) if len(matches) == 1 else None
     if source_brand is not None:
-        if name_brand is not None and name_brand != source_brand:
-            return BrandResolution(
-                canonical_brand=None,
-                source="source_conflict",
-                source_brand=source_brand,
-                name_brand=name_brand,
-                conflict=True,
-            )
+        source_brand = aliases.get(source_brand, source_brand)
+    name = fold_text(record.source_name) or ""
+    hits = _brand_hits(name, brand_lexicon)
+    if not hits:
+        # Nombres pegados de catálogos abreviados: "MagiaBlanca Desinf".
+        split_name = fold_text(split_glued_words(record.source_name)) or ""
+        if split_name != name:
+            hits = _brand_hits(split_name, brand_lexicon)
+    name_brand, _ = _select_name_brand(hits, generic)
+    if source_brand is not None:
+        # Contradicción sólo con evidencia inequívoca: UNA sola marca en todo el
+        # nombre (incluidas palabras comunes, como antes: "Lays Max" con fuente
+        # "Frito Lay" sigue siendo ambiguo), no genérica, distinta de la fuente y
+        # de otra familia. La preferencia por posición y la lista de palabras
+        # comunes sólo completan marcas ausentes; nunca anulan una marca fuente.
+        strict = _name_brand_candidates(hits, use_stoplist=False)
+        if source_brand not in {brand for _, _, brand in hits} and len(strict) == 1:
+            (only,) = strict
+            if (
+                only not in generic
+                and only not in BRAND_NAME_STOPLIST
+                and not _brands_overlap(only, source_brand)
+            ):
+                return BrandResolution(
+                    canonical_brand=None,
+                    source="source_conflict",
+                    source_brand=source_brand,
+                    name_brand=only,
+                    conflict=True,
+                )
         return BrandResolution(source_brand, "source", source_brand, name_brand)
     if name_brand is not None:
         return BrandResolution(name_brand, "name_known_brand", None, name_brand)
@@ -620,10 +837,249 @@ def canonical_egg_size(record: SourceProductRecord, taxonomy: TaxonomyAssignment
     return None
 
 
+# --- Tipo de producto: contexto negativo y ruta de categoría fuente ----------
+# Contextos que contradicen un tipo alimenticio asignado por palabra clave. Se
+# miden sobre el nombre plegado (sin acentos, minúsculas). Precision first: un
+# contexto negativo deja el tipo vacío (o en el tipo no alimenticio correcto),
+# nunca inventa otro tipo alimenticio.
+_VISCOSITY_RE = re.compile(r"(?<![a-z0-9])\d{1,2}\s?w\s?\d{2}")
+_MOTOR_CONTEXT = frozenset(
+    {
+        "2t", "4t", "atf", "automatico", "automotriz", "auto", "autos", "diesel",
+        "frenos", "hidraulico", "llave", "lubricante", "lubricantes", "moto", "motocicleta",
+        "motor", "motordiesel", "motos", "multigrado", "sintetico", "transmision", "vehiculo",
+    }
+)
+_PAINT_CONTEXT = frozenset(
+    {"anticorrosivo", "barniz", "esmalte", "latex", "pintura", "pinturas", "sellador", "thinner"}
+)
+_COSMETIC_CONTEXT = frozenset(
+    {
+        "acondicionador", "alisadora", "aromaterapia", "argan", "baby", "barba", "bebe", "bebes",
+        "bronceador", "bronceadora", "cabello", "capilar", "corporal", "cuticula", "cuticulas",
+        "depilatorio", "desmaquillante", "enjuague", "esencial", "esenciales", "espuma",
+        "facial", "fijador", "fijadora", "frizz", "hidratante", "humectante", "keratina",
+        "labial", "labios", "limpiadora", "locion", "masaje", "mascarilla", "mosqueta", "peinar",
+        "piel", "plancha", "ricino", "rizos", "rostro", "serum", "shampoo", "solar",
+        "tratamiento", "unas",
+    }
+)
+_ORAL_CARE_CONTEXT = frozenset(
+    {
+        "aquafresh", "blanqueadora", "colgate", "crest", "dental", "dentifrica", "dientes",
+        "dnt", "encias", "kolynos", "oralb", "parodontax", "sensodyne",
+    }
+)
+_ORAL_CARE_PHRASES = ("close up", "oral b")
+_NON_FOOD_PASTA_CONTEXT = frozenset(
+    {"calzado", "ceramica", "lustrar", "modelar", "muro", "pared", "plastilina", "resanar", "silicon"}
+)
+_COFFEE_OBJECT_CONTEXT = frozenset(
+    {
+        "betun", "cafetera", "esponja", "filtro", "filtros", "gancho", "mesa", "percoladora",
+        "silla", "sillon", "taza", "tazas", "termo", "toalla", "vaso",
+    }
+)
+_HAIR_GEL_CONTEXT = frozenset(
+    {"cabello", "capilar", "ego", "fijador", "fijadora", "herbal", "peinar", "rizos", "sabila", "vitacreme"}
+)
+_BATH_SALT_CONTEXT = frozenset({"bano", "epsom", "piscina", "tina"})
+_COSMETIC_MILK_CONTEXT = frozenset(
+    {"bronceadora", "corporal", "desmaquillante", "facial", "hidratante", "humectante", "limpiadora", "magnesia", "solar"}
+)
+_CAT_CONTEXT = frozenset({"felix", "friskies", "gati", "gato", "gatos", "minino", "whiskas"})
+_DOG_CONTEXT = frozenset({"beneful", "canino", "dogui", "pedigree", "perro", "perros"})
+_CAT_PHRASES = ("cat chow",)
+_DOG_PHRASES = ("dog chow",)
+# "Pan para perro caliente" / "hot dog" es comida humana.
+_HOT_DOG_CONTEXT = frozenset({"caliente", "calientes", "hot"})
+_PET_NON_FOOD = frozenset(
+    {"arena", "cama", "cepillo", "collar", "comedero", "correa", "juguete", "plato", "rascador", "shampoo", "transportadora"}
+)
+_SUGAR_FREE_RE = re.compile(r"(?<!\w)(?:s|zero|cero|0|libre de|no|sugar free)\s*azucar(?!\w)|(?<!\w)sugar free(?!\w)")
+_FOOD_CATEGORIES = frozenset({"Alimentos", "Bebidas"})
+# Departamentos fuente que contradicen un tipo alimenticio por nombre ("Pintura
+# de Aceite" en /Artículos para el hogar/, "Aceite 20W50" en /Autos/). Salud y
+# Mascotas no cuentan: farmacias venden té y dulces (Walmart cuelga chocolates
+# de "/Anthistaminicos/Dulces y Chocolates/") y el alimento de mascota con
+# sabor a atún ya tiene su regla de contexto.
+_NON_FOOD_DEPARTMENTS = frozenset({"General", "Cuidado personal", "Limpieza", "Hogar"})
+# Departamentos que ya existen como categoría pública del catálogo.
+_PUBLIC_CATEGORIES = frozenset(
+    {"Alimentos", "Bebidas", "Cuidado personal", "Limpieza", "Hogar", "Bebés", "Mascotas"}
+)
+SOURCE_CATEGORY_RULE_PREFIX = "source_category"
+
+
+def _known_product_types() -> dict[str, tuple[str, str]]:
+    from . import product_homologation as v1
+
+    known: dict[str, tuple[str, str]] = {}
+    for rule in v1._TAXONOMY_RULES:
+        known.setdefault(rule.product_type, (rule.category, rule.subcategory))
+    for _, category, subcategory, product_type, _ in v1._HEAD_TAXONOMY:
+        known.setdefault(product_type, (category, subcategory))
+    known.setdefault("Miel", ("Alimentos", "Miel"))
+    return known
+
+
+_KNOWN_PRODUCT_TYPES = _known_product_types()
+
+
+@lru_cache(maxsize=1)
+def _source_category_taxonomy():  # type: ignore[no-untyped-def]
+    """Mapa versionado de rutas de categoría fuente (config/homologation)."""
+
+    from .matching.config import DEFAULT_TAXONOMY_PATH
+    from .matching.taxonomy import load_source_taxonomy
+
+    return load_source_taxonomy(DEFAULT_TAXONOMY_PATH)
+
+
+def is_source_category_type(taxonomy: TaxonomyAssignment) -> bool:
+    """Tipo derivado de la ruta de categoría: evidencia débil, nunca conflicto."""
+
+    return (taxonomy.rule_id or "").startswith(SOURCE_CATEGORY_RULE_PREFIX)
+
+
+def _object_before_noun(text: str, noun: str) -> bool:
+    words = text.split()
+    if noun not in words:
+        return False
+    head = words.index(noun)
+    return any(word in _COFFEE_OBJECT_CONTEXT for word in words[:head])
+
+
+def _category_path_type(source_taxonomy, category: str) -> str | None:  # type: ignore[no-untyped-def]
+    """Tipo por palabra clave al INICIO de la hoja de la ruta fuente.
+
+    Sólo la hoja describe el producto: el departamento ("Cervezas, Vinos y
+    Licores") y la familia ("Azúcar y Postres" contiene flanes) son demasiado
+    amplios, y "Tacos, Pizzas y Pastas" no es Pasta. Rutas de un solo segmento
+    (Colonial, PriceSmart) sólo aportan departamento. La regla debe ser
+    compatible con el departamento de la ruta completa ("Desmaquillante y agua
+    micelar" en Higiene y Belleza no es Agua).
+    """
+
+    from .matching.taxonomy import category_segments, departments_compatible
+
+    segments = category_segments(category)
+    if len(segments) < 2:
+        return None
+    leaf = segments[-1]
+    department = source_taxonomy.department_for(category)
+    for keyword, product_type, rule_department in source_taxonomy.keyword_rules:
+        if leaf != keyword and not leaf.startswith(keyword + " "):
+            continue
+        if departments_compatible(department, rule_department) is False:
+            continue
+        return product_type
+    return None
+
+
+def _non_food_override(
+    taxonomy: TaxonomyAssignment,
+    text: str,
+    tokens: set[str],
+) -> TaxonomyAssignment | None:
+    product_type = taxonomy.product_type
+    if product_type is None or taxonomy.category not in _FOOD_CATEGORIES:
+        return None
+    if _VISCOSITY_RE.search(text) or tokens & _MOTOR_CONTEXT:
+        return TaxonomyAssignment(None, None, None, "v2_motor_context_not_food")
+    if tokens & _PAINT_CONTEXT:
+        return TaxonomyAssignment(None, None, None, "v2_paint_context_not_food")
+    cat = bool(tokens & _CAT_CONTEXT) or any(_phrase_present(text, phrase) for phrase in _CAT_PHRASES)
+    dog = bool(tokens & _DOG_CONTEXT) or any(_phrase_present(text, phrase) for phrase in _DOG_PHRASES)
+    # Sólo alimentos (no bebidas: "Vino Gato Negro" es vino).
+    if (
+        (cat or dog)
+        and taxonomy.category == "Alimentos"
+        and not tokens & (_PET_NON_FOOD | _HOT_DOG_CONTEXT)
+    ):
+        if cat and not dog:
+            return TaxonomyAssignment("Mascotas", "Alimento para mascotas", "Alimento para gato", "v2_pet_food_cat")
+        if dog and not cat:
+            return TaxonomyAssignment("Mascotas", "Alimento para mascotas", "Alimento para perro", "v2_pet_food_dog")
+        return TaxonomyAssignment("Mascotas", None, None, "v2_pet_food_ambiguous")
+    if product_type == "Aceite comestible" and tokens & _COSMETIC_CONTEXT:
+        return TaxonomyAssignment("Cuidado personal", None, None, "v2_cosmetic_oil_not_food")
+    if product_type == "Pasta":
+        if tokens & _ORAL_CARE_CONTEXT or any(_phrase_present(text, phrase) for phrase in _ORAL_CARE_PHRASES):
+            return TaxonomyAssignment("Cuidado personal", "Higiene oral", "Pasta dental", "v2_pasta_oral_care")
+        if tokens & _NON_FOOD_PASTA_CONTEXT:
+            return TaxonomyAssignment(None, None, None, "v2_pasta_not_food")
+    if product_type == "Café" and (_object_before_noun(text, "cafe") or _phrase_present(text, "color cafe")):
+        # "Taza de café", "Filtro para café", "Betún Café"; "Café molido tipo
+        # percoladora" sigue siendo café (el objeto va después del sustantivo).
+        return TaxonomyAssignment(None, None, None, "v2_coffee_object_or_color")
+    if product_type == "Gelatina" and tokens & _HAIR_GEL_CONTEXT:
+        return TaxonomyAssignment("Cuidado personal", None, None, "v2_hair_gel_not_food")
+    if product_type == "Sal" and tokens & _BATH_SALT_CONTEXT:
+        return TaxonomyAssignment("Cuidado personal", None, None, "v2_bath_salt_not_food")
+    if product_type == "Leche" and tokens & _COSMETIC_MILK_CONTEXT:
+        return TaxonomyAssignment(None, None, None, "v2_cosmetic_milk_not_food")
+    return None
+
+
 def assign_taxonomy_v2(record: SourceProductRecord) -> TaxonomyAssignment:
-    """Corrige falsos positivos demostrados antes de aplicar la taxonomía v1."""
+    """Taxonomía v2: nombre con contexto negativo y, sin tipo, ruta de categoría.
+
+    1. Reglas por nombre (v2 + v1), con "S/Azúcar", "Zero Azúcar" leídos como
+       "sin azúcar" para que no se clasifiquen como Azúcar.
+    2. Contexto negativo: aceite de motor (20W50, ATF, moto), pintura, cosmética
+       (argán, cabello, bebé), pasta dental, alimento para mascota, objetos color
+       café, gel para cabello, sal de baño.
+    3. Si el departamento de la ruta fuente es no alimenticio, un tipo
+       alimenticio por nombre se descarta (fail-closed).
+    4. Sin tipo por nombre: palabra clave de la ruta (``source_category``,
+       evidencia débil que nunca crea un conflicto de tipo) o, al menos, el
+       departamento como categoría pública.
+    """
+
     text = fold_text(record.source_name) or ""
     tokens = set(text.split())
+    by_name = _assign_taxonomy_by_name(record, text, tokens)
+    override = _non_food_override(by_name, text, tokens)
+    if override is not None:
+        by_name = override
+    if record.source_category is None:
+        return by_name
+    try:
+        source_taxonomy = _source_category_taxonomy()
+    except Exception:  # pragma: no cover - el mapa es parte versionada del repo
+        return by_name
+    department = source_taxonomy.department_for(record.source_category)
+    seasonal = "temporada" in (fold_text(record.source_category) or "")
+    if (
+        by_name.product_type is not None
+        and by_name.category in _FOOD_CATEGORIES
+        and department in _NON_FOOD_DEPARTMENTS
+        and not seasonal
+    ):
+        return TaxonomyAssignment(
+            department if department in _PUBLIC_CATEGORIES else None,
+            None,
+            None,
+            "v2_source_department_not_food",
+        )
+    if by_name.product_type is not None or by_name.rule_id is not None:
+        return by_name
+    category_type = _category_path_type(source_taxonomy, record.source_category)
+    if category_type is not None and category_type in _KNOWN_PRODUCT_TYPES:
+        category, subcategory = _KNOWN_PRODUCT_TYPES[category_type]
+        return TaxonomyAssignment(category, subcategory, category_type, f"{SOURCE_CATEGORY_RULE_PREFIX}_keyword")
+    if department in _PUBLIC_CATEGORIES:
+        return TaxonomyAssignment(department, None, None, f"{SOURCE_CATEGORY_RULE_PREFIX}_department")
+    return by_name
+
+
+def _assign_taxonomy_by_name(
+    record: SourceProductRecord,
+    text: str,
+    tokens: set[str],
+) -> TaxonomyAssignment:
+    """Corrige falsos positivos demostrados antes de aplicar la taxonomía v1."""
     if "abrillantador" in tokens and "calzado" in tokens:
         return TaxonomyAssignment(
             "Hogar",
@@ -650,6 +1106,11 @@ def assign_taxonomy_v2(record: SourceProductRecord) -> TaxonomyAssignment:
         return TaxonomyAssignment("Alimentos", "Dulces y chocolates", "Chocolate", "v2_kinder_huevo")
     if "toro" in tokens and ("huevo" in tokens or "huevos" in tokens):
         return TaxonomyAssignment(None, None, None, "v2_huevos_toro_unresolved")
+    sugar_free = _SUGAR_FREE_RE.sub("sin azucar", text)
+    if sugar_free != text:
+        # La regla v1 de Azúcar ya excluye "sin azucar"; "S/Azúcar" y "Zero
+        # Azúcar" son la misma declaración ("SILK Almendra S/Azucar").
+        return assign_taxonomy(replace(record, source_name=sugar_free))
     return assign_taxonomy(record)
 
 
@@ -672,6 +1133,30 @@ def _replace_natural_multipack(match: re.Match[str]) -> str:
     return f"{match.group('count')} x {match.group('amount')} {match.group('unit')}"
 
 
+def normalize_thousands_separators(value: str) -> str:
+    """"1,400 ml" → "1400 ml"; "1,5 L" y "1.892 L" no cambian (ver regla)."""
+
+    return _THOUSANDS_SMALL_UNIT_RE.sub(
+        lambda match: f"{match.group('integer')}{match.group('group')}{match.group('unit')}",
+        value,
+    )
+
+
+def _thousands_misreadings(value: str | None) -> set[tuple[Decimal, str]]:
+    """Lecturas decimales erróneas de un separador de miles del nombre.
+
+    Algunas fuentes (y scrapers previos) derivaron la presentación del nombre
+    leyendo "1,400 ml" como 1.4 ml. Si la presentación fuente coincide con esa
+    lectura no es evidencia independiente: describe la misma etiqueta.
+    """
+
+    result: set[tuple[Decimal, str]] = set()
+    for match in _THOUSANDS_SMALL_UNIT_RE.finditer(value or ""):
+        amount = Decimal(f"{match.group('integer')}.{match.group('group')}")
+        result.add((amount.normalize(), match.group("unit").strip().casefold()))
+    return result
+
+
 def _normalize_parser_text(
     value: str | None,
     *,
@@ -682,6 +1167,7 @@ def _normalize_parser_text(
     # "ShampAguac&Sab550ml" → "ShampAguac&Sab 550ml": sin esto la cantidad pegada
     # a una palabra (frecuente en Colonial) no se reconoce como presentación.
     text = " ".join(_GLUED_LETTERS_DIGIT_RE.sub(" ", value).split())
+    text = normalize_thousands_separators(text)
     text = _FRACTION_WITH_UNIT_RE.sub(_replace_fraction_with_unit, text)
     text = _NATURAL_MULTIPACK_RE.sub(_replace_natural_multipack, text)
     text = _COMPACT_SLASH_MULTIPACK_RE.sub(_replace_natural_multipack, text)
@@ -696,22 +1182,92 @@ def _normalize_parser_text(
     return text
 
 
+# Tipos cuyo contenido neto en onzas es peso (NET WT), no volumen: sólo en ellos
+# una presentación sólo-onzas se convierte a gramos. En cualquier otro tipo (o
+# sin tipo) la onza queda como dimensión "ounce": sin conversión, no crea
+# conflictos nuevos contra fuentes en ml ni confirma igualdad dudosa.
+OUNCE_MASS_PRODUCT_TYPES = frozenset(
+    {
+        "Arroz",
+        "Atún",
+        "Avena",
+        "Azúcar",
+        "Café",
+        "Cereal",
+        "Chocolate",
+        "Frijol",
+        "Galleta",
+        "Gelatina",
+        "Harina de maíz",
+        "Harina de trigo",
+        "Leche en polvo",
+        "Mantequilla",
+        "Mantequilla de maní",
+        "Margarina",
+        "Pan",
+        "Pan de molde",
+        "Pasta",
+        "Pasta de tomate",
+        "Queso",
+        "Sal",
+        "Sardina",
+        "Yogurt",
+    }
+)
+
+
+def _drop_misread_source(name: str, source: str | None) -> str | None:
+    """Descarta una presentación fuente que sólo repite la lectura errónea."""
+
+    if source is None:
+        return None
+    misreadings = _thousands_misreadings(name)
+    if not misreadings:
+        return source
+    folded = " ".join(source.casefold().split())
+    for amount, unit in misreadings:
+        for rendered in {format(amount, "f"), format(amount, "f").replace(".", ",")}:
+            if re.fullmatch(rf"{re.escape(rendered)}0*\s*{re.escape(unit)}\.?", folded):
+                return None
+    return source
+
+
 def resolve_presentation_v2(
     record: SourceProductRecord,
     taxonomy: TaxonomyAssignment | None = None,
 ) -> tuple[PresentationSignature | None, str]:
     taxonomy = taxonomy or assign_taxonomy_v2(record)
     shell_egg = is_shell_egg(record, taxonomy)
+    source_presentation = _drop_misread_source(record.source_name, record.source_presentation)
     normalized = SourceProductRecord(
         source_record_id=record.source_record_id,
         supermarket_id=record.supermarket_id,
         source_name=_normalize_parser_text(record.source_name, shell_egg=shell_egg) or record.source_name,
         source_brand=record.source_brand,
-        source_presentation=_normalize_parser_text(record.source_presentation, shell_egg=shell_egg),
+        source_presentation=_normalize_parser_text(source_presentation, shell_egg=shell_egg),
         source_category=record.source_category,
         barcode=record.barcode,
     )
-    return resolve_presentation(normalized)
+    return resolve_presentation(
+        normalized,
+        ounce_as_mass=taxonomy.product_type in OUNCE_MASS_PRODUCT_TYPES,
+    )
+
+
+def display_quantity(value: Decimal) -> str:
+    """Cantidad legible: máximo 2 decimales (3 cifras significativas bajo 1).
+
+    Sólo para mostrar: el valor canónico exacto (p. ej. 907.18474 g para 2 lb)
+    se conserva en ``canonical_total`` y en la firma de comparación.
+    """
+
+    if value >= 1:
+        rounded = value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    else:
+        exponent = value.adjusted() - 2
+        rounded = value.quantize(Decimal(1).scaleb(exponent), rounding=ROUND_HALF_UP)
+    rendered = format(rounded.normalize(), "f")
+    return "0" if rendered in {"", "-0"} else rendered
 
 
 def canonical_presentation_fields(
@@ -738,12 +1294,10 @@ def canonical_presentation_fields(
         display = f"{int(signature.total_base)} unidades"
     elif signature.pack_count > 1 and signature.unit_amount_base is not None:
         normalized_pack_count = signature.pack_count
-        display = (
-            f"{signature.pack_count} × {format(signature.unit_amount_base.normalize(), 'f')} {unit}"
-        )
+        display = f"{signature.pack_count} × {display_quantity(signature.unit_amount_base)} {unit}"
     else:
         normalized_pack_count = signature.pack_count
-        display = f"{format(signature.total_base.normalize(), 'f')} {unit}"
+        display = f"{display_quantity(signature.total_base)} {unit}"
     return CanonicalPresentation(
         raw_presentation=raw,
         normalized_quantity=quantity,
@@ -849,6 +1403,7 @@ NAME_ABBREVIATIONS: dict[str, str] = {
     "vainila": "vainilla",
     "vanila": "vainilla",
     "watermelo": "watermelon",
+    "xtra": "extra",
     "zanah": "zanahoria",
     "zanaho": "zanahoria",
 }
@@ -928,6 +1483,28 @@ def _variant_labels(profile: ProductProfile) -> frozenset[str]:
     return frozenset(labels)
 
 
+def _brand_from_name(profile: ProductProfile) -> bool:
+    source = canonicalize_brand_key(profile.record.source_brand)
+    return source is None or _squash(source) != _squash(profile.normalized_brand or "")
+
+
+def _name_brand_line_overlap(left: ProductProfile, right: ProductProfile) -> bool:
+    """Fabricante vs línea con una marca extraída del nombre ("Nestle" vs "Nesquik").
+
+    Si alguna marca salió del nombre y cualquiera de las dos marcas aparece en el
+    nombre del otro lado, no es una contradicción de marca: ambos nombres citan
+    la misma marca. Dos marcas fuente distintas siguen en conflicto.
+    """
+
+    if not (_brand_from_name(left) or _brand_from_name(right)):
+        return False
+    left_brand = _squash(left.normalized_brand or "")
+    right_brand = _squash(right.normalized_brand or "")
+    left_name = _squash(fold_text(left.record.source_name) or "")
+    right_name = _squash(fold_text(right.record.source_name) or "")
+    return bool(left_brand and right_brand) and (left_brand in right_name or right_brand in left_name)
+
+
 def _hard_conflicts(left: ProductProfile, right: ProductProfile) -> tuple[str, ...]:
     conflicts: set[str] = set()
     if left.canonical_gtin is not None and right.canonical_gtin is not None and left.canonical_gtin != right.canonical_gtin:
@@ -936,9 +1513,16 @@ def _hard_conflicts(left: ProductProfile, right: ProductProfile) -> tuple[str, .
         left.taxonomy.product_type is not None
         and right.taxonomy.product_type is not None
         and left.taxonomy.product_type != right.taxonomy.product_type
+        and not is_source_category_type(left.taxonomy)
+        and not is_source_category_type(right.taxonomy)
     ):
         conflicts.add("product_type_conflict")
-    if left.normalized_brand and right.normalized_brand and left.normalized_brand != right.normalized_brand:
+    if (
+        left.normalized_brand
+        and right.normalized_brand
+        and left.normalized_brand != right.normalized_brand
+        and not _name_brand_line_overlap(left, right)
+    ):
         conflicts.add("brand_conflict")
     if (
         left.presentation is not None
@@ -1215,16 +1799,13 @@ def _agreement_token_match(left: str, right: str) -> bool:
     return shorter >= 5 and SequenceMatcher(None, left, right).ratio() >= 0.8
 
 
-def sku_gtin_name_agreement(left: ProductProfile, right: ProductProfile) -> bool:
-    """Acuerdo mínimo de nombre sin marca ni tamaño (sólo GTIN derivado de SKU)."""
-
+def _name_agreement_with_brands(
+    left: ProductProfile,
+    right: ProductProfile,
+    brands: Iterable[str | None],
+) -> bool:
     brand_tokens: set[str] = set()
-    for value in (
-        left.normalized_brand,
-        right.normalized_brand,
-        left.record.source_brand,
-        right.record.source_brand,
-    ):
+    for value in brands:
         folded = fold_text(value)
         if folded:
             brand_tokens.update(folded.split())
@@ -1245,6 +1826,30 @@ def sku_gtin_name_agreement(left: ProductProfile, right: ProductProfile) -> bool
     if matched == 0:
         return False
     return Decimal(matched) / Decimal(min(len(left_tokens), len(right_tokens))) >= SKU_NAME_MIN_OVERLAP
+
+
+def sku_gtin_name_agreement(left: ProductProfile, right: ProductProfile) -> bool:
+    """Acuerdo mínimo de nombre sin marca ni tamaño (sólo GTIN derivado de SKU).
+
+    Siempre se excluyen las marcas declaradas por la fuente. Una marca inferida
+    del nombre por el léxico es ambigua (¿marca o palabra del nombre?): el
+    acuerdo se acepta si se cumple excluyéndola o tratándola como token, para no
+    depender de la cobertura del léxico (calibración 2026-10-01 sin léxico ampliado).
+    """
+
+    declared = [
+        *(profile.normalized_brand for profile in (left, right) if not _brand_from_name(profile)),
+        left.record.source_brand,
+        right.record.source_brand,
+    ]
+    inferred = [
+        profile.normalized_brand
+        for profile in (left, right)
+        if profile.normalized_brand and _brand_from_name(profile)
+    ]
+    if _name_agreement_with_brands(left, right, declared):
+        return True
+    return bool(inferred) and _name_agreement_with_brands(left, right, (*declared, *inferred))
 
 
 # Cosméticos: un número de tono/modelo distinto ("Light 20" vs "Light Honey 120")

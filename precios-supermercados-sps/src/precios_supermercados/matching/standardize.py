@@ -294,6 +294,8 @@ class Standardizer:
         name_tokens = [self.synonyms.get(token, token) for token in name.split()]
         brand = profile.normalized_brand
         source_brand = canonicalize_brand_key(record.source_brand)
+        if source_brand is not None:
+            source_brand = getattr(self.brand_lexicon, "aliases", {}).get(source_brand, source_brand)
         if brand is None:
             brand_source = "source_conflict" if source_brand is not None else "missing"
         elif source_brand == brand:
@@ -310,6 +312,8 @@ class Standardizer:
         size = _size_info(size_profile)
         product_type = profile.taxonomy.product_type or size_profile.taxonomy.product_type
         product_type_source = "name" if product_type is not None else None
+        if product_type is not None and (profile.taxonomy.rule_id or "").startswith("source_category"):
+            product_type_source = "category_rule"
         department = None
         if self.taxonomy is not None:
             department = self.taxonomy.department_for(record.source_category)
