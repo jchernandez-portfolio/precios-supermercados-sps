@@ -94,6 +94,33 @@ def _partial_page_is_safe_for_bucket_recovery(result: Any) -> bool:
     )
 
 
+def _unpriced_unavailable_page_is_safe(result: Any) -> bool:
+    """Página completa cuyos SKU están todos sin precio y agotados ("NO DISPONIBLE").
+
+    El extractor base rechaza una página sin ningún precio. En el catálogo
+    operativo esa página es válida si cada SKU está explícitamente agotado: la
+    regla 2026-10-02 los separa del snapshot con precio y la validación global
+    limita su volumen (≤2 %). Sin precio ``in_stock``/``unknown`` sigue fallando.
+    """
+
+    metrics = result.metrics
+    products = tuple(result.products)
+    return (
+        not result.accepted
+        and "quality:partial_product_page" not in result.quality_events
+        and metrics.structural_events == 0
+        and metrics.errors == 0
+        and metrics.skus_with_price == 0
+        and metrics.skus_extracted > 0
+        and len(products) == metrics.skus_extracted
+        and all(
+            product.raw_values.get("current_price") is None
+            and product.raw_values.get("availability") == AvailabilityStatus.OUT_OF_STOCK.value
+            for product in products
+        )
+    )
+
+
 def _empty_page_for_bucket_recovery(
     payload: Any,
     *,
@@ -136,6 +163,8 @@ class RecoveryAwareLaColoniaExtractor(BaseExtractor):
                 page_size=int(kwargs.get("page_size") or 5),
             )
         if _partial_page_is_safe_for_bucket_recovery(result):
+            return replace(result, accepted=True)
+        if _unpriced_unavailable_page_is_safe(result):
             return replace(result, accepted=True)
         return result
 

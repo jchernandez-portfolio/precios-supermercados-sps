@@ -517,12 +517,7 @@ def _relative_states(
     freshness_by_scope: dict[tuple[str, str], str],
 ) -> dict[str, str]:
     result = {offer.source_product_id: "neutral" for offer in offers}
-    valid = [
-        offer for offer in offers
-        if offer.current_price_minor is not None
-        and offer.current_price_minor > 0
-        and offer.availability != "out_of_stock"
-    ]
+    valid = [offer for offer in offers if _comparison_eligible(offer)]
     if (
         mode != "comparable"
         or len(valid) < 2
@@ -539,6 +534,32 @@ def _relative_states(
         price = offer.current_price_minor
         result[offer.source_product_id] = "best" if price == minimum else "highest" if price == maximum else "intermediate"
     return result
+def _comparison_eligible(offer: VisibleOffer) -> bool:
+    """Oferta apta para comparar hoy: precio positivo y no agotada.
+
+    ``unknown`` sigue siendo comparable (muchas cadenas no publican stock). Una
+    oferta ``out_of_stock`` se publica como información individual visible, pero
+    nunca entra a ranking, mejor precio, diferencia, PCI ni canastas.
+    """
+    return (
+        offer.current_price_minor is not None
+        and offer.current_price_minor > 0
+        and offer.availability != "out_of_stock"
+    )
+
+
+def _comparability_today(mode: str, group: Sequence[VisibleOffer]) -> str:
+    """Un grupo comparable exige hoy ≥2 cadenas con ofertas no agotadas con precio.
+
+    La identidad (``canonical_product_id``/``row_id``) no cambia: sólo la
+    comparabilidad del día. Si vuelve el stock, vuelve a ser comparable.
+    """
+    if mode != "comparable":
+        return mode
+    retailers = {offer.supermarket_id for offer in group if _comparison_eligible(offer)}
+    return "comparable" if len(retailers) >= 2 else "individual"
+
+
 def _representative(group: Sequence[VisibleOffer]) -> VisibleOffer:
     return sorted(
         group,
@@ -560,10 +581,11 @@ def build_rows(
 ) -> list[dict[str, object]]:
     history_by_offer = history_by_offer or {}
     rows: list[dict[str, object]] = []
-    for mode, group in _identity_groups(offers):
+    for identity_mode, group in _identity_groups(offers):
         representative = _representative(group)
-        canonical_id = representative.canonical_product_id if mode == "comparable" else None
+        canonical_id = representative.canonical_product_id if identity_mode == "comparable" else None
         identity_value = canonical_id or representative.source_product_id
+        mode = _comparability_today(identity_mode, group)
         states = _relative_states(mode, group, freshness_by_scope)
         public_offers = []
         for offer in sorted(group, key=lambda item: EXPECTED_SCOPE.index((item.supermarket_id, item.location_id))):

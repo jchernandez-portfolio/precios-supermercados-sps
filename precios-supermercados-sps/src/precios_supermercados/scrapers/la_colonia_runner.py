@@ -16,6 +16,7 @@ from enum import Enum
 from typing import Any, Callable, Mapping, Sequence
 
 from precios_supermercados.models import RawProduct
+from precios_supermercados.unpriced_unavailable import unpriced_unavailable_limit
 
 from .base import (
     BlockedResponseError,
@@ -182,6 +183,7 @@ class CatalogRunMetrics:
     skus_extracted: int = 0
     skus_with_price: int = 0
     skus_without_price: int = 0
+    skus_unpriced_unavailable: int = 0
     skus_pending_review: int = 0
     weighted_skus: int = 0
     promotional_skus: int = 0
@@ -615,6 +617,14 @@ class LaColoniaCatalogRunner:
             1 for product in products if product.raw_values.get("current_price") is not None
         )
         metrics.skus_without_price = metrics.skus_extracted - metrics.skus_with_price
+        # Sin precio y declarado agotado ("NO DISPONIBLE"): no es un precio
+        # faltante por extracción, pero su volumen sigue acotado (regla 2026-10-02).
+        metrics.skus_unpriced_unavailable = sum(
+            1
+            for product in products
+            if product.raw_values.get("current_price") is None
+            and product.raw_values.get("availability") == "out_of_stock"
+        )
         metrics.skus_pending_review = sum(
             1
             for product in products
@@ -650,7 +660,8 @@ class LaColoniaCatalogRunner:
             abs(metrics.total_change_absolute), metrics.products_reported_initial
         )
         metrics.missing_price_ratio = _ratio(
-            metrics.skus_without_price, metrics.skus_extracted
+            metrics.skus_without_price - metrics.skus_unpriced_unavailable,
+            metrics.skus_extracted,
         )
         metrics.duplicate_sku_ratio = _ratio(
             metrics.duplicate_skus, metrics.skus_returned
@@ -683,6 +694,10 @@ class LaColoniaCatalogRunner:
                 len(seen_products) != metrics.products_reported_initial
             ),
             "duplicate_skus_present": metrics.duplicate_skus != 0,
+            "unpriced_unavailable_above_threshold": (
+                metrics.skus_unpriced_unavailable
+                > unpriced_unavailable_limit(metrics.skus_extracted)
+            ),
             "canonical_coverage_missing": True,
         }
         for reason, failed in mandatory.items():
