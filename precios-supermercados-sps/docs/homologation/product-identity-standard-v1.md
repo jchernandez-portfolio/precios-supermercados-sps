@@ -14,7 +14,10 @@ que dos ofertas son el mismo producto.
 - **Perfil normalizado:** proyección reconstruible con marca, tipo, presentación,
   atributos y conflictos. No reemplaza el producto fuente.
 - **Producto maestro:** identidad estable que puede reunir productos fuente sólo
-  mediante `EXACT_TRADE_ITEM` o `VERIFIED_EQUIVALENT`.
+  mediante `EXACT_TRADE_ITEM` o `VERIFIED_EQUIVALENT`. Desde 2026-10-01 se
+  persiste en `master_products` (id `mp_*`, atributos golden con procedencia)
+  y la pertenencia en `master_product_links` (método, evidencia, autor,
+  historial); ver regla 20 y [`product-master-v1.md`](product-master-v1.md).
 - **Decisión:** relación auditada entre una pareja, ligada a las huellas de la
   evidencia que se revisó.
 
@@ -189,6 +192,23 @@ confirman identidad por sí mismos.
     sólo crea identidad si coincide con el GTIN de otra cadena y supera las
     guardas de marca, acuerdo mínimo de nombre, tono/modelo y los conflictos de
     tamaño/variante/tipo. La marca placeholder `Marca COMANDES` nunca contradice.
+
+20. **Producto maestro y vínculos (v1, 2026-10-01).** La identidad deja de ser
+    sólo `canonical_product_id`: cada producto fuente tiene a lo sumo un
+    vínculo activo a un `master_product_id` estable (`mp_*`; el de un maestro
+    nacido de un GTIN se deriva del GTIN, el de uno sin GTIN de la decisión
+    que lo crea). Métodos: `gtin_exact` y `gtin_sku_derived`
+    (`EXACT_TRADE_ITEM`, decididos por `system` y equivalentes 1:1 a los
+    perfiles `ready`/`single_source`), `reviewed_decision` y `manual_review`
+    (`VERIFIED_EQUIVALENT`, `human:<id>`) y `engine_auto` (deshabilitado: el
+    motor sólo alimenta la cola de revisión). Un maestro admite un solo
+    vínculo activo por cadena. Un "Distinto" humano se guarda en
+    `master_link_rejections` y no se vuelve a proponer. Un producto con otro
+    GTIN válido nunca se vincula automáticamente a un maestro, aunque todos
+    los atributos coincidan. Los atributos golden siguen reglas de
+    supervivencia documentadas (marca fuente > inferida, métrico > imperial,
+    más frecuente) y un atributo fijado por una persona nunca se sobrescribe.
+    Política en la sección `product_master` de `identity-policy-v1.yaml`.
 
 ## Casos iniciales
 

@@ -250,3 +250,15 @@ las cifras de la corrida. Las salidas completas son privadas y no se versionan.
    `probabilistic_auto_match_with_measured_precision` y cambiar
    `publication.mode` en un PR revisado. `PolicyGate.engine_publication_allowed`
    exige además la precisión medida.
+
+## 10. Candidatos contra el producto maestro (2026-10-01)
+
+Además de parejas producto↔producto, `matching/master_candidates.py` compara
+cada producto no homologado contra los registros *golden* de
+`master_products` (marca, tamaño ±2 %, pack, variante, tipo y nombre contra
+los miembros) y produce una cola de revisión con `master_product_id`
+(`scripts/exportar_cola_maestro.py`). Sigue en modo shadow: `engine_auto`
+está deshabilitado en la política, un GTIN válido distinto siempre es
+revisión y las decisiones humanas se importan con
+`scripts/importar_decisiones_maestro.py` como vínculos `manual_review` o
+rechazos. Ver [`product-master-v1.md`](product-master-v1.md).

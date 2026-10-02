@@ -9,7 +9,7 @@ import re
 import sys
 import unicodedata
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -31,6 +31,11 @@ from precios_supermercados.price_history_analytics import (  # noqa: E402
 )
 from precios_supermercados.product_homologation_persistence import (  # noqa: E402
     NORMALIZATION_VERSION,
+)
+from precios_supermercados.product_master import (  # noqa: E402
+    DEFAULT_POLICY_PATH as MASTER_POLICY_PATH,
+    curated_link_overrides,
+    load_master_policy,
 )
 SCHEMA, MANIFEST_SCHEMA = "rpi-consumer-catalog/v3", "rpi-consumer-catalog-manifest/v3"
 FACETS_SCHEMA, INDEX_SCHEMA = "rpi-consumer-facets/v3", "rpi-consumer-index/v3"
@@ -93,6 +98,9 @@ class VisibleOffer:
     presentation_total_base: str | None
     presentation_status: str
     comparison_status: str
+    # Llave de grupo de un vínculo curado del producto maestro (manual/registro).
+    # ``None`` = identidad GTIN vigente; no aparece en la salida pública.
+    master_group_key: str | None = None
 def _text(value: object) -> str | None:
     if not isinstance(value, str):
         return None
@@ -245,7 +253,43 @@ def fetch_visible_offers(
                 comparison_status=str(comparison_status),
             )
         )
-    return tuple(result)
+    return apply_master_link_overrides(tuple(result), fetch_master_link_overrides(backend))
+
+
+def fetch_master_link_overrides(backend: QueryBackend) -> dict[str, str]:
+    """Vínculos curados servibles del producto maestro (vacío sin tablas o sin vínculos).
+
+    Lee sólo ``sqlite_master`` y los vínculos curados activos por índice. Los
+    vínculos GTIN no se leen: materializan exactamente la identidad de los
+    perfiles, así que la salida es idéntica a la vigente mientras no existan
+    vínculos curados.
+    """
+    return curated_link_overrides(backend, load_master_policy(MASTER_POLICY_PATH))
+
+
+def apply_master_link_overrides(
+    offers: tuple[VisibleOffer, ...],
+    overrides: dict[str, str],
+) -> tuple[VisibleOffer, ...]:
+    if not overrides:
+        return offers
+    return tuple(
+        replace(offer, master_group_key=overrides[offer.source_product_id], canonical_product_id=overrides[offer.source_product_id])
+        if offer.source_product_id in overrides
+        else offer
+        for offer in offers
+    )
+
+
+def master_group_key(offer: VisibleOffer, promoted: set[str]) -> str | None:
+    """Llave de agrupación comparable: vínculo curado > identidad ready > single_source promovido."""
+    if offer.master_group_key:
+        return offer.master_group_key
+    if offer.comparison_status == "ready" and offer.canonical_product_id:
+        return offer.canonical_product_id
+    if offer.comparison_status == "single_source" and offer.canonical_product_id in promoted:
+        return offer.canonical_product_id
+    return None
 
 
 # `idx_ph_loc_hist` lo crea `migrar_mvp_paiz.py`; si todavía no existe, el
@@ -449,9 +493,11 @@ def _identity_groups(offers: Iterable[VisibleOffer]) -> list[tuple[str, list[Vis
     values = tuple(offers)
     candidates: dict[str, list[VisibleOffer]] = defaultdict(list)
     individual: list[VisibleOffer] = []
+    promoted = {offer.master_group_key for offer in values if offer.master_group_key}
     for offer in values:
-        if offer.comparison_status == "ready" and offer.canonical_product_id:
-            candidates[offer.canonical_product_id].append(offer)
+        key = master_group_key(offer, promoted)
+        if key:
+            candidates[key].append(offer)
         else:
             individual.append(offer)
     groups: list[tuple[str, list[VisibleOffer]]] = []

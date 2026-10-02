@@ -34,7 +34,18 @@ from precios_supermercados.unpriced_unavailable import (  # noqa: E402
 )
 
 EXPECTED_TABLES = {"supermarkets", "locations", "products", "price_history", "scrape_runs"}
-OPTIONAL_DERIVED_TABLES = {"product_homologation_profiles", "catalog_unpriced_observations"}
+# Tablas derivadas que la persistencia diaria tolera sin tocarlas: perfiles de
+# homologación, producto maestro (docs/homologation/product-master-v1.md) y
+# observaciones de productos listados sin precio y no disponibles.
+OPTIONAL_DERIVED_TABLES = {
+    "product_homologation_profiles",
+    "master_products",
+    "master_product_links",
+    "master_link_rejections",
+    "master_sync_state",
+    "master_sync_dirty",
+    "catalog_unpriced_observations",
+}
 
 
 def _validate_table_names(names: object) -> None:
