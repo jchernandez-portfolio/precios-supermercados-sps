@@ -16,7 +16,8 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from precios_supermercados.scrapers.colonial import (  # noqa: E402
-    ORIGIN, SECTION, ColonialError, parse_cards, parse_products, reconcile, sitemap_urls,
+    MAX_COMMERCIAL_RECHECKS, ORIGIN, SECTION, ColonialError, apply_commercial_recheck,
+    commercial_disagreements, parse_cards, parse_product_detail, parse_products, reconcile, sitemap_urls,
 )
 
 
@@ -98,6 +99,48 @@ class Download:
         return raw
 
 
+def html_page_url(page: int, *, recheck: bool = False) -> str:
+    if page == 1:
+        url = ORIGIN + "/collections/all"
+        return url + "?recheck=1" if recheck else url
+    url = f"{ORIGIN}/collections/all?section_id={SECTION}&page={page}"
+    return url + "&recheck=1" if recheck else url
+
+
+def recheck_commercial_disagreements(get, rows: list[dict], cards: list[dict], page_of: dict[str, int],
+                                     total: int) -> tuple[list[dict], list[dict], dict]:
+    """Relee sólo los productos cuyo precio JSON y de tarjeta no cuadran.
+
+    Cada producto se vuelve a pedir en ``/products/<handle>.json`` y su tarjeta en
+    la misma página HTML (URL distinta para no reutilizar la respuesta vieja ni la
+    caché del CDN). Si las lecturas frescas siguen sin cuadrar, ``reconcile``
+    rechaza el catálogo igual que antes.
+    """
+    handles = commercial_disagreements(rows, cards)
+    recheck = {"disagreements": len(handles), "handles": handles}
+    if not handles:
+        return rows, cards, recheck
+    print(json.dumps({"commercial_recheck": handles}, ensure_ascii=False), flush=True)
+    if len(handles) > MAX_COMMERCIAL_RECHECKS:
+        raise ColonialError("commercial_sources_disagree")
+    for handle in handles:
+        fresh_rows = parse_product_detail(get(f"{ORIGIN}/products/{handle}.json"), handle)
+        page = page_of.get(handle)
+        if page is None:
+            raise ColonialError("commercial_recheck_card_missing")
+        count, incoming = parse_cards(get(html_page_url(page, recheck=True)))
+        if count != total:
+            raise ColonialError("html_total_drift_or_page_incomplete")
+        matches = [card for card in incoming if card["handle"] == handle]
+        if len(matches) != 1:
+            raise ColonialError("commercial_recheck_card_moved")
+        rows, cards = apply_commercial_recheck(rows, cards, handle, fresh_rows, matches[0])
+    still = commercial_disagreements(rows, cards)
+    recheck["resolved"] = len(handles) - len(still)
+    print(json.dumps({"commercial_recheck_resolved": recheck["resolved"], "unresolved": still}, ensure_ascii=False), flush=True)
+    return rows, cards, recheck
+
+
 def collect(get) -> dict:
     home = get(ORIGIN + "/").decode("utf-8")
     if not all(signal in home for signal in ('Shopify.shop = "bm1gbx-tm.myshopify.com"', '"active":"HNL"', 'San Pedro Sula')):
@@ -124,13 +167,16 @@ def collect(get) -> dict:
             raise ColonialError("json_page_incomplete")
         rows.extend(incoming)
     cards = list(first_cards)
+    page_of = {card["handle"]: 1 for card in first_cards}
     for page in range(2, preflight["html_pages"] + 1):
-        count, incoming = parse_cards(get(f"{ORIGIN}/collections/all?section_id={SECTION}&page={page}"))
+        count, incoming = parse_cards(get(html_page_url(page)))
         if count != total or len(incoming) != min(24, total - (page - 1) * 24):
             raise ColonialError("html_total_drift_or_page_incomplete")
         cards.extend(incoming)
+        page_of.update({card["handle"]: page for card in incoming})
         if page % 25 == 0:
             print(json.dumps({"html_pages_completed": page, "products": len(cards)}), flush=True)
+    rows, cards, recheck = recheck_commercial_disagreements(get, rows, cards, page_of, total)
     products = reconcile(rows, cards, membership, total)
     return {"result": "success", "supermarket_id": "colonial", "location_id": "colonial_sps",
             "city": "San Pedro Sula", "currency": "HNL", "catalog_complete": True,
@@ -142,7 +188,7 @@ def collect(get) -> dict:
             "membership_sha256": hashlib.sha256("\n".join(sorted(membership)).encode()).hexdigest(),
             "membership_count": len(membership), "html_cards_count": len(cards),
             "availability_counts": dict(Counter(p["availability"] for p in products)),
-            "preflight": preflight, "products": products}
+            "preflight": preflight, "commercial_recheck": recheck, "products": products}
 
 
 def main() -> None:
