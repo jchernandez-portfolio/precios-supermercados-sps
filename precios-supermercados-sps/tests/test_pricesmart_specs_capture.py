@@ -332,7 +332,9 @@ def test_first_run_saves_raw_sample_and_later_runs_only_failures(catalog, tmp_pa
 
 
 def test_committed_authorization_is_valid_and_tampering_fails(tmp_path: Path) -> None:
+    NOW = datetime(2026, 10, 3, 17, 0, tzinfo=timezone.utc)  # autorización navegador 2026-10-03 16:20Z
     document = capture.load_authorization(AUTHORIZATION, now=NOW, delay=2.0, max_requests=1200)
+    assert document["authorization_id"] == "pricesmart-specs-weekly-20261003-browser"
     assert document["live_read_only_authorized"] is True
     assert document["allowed_url_prefix"] == "https://www.pricesmart.com/es-hn/producto/"
     with pytest.raises(capture.CaptureError, match="request_budget_above_authorization"):

@@ -5,7 +5,8 @@ name: Precios SPS - Especificaciones PriceSmart semanal
 # por el responsable del proyecto en
 # precios-supermercados-sps/.automation/pricesmart-specs-capture-authorization.json.
 # Lee el catálogo de la última corrida diaria exitosa (artifact de handoff
-# PriceSmart), descarga sólo ítems nuevos o verificados hace >= 28 días y
+# PriceSmart), abre con un navegador headless sólo ítems nuevos o verificados hace
+# >= 28 días (el HTML del servidor no trae las especificaciones) y
 # persiste en Turso únicamente filas nuevas/cambiadas de pricesmart_product_specs.
 
 on:
@@ -49,6 +50,13 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
+
+      - name: Instalar navegador headless (Chromium vía Playwright)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check playwright==1.62.0
+          python -m playwright install --with-deps chromium
 
       - name: Validar autorización registrada del responsable
         shell: bash
@@ -135,6 +143,7 @@ jobs:
           fi
           python scripts/obtener_especificaciones_pricesmart.py \
             --live-read-only \
+            --transport browser \
             --authorization .automation/pricesmart-specs-capture-authorization.json \
             --daily-artifact-dir run-artifacts/daily-handoffs \
             --daily-run-id "$DAILY_RUN_ID" \
@@ -144,7 +153,7 @@ jobs:
             --checkpoint run-artifacts/pricesmart-specs/checkpoint.jsonl \
             --delay-seconds 2.0 \
             --max-requests 1200 \
-            --max-items 900 \
+            --max-items 600 \
             --deadline-seconds 6000 \
             --github-run-id "$GITHUB_RUN_ID" \
             "${extra[@]}"
