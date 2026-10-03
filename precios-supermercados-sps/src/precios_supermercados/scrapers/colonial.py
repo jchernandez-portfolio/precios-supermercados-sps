@@ -265,6 +265,58 @@ def sitemap_urls(raw: bytes, *, index: bool = False) -> set[str]:
     return urls
 
 
+# Re-verificación acotada (2026-10-03): el JSON se lee al inicio y las tarjetas
+# HTML a lo largo de ~8 minutos; un cambio de precio en ese intervalo hacía caer
+# todo Colonial. Se releen sólo los productos que no cuadran y, si sus fuentes
+# frescas coinciden, se usa el precio actual. Más de este número de productos en
+# desacuerdo no es un cambio puntual de precio: se sigue rechazando el catálogo.
+MAX_COMMERCIAL_RECHECKS = 25
+
+
+def _card_matches(card: dict, options: list[dict]) -> bool:
+    return any(all(option[key] == card[key] for key in ("current_price", "reported_regular_price"))
+               for option in options)
+
+
+def commercial_disagreements(rows: list[dict], cards: list[dict]) -> list[str]:
+    """Handles cuya tarjeta anuncia un precio que no tiene ninguna variante JSON."""
+    by_handle: dict[str, list[dict]] = {}
+    for row in rows:
+        by_handle.setdefault(row["handle"], []).append(row)
+    return sorted({card["handle"] for card in cards
+                   if card["handle"] in by_handle and not _card_matches(card, by_handle[card["handle"]])})
+
+
+def parse_product_detail(raw: bytes, handle: str) -> list[dict]:
+    """Variantes de ``/products/<handle>.json`` con el mismo contrato que products.json."""
+    try:
+        product = json.loads(raw)["product"]
+    except (ValueError, KeyError, TypeError) as exc:
+        raise ColonialError("product_detail_shape_invalid") from exc
+    if not isinstance(product, dict) or product.get("handle") != handle:
+        raise ColonialError("product_detail_identity_invalid")
+    return parse_products(json.dumps({"products": [product]}).encode("utf-8"))
+
+
+def apply_commercial_recheck(rows: list[dict], cards: list[dict], handle: str,
+                             fresh_rows: list[dict], fresh_card: dict) -> tuple[list[dict], list[dict]]:
+    """Sustituye las variantes y la tarjeta de un producto por su lectura fresca.
+
+    La identidad (producto y variantes) debe ser exactamente la misma; si cambió,
+    no es un cambio de precio y se rechaza el catálogo.
+    """
+    old = [row for row in rows if row["handle"] == handle]
+    old_card = [card for card in cards if card["handle"] == handle]
+    if (not old or len(old_card) != 1
+            or {(r["product_id"], r["item_id"]) for r in fresh_rows} != {(r["product_id"], r["item_id"]) for r in old}
+            or fresh_card["handle"] != handle or fresh_card["item_id"] != old_card[0]["item_id"]):
+        raise ColonialError("commercial_recheck_identity_changed")
+    fresh_by_variant = {row["item_id"]: row for row in fresh_rows}
+    new_rows = [fresh_by_variant[row["item_id"]] if row["handle"] == handle else row for row in rows]
+    new_cards = [fresh_card if card["handle"] == handle else card for card in cards]
+    return new_rows, new_cards
+
+
 def reconcile(rows: list[dict], cards: list[dict], membership: set[str], expected: int) -> list[dict]:
     by_variant = {row["item_id"]: row for row in rows}
     by_handle = {}
@@ -286,8 +338,7 @@ def reconcile(rows: list[dict], cards: list[dict], membership: set[str], expecte
         # La tarjeta puede anunciar el precio de otra variante (mínimo del
         # producto) aunque su botón apunte a la primera. No copiar ese precio
         # sobre la variante del botón ni propagar su stock a variantes no expuestas.
-        if not any(all(option[key] == card[key] for key in ("current_price", "reported_regular_price"))
-                   for option in by_handle[card["handle"]]):
+        if not _card_matches(card, by_handle[card["handle"]]):
             raise ColonialError("commercial_sources_disagree")
         row["availability"] = card["availability"]
     return [{key: value for key, value in row.items() if key != "handle"} for row in rows]
