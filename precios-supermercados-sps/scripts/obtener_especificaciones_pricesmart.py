@@ -9,7 +9,12 @@ vez desde ``/es-hn/producto/<slug>/<pid>``.
 Política de tráfico (autorización del responsable del proyecto registrada en
 ``.automation/pricesmart-specs-capture-authorization.json``):
 
-- una sola conexión, ≥ 1.5 s entre inicios de request (2 s por defecto);
+- la ficha se abre con un navegador headless (Chromium vía Playwright): el HTML
+  del servidor no trae las especificaciones, la página las carga después
+  (decisión del responsable 2026-10-03). Se bloquean imágenes, fuentes, medios
+  y todo host distinto de www.pricesmart.com; se borran cookies antes de cada
+  ficha. ``--transport http`` conserva la descarga HTTP simple;
+- una sola página a la vez, ≥ 1.5 s entre inicios de ficha (2 s por defecto);
 - User-Agent identificable, sin cookies ni credenciales;
 - presupuesto finito de requests y de reintentos (sólo 5xx/timeouts);
 - aborta ante 429, 403 repetido o desafío anti-bot (no se evaden);
@@ -17,7 +22,9 @@ Política de tráfico (autorización del responsable del proyecto registrada en
 - reanudable con ``--checkpoint`` (JSONL por ítem).
 
 Fail-closed por página (``specs=None`` si no se puede parsear); la corrida falla
-sólo si la tasa de fallos supera ``--max-failure-rate``. La primera corrida real
+sólo si la tasa de fallos supera ``--max-failure-rate``. Si tras las primeras
+``EARLY_CHECK_ITEMS`` fichas evaluables la tasa supera ``EARLY_ABORT_FAILURE_RATE``
+la corrida se detiene (no gasta el presupuesto completo contra un formato roto). La primera corrida real
 (sin estado previo) guarda HTML crudo de una muestra para endurecer el parser.
 """
 from __future__ import annotations
@@ -52,6 +59,7 @@ from precios_supermercados.pricesmart_specs_persistence import (  # noqa: E402
 from precios_supermercados.scrapers.pricesmart_specs import (  # noqa: E402
     PARSER_VERSION,
     PRODUCT_BASE_URL,
+    PRODUCT_HOST,
     STATUS_PARSED,
     PriceSmartSpecsError,
     build_product_url,
@@ -80,6 +88,12 @@ DEFAULT_DEADLINE_SECONDS = 100 * 60
 MAX_BODY_BYTES = 4 * 1024 * 1024
 FIRST_RUN_RAW_SAMPLE = 10
 RAW_FAILURE_CAP = 25
+EARLY_CHECK_ITEMS = 30
+EARLY_ABORT_FAILURE_RATE = 0.80
+BROWSER_NAV_TIMEOUT_MS = 45_000
+BROWSER_SPECS_WAIT_MS = 15_000
+BROWSER_SPECS_SELECTOR = "td.specification-data"
+BROWSER_BLOCKED_RESOURCES = frozenset({"image", "media", "font"})
 RETRYABLE_STATUSES = frozenset({500, 502, 503, 504})
 NOT_FOUND_STATUSES = frozenset({404, 410})
 ANTI_BOT_MARKERS = (
@@ -339,6 +353,69 @@ def urllib_transport(url: str) -> Response:
     return Response(status, final_url, body, None)
 
 
+class BrowserTransport:
+    """Abre la ficha pública en Chromium headless y devuelve el DOM ya cargado.
+
+    Una sola página reutilizada (concurrencia 1). Sólo se permiten requests a
+    ``www.pricesmart.com`` y nunca imágenes, fuentes ni medios. Las cookies se
+    borran antes de cada ficha. Si la ficha no tiene bloque de especificaciones
+    se devuelve el DOM igual y el parser decide (``no_specifications``).
+    """
+
+    def __init__(self, *, headless: bool = True):
+        from playwright.sync_api import sync_playwright  # import diferido: sólo en vivo
+
+        self._playwright = sync_playwright().start()
+        self._browser = self._playwright.chromium.launch(headless=headless)
+        self._context = self._browser.new_context(
+            user_agent=UA, locale="es-HN", java_script_enabled=True,
+            extra_http_headers={"Accept-Language": "es-HN,es;q=0.9"},
+        )
+        self._context.route("**/*", self._route)
+        self._page = self._context.new_page()
+
+    @staticmethod
+    def _route(route: Any) -> None:
+        request = route.request
+        host = request.url.split("/", 3)[2] if "://" in request.url else ""
+        if host != PRODUCT_HOST or request.resource_type in BROWSER_BLOCKED_RESOURCES:
+            route.abort()
+        else:
+            route.continue_()
+
+    def __call__(self, url: str) -> Response:
+        from playwright.sync_api import Error as PlaywrightError
+        from playwright.sync_api import TimeoutError as PlaywrightTimeout
+
+        try:
+            self._context.clear_cookies()
+            response = self._page.goto(url, wait_until="domcontentloaded", timeout=BROWSER_NAV_TIMEOUT_MS)
+        except PlaywrightTimeout:
+            return Response(None, None, b"", "browser_navigation_timeout")
+        except PlaywrightError as exc:
+            return Response(None, None, b"", f"browser_error:{str(exc)[:200]}")
+        status = response.status if response is not None else None
+        if status != 200:
+            return Response(status, self._page.url, b"", f"http_{status}")
+        try:
+            self._page.wait_for_selector(BROWSER_SPECS_SELECTOR, timeout=BROWSER_SPECS_WAIT_MS)
+        except PlaywrightTimeout:
+            pass  # sin bloque de especificaciones: el parser lo marcará
+        except PlaywrightError as exc:
+            return Response(status, self._page.url, b"", f"browser_error:{str(exc)[:200]}")
+        body = self._page.content().encode("utf-8")
+        if len(body) > 4 * MAX_BODY_BYTES:
+            return Response(status, self._page.url, b"", "body_too_large")
+        return Response(status, self._page.url, body, None)
+
+    def close(self) -> None:
+        for closer in (self._context.close, self._browser.close, self._playwright.stop):
+            try:
+                closer()
+            except Exception:  # noqa: BLE001
+                pass
+
+
 @dataclass
 class Fetcher:
     transport: Transport
@@ -523,6 +600,17 @@ def coverage(results: list[dict[str, Any]], *, max_failure_rate: float) -> dict[
     }
 
 
+def early_abort_reason(results: list[dict[str, Any]]) -> str | None:
+    """Detiene el tráfico si las primeras fichas evaluables fallan casi todas."""
+    evaluable = [item for item in results if item["status"] != NOT_FOUND]
+    if len(evaluable) != EARLY_CHECK_ITEMS:
+        return None
+    failures = sum(1 for item in evaluable if item["status"] in FAILURE_STATUSES)
+    if failures / len(evaluable) > EARLY_ABORT_FAILURE_RATE:
+        return f"early_failure_rate:{failures}/{len(evaluable)}"
+    return None
+
+
 @dataclass
 class RunConfig:
     delay: float = DEFAULT_DELAY
@@ -600,6 +688,7 @@ def run_capture(
         result["raw_saved"] = save
         results.append(result)
         _append_checkpoint(checkpoint, catalog_evidence["catalog_sha256"], result)
+        aborted = aborted or early_abort_reason(results)
 
     stats = coverage(results, max_failure_rate=config.max_failure_rate)
     passed = aborted is None and stats["failure_rate"] <= config.max_failure_rate
@@ -671,6 +760,7 @@ def main() -> int:
     parser.add_argument("--raw-sample-size", type=int)
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--github-run-id")
+    parser.add_argument("--transport", choices=("browser", "http"), default="browser")
     args = parser.parse_args()
 
     if not args.live_read_only:
@@ -714,12 +804,18 @@ def main() -> int:
         github_run_id=args.github_run_id,
         authorization_id=authorization["authorization_id"],
     )
-    artifact = run_capture(
-        items, evidence, fresh, config,
-        transport=urllib_transport,
-        raw_directory=args.raw_directory,
-        checkpoint=args.checkpoint,
-    )
+    browser = BrowserTransport() if args.transport == "browser" else None
+    try:
+        artifact = run_capture(
+            items, evidence, fresh, config,
+            transport=browser if browser is not None else urllib_transport,
+            raw_directory=args.raw_directory,
+            checkpoint=args.checkpoint,
+        )
+    finally:
+        if browser is not None:
+            browser.close()
+    artifact["run"]["transport"] = args.transport
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(artifact, ensure_ascii=False, sort_keys=True, indent=1) + "\n", encoding="utf-8")
     summary = {key: artifact[key] for key in ("result", "generated_at_utc")} | {

@@ -1,9 +1,9 @@
 {
   "schema": "precios-sps-pricesmart-specs-authorization/v1",
-  "authorization_id": "pricesmart-specs-weekly-20261001",
+  "authorization_id": "pricesmart-specs-weekly-20261003-browser",
   "operation": "weekly_pricesmart_product_specs",
   "approved_by": "project_owner",
-  "approved_at_utc": "2026-10-02T05:00:00Z",
+  "approved_at_utc": "2026-10-03T16:20:00Z",
   "cadence": "weekly",
   "live_read_only_authorized": true,
   "persistence_target": "turso:pricesmart_product_specs",
@@ -12,5 +12,5 @@
   "min_delay_seconds": 1.5,
   "concurrency": 1,
   "requested_ref": "main",
-  "note": "Aprobación explícita del responsable del proyecto (2026-10-01, hora de Honduras) para capturar semanalmente las especificaciones públicas de las fichas de producto PriceSmart HN listadas por la última captura diaria aceptada. Read-only, una conexión, sin cookies ni login, sin evadir 403/429/anti-bot. Recurrente mientras live_read_only_authorized sea true; revocar cambiándolo a false."
+  "note": "Aprobación explícita del responsable del proyecto (2026-10-01, hora de Honduras) para capturar semanalmente las especificaciones públicas de las fichas de producto PriceSmart HN listadas por la última captura diaria aceptada. 2026-10-03: el responsable aprobó abrir la ficha pública con un navegador headless (el HTML del servidor no trae las especificaciones; la página las carga después). Read-only, una página a la vez, sin login; se borran cookies antes de cada ficha; sólo se permiten requests a www.pricesmart.com y nunca imágenes, fuentes ni medios; sin evadir 403/429/anti-bot. max_requests_per_run cuenta fichas abiertas. Recurrente mientras live_read_only_authorized sea true; revocar cambiándolo a false."
 }

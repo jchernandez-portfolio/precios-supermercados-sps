@@ -616,7 +616,11 @@ def test_pricesmart_specs_weekly_is_authorized_bounded_and_least_privilege() -> 
     assert "--live-read-only" in raw
     assert "--delay-seconds 2.0" in raw
     assert "--max-requests 1200" in raw
-    assert "--max-items 900" in raw
+    assert "--max-items 600" in raw
+    # Navegador headless (2026-10-03): versión fijada, transporte explícito.
+    assert "python -m pip install --disable-pip-version-check playwright==1.62.0" in raw
+    assert "python -m playwright install --with-deps chromium" in raw
+    assert "--transport browser" in raw
     # Entrada: sólo el handoff PriceSmart de la última corrida diaria exitosa.
     assert "--workflow precios-supermercados-sps-la-colonia-mvp-update.yml" in raw
     assert "--status success" in raw

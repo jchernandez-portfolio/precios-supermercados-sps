@@ -40,7 +40,7 @@ from typing import Any, Iterator
 
 from ..identifiers import canonicalize_gtin
 
-PARSER_VERSION = "pricesmart-specs-parser/v1"
+PARSER_VERSION = "pricesmart-specs-parser/v2"
 PRODUCT_BASE_URL = "https://www.pricesmart.com/es-hn/producto/"
 PRODUCT_HOST = "www.pricesmart.com"
 _SLUG_RE = re.compile(r"[A-Za-z0-9-]{1,200}")
@@ -726,7 +726,7 @@ def _breadcrumb_dom(root: Node, title: str | None) -> list[str]:
         if "breadcrumb" in label or "ruta de navegacion" in label or "breadcrumb" in classes:
             items = [
                 text for _, text in node.leaves()
-                if text not in {"›", ">", "/", "|", "»", "·"} and fold(text) not in {"inicio", "home"}
+                if text not in {"›", ">", "/", "|", "»", "·"} and fold(text) not in {"inicio", "home", "pricesmart"}
             ]
             if title and items and fold(items[-1]) == fold(title):
                 items = items[:-1]

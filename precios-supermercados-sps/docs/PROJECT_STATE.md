@@ -23,6 +23,11 @@ Regla nueva (decisión del dueño):
 
 Impacto medido sobre el corte publicado del 2026-10-01 (`portfolio-data` 84722dc0): SPS 640 de 4.063 filas `comparable` pasan a `individual` (ya excluidas del `analysis`), 225 siguen comparables sin su oferta agotada; TGU 252 de 8.876 pasan a `individual`, 230 ofertas de dos sucursales de una misma cadena (Walmart 154, Paiz 76) pierden un ranking intra-cadena y `analysis` TGU baja de 8.739 a 8.624 productos comparables.
 
+## Incidente 2026-10-03 — Colonial y primera corrida de especificaciones PriceSmart
+
+- **Colonial `commercial_sources_disagree` (2026-10-02 relanzada y 2026-10-03 programada).** El JSON `products.json` se lee al inicio y las ~140 páginas de tarjetas HTML durante ~8 minutos; un cambio de precio en ese intervalo rechazaba todo Colonial y, como la persistencia exige las seis cadenas, ese día no se publicaba nada. Arreglo (rama `rpi/colonial-recheck`, aprobado por el responsable): se releen sólo los productos en desacuerdo (`/products/<handle>.json` y su página HTML con `recheck=1`) y, si las fuentes frescas coinciden, se usa el precio actual. Sigue fallando cerrado si no coinciden, si cambió la identidad, si la tarjeta se movió de página o si hay más de 25 en desacuerdo (`MAX_COMMERCIAL_RECHECKS`).
+- **Especificaciones PriceSmart: 0 de 900 fichas parseadas** (run `37132418500`, 889 `no_specifications`, 10 `not_found`). El HTML del servidor (Nuxt SSR) no trae los valores: la página los carga después en el navegador. Nada se persistió (fail-closed). Arreglo aprobado por el responsable (2026-10-03): abrir la ficha pública con Chromium headless (Playwright), una página a la vez, cookies borradas por ficha, sólo requests a `www.pricesmart.com`, sin imágenes/fuentes/medios. El parser existente lee la tabla `td.specification`/`td.specification-data` del DOM renderizado (fixture real reducido `RENDERED-breadco-415586.html`); se quita la raíz "PriceSmart" del breadcrumb (`pricesmart-specs-parser/v2`). Corte temprano: si las primeras 30 fichas evaluables fallan > 80 %, se detiene (antes gastó 913 requests). 600 ítems por corrida.
+
 ## Incidente vigente — sin cortes aceptados desde el 2026-09-22
 
 El diseño fail-closed funcionó: ninguna corrida fallida reemplazó el último estado válido, por eso el sitio sigue mostrando el corte del 21 de septiembre con su fecha. Las causas observadas en los logs de GitHub Actions son dos y se suman:
@@ -374,8 +379,9 @@ Rama `rpi/pricesmart-specs` (no fusionada, sin corrida real). Detalle:
   cambiadas; aceptada como tabla opcional por las guardas de esquema.
 - Homologación: completa marca/presentación faltantes de perfiles PriceSmart
   (`source_only`); no crea comparables.
-- Pendiente: primera corrida real para endurecer el parser con el HTML crudo
-  guardado (el fixture actual es sintético).
+- 2026-10-03: la primera corrida real mostró que el HTML del servidor no trae
+  las especificaciones; la captura pasa a navegador headless (ver
+  [Incidente 2026-10-03](#incidente-2026-10-03--colonial-y-primera-corrida-de-especificaciones-pricesmart)).
 
 ## Producto maestro v1 (2026-10-01)
 
