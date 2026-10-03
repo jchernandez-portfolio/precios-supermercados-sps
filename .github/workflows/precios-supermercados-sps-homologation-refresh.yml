@@ -48,6 +48,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      # El producto maestro lee su política desde YAML (identity-policy-v1.yaml);
+      # sin PyYAML el refresco del 2026-10-03 falló con ModuleNotFoundError.
+      - name: Instalar dependencias del refresco (PyYAML fijado)
+        run: python -m pip install --disable-pip-version-check PyYAML==6.0.3
+
       - name: Validar solicitud cerrada de persistencia derivada
         working-directory: precios-supermercados-sps
         run: |
