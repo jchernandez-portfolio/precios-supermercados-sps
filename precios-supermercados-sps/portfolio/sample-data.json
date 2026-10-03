@@ -1,7 +1,7 @@
 {
   "comparison_policy": "fail_closed_strong_identity_and_commercial_consistency",
   "currency": "HNL",
-  "published_at_utc": "2026-10-02T21:57:54Z",
+  "published_at_utc": "2026-10-03T17:40:24Z",
   "row_count": 10,
   "rows": [
     {
@@ -104,15 +104,15 @@
       "savings_vs_highest_pct": "22.59"
     },
     {
-      "best_price": "435.00",
-      "best_supermarket_id": "walmart",
+      "best_price": "390.36",
+      "best_supermarket_id": "la_colonia",
       "canonical_gtin": "00099176231837",
       "canonical_product_id": "prod_gtin_00099176231837",
-      "highest_price": "487.95",
+      "highest_price": "435.00",
       "offers": [
         {
-          "current_price": "487.95",
-          "is_best_price": false,
+          "current_price": "390.36",
+          "is_best_price": true,
           "location_id": "la_colonia_sps",
           "source_brand": "Suavitel",
           "source_category": "Limpieza",
@@ -123,7 +123,7 @@
         },
         {
           "current_price": "435.00",
-          "is_best_price": true,
+          "is_best_price": false,
           "location_id": "walmart_sps",
           "source_brand": "SUAVITEL",
           "source_category": "Limpieza",
@@ -133,8 +133,41 @@
           "supermarket_id": "walmart"
         }
       ],
-      "savings_vs_highest": "52.95",
-      "savings_vs_highest_pct": "10.85"
+      "savings_vs_highest": "44.64",
+      "savings_vs_highest_pct": "10.26"
+    },
+    {
+      "best_price": "242.05",
+      "best_supermarket_id": "la_colonia",
+      "canonical_gtin": "07804320706009",
+      "canonical_product_id": "prod_gtin_07804320706009",
+      "highest_price": "285.00",
+      "offers": [
+        {
+          "current_price": "242.05",
+          "is_best_price": true,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Frontera",
+          "source_category": "Bebidas",
+          "source_name": "Vino Tinto Frontera Merlot 750 Ml",
+          "source_presentation": "750 Ml",
+          "source_record_id": "la_colonia:6992",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "285.00",
+          "is_best_price": false,
+          "location_id": "walmart_sps",
+          "source_brand": "FRONTERA",
+          "source_category": "Bebidas",
+          "source_name": "Vino Tinto Frontera Merlot- 750 Ml",
+          "source_presentation": null,
+          "source_record_id": "walmart:20170",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "42.95",
+      "savings_vs_highest_pct": "15.07"
     },
     {
       "best_price": "162.00",
@@ -168,6 +201,39 @@
       ],
       "savings_vs_highest": "38.95",
       "savings_vs_highest_pct": "19.38"
+    },
+    {
+      "best_price": "157.56",
+      "best_supermarket_id": "la_colonia",
+      "canonical_gtin": "00099176231813",
+      "canonical_product_id": "prod_gtin_00099176231813",
+      "highest_price": "193.50",
+      "offers": [
+        {
+          "current_price": "157.56",
+          "is_best_price": true,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Suavitel",
+          "source_category": "Limpieza",
+          "source_name": "Suavizante de Telas Suavitel Complete Fresca Primavera 1.9 L",
+          "source_presentation": "1.9 L",
+          "source_record_id": "la_colonia:3868",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "193.50",
+          "is_best_price": false,
+          "location_id": "walmart_sps",
+          "source_brand": "SUAVITEL",
+          "source_category": "Limpieza",
+          "source_name": "Suavizante de Telas Suavitel Complete Fresca Primavera -1.9 L",
+          "source_presentation": null,
+          "source_record_id": "walmart:23045",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "35.94",
+      "savings_vs_highest_pct": "18.57"
     },
     {
       "best_price": "270.10",
@@ -267,72 +333,6 @@
       ],
       "savings_vs_highest": "26.15",
       "savings_vs_highest_pct": "33.04"
-    },
-    {
-      "best_price": "100.50",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "07500435183697",
-      "canonical_product_id": "prod_gtin_07500435183697",
-      "highest_price": "125.90",
-      "offers": [
-        {
-          "current_price": "125.90",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Old Spice",
-          "source_category": "Cuidado personal",
-          "source_name": "Desodorante Barra Old Spice Mar Profundo 85 Gr",
-          "source_presentation": "85 Gr",
-          "source_record_id": "la_colonia:2122",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "100.50",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "OLD SPICE",
-          "source_category": "Cuidado personal",
-          "source_name": "Barra Desodorante Old Spice Mar Profundo - 85 g",
-          "source_presentation": null,
-          "source_record_id": "walmart:21717",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "25.40",
-      "savings_vs_highest_pct": "20.17"
-    },
-    {
-      "best_price": "420.95",
-      "best_supermarket_id": "la_colonia",
-      "canonical_gtin": "04022025811030",
-      "canonical_product_id": "prod_gtin_04022025811030",
-      "highest_price": "443.80",
-      "offers": [
-        {
-          "current_price": "420.95",
-          "is_best_price": true,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Blue Nun",
-          "source_category": "Bebidas",
-          "source_name": "Vino Tinto Blue Nun Merlot 750 Ml",
-          "source_presentation": "750 Ml",
-          "source_record_id": "la_colonia:6857",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "443.80",
-          "is_best_price": false,
-          "location_id": "walmart_sps",
-          "source_brand": "BLUE NUN",
-          "source_category": "Bebidas",
-          "source_name": "Vino Blue Nun Tinto Merlot - 750 ml",
-          "source_presentation": null,
-          "source_record_id": "walmart:28213",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "22.85",
-      "savings_vs_highest_pct": "5.15"
     }
   ],
   "schema": "precios-sps-safe-portfolio-sample/v1",
@@ -347,8 +347,8 @@
     }
   ],
   "selection_rule": "highest_absolute_savings_within_safe_common_comparable_universe",
-  "source_as_of": "2026-10-02T21:56:22.710509Z",
-  "source_head_sha": "58dfee9644f2f51cbf64b5ff65079b175a1329dd",
+  "source_as_of": "2026-10-03T17:39:19.554193Z",
+  "source_head_sha": "e38bc3ddc1a193b9c92a11087d81ff78c7b89a20",
   "source_schema": "rpi-consumer-mart/v2",
-  "source_workflow_run_id": 37069708402
+  "source_workflow_run_id": 37141288061
 }
