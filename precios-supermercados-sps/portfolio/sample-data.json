@@ -1,42 +1,9 @@
 {
   "comparison_policy": "fail_closed_strong_identity_and_commercial_consistency",
   "currency": "HNL",
-  "published_at_utc": "2026-10-06T20:03:38Z",
+  "published_at_utc": "2026-10-07T20:17:27Z",
   "row_count": 10,
   "rows": [
-    {
-      "best_price": "350.00",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "07501199413242",
-      "canonical_product_id": "prod_gtin_07501199413242",
-      "highest_price": "433.15",
-      "offers": [
-        {
-          "current_price": "433.15",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Mas Color",
-          "source_category": "Limpieza",
-          "source_name": "Detergente Líquido Mas Color Cuidado&Renovación 4.65 Lt",
-          "source_presentation": "4.65 Lt",
-          "source_record_id": "la_colonia:7329",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "350.00",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "MAS COLOR",
-          "source_category": "Limpieza",
-          "source_name": "Detergente líquido Más Color cuidado y renovación - 4.65 L",
-          "source_presentation": null,
-          "source_record_id": "walmart:23281",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "83.15",
-      "savings_vs_highest_pct": "19.20"
-    },
     {
       "best_price": "179.00",
       "best_supermarket_id": "walmart",
@@ -104,39 +71,6 @@
       "savings_vs_highest_pct": "15.07"
     },
     {
-      "best_price": "162.00",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "07421001641338",
-      "canonical_product_id": "prod_gtin_07421001641338",
-      "highest_price": "200.95",
-      "offers": [
-        {
-          "current_price": "200.95",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Limpiox",
-          "source_category": "Limpieza",
-          "source_name": "Desinfectante Limpiox Lavanda 5 Lt",
-          "source_presentation": "5 Lt",
-          "source_record_id": "la_colonia:4848",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "162.00",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "LIMPIOX",
-          "source_category": "Limpieza",
-          "source_name": "Desinfectante Limpiox Lavanda - 5000 ml",
-          "source_presentation": null,
-          "source_record_id": "walmart:31901",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "38.95",
-      "savings_vs_highest_pct": "19.38"
-    },
-    {
       "best_price": "270.10",
       "best_supermarket_id": "walmart",
       "canonical_gtin": "07500435252089",
@@ -168,6 +102,39 @@
       ],
       "savings_vs_highest": "33.85",
       "savings_vs_highest_pct": "11.14"
+    },
+    {
+      "best_price": "170.00",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "07421001641338",
+      "canonical_product_id": "prod_gtin_07421001641338",
+      "highest_price": "200.95",
+      "offers": [
+        {
+          "current_price": "200.95",
+          "is_best_price": false,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Limpiox",
+          "source_category": "Limpieza",
+          "source_name": "Desinfectante Limpiox Lavanda 5 Lt",
+          "source_presentation": "5 Lt",
+          "source_record_id": "la_colonia:4848",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "170.00",
+          "is_best_price": true,
+          "location_id": "walmart_sps",
+          "source_brand": "LIMPIOX",
+          "source_category": "Limpieza",
+          "source_name": "Desinfectante Limpiox Lavanda - 5000 ml",
+          "source_presentation": null,
+          "source_record_id": "walmart:31901",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "30.95",
+      "savings_vs_highest_pct": "15.40"
     },
     {
       "best_price": "285.80",
@@ -269,39 +236,6 @@
       "savings_vs_highest_pct": "33.04"
     },
     {
-      "best_price": "100.50",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "07500435183697",
-      "canonical_product_id": "prod_gtin_07500435183697",
-      "highest_price": "125.90",
-      "offers": [
-        {
-          "current_price": "125.90",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Old Spice",
-          "source_category": "Cuidado personal",
-          "source_name": "Desodorante Barra Old Spice Mar Profundo 85 Gr",
-          "source_presentation": "85 Gr",
-          "source_record_id": "la_colonia:2122",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "100.50",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "OLD SPICE",
-          "source_category": "Cuidado personal",
-          "source_name": "Barra Desodorante Old Spice Mar Profundo - 85 g",
-          "source_presentation": null,
-          "source_record_id": "walmart:21717",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "25.40",
-      "savings_vs_highest_pct": "20.17"
-    },
-    {
       "best_price": "420.95",
       "best_supermarket_id": "la_colonia",
       "canonical_gtin": "04022025811030",
@@ -333,6 +267,72 @@
       ],
       "savings_vs_highest": "22.85",
       "savings_vs_highest_pct": "5.15"
+    },
+    {
+      "best_price": "275.35",
+      "best_supermarket_id": "la_colonia",
+      "canonical_gtin": "07804320985633",
+      "canonical_product_id": "prod_gtin_07804320985633",
+      "highest_price": "297.00",
+      "offers": [
+        {
+          "current_price": "275.35",
+          "is_best_price": true,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Casillero Del Diablo",
+          "source_category": "Bebidas",
+          "source_name": "Vino Casillero Del Diablo Merlot 750 Ml",
+          "source_presentation": "750 Ml",
+          "source_record_id": "la_colonia:6692",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "297.00",
+          "is_best_price": false,
+          "location_id": "walmart_sps",
+          "source_brand": "CASILLERO DEL DIABLO",
+          "source_category": "Bebidas",
+          "source_name": "Vino Casillero Del Diablo Merlot- 750 ml",
+          "source_presentation": null,
+          "source_record_id": "walmart:20171",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "21.65",
+      "savings_vs_highest_pct": "7.29"
+    },
+    {
+      "best_price": "150.00",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "07501008041703",
+      "canonical_product_id": "prod_gtin_07501008041703",
+      "highest_price": "169.40",
+      "offers": [
+        {
+          "current_price": "169.40",
+          "is_best_price": false,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Kelloggs",
+          "source_category": "Alimentos",
+          "source_name": "Cereal Kelloggs Komplete Pasas 420 Gr",
+          "source_presentation": "420 Gr",
+          "source_record_id": "la_colonia:2935",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "150.00",
+          "is_best_price": true,
+          "location_id": "walmart_sps",
+          "source_brand": "KELLOGGS",
+          "source_category": "Alimentos",
+          "source_name": "Cereal Komplete con pasas kelloggs - 420 g",
+          "source_presentation": null,
+          "source_record_id": "walmart:22678",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "19.40",
+      "savings_vs_highest_pct": "11.45"
     }
   ],
   "schema": "precios-sps-safe-portfolio-sample/v1",
@@ -347,8 +347,8 @@
     }
   ],
   "selection_rule": "highest_absolute_savings_within_safe_common_comparable_universe",
-  "source_as_of": "2026-10-06T20:00:55.821103Z",
+  "source_as_of": "2026-10-07T20:15:20.551493Z",
   "source_head_sha": "e38bc3ddc1a193b9c92a11087d81ff78c7b89a20",
   "source_schema": "rpi-consumer-mart/v2",
-  "source_workflow_run_id": 37523171214
+  "source_workflow_run_id": 37680569491
 }
