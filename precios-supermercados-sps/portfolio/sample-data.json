@@ -1,42 +1,9 @@
 {
   "comparison_policy": "fail_closed_strong_identity_and_commercial_consistency",
   "currency": "HNL",
-  "published_at_utc": "2026-10-09T04:37:23Z",
+  "published_at_utc": "2026-10-09T15:14:08Z",
   "row_count": 10,
   "rows": [
-    {
-      "best_price": "179.00",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "07891150103115",
-      "canonical_product_id": "prod_gtin_07891150103115",
-      "highest_price": "241.95",
-      "offers": [
-        {
-          "current_price": "241.95",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Dove",
-          "source_category": "Cuidado personal",
-          "source_name": "Acondicionador Dove Nutrición+Tri Oleos 370 Ml",
-          "source_presentation": "370 Ml",
-          "source_record_id": "la_colonia:59606",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "179.00",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "DOVE",
-          "source_category": "Cuidado personal",
-          "source_name": "Acondicionador Dove nutrición tri-óleos - 370 ml",
-          "source_presentation": null,
-          "source_record_id": "walmart:30385",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "62.95",
-      "savings_vs_highest_pct": "26.02"
-    },
     {
       "best_price": "242.05",
       "best_supermarket_id": "la_colonia",
@@ -333,6 +300,39 @@
       ],
       "savings_vs_highest": "19.40",
       "savings_vs_highest_pct": "11.45"
+    },
+    {
+      "best_price": "226.70",
+      "best_supermarket_id": "la_colonia",
+      "canonical_gtin": "07500435155847",
+      "canonical_product_id": "prod_gtin_07500435155847",
+      "highest_price": "246.00",
+      "offers": [
+        {
+          "current_price": "226.70",
+          "is_best_price": true,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Pantene",
+          "source_category": "Cuidado personal",
+          "source_name": "Shampoo Pantene Pro-V Bambu Nutre Y Crece 400 Ml",
+          "source_presentation": "400 Ml",
+          "source_record_id": "la_colonia:2543",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "246.00",
+          "is_best_price": false,
+          "location_id": "walmart_sps",
+          "source_brand": "PANTENE",
+          "source_category": "Cuidado personal",
+          "source_name": "Shampoo Pantene Pro-V Bambú Nutre Crece - 400 ml",
+          "source_presentation": null,
+          "source_record_id": "walmart:19217",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "19.30",
+      "savings_vs_highest_pct": "7.85"
     }
   ],
   "schema": "precios-sps-safe-portfolio-sample/v1",
@@ -347,8 +347,8 @@
     }
   ],
   "selection_rule": "highest_absolute_savings_within_safe_common_comparable_universe",
-  "source_as_of": "2026-10-09T04:34:22.875221Z",
-  "source_head_sha": "73b3f5c3261207ca556cabad42e6677d22a8c2ae",
+  "source_as_of": "2026-10-09T15:12:31.823804Z",
+  "source_head_sha": "50ebafc71207ff9c68a32a10dfc5aa4873945570",
   "source_schema": "rpi-consumer-mart/v2",
-  "source_workflow_run_id": 37884482010
+  "source_workflow_run_id": 37949953697
 }
