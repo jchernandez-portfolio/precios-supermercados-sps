@@ -366,6 +366,9 @@ Aprobado por el responsable. Detalle: [`homologation/master-category-tree-v1.md`
 - Solución: árbol propio de 4 niveles alineado a GS1 GPC (14 departamentos, 180 subcategorías) + tabla de equivalencias versionada con las 1,311 categorías que publican los seis súper. Sólo con la tabla, el 98 % de los productos queda al menos en un departamento y el 72 % llega a subcategoría; el resto lo refina el tipo por nombre. Lo mezclado (p. ej. "Hogar" de PriceSmart) se decide por nombre; las tarjetas de regalo salen del catálogo.
 - Publicación: `category` = departamento; `product_type` = tipo de producto o, si no hay, subcategoría/categoría del árbol. Un grupo comparable comparte el nodo más específico de sus ofertas. La identidad y la comparabilidad no cambian.
 - Gobierno: categorías nuevas del súper aparecen como `taxonomy_unmapped_source_categories` en el log de publicación y se agregan al CSV.
+- Primera publicación (PR #15, corrida 37884482010): ofertas con departamento SPS Walmart 76→100 %, Comisariato 45→97 %, La Colonia 83→100 %, PriceSmart 52→88 %, Colonial 99→100 %; TGU Paiz 93→100 %, Walmart 74→100 %. Segundo nivel navegable: Walmart/Paiz 100 %, La Colonia 98 %, Comisariato 93 %, Colonial 76 %, PriceSmart 33 %. De 7 a 14 departamentos y de 72 a 257 filtros de segundo nivel.
+- El aviso de esa corrida listó 18 categorías nuevas (verduras, pruebas de embarazo, macetas, etc.); se agregaron al CSV (1,329 filas) con una prueba que exige que Paiz y Walmart mapeen igual la misma ruta.
+- Pendiente: PriceSmart sigue con ~12 % sin departamento y 33 % sin segundo nivel porque sus categorías "Hogar" y "Productos de temporada" son mixtas y el nombre no siempre trae un tipo conocido.
 
 ## Especificaciones PriceSmart (semanal, 2026-10-01)
 

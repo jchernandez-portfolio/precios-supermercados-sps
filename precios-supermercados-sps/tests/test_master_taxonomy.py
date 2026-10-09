@@ -49,7 +49,7 @@ def test_every_identity_product_type_has_exactly_one_node():
 def test_crosswalk_is_complete_valid_and_sorted():
     with mt.CROSSWALK_PATH.open(encoding="utf-8", newline="") as handle:
         rows = list(csv.DictReader(handle))
-    assert len(rows) == len(TAX.crosswalk) == 1311
+    assert len(rows) == len(TAX.crosswalk) == 1329
     assert {r["supermarket_id"] for r in rows} == {"walmart", "paiz", "colonial", "la_colonia", "comisariato_los_andes", "pricesmart"}
     assert rows == sorted(rows, key=lambda r: (r["supermarket_id"], r["source_category"]))
     by_level = {r["level"] for r in rows}
@@ -69,6 +69,29 @@ def test_crosswalk_is_complete_valid_and_sorted():
 def test_crosswalk_examples(supermarket, category, expected):
     entry = TAX.crosswalk[(supermarket, mt.fold_key(category))]
     assert (entry.node.department, entry.node.category, entry.node.subcategory) == expected
+
+
+def test_paiz_and_walmart_share_the_same_mapping_for_the_same_path():
+    """Paiz y Walmart Honduras publican el mismo árbol: una misma ruta va al mismo nodo."""
+    by_path = {}
+    for (supermarket, key), entry in TAX.crosswalk.items():
+        if supermarket in ("paiz", "walmart"):
+            by_path.setdefault(key, {})[supermarket] = (entry.level, entry.node)
+    mismatched = sorted(k for k, v in by_path.items() if len(v) == 2 and v["paiz"] != v["walmart"])
+    assert not mismatched, mismatched[:10]
+
+
+def test_categories_reported_by_first_publication_are_mapped():
+    """Aviso taxonomy_unmapped_source_categories de la corrida 37884482010 (2026-10-08)."""
+    reported = [
+        ("paiz", "/Artículos para el hogar/Ferretería/Candados y Cerraduras/"),
+        ("paiz", "/Frutas y Verduras/Verduras/Acelga/"),
+        ("pricesmart", "Hogar | Mascotas"),
+        ("walmart", "/Farmacia/Salud Sexual y Reproductiva/Pruebas de Embarazo/"),
+        ("walmart", "/Higiene y Belleza/Cuidado Corporal/Desodrantes/"),
+        ("walmart", "/Juguetes/Juguetes exterior/Piscinas familiares/"),
+    ]
+    assert mt.unmapped_source_categories(reported) == []
 
 
 def test_crosswalk_special_levels():

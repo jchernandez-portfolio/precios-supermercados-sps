@@ -5,7 +5,7 @@ Aprobado por el responsable del proyecto el 2026-10-08. Una sola clasificación 
 ## Archivos versionados
 
 - `config/homologation/master-category-tree-v1.json`: el árbol (14 departamentos, 180 subcategorías) con el segmento GPC de referencia por departamento y los tipos de producto (nivel 4) que ya produce el motor de homologación.
-- `config/homologation/source-category-crosswalk-v1.csv`: tabla de equivalencias. Una fila por categoría publicada por cada supermercado (1,311 filas, capturadas de la corrida diaria 37796223788 del 2026-10-08). Columnas: `supermarket_id, source_category, department, category, subcategory, level`. `level` = `subcategory` (1229), `category` (57), `department` (16), `by_name` (8: la categoría del súper mezcla cosas distintas) o `excluded` (1: fuera del catálogo, p. ej. tarjetas de regalo). La comparación de `source_category` ignora mayúsculas, acentos y espacios.
+- `config/homologation/source-category-crosswalk-v1.csv`: tabla de equivalencias. Una fila por categoría publicada por cada supermercado (1,311 filas capturadas de la corrida diaria 37796223788 del 2026-10-08, más 18 que avisó la primera publicación: 1,329). Columnas: `supermarket_id, source_category, department, category, subcategory, level`. `level` = `subcategory` (1246), `category` (57), `department` (17), `by_name` (8: la categoría del súper mezcla cosas distintas) o `excluded` (1: fuera del catálogo, p. ej. tarjetas de regalo). La comparación de `source_category` ignora mayúsculas, acentos y espacios.
 - `src/precios_supermercados/master_taxonomy.py`: carga y valida ambos archivos y asigna el nodo público.
 
 ## Orden de asignación

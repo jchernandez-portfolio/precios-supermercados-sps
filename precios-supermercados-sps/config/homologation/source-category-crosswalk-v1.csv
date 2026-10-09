@@ -296,6 +296,7 @@ paiz,/Artículos para el hogar/Colchones y Blancos/Toallas/,Hogar y cocina,Blanc
 paiz,/Artículos para el hogar/Decoración y Muebles/Accesorios para baño/,Hogar y cocina,Decoración,Decoración del hogar,subcategory
 paiz,/Artículos para el hogar/Decoración y Muebles/Espejos/,Hogar y cocina,Decoración,Decoración del hogar,subcategory
 paiz,/Artículos para el hogar/Decoración y Muebles/Velas y aromaterapia/,Hogar y cocina,Decoración,Decoración del hogar,subcategory
+paiz,/Artículos para el hogar/Ferretería/Candados y Cerraduras/,Ferretería y autos,Ferretería,Herramientas,subcategory
 paiz,/Artículos para el hogar/Ferretería/Extensiones y contactos/,Ferretería y autos,Ferretería,Electricidad e iluminación,subcategory
 paiz,"/Artículos para el hogar/Ferretería/Focos, Lámparas e Iluminación/",Ferretería y autos,Ferretería,Electricidad e iluminación,subcategory
 paiz,/Artículos para el hogar/Ferretería/Herramientas Manuales/,Ferretería y autos,Ferretería,Herramientas,subcategory
@@ -303,6 +304,7 @@ paiz,/Artículos para el hogar/Ferretería/Pegamentos/,Ferretería y autos,Ferre
 paiz,/Artículos para el hogar/Ferretería/Pilas y baterías/,Ferretería y autos,Ferretería,Pilas y baterías,subcategory
 paiz,/Artículos para el hogar/Jardinería y Exteriores/Encendedores/,Hogar y cocina,Jardín y exteriores,"Muebles, parrillas y exteriores",subcategory
 paiz,/Artículos para el hogar/Jardinería y Exteriores/Hieleras/,Hogar y cocina,Jardín y exteriores,"Muebles, parrillas y exteriores",subcategory
+paiz,/Artículos para el hogar/Jardinería y Exteriores/Macetas/,Hogar y cocina,Jardín y exteriores,Jardinería,subcategory
 paiz,/Artículos para el hogar/Jardinería y Exteriores/Muebles de Jardín/,Hogar y cocina,Jardín y exteriores,"Muebles, parrillas y exteriores",subcategory
 paiz,/Artículos para el hogar/Jardinería y Exteriores/Parrillas/,Hogar y cocina,Jardín y exteriores,"Muebles, parrillas y exteriores",subcategory
 paiz,/Artículos para el hogar/Jardinería y Exteriores/Utensilios para asar/,Hogar y cocina,Jardín y exteriores,"Muebles, parrillas y exteriores",subcategory
@@ -322,7 +324,9 @@ paiz,/Artículos para el hogar/Papelería/Lapiceros y correctores/,"Papelería, 
 paiz,/Artículos para el hogar/Papelería/Lápices y lapiceros/,"Papelería, oficina y fiestas",Papelería y oficina,Útiles escolares y de oficina,subcategory
 paiz,/Artículos para el hogar/Papelería/Marcadores y resaltadores/,"Papelería, oficina y fiestas",Papelería y oficina,Útiles escolares y de oficina,subcategory
 paiz,/Artículos para el hogar/Papelería/Material para manualidades/,"Papelería, oficina y fiestas",Papelería y oficina,Útiles escolares y de oficina,subcategory
+paiz,/Artículos para el hogar/Papelería/Mochilas/,"Papelería, oficina y fiestas",Papelería y oficina,Mochilas,subcategory
 paiz,/Artículos para el hogar/Papelería/Papel y forros/,"Papelería, oficina y fiestas",Papelería y oficina,Útiles escolares y de oficina,subcategory
+paiz,/Artículos para el hogar/Papelería/Pizarras y marcadores de pizarra/,"Papelería, oficina y fiestas",Papelería y oficina,Útiles escolares y de oficina,subcategory
 paiz,/Artículos para el hogar/Papelería/Reglas y juegos de geometría/,"Papelería, oficina y fiestas",Papelería y oficina,Útiles escolares y de oficina,subcategory
 paiz,"/Artículos para el hogar/Papelería/Tijeras, cintas y pegamentos/","Papelería, oficina y fiestas",Papelería y oficina,Útiles escolares y de oficina,subcategory
 paiz,/Artículos para el hogar/Pintura/Accesorios para pintar/,Ferretería y autos,Ferretería,Pintura,subcategory
@@ -344,6 +348,7 @@ paiz,/Bebes y Niños/Comida para bebé y lactancia/Colados 3ra etapa/,Bebé,Alim
 paiz,/Bebes y Niños/Comida para bebé y lactancia/Colados 4ta etapa y junior/,Bebé,Alimentación del bebé,"Colados, cereales y galletas infantiles",subcategory
 paiz,/Bebes y Niños/Comida para bebé y lactancia/Fórmulas lácteas/,Bebé,Alimentación del bebé,Fórmulas y leches infantiles,subcategory
 paiz,"/Bebes y Niños/Comida para bebé y lactancia/Platos, vasos y cubiertos para niños/",Bebé,Alimentación del bebé,Biberones y lactancia,subcategory
+paiz,"/Bebes y Niños/Cunas, coches y accesorios/Cunas y encierros/",Bebé,"Accesorios, coches y cunas","Accesorios, coches y cunas",subcategory
 paiz,/Bebes y Niños/Juguetes para bebe y estimulación temprana/Juguetes para bebes/,Juguetes,Juguetes,Bebé y preescolar,subcategory
 paiz,/Bebes y Niños/Pañales/Pañales - Etapa 2/,Bebé,Pañales y toallitas,Pañales,subcategory
 paiz,/Bebes y Niños/Pañales/Pañales - Etapa 3/,Bebé,Pañales y toallitas,Pañales,subcategory
@@ -392,6 +397,7 @@ paiz,/Deportes/Artículos deportivos/Balones y Entrenamiento/,Deportes y aire li
 paiz,/Deportes/Campismo/,Deportes y aire libre,Aire libre,Campismo,subcategory
 paiz,"/Deportes/Montables, bicicletas y scooters/Bicicletas adultos/",Deportes y aire libre,Deportes,"Bicicletas, scooters y patines",subcategory
 paiz,/Deportes/Natación/,Deportes y aire libre,Deportes,Natación y piscinas,subcategory
+paiz,/Electrónica/Línea Blanca/Refrigeradores y Congeladores/,Electrónica y electrodomésticos,Electrodomésticos,Línea blanca,subcategory
 paiz,/Farmacia/Antibióticos y Antiinfecciosos/Antiparasitario/,Salud y farmacia,Medicamentos de venta libre,Antiparasitarios,subcategory
 paiz,/Farmacia/Control de diabetes/Suplemento para diabeticos/,Salud y farmacia,Vitaminas y suplementos,Control de diabetes,subcategory
 paiz,/Farmacia/Cuidado Ocular y Ótico/Gotas y lubricantes/,Salud y farmacia,Medicamentos de venta libre,Ojos y oídos,subcategory
@@ -419,6 +425,7 @@ paiz,/Farmacia/Primeros Auxilios/Curitas y Vendajes/,Salud y farmacia,Primeros a
 paiz,/Farmacia/Salud Sexual y Reproductiva/Incontinencia urinaria/,Salud y farmacia,Salud sexual e incontinencia,Salud sexual,subcategory
 paiz,/Farmacia/Salud Sexual y Reproductiva/Lubricantes Íntimos/,Salud y farmacia,Salud sexual e incontinencia,Salud sexual,subcategory
 paiz,/Farmacia/Salud Sexual y Reproductiva/Preservativos/,Salud y farmacia,Salud sexual e incontinencia,Salud sexual,subcategory
+paiz,/Farmacia/Salud Sexual y Reproductiva/Pruebas de Embarazo/,Salud y farmacia,Salud sexual e incontinencia,Salud sexual,subcategory
 paiz,/Farmacia/Sistema Digestivo/Antidiarreicos y Suero Oral/,Salud y farmacia,Medicamentos de venta libre,Sistema digestivo,subcategory
 paiz,/Farmacia/Sistema Digestivo/Antiácidos/,Salud y farmacia,Medicamentos de venta libre,Sistema digestivo,subcategory
 paiz,/Farmacia/Sistema Digestivo/Laxantes y Fibra/,Salud y farmacia,Medicamentos de venta libre,Sistema digestivo,subcategory
@@ -452,9 +459,11 @@ paiz,/Frutas y Verduras/Frutas/Naranjas/,Alimentos,Frutas y verduras,Frutas,subc
 paiz,/Frutas y Verduras/Frutas/Papayas y tropicales/,Alimentos,Frutas y verduras,Frutas,subcategory
 paiz,/Frutas y Verduras/Frutas/Peras/,Alimentos,Frutas y verduras,Frutas,subcategory
 paiz,/Frutas y Verduras/Frutas/Uvas/,Alimentos,Frutas y verduras,Frutas,subcategory
+paiz,/Frutas y Verduras/Verduras/Acelga/,Alimentos,Frutas y verduras,Verduras,subcategory
 paiz,/Frutas y Verduras/Verduras/Aguacates/,Alimentos,Frutas y verduras,Verduras,subcategory
 paiz,/Frutas y Verduras/Verduras/Ajos/,Alimentos,Frutas y verduras,Verduras,subcategory
 paiz,/Frutas y Verduras/Verduras/Apio/,Alimentos,Frutas y verduras,Verduras,subcategory
+paiz,/Frutas y Verduras/Verduras/Arvejas/,Alimentos,Frutas y verduras,Verduras,subcategory
 paiz,/Frutas y Verduras/Verduras/Berenjena/,Alimentos,Frutas y verduras,Verduras,subcategory
 paiz,/Frutas y Verduras/Verduras/Brocoli/Coliflor/,Alimentos,Frutas y verduras,Verduras,subcategory
 paiz,"/Frutas y Verduras/Verduras/Cebollas, papas y verduras de raíz/",Alimentos,Frutas y verduras,Verduras,subcategory
@@ -465,6 +474,7 @@ paiz,/Frutas y Verduras/Verduras/Chiles/,Alimentos,Frutas y verduras,Verduras,su
 paiz,/Frutas y Verduras/Verduras/Culantro-Cilantro/,Alimentos,Frutas y verduras,Verduras,subcategory
 paiz,/Frutas y Verduras/Verduras/Elotes/,Alimentos,Frutas y verduras,Verduras,subcategory
 paiz,/Frutas y Verduras/Verduras/Ensaladas y empacados/,Alimentos,Frutas y verduras,Verduras,subcategory
+paiz,/Frutas y Verduras/Verduras/Espinacas/,Alimentos,Frutas y verduras,Verduras,subcategory
 paiz,/Frutas y Verduras/Verduras/Hierba Medicinal-Organico/,Alimentos,Frutas y verduras,Verduras,subcategory
 paiz,/Frutas y Verduras/Verduras/Hongos Frescos/,Alimentos,Frutas y verduras,Verduras,subcategory
 paiz,"/Frutas y Verduras/Verduras/Hongos, brócolis y espárragos/",Alimentos,Frutas y verduras,Verduras,subcategory
@@ -484,6 +494,7 @@ paiz,/Frutas y Verduras/Verduras/Vainicas enteras/,Alimentos,Frutas y verduras,V
 paiz,/Frutas y Verduras/Verduras/Vegetales Procesados Mix/,Alimentos,Frutas y verduras,Verduras,subcategory
 paiz,/Frutas y Verduras/Verduras/Zanahoria/,Alimentos,Frutas y verduras,Verduras,subcategory
 paiz,/Frutas y Verduras/Verduras/Zapallo Entero/Partido/,Alimentos,Frutas y verduras,Verduras,subcategory
+paiz,/Higiene y Belleza/Accesorios y básicos/Básicos de algodón/,Cuidado personal y belleza,Básicos de higiene,"Algodón, hisopos y pañuelos",subcategory
 paiz,/Higiene y Belleza/Accesorios y básicos/Kits de viaje/,Cuidado personal y belleza,Básicos de higiene,Kits de viaje,subcategory
 paiz,/Higiene y Belleza/Accesorios y básicos/Pañuelos desechables/,Cuidado personal y belleza,Básicos de higiene,"Algodón, hisopos y pañuelos",subcategory
 paiz,/Higiene y Belleza/Afeitado/Cuidado del Hombre/,Cuidado personal y belleza,Afeitado y depilación,Afeitado y depilación,subcategory
@@ -677,6 +688,7 @@ pricesmart,Exteriores,Hogar y cocina,Jardín y exteriores,"Muebles, parrillas y 
 pricesmart,Ferretería y mejoras al hogar,Ferretería y autos,Ferretería,,category
 pricesmart,Ferretería y mejoras al hogar | Exteriores,Hogar y cocina,Jardín y exteriores,"Muebles, parrillas y exteriores",subcategory
 pricesmart,Hogar,,,,by_name
+pricesmart,Hogar | Mascotas,Mascotas,,,department
 pricesmart,Juguetes y juegos,Juguetes,Juguetes,,category
 pricesmart,"Licor, cerveza y vino",Bebidas y tabaco,Bebidas alcohólicas,,category
 pricesmart,Línea blanca,Electrónica y electrodomésticos,Electrodomésticos,Línea blanca,subcategory
@@ -1043,6 +1055,7 @@ walmart,/Farmacia/Primeros Auxilios/Curitas y Vendajes/,Salud y farmacia,Primero
 walmart,/Farmacia/Salud Sexual y Reproductiva/Incontinencia urinaria/,Salud y farmacia,Salud sexual e incontinencia,Salud sexual,subcategory
 walmart,/Farmacia/Salud Sexual y Reproductiva/Lubricantes Íntimos/,Salud y farmacia,Salud sexual e incontinencia,Salud sexual,subcategory
 walmart,/Farmacia/Salud Sexual y Reproductiva/Preservativos/,Salud y farmacia,Salud sexual e incontinencia,Salud sexual,subcategory
+walmart,/Farmacia/Salud Sexual y Reproductiva/Pruebas de Embarazo/,Salud y farmacia,Salud sexual e incontinencia,Salud sexual,subcategory
 walmart,/Farmacia/Sistema Digestivo/Antidiarreicos y Suero Oral/,Salud y farmacia,Medicamentos de venta libre,Sistema digestivo,subcategory
 walmart,/Farmacia/Sistema Digestivo/Antiácidos/,Salud y farmacia,Medicamentos de venta libre,Sistema digestivo,subcategory
 walmart,/Farmacia/Sistema Digestivo/Laxantes y Fibra/,Salud y farmacia,Medicamentos de venta libre,Sistema digestivo,subcategory
@@ -1080,6 +1093,7 @@ walmart,/Frutas y Verduras/Verduras/Acelga/,Alimentos,Frutas y verduras,Verduras
 walmart,/Frutas y Verduras/Verduras/Aguacates/,Alimentos,Frutas y verduras,Verduras,subcategory
 walmart,/Frutas y Verduras/Verduras/Ajos/,Alimentos,Frutas y verduras,Verduras,subcategory
 walmart,/Frutas y Verduras/Verduras/Apio/,Alimentos,Frutas y verduras,Verduras,subcategory
+walmart,/Frutas y Verduras/Verduras/Arvejas/,Alimentos,Frutas y verduras,Verduras,subcategory
 walmart,/Frutas y Verduras/Verduras/Berenjena/,Alimentos,Frutas y verduras,Verduras,subcategory
 walmart,/Frutas y Verduras/Verduras/Brocoli/Coliflor/,Alimentos,Frutas y verduras,Verduras,subcategory
 walmart,"/Frutas y Verduras/Verduras/Cebollas, papas y verduras de raíz/",Alimentos,Frutas y verduras,Verduras,subcategory
@@ -1091,6 +1105,7 @@ walmart,/Frutas y Verduras/Verduras/Culantro-Cilantro/,Alimentos,Frutas y verdur
 walmart,/Frutas y Verduras/Verduras/Elotes/,Alimentos,Frutas y verduras,Verduras,subcategory
 walmart,/Frutas y Verduras/Verduras/Ensaladas y empacados/,Alimentos,Frutas y verduras,Verduras,subcategory
 walmart,/Frutas y Verduras/Verduras/Esparragos/,Alimentos,Frutas y verduras,Verduras,subcategory
+walmart,/Frutas y Verduras/Verduras/Espinacas/,Alimentos,Frutas y verduras,Verduras,subcategory
 walmart,/Frutas y Verduras/Verduras/Hierba Medicinal-Organico/,Alimentos,Frutas y verduras,Verduras,subcategory
 walmart,/Frutas y Verduras/Verduras/Hongos Frescos/,Alimentos,Frutas y verduras,Verduras,subcategory
 walmart,"/Frutas y Verduras/Verduras/Hongos, brócolis y espárragos/",Alimentos,Frutas y verduras,Verduras,subcategory
@@ -1130,6 +1145,7 @@ walmart,/Higiene y Belleza/Cuidado Corporal/Bloqueadores y bronceadores/,Cuidado
 walmart,/Higiene y Belleza/Cuidado Corporal/Cremas corporales/,Cuidado personal y belleza,Higiene corporal,Cremas y lociones corporales,subcategory
 walmart,/Higiene y Belleza/Cuidado Corporal/Depilación y Afeitado/,Cuidado personal y belleza,Afeitado y depilación,Afeitado y depilación,subcategory
 walmart,/Higiene y Belleza/Cuidado Corporal/Desodorantes/,Cuidado personal y belleza,Higiene corporal,Desodorantes,subcategory
+walmart,/Higiene y Belleza/Cuidado Corporal/Desodrantes/,Cuidado personal y belleza,Higiene corporal,Desodorantes,subcategory
 walmart,/Higiene y Belleza/Cuidado Corporal/Fragancias/,Cuidado personal y belleza,Higiene corporal,Fragancias,subcategory
 walmart,/Higiene y Belleza/Cuidado Corporal/Jabón y gel corporal/,Cuidado personal y belleza,Higiene corporal,Jabones y geles de baño,subcategory
 walmart,/Higiene y Belleza/Cuidado Corporal/Tratamientos corporales/,Cuidado personal y belleza,Higiene corporal,Cremas y lociones corporales,subcategory
@@ -1137,6 +1153,7 @@ walmart,/Higiene y Belleza/Cuidado Facial/Accesorios faciales/,Cuidado personal 
 walmart,/Higiene y Belleza/Cuidado Facial/Crema facial/,Cuidado personal y belleza,Cuidado facial,Cremas y tratamientos faciales,subcategory
 walmart,/Higiene y Belleza/Cuidado Facial/Desmaquillante y agua micelar/,Cuidado personal y belleza,Cuidado facial,Limpieza y desmaquillantes,subcategory
 walmart,/Higiene y Belleza/Cuidado Facial/Tratamientos faciales/,Cuidado personal y belleza,Cuidado facial,Cremas y tratamientos faciales,subcategory
+walmart,/Higiene y Belleza/Cuidado del cabello/Accesorios para el cabello/,Cuidado personal y belleza,Cuidado del cabello,Cepillos y accesorios para cabello,subcategory
 walmart,/Higiene y Belleza/Cuidado del cabello/Acondicionador/,Cuidado personal y belleza,Cuidado del cabello,Acondicionadores y tratamientos,subcategory
 walmart,"/Higiene y Belleza/Cuidado del cabello/Cepillos, Planchas y Accesorios/",Cuidado personal y belleza,Cuidado del cabello,Cepillos y accesorios para cabello,subcategory
 walmart,/Higiene y Belleza/Cuidado del cabello/Crema para peinar/,Cuidado personal y belleza,Cuidado del cabello,"Cremas, geles y fijadores",subcategory
@@ -1183,6 +1200,7 @@ walmart,/Juguetes/Juguetes exterior/Accesorios para piscina/,Juguetes,Juguetes,J
 walmart,/Juguetes/Juguetes exterior/Bolas y pelotas/,Juguetes,Juguetes,Juegos de exterior,subcategory
 walmart,/Juguetes/Juguetes exterior/Casitas/,Juguetes,Juguetes,Juegos de exterior,subcategory
 walmart,/Juguetes/Juguetes exterior/Juguetes para exterior/,Juguetes,Juguetes,Juegos de exterior,subcategory
+walmart,/Juguetes/Juguetes exterior/Piscinas familiares/,Juguetes,Juguetes,Juegos de exterior,subcategory
 walmart,/Juguetes/Juguetes exterior/Piscinas para niños/,Juguetes,Juguetes,Juegos de exterior,subcategory
 walmart,/Juguetes/Juguetes exterior/Trampolines/,Juguetes,Juguetes,Juegos de exterior,subcategory
 walmart,/Juguetes/Peluches y Muñecas/Accesorios y sets de juego/,Juguetes,Juguetes,Muñecas y peluches,subcategory
