@@ -23,6 +23,7 @@ from exportar_modelo_analitico import (  # noqa: E402
 )
 from exportar_rpi_marts import _parse_utc, fetch_freshness  # noqa: E402
 from generar_mvp_sqlite_la_colonia import HISTORY_INDEX_NAME  # noqa: E402
+from precios_supermercados import master_taxonomy  # noqa: E402
 from precios_supermercados.price_analytics import ComparisonScope  # noqa: E402
 from precios_supermercados.price_history_analytics import (  # noqa: E402
     HistoricalPriceObservation,
@@ -61,7 +62,8 @@ _VISIBLE_OFFERS_SELECT = """SELECT p.product_id,p.supermarket_id,p.name,
                    h.is_promotion,h.availability,h.valid_from_utc,
                    hp.canonical_product_id,hp.category,hp.product_type,
                    hp.presentation_dimension,hp.presentation_total_base,
-                   hp.presentation_status,hp.comparison_status,hp.normalization_version
+                   hp.presentation_status,hp.comparison_status,hp.normalization_version,
+                   p.category
             FROM price_history AS h
             JOIN products AS p
               ON p.product_id=h.product_id AND p.supermarket_id=h.supermarket_id
@@ -101,6 +103,9 @@ class VisibleOffer:
     # Llave de grupo de un vínculo curado del producto maestro (manual/registro).
     # ``None`` = identidad GTIN vigente; no aparece en la salida pública.
     master_group_key: str | None = None
+    # Categoría tal como la publica el supermercado (``products.category``); sólo
+    # alimenta la tabla de equivalencias del árbol maestro de categorías.
+    source_category: str | None = None
 def _text(value: object) -> str | None:
     if not isinstance(value, str):
         return None
@@ -211,7 +216,7 @@ def fetch_visible_offers(
             location_id, current_price, regular_price, is_promotion, availability,
             observed_at, canonical_product_id, category, product_type,
             presentation_dimension, presentation_total_base, presentation_status,
-            comparison_status, normalization_version,
+            comparison_status, normalization_version, source_category,
         ) = row
         key = (product_id, str(location_id))
         if key in seen:
@@ -251,6 +256,7 @@ def fetch_visible_offers(
                 presentation_total_base=_text(presentation_total_base),
                 presentation_status=str(presentation_status),
                 comparison_status=str(comparison_status),
+                source_category=_text(source_category),
             )
         )
     return apply_master_link_overrides(tuple(result), fetch_master_link_overrides(backend))
@@ -572,6 +578,24 @@ def _representative(group: Sequence[VisibleOffer]) -> VisibleOffer:
             offer.supermarket_id,
         ),
     )[0]
+def _public_taxonomy(group: Sequence[VisibleOffer]) -> tuple[str | None, str | None] | None:
+    """Categoría pública del árbol maestro v1 para un grupo; ``None`` = excluir.
+
+    El grupo comparable comparte un solo nodo (paso "mismo producto en otro
+    súper"); cada oferta aporta su equivalencia de categoría y su tipo por nombre.
+    """
+    assignments = [
+        master_taxonomy.assign_offer(
+            offer.supermarket_id, offer.source_category, offer.product_type, offer.category
+        )
+        for offer in group
+    ]
+    chosen = master_taxonomy.assign_group(assignments)
+    if chosen.source == "excluded":
+        return None
+    return master_taxonomy.public_fields(chosen.node)
+
+
 def build_rows(
     offers: Iterable[VisibleOffer],
     freshness_by_scope: dict[tuple[str, str], str],
@@ -609,13 +633,16 @@ def build_rows(
                     ),
                 }
             )
-        category = representative.category
+        public = _public_taxonomy(group)
+        if public is None:
+            continue  # fuera del catálogo (p. ej. tarjetas de regalo)
+        category, public_type = public
         row = {
             "row_id": _row_id("product" if canonical_id else "source", identity_value),
             "canonical_product_id": canonical_id,
             "comparability": mode,
             "category": category,
-            "product_type": representative.product_type,
+            "product_type": public_type,
             "product_name": representative.product_name,
             "brand": representative.brand,
             "presentation": _derived_presentation(representative),
@@ -871,6 +898,15 @@ def export_consumer_catalog(
     if tuple(scope.locations) != EXPECTED_SCOPE:
         raise ExportError("consumer_catalog_sps_scope_invalid")
     offers = fetch_visible_offers(backend, scope)
+    unmapped = master_taxonomy.unmapped_source_categories(
+        (offer.supermarket_id, offer.source_category) for offer in offers
+    )
+    if unmapped:
+        # Gobierno del árbol: una categoría nueva del súper debe mapearse en
+        # config/homologation/source-category-crosswalk-v1.csv. No bloquea la
+        # publicación; sus productos usan el tipo por nombre o quedan sin categoría.
+        print(json.dumps({"taxonomy_unmapped_source_categories": [list(item) for item in unmapped[:50]],
+                          "count": len(unmapped)}, ensure_ascii=False), file=sys.stderr)
     retailer_offer_counts = {
         supermarket_id: sum(offer.supermarket_id == supermarket_id for offer in offers)
         for supermarket_id, _ in scope.locations
