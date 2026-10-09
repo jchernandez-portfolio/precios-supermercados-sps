@@ -221,7 +221,7 @@ def test_production_operator_is_main_only_closed_and_least_privilege() -> None:
     assert "listWorkflowRuns" in raw
     assert "const maxRunAttempt = 3" in raw
     assert "retryableConclusions = new Set(['failure', 'timed_out'])" in raw
-    # Corte diario por workflow_dispatch (Worker 01:43) o schedule (histórico);
+    # Corte diario por workflow_dispatch (Worker 05:17) o schedule (histórico);
     # sin corte hoy, el operador lo arranca (respaldo del disparo externo).
     assert "dailyEvents = new Set(['workflow_dispatch', 'schedule'])" in raw
     assert "run.conclusion !== 'cancelled'" in raw
@@ -596,7 +596,7 @@ def test_pricesmart_specs_weekly_is_authorized_bounded_and_least_privilege() -> 
     assert workflow["permissions"] == {"actions": "read", "contents": "read"}
     triggers = workflow["on"]
     assert set(triggers) == {"schedule", "workflow_dispatch"}
-    assert triggers["schedule"] == [{"cron": "37 11 * * 6"}]
+    assert triggers["schedule"] == [{"cron": "37 16 * * 6"}]
     assert triggers["workflow_dispatch"]["inputs"]["force"]["type"] == "boolean"
     assert triggers["workflow_dispatch"]["inputs"]["force"]["default"] == "false"
     assert workflow["concurrency"] == {

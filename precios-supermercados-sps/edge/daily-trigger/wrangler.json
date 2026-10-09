@@ -4,7 +4,7 @@
   "compatibility_date": "2026-09-01",
   "workers_dev": false,
   "triggers": {
-    "crons": ["43 7 * * *"]
+    "crons": ["17 11 * * *"]
   },
   "observability": {
     "enabled": true

@@ -48,8 +48,8 @@ test("fails closed without a token", async () => {
   await assert.rejects(dispatchDaily({}, { fetchImpl: async () => new Response(null, { status: 204 }) }), /token_missing/);
 });
 
-test("exposes no public endpoint and runs at 07:43 UTC (01:43 Honduras)", async () => {
+test("exposes no public endpoint and runs at 11:17 UTC (05:17 Honduras)", async () => {
   const response = await worker.fetch(new Request("https://example.test/"));
   assert.equal(response.status, 404);
-  assert.equal(CRON, "43 7 * * *");
+  assert.equal(CRON, "17 11 * * *");
 });

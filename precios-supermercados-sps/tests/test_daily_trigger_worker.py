@@ -1,4 +1,4 @@
-"""Worker de Cloudflare que dispara el corte diario a las 01:43 Honduras.
+"""Worker de Cloudflare que dispara el corte diario a las 05:17 Honduras.
 
 El cron de GitHub llegaba 5–9 h tarde (2026-10-02 a 10-09). Las pruebas del
 Worker son de Node (``node --test``); los runners de GitHub traen Node.
@@ -19,7 +19,7 @@ def test_wrangler_config_runs_once_a_day_at_0743_utc_without_public_route() -> N
     config = json.loads((TRIGGER / "wrangler.json").read_text(encoding="utf-8"))
     assert config["name"] == "precios-sps-daily-trigger"
     assert config["main"] == "worker.mjs"
-    assert config["triggers"] == {"crons": ["43 7 * * *"]}
+    assert config["triggers"] == {"crons": ["17 11 * * *"]}
     assert config["workers_dev"] is False
     assert "routes" not in config and "vars" not in config
 

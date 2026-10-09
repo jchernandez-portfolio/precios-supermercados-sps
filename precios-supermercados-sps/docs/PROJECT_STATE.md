@@ -87,11 +87,11 @@ La información se actualiza **una sola vez al día**:
 
 | Paso | Veces por día |
 | --- | --- |
-| Scraping (6 cadenas, 11 contextos) | 1, a las **01:43** de Honduras, disparado por el Worker de Cloudflare `edge/daily-trigger` (`43 7 * * *` UTC, `workflow_dispatch`); el cron de GitHub se quitó porque llegaba 5–9 h tarde. Respaldo: si a las 08:17 no hay corte del día, el operador lo arranca. Sólo si una cadena falla, el operador re-ejecuta **esa** cadena a las 08:17 y 12:17 (máximo 3 intentos en total). |
+| Scraping (6 cadenas, 11 contextos) | 1, a las **05:17** de Honduras, disparado por el Worker de Cloudflare `edge/daily-trigger` (`17 11 * * *` UTC, `workflow_dispatch`); el cron de GitHub se quitó porque llegaba 5–9 h tarde. Respaldo: si a las 08:17 no hay corte del día, el operador lo arranca. Sólo si una cadena falla, el operador re-ejecuta **esa** cadena a las 08:17 y 12:17 (máximo 3 intentos en total). |
 | Persistencia en Turso | 1 (sólo cuando todas las cadenas tienen handoff aceptado) |
 | Homologación + publicación RPI + `portfolio-data` | 1, encadenadas por `workflow_run`; los intentos fallidos sólo generan ejecuciones `skipped` |
 
-Además, `precios-supermercados-sps-turso-weekly-integrity.yml` lee Turso una vez por semana (domingo 04:23 de Honduras, `23 10 * * 0`) para las verificaciones completas de integridad, y `precios-supermercados-sps-pricesmart-specs-weekly.yml` (rama `rpi/pricesmart-specs`) captura especificaciones de fichas PriceSmart una vez por semana (sábado 05:37 de Honduras, `37 11 * * 6`; ver [Especificaciones PriceSmart](#especificaciones-pricesmart-semanal-2026-10-01)). No existen otros crons de este proyecto que hagan scraping o lean Turso. Los crons `17 11` y `30 12` que aparecían en el monorepo pertenecen al proyecto Mundial 2026.
+Además, `precios-supermercados-sps-turso-weekly-integrity.yml` lee Turso una vez por semana (domingo 04:23 de Honduras, `23 10 * * 0`) para las verificaciones completas de integridad, y `precios-supermercados-sps-pricesmart-specs-weekly.yml` (rama `rpi/pricesmart-specs`) captura especificaciones de fichas PriceSmart una vez por semana (sábado 10:37 de Honduras, `37 16 * * 6`, después del corte para no leer PriceSmart en paralelo; ver [Especificaciones PriceSmart](#especificaciones-pricesmart-semanal-2026-10-01)). No existen otros crons de este proyecto que hagan scraping o lean Turso. Los crons de GitHub `17 11` y `30 12` que aparecían en el monorepo pertenecen al proyecto Mundial 2026 (el `17 11 * * *` del corte diario vive en Cloudflare, no en GitHub).
 
 Evidencia del esquema de recuperación (#455 + #461 + #462): entre el **12 y el 21 de septiembre** hubo **10 cortes programados aceptados seguidos**. Sólo 3 pasaron en el primer intento; 6 necesitaron la primera recuperación y 1 la segunda. El mecanismo funciona, y a la vez muestra que el intento inicial falla con frecuencia por inestabilidad de las fuentes.
 
@@ -379,6 +379,7 @@ Revisión de las 11 corridas del 1 al 9 de octubre (aprobada la corrección por 
 - **Día sin datos:** 5-oct, Paiz falló los 3 intentos y `persist` se saltó para todas las cadenas.
 - **Corrección 1 (este cambio):** Worker de Cloudflare `edge/daily-trigger` dispara a las 07:43 UTC (`workflow_dispatch`); sin cron de GitHub en el corte; el operador arranca el corte si falta y reconoce `workflow_dispatch` y `schedule`.
 - **Corrección 3 (persistencia parcial):** `persist` corre aunque una cadena haya fallado (`acquire` en `failure`); ensambla sólo los handoffs aceptados (`--allow-missing`, `missing_retailers` en la evidencia y `::warning`), y preflight, persistencia y verificaciones se limitan a esas cadenas (`DAILY_RETAILERS`). La fallida queda STALE (frescura por cadena ya la excluye de comparaciones) y el operador la reintenta; el reintento re-persiste las demás como `exact_replay`. La publicación (`homologation-refresh`) corre tras un día parcial sólo si el job `persist` del intento terminó en éxito (job `daily-gate`, `actions: read`).
+- **Horario (aprobado por el responsable):** el corte vuelve a las **05:17** Honduras (`17 11 * * *` en Cloudflare), su hora original del 2026-08-28; la 01:43 sólo compensaba el retraso de GitHub. Especificaciones PriceSmart pasan al sábado 10:37 (`37 16 * * 6`); integridad semanal sin cambio (domingo 04:23).
 - **Pendiente:** reintentos cortos por página ante HTTP 5xx o catálogo cambiante; operador disparado al terminar el corte.
 
 ## Medidas estandarizadas v2.7 (2026-10-09)
@@ -397,7 +398,7 @@ Rama `rpi/pricesmart-specs` (no fusionada, sin corrida real). Detalle:
 [`supermercados/pricesmart-especificaciones.md`](supermercados/pricesmart-especificaciones.md).
 
 - **Cadencia semanal aprobada por el responsable** (registro en
-  `.automation/pricesmart-specs-capture-authorization.json`): sábado 05:37
+  `.automation/pricesmart-specs-capture-authorization.json`): sábado 10:37
   Honduras + manual; read-only, una conexión, 2 s entre requests, ≤ 1200
   requests/≤ 900 ítems por corrida, aborta ante 429/403 repetido/anti-bot.
 - Entrada: handoff PriceSmart de la última corrida diaria exitosa; cada pid una

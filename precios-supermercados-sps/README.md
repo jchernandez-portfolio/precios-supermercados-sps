@@ -128,7 +128,7 @@ No se agregan impuestos/ISV, delivery, service fees o membership fees inferidos.
 
 ## Operación recurrente
 
-La información se actualiza **una vez al día**: la captura arranca a la 01:43 de Honduras (disparo puntual desde un Worker de Cloudflare, `edge/daily-trigger`; si no llega, el operador la arranca a las 08:17). Si alguna cadena falla, sólo esa cadena se reintenta a las 08:17 y a las 12:17, con un máximo de tres intentos. Luego se persiste en Turso y se publica una sola vez.
+La información se actualiza **una vez al día**: la captura arranca a las 05:17 de Honduras (disparo puntual desde un Worker de Cloudflare, `edge/daily-trigger`; si no llega, el operador la arranca a las 08:17). Si alguna cadena falla, sólo esa cadena se reintenta a las 08:17 y a las 12:17, con un máximo de tres intentos. Luego se persiste en Turso y se publica una sola vez.
 
 El workflow diario común cubre:
 

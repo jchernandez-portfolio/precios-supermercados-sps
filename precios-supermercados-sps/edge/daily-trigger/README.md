@@ -6,7 +6,8 @@ llegaba con **5–9 h de retraso** (2026-10-02 a 10-09: arranques entre 06:42 y
 "el catálogo cambió durante la lectura". Este Worker usa un Cron Trigger de
 Cloudflare (puntual al minuto) para arrancar el workflow
 `precios-supermercados-sps-la-colonia-mvp-update.yml` con `workflow_dispatch`
-a las **07:43 UTC = 01:43 Honduras**.
+a las **11:17 UTC = 05:17 Honduras** (hora original del corte; el adelanto a
+la 01:43 sólo compensaba el retraso de GitHub y ya no hace falta).
 
 - Archivo único: `worker.mjs` (sin dependencias). Pruebas: `node --test test/worker.test.mjs`.
 - No expone endpoints (`fetch` → 404). Una sola llamada saliente: el dispatch a la API de GitHub.
@@ -27,12 +28,12 @@ a las **07:43 UTC = 01:43 Honduras**.
    - Nombre `precios-sps-daily-trigger`; pegar el contenido de `worker.mjs` y *Deploy*.
    - Settings → Variables and Secrets → Add → tipo **Secret**, nombre
      `GITHUB_DISPATCH_TOKEN`, valor = el token del paso 1.
-   - Settings → Trigger events → Add → **Cron Triggers** → `43 7 * * *`.
+   - Settings → Trigger events → Add → **Cron Triggers** → `17 11 * * *`.
    - Settings → Domains & Routes: desactivar la URL `workers.dev` (no se necesita).
    - Alternativa por línea de comandos: `npx --yes wrangler@4.125.0 deploy`
      desde esta carpeta y `npx wrangler secret put GITHUB_DISPATCH_TOKEN`.
 3. **Prueba:** en el Worker, pestaña *Settings → Trigger events*, usar
-   "Trigger scheduled event" (o esperar a las 01:43) y verificar en GitHub
+   "Trigger scheduled event" (o esperar a las 05:17) y verificar en GitHub
    Actions un run de "La Colonia - Actualización MVP" con evento
    `workflow_dispatch`. Logs del Worker: `daily_trigger_dispatched` o
    `daily_trigger_failed:<status>` (401 = token inválido/vencido).

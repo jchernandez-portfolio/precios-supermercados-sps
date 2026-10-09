@@ -18,7 +18,7 @@ def _workflow() -> dict[str, object]:
 def test_daily_workflow_uses_one_matrix_child_per_retailer_and_external_trigger() -> None:
     workflow = _workflow()
     # Sin cron de GitHub (5–9 h de retraso): lo dispara edge/daily-trigger a las
-    # 07:43 UTC y el operador productivo es el respaldo.
+    # 11:17 UTC y el operador productivo es el respaldo.
     assert workflow["on"] == {
         "workflow_dispatch": {
             "inputs": {

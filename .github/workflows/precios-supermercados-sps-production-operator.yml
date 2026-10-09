@@ -130,7 +130,7 @@ jobs:
             const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
             // El corte diario lo dispara el Worker de Cloudflare (workflow_dispatch,
-            // 01:43); los cortes previos al 2026-10-09 eran event 'schedule'.
+            // 05:17); los cortes previos al 2026-10-09 eran event 'schedule'.
             const dailyEvents = new Set(['workflow_dispatch', 'schedule']);
             const response = await github.rest.actions.listWorkflowRuns({
               owner: context.repo.owner,

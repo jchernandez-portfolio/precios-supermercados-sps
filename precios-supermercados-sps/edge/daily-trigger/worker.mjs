@@ -3,7 +3,8 @@
 // El cron de GitHub Actions llegaba con 5–9 h de retraso (programado 01:43,
 // arrancaba entre 06:42 y 10:21 hora de Honduras). Este Worker usa un Cron
 // Trigger de Cloudflare (puntual al minuto) para pedir a GitHub que arranque
-// el workflow diario con `workflow_dispatch` a las 07:43 UTC = 01:43 Honduras.
+// el workflow diario con `workflow_dispatch` a las 11:17 UTC = 05:17 Honduras
+// (la hora original del corte; la 01:43 sólo compensaba el retraso de GitHub).
 //
 // - Único secreto: GITHUB_DISPATCH_TOKEN, token fine-grained con permiso
 //   "Actions: Read and write" SÓLO sobre jchernandez-portfolio/precios-supermercados-sps.
@@ -15,7 +16,7 @@
 export const OWNER = "jchernandez-portfolio";
 export const REPO = "precios-supermercados-sps";
 export const WORKFLOW = "precios-supermercados-sps-la-colonia-mvp-update.yml";
-export const CRON = "43 7 * * *";
+export const CRON = "17 11 * * *";
 const API = `https://api.github.com/repos/${OWNER}/${REPO}/actions/workflows/${WORKFLOW}/dispatches`;
 const MAX_ATTEMPTS = 3;
 

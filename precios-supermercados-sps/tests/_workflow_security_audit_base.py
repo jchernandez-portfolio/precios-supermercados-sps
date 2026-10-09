@@ -109,7 +109,7 @@ EXPECTED_TRIGGERS = {
     RECOVERY_WORKFLOW: {"workflow_run"},
     FACET_WORKFLOW: {"workflow_dispatch"},
     LIVE_WORKFLOW: {"workflow_dispatch", "push"},
-    # Desde 2026-10-09 lo dispara el Worker edge/daily-trigger (01:43) y, de
+    # Desde 2026-10-09 lo dispara el Worker edge/daily-trigger (05:17) y, de
     # respaldo, el operador productivo; sin cron propio (llegaba 5–9 h tarde).
     MVP_UPDATE_WORKFLOW: {"workflow_dispatch"},
     LOCATION_BINDING_WORKFLOW: {"workflow_dispatch"},
