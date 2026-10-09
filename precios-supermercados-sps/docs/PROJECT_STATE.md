@@ -87,7 +87,7 @@ La información se actualiza **una sola vez al día**:
 
 | Paso | Veces por día |
 | --- | --- |
-| Scraping (6 cadenas, 11 contextos) | 1, a las **01:43** de Honduras (`43 7 * * *`, puede retrasarse por el scheduler de GitHub). Sólo si una cadena falla, el operador re-ejecuta **esa** cadena a las 08:17 y 12:17 (máximo 3 intentos en total). |
+| Scraping (6 cadenas, 11 contextos) | 1, a las **01:43** de Honduras, disparado por el Worker de Cloudflare `edge/daily-trigger` (`43 7 * * *` UTC, `workflow_dispatch`); el cron de GitHub se quitó porque llegaba 5–9 h tarde. Respaldo: si a las 08:17 no hay corte del día, el operador lo arranca. Sólo si una cadena falla, el operador re-ejecuta **esa** cadena a las 08:17 y 12:17 (máximo 3 intentos en total). |
 | Persistencia en Turso | 1 (sólo cuando todas las cadenas tienen handoff aceptado) |
 | Homologación + publicación RPI + `portfolio-data` | 1, encadenadas por `workflow_run`; los intentos fallidos sólo generan ejecuciones `skipped` |
 
@@ -369,6 +369,17 @@ Aprobado por el responsable. Detalle: [`homologation/master-category-tree-v1.md`
 - Primera publicación (PR #15, corrida 37884482010): ofertas con departamento SPS Walmart 76→100 %, Comisariato 45→97 %, La Colonia 83→100 %, PriceSmart 52→88 %, Colonial 99→100 %; TGU Paiz 93→100 %, Walmart 74→100 %. Segundo nivel navegable: Walmart/Paiz 100 %, La Colonia 98 %, Comisariato 93 %, Colonial 76 %, PriceSmart 33 %. De 7 a 14 departamentos y de 72 a 257 filtros de segundo nivel.
 - El aviso de esa corrida listó 18 categorías nuevas (verduras, pruebas de embarazo, macetas, etc.); se agregaron al CSV (1,329 filas) con una prueba que exige que Paiz y Walmart mapeen igual la misma ruta.
 - Pendiente: PriceSmart sigue con ~12 % sin departamento y 33 % sin segundo nivel porque sus categorías "Hogar" y "Productos de temporada" son mixtas y el nombre no siempre trae un tipo conocido.
+
+## Incidente 2026-10-09 — el corte diario arrancaba 5–9 h tarde
+
+Revisión de las 11 corridas del 1 al 9 de octubre (aprobada la corrección por el responsable):
+
+- **Retraso del cron de GitHub:** programado 01:43, arrancó entre 06:42 y 10:21 (Honduras). El operador de reintentos (08:17) solía correr antes que el propio corte.
+- **Fallas del primer intento** (sólo el 9-oct salió limpio): Paiz 8 (catálogo cambió durante la lectura: `page_count_changed`, `catalog_changed_during_capture`, totales de categoría; HTTP 500/504 de VTEX), La Colonia 6 (`partition_total_changed_mid_run`, `snapshot_sku_count_mismatch`, timeout, HTTP 500 TGU), Colonial 2 (`commercial_sources_disagree`, ya corregido en #12), Walmart 1 (`category2_membership_total_mismatch`), persistencia 2 (`snapshot_out_of_order` tras reruns manuales). PriceSmart y Los Andes: 0.
+- **Día sin datos:** 5-oct, Paiz falló los 3 intentos y `persist` se saltó para todas las cadenas.
+- **Corrección 1 (este cambio):** Worker de Cloudflare `edge/daily-trigger` dispara a las 07:43 UTC (`workflow_dispatch`); sin cron de GitHub en el corte; el operador arranca el corte si falta y reconoce `workflow_dispatch` y `schedule`.
+- **Corrección 3 (persistencia parcial):** `persist` corre aunque una cadena haya fallado (`acquire` en `failure`); ensambla sólo los handoffs aceptados (`--allow-missing`, `missing_retailers` en la evidencia y `::warning`), y preflight, persistencia y verificaciones se limitan a esas cadenas (`DAILY_RETAILERS`). La fallida queda STALE (frescura por cadena ya la excluye de comparaciones) y el operador la reintenta; el reintento re-persiste las demás como `exact_replay`. La publicación (`homologation-refresh`) corre tras un día parcial sólo si el job `persist` del intento terminó en éxito (job `daily-gate`, `actions: read`).
+- **Pendiente:** reintentos cortos por página ante HTTP 5xx o catálogo cambiante; operador disparado al terminar el corte.
 
 ## Medidas estandarizadas v2.7 (2026-10-09)
 

@@ -95,6 +95,10 @@ ALLOWED_JOB_PERMISSIONS = {
     LIVE_WORKFLOW: {
         LIVE_FACET_JOB: {"contents": "read", "id-token": "write"},
     },
+    # Lectura de jobs del corte para publicar persistencias parciales (2026-10-09).
+    HOMOLOGATION_REFRESH_WORKFLOW: {
+        "daily-gate": {"actions": "read"},
+    },
 }
 
 EXPECTED_TRIGGERS = {
@@ -105,7 +109,9 @@ EXPECTED_TRIGGERS = {
     RECOVERY_WORKFLOW: {"workflow_run"},
     FACET_WORKFLOW: {"workflow_dispatch"},
     LIVE_WORKFLOW: {"workflow_dispatch", "push"},
-    MVP_UPDATE_WORKFLOW: {"workflow_dispatch", "schedule"},
+    # Desde 2026-10-09 lo dispara el Worker edge/daily-trigger (01:43) y, de
+    # respaldo, el operador productivo; sin cron propio (llegaba 5–9 h tarde).
+    MVP_UPDATE_WORKFLOW: {"workflow_dispatch"},
     LOCATION_BINDING_WORKFLOW: {"workflow_dispatch"},
     PRESERVE_INITIAL_SNAPSHOT_WORKFLOW: {"workflow_dispatch", "push"},
     HOMOLOGATION_REFRESH_WORKFLOW: {"workflow_dispatch", "workflow_run"},

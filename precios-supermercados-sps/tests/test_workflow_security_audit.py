@@ -221,7 +221,12 @@ def test_production_operator_is_main_only_closed_and_least_privilege() -> None:
     assert "listWorkflowRuns" in raw
     assert "const maxRunAttempt = 3" in raw
     assert "retryableConclusions = new Set(['failure', 'timed_out'])" in raw
-    assert "event: 'schedule'" in raw
+    # Corte diario por workflow_dispatch (Worker 01:43) o schedule (histórico);
+    # sin corte hoy, el operador lo arranca (respaldo del disparo externo).
+    assert "dailyEvents = new Set(['workflow_dispatch', 'schedule'])" in raw
+    assert "run.conclusion !== 'cancelled'" in raw
+    assert "daily_recovery_dispatched_missing_run" in raw
+    assert raw.count("createWorkflowDispatch") == 2
     assert "branch: 'main'" in raw
     assert "daily_recovery_no_scheduled_run_today" in raw
     assert "daily_recovery_run_still_active" in raw

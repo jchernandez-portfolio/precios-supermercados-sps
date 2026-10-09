@@ -15,10 +15,11 @@ def _workflow() -> dict[str, object]:
     return value
 
 
-def test_daily_workflow_uses_one_matrix_child_per_retailer_and_keeps_schedule() -> None:
+def test_daily_workflow_uses_one_matrix_child_per_retailer_and_external_trigger() -> None:
     workflow = _workflow()
+    # Sin cron de GitHub (5–9 h de retraso): lo dispara edge/daily-trigger a las
+    # 07:43 UTC y el operador productivo es el respaldo.
     assert workflow["on"] == {
-        "schedule": [{"cron": "43 7 * * *"}],
         "workflow_dispatch": {
             "inputs": {
                 "live_read_only_authorized": {
@@ -44,6 +45,10 @@ def test_daily_workflow_uses_one_matrix_child_per_retailer_and_keeps_schedule() 
         "pricesmart",
     ]
     assert jobs["persist"]["needs"] == "acquire"
+    assert acquire["if"] == (
+        "${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' && "
+        "inputs.live_read_only_authorized == true }}"
+    )
 
 
 def test_acquisition_job_is_read_only_and_publishes_attempt_scoped_handoff() -> None:
