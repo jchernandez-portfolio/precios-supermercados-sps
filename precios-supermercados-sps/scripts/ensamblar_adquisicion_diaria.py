@@ -6,6 +6,11 @@ fallidos pueden coexistir intentos distintos dentro del mismo workflow run. Este
 módulo selecciona, para cada supermercado, el intento aceptado más alto y
 reconstruye un único ``run-artifacts/`` para las validaciones y persistencia ya
 existentes.
+
+Con ``--allow-missing`` (persistencia parcial, aprobada 2026-10-09) una cadena
+sin handoff aceptado no bloquea a las demás: se lista en ``missing_retailers``
+y sólo se ensamblan las aceptadas (al menos una). La cadena faltante conserva
+su último precio en Turso y el catálogo la marca como no fresca (``STALE``).
 """
 from __future__ import annotations
 
@@ -106,7 +111,12 @@ def _complete(path: Path, required: tuple[str, ...]) -> bool:
     )
 
 
-def select_handoffs(root: Path, *, run_id: str) -> dict[str, tuple[int, Path]]:
+def select_handoffs(
+    root: Path,
+    *,
+    run_id: str,
+    allow_missing: bool = False,
+) -> dict[str, tuple[int, Path]]:
     if not run_id.isdigit() or int(run_id) < 1:
         raise AssemblyError("daily_acquisition_run_id_invalid")
     selected: dict[str, tuple[int, Path]] = {}
@@ -117,13 +127,17 @@ def select_handoffs(root: Path, *, run_id: str) -> dict[str, tuple[int, Path]]:
             if _complete(path, required)
         ]
         if not valid:
+            if allow_missing:
+                continue
             raise AssemblyError(f"accepted_retailer_handoff_missing:{retailer}")
         selected[retailer] = valid[-1]
+    if not selected:
+        raise AssemblyError("accepted_retailer_handoff_missing:all")
     return selected
 
 
-def assemble(root: Path, output: Path, *, run_id: str) -> dict[str, object]:
-    selected = select_handoffs(root, run_id=run_id)
+def assemble(root: Path, output: Path, *, run_id: str, allow_missing: bool = False) -> dict[str, object]:
+    selected = select_handoffs(root, run_id=run_id, allow_missing=allow_missing)
     if output.exists():
         if output.is_symlink() or not output.is_dir():
             raise AssemblyError("daily_acquisition_output_not_safe_directory")
@@ -152,6 +166,8 @@ def assemble(root: Path, output: Path, *, run_id: str) -> dict[str, object]:
                 raise AssemblyError(f"retailer_handoff_collision:{top_level}")
             shutil.copytree(item, destination, symlinks=False)
     for retailer, required in EXPECTED.items():
+        if retailer not in selected:
+            continue
         for relative in required:
             if not (output / relative).is_file():
                 raise AssemblyError(
@@ -167,6 +183,7 @@ def assemble(root: Path, output: Path, *, run_id: str) -> dict[str, object]:
             }
             for retailer, (attempt, _) in sorted(selected.items())
         },
+        "missing_retailers": sorted(set(EXPECTED) - set(selected)),
     }
 
 
@@ -176,8 +193,9 @@ def main() -> int:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--evidence", type=Path)
+    parser.add_argument("--allow-missing", action="store_true", help="persistencia parcial: ensambla sólo cadenas aceptadas")
     args = parser.parse_args()
-    result = assemble(args.input, args.output, run_id=args.run_id)
+    result = assemble(args.input, args.output, run_id=args.run_id, allow_missing=args.allow_missing)
     text = json.dumps(result, ensure_ascii=False, sort_keys=True)
     if args.evidence:
         args.evidence.parent.mkdir(parents=True, exist_ok=True)

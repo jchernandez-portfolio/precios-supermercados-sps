@@ -378,7 +378,8 @@ Revisión de las 11 corridas del 1 al 9 de octubre (aprobada la corrección por 
 - **Fallas del primer intento** (sólo el 9-oct salió limpio): Paiz 8 (catálogo cambió durante la lectura: `page_count_changed`, `catalog_changed_during_capture`, totales de categoría; HTTP 500/504 de VTEX), La Colonia 6 (`partition_total_changed_mid_run`, `snapshot_sku_count_mismatch`, timeout, HTTP 500 TGU), Colonial 2 (`commercial_sources_disagree`, ya corregido en #12), Walmart 1 (`category2_membership_total_mismatch`), persistencia 2 (`snapshot_out_of_order` tras reruns manuales). PriceSmart y Los Andes: 0.
 - **Día sin datos:** 5-oct, Paiz falló los 3 intentos y `persist` se saltó para todas las cadenas.
 - **Corrección 1 (este cambio):** Worker de Cloudflare `edge/daily-trigger` dispara a las 07:43 UTC (`workflow_dispatch`); sin cron de GitHub en el corte; el operador arranca el corte si falta y reconoce `workflow_dispatch` y `schedule`.
-- **Pendiente:** persistir las cadenas exitosas aunque otra falle (la fallida queda no actualizada); reintentos cortos por página ante HTTP 5xx o catálogo cambiante; operador disparado al terminar el corte.
+- **Corrección 3 (persistencia parcial):** `persist` corre aunque una cadena haya fallado (`acquire` en `failure`); ensambla sólo los handoffs aceptados (`--allow-missing`, `missing_retailers` en la evidencia y `::warning`), y preflight, persistencia y verificaciones se limitan a esas cadenas (`DAILY_RETAILERS`). La fallida queda STALE (frescura por cadena ya la excluye de comparaciones) y el operador la reintenta; el reintento re-persiste las demás como `exact_replay`. La publicación (`homologation-refresh`) corre tras un día parcial sólo si el job `persist` del intento terminó en éxito (job `daily-gate`, `actions: read`).
+- **Pendiente:** reintentos cortos por página ante HTTP 5xx o catálogo cambiante; operador disparado al terminar el corte.
 
 ## Medidas estandarizadas v2.7 (2026-10-09)
 

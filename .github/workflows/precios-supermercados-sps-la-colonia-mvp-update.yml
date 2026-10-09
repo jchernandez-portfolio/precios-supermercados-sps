@@ -69,8 +69,12 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  # Persistencia parcial (2026-10-09): corre aunque falle alguna cadena y
+  # guarda sólo las aceptadas; la fallida conserva su último precio y el
+  # catálogo la marca STALE. El operador sigue reintentando la cadena fallida.
   persist:
     needs: acquire
+    if: ${{ !cancelled() && (needs.acquire.result == 'success' || needs.acquire.result == 'failure') }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     defaults:
@@ -110,7 +114,15 @@ jobs:
             --input run-artifacts-handoffs \
             --output run-artifacts \
             --run-id "$GITHUB_RUN_ID" \
+            --allow-missing \
             --evidence run-artifacts/acquisition-assembly.json
+          retailers="$(python -c "import json; print(','.join(sorted(json.load(open('run-artifacts/acquisition-assembly.json'))['retailers'])))")"
+          missing="$(python -c "import json; print(','.join(json.load(open('run-artifacts/acquisition-assembly.json'))['missing_retailers']))")"
+          echo "DAILY_RETAILERS=${retailers}" >> "$GITHUB_ENV"
+          echo "daily_retailers_accepted=${retailers}"
+          if [ -n "$missing" ]; then
+            echo "::warning title=Persistencia parcial::Cadenas sin captura aceptada hoy: ${missing} (quedan STALE hasta su reintento)"
+          fi
 
       - name: Aceptar sólo snapshots completos
         shell: bash
@@ -123,8 +135,11 @@ jobs:
           from actualizar_mvp_sqlite_la_colonia import validate_snapshot_bytes
           from actualizar_mvp_turso_comisariato_los_andes import validate_snapshot_bytes as validate_los_andes
           from actualizar_mvp_turso_paiz import validate_snapshot_bytes as validate_paiz
+          import os
 
-          for city in ('sps', 'tgu'):
+          accepted = set(os.environ['DAILY_RETAILERS'].split(','))
+
+          for city in (('sps', 'tgu') if 'la_colonia' in accepted else ()):
               snapshot = validate_snapshot_bytes(Path(f'run-artifacts/{city}/full-catalog.json').read_bytes())
               assert snapshot['catalog_complete'] is True
               assert snapshot['location_verified_same_run'] is True
@@ -132,12 +147,13 @@ jobs:
               # products (validado: todos out_of_stock y <=2 % del catálogo).
               print(f"la_colonia_{city}_unpriced_unavailable={snapshot.get('skus_unpriced_unavailable', 0)}")
 
-          los_andes = validate_los_andes(Path('run-artifacts/los-andes/full-catalog.json').read_bytes())
-          assert los_andes['catalog_complete'] is True
-          assert los_andes['location_verified_same_run'] is True
-          assert los_andes['catalog_products_reported'] == los_andes['unique_products_extracted']
+          if 'los_andes' in accepted:
+              los_andes = validate_los_andes(Path('run-artifacts/los-andes/full-catalog.json').read_bytes())
+              assert los_andes['catalog_complete'] is True
+              assert los_andes['location_verified_same_run'] is True
+              assert los_andes['catalog_products_reported'] == los_andes['unique_products_extracted']
 
-          for name in ('multiplaza', 'proceres'):
+          for name in (('multiplaza', 'proceres') if 'paiz' in accepted else ()):
               snapshot = validate_paiz(Path(f'run-artifacts/paiz/snapshot-paiz-{name}.json').read_bytes())
               assert snapshot['catalog_complete'] is True
               assert snapshot['location_verified_same_run'] is True
@@ -151,6 +167,8 @@ jobs:
               ('run-artifacts/pricesmart/snapshot-pricesmart-sps.json', 'pricesmart'),
               ('run-artifacts/pricesmart/snapshot-pricesmart-tgu.json', 'pricesmart'),
           ):
+              if supermarket not in accepted:
+                  continue
               snapshot = validate_snapshot_bytes(Path(path).read_bytes(), supermarket_id=supermarket)
               assert snapshot['catalog_complete'] is True
               assert snapshot['location_verified_same_run'] is True
@@ -176,6 +194,7 @@ jobs:
           python scripts/preflight_mvp_turso_daily.py \
             --artifact-root run-artifacts \
             --run-id "$GITHUB_RUN_ID" \
+            --assembly run-artifacts/acquisition-assembly.json \
             | tee run-artifacts/turso-daily-preflight.json
 
       - name: Persistir La Colonia, Los Andes, Colonial, Walmart y PriceSmart
@@ -195,19 +214,32 @@ jobs:
               --run-id "${GITHUB_RUN_ID}-${suffix}"
           }
 
-          persist_generic run-artifacts/sps/full-catalog.json la_colonia sps
-          persist_generic run-artifacts/tgu/full-catalog.json la_colonia tgu
-          python scripts/actualizar_mvp_turso_comisariato_los_andes.py \
-            run-artifacts/los-andes/full-catalog.json \
-            --run-id "${GITHUB_RUN_ID}-los-andes"
-          persist_generic run-artifacts/colonial/full-catalog.json colonial colonial
-          persist_generic run-artifacts/walmart/snapshot-walmart-sps.json walmart walmart-sps
-          persist_generic run-artifacts/walmart/snapshot-walmart-tgu-ffaa.json walmart walmart-tgu-ffaa
-          persist_generic run-artifacts/walmart/snapshot-walmart-tgu-el-sauce.json walmart walmart-tgu-el-sauce
-          persist_generic run-artifacts/pricesmart/snapshot-pricesmart-sps.json pricesmart pricesmart-sps
-          persist_generic run-artifacts/pricesmart/snapshot-pricesmart-tgu.json pricesmart pricesmart-tgu
+          accepted() { [[ ",${DAILY_RETAILERS}," == *",$1,"* ]]; }
+
+          if accepted la_colonia; then
+            persist_generic run-artifacts/sps/full-catalog.json la_colonia sps
+            persist_generic run-artifacts/tgu/full-catalog.json la_colonia tgu
+          fi
+          if accepted los_andes; then
+            python scripts/actualizar_mvp_turso_comisariato_los_andes.py \
+              run-artifacts/los-andes/full-catalog.json \
+              --run-id "${GITHUB_RUN_ID}-los-andes"
+          fi
+          if accepted colonial; then
+            persist_generic run-artifacts/colonial/full-catalog.json colonial colonial
+          fi
+          if accepted walmart; then
+            persist_generic run-artifacts/walmart/snapshot-walmart-sps.json walmart walmart-sps
+            persist_generic run-artifacts/walmart/snapshot-walmart-tgu-ffaa.json walmart walmart-tgu-ffaa
+            persist_generic run-artifacts/walmart/snapshot-walmart-tgu-el-sauce.json walmart walmart-tgu-el-sauce
+          fi
+          if accepted pricesmart; then
+            persist_generic run-artifacts/pricesmart/snapshot-pricesmart-sps.json pricesmart pricesmart-sps
+            persist_generic run-artifacts/pricesmart/snapshot-pricesmart-tgu.json pricesmart pricesmart-tgu
+          fi
 
       - name: Persistir Paiz
+        if: ${{ contains(format(',{0},', env.DAILY_RETAILERS), ',paiz,') }}
         shell: bash
         env:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
@@ -224,6 +256,7 @@ jobs:
             --verify
 
       - name: Verificar commits exactos en Turso
+        if: ${{ contains(format(',{0},', env.DAILY_RETAILERS), ',la_colonia,') || contains(format(',{0},', env.DAILY_RETAILERS), ',los_andes,') }}
         shell: bash
         env:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
@@ -242,11 +275,12 @@ jobs:
           from actualizar_mvp_turso_comisariato_los_andes import validate_snapshot_bytes as validate_los_andes
           from actualizar_mvp_turso_la_colonia import _execute_rows, _pipeline, _stmt
 
+          accepted = set(os.environ['DAILY_RETAILERS'].split(','))
           expected_runs = []
           expected_open_by_location = []
           for city, supermarket_id, location_id in (
-              ('sps', 'la_colonia', 'la_colonia_sps'),
-              ('tgu', 'la_colonia', 'la_colonia_tgu'),
+              (('sps', 'la_colonia', 'la_colonia_sps'), ('tgu', 'la_colonia', 'la_colonia_tgu'))
+              if 'la_colonia' in accepted else ()
           ):
               raw = Path(f'run-artifacts/{city}/full-catalog.json').read_bytes()
               snapshot = validate_snapshot_bytes(raw)
@@ -262,32 +296,30 @@ jobs:
               ])
               expected_open_by_location.append([location_id, snapshot['skus_extracted']])
 
-          raw = Path('run-artifacts/los-andes/full-catalog.json').read_bytes()
-          los_andes_snapshot = validate_los_andes(raw)
-          digest = hashlib.sha256(raw).hexdigest()
-          expected_runs.append([
-              f"{os.environ['GITHUB_RUN_ID']}-los-andes",
-              'comisariato_los_andes',
-              'comisariato_los_andes_sps',
-              'success',
-              los_andes_snapshot['skus_extracted'],
-              los_andes_snapshot['catalog_products_reported'],
-              digest,
-          ])
-          expected_los_andes = [[
-              'comisariato_los_andes',
-              'comisariato_los_andes_sps',
-              los_andes_snapshot['skus_extracted'],
-          ]]
+          expected_los_andes = []
+          if 'los_andes' in accepted:
+              raw = Path('run-artifacts/los-andes/full-catalog.json').read_bytes()
+              los_andes_snapshot = validate_los_andes(raw)
+              digest = hashlib.sha256(raw).hexdigest()
+              expected_runs.append([
+                  f"{os.environ['GITHUB_RUN_ID']}-los-andes",
+                  'comisariato_los_andes',
+                  'comisariato_los_andes_sps',
+                  'success',
+                  los_andes_snapshot['skus_extracted'],
+                  los_andes_snapshot['catalog_products_reported'],
+                  digest,
+              ])
+              expected_los_andes = [[
+                  'comisariato_los_andes',
+                  'comisariato_los_andes_sps',
+                  los_andes_snapshot['skus_extracted'],
+              ]]
           expected_runs.sort()
           expected_open_by_location.sort()
 
-          run_sql = '''SELECT scrape_run_id,supermarket_id,location_id,run_status,sku_count,catalog_product_count,source_json_sha256 FROM scrape_runs WHERE scrape_run_id IN (?,?,?) ORDER BY scrape_run_id'''
-          run_args = (
-              f"{os.environ['GITHUB_RUN_ID']}-sps",
-              f"{os.environ['GITHUB_RUN_ID']}-tgu",
-              f"{os.environ['GITHUB_RUN_ID']}-los-andes",
-          )
+          run_args = tuple(row[0] for row in expected_runs)
+          run_sql = f'''SELECT scrape_run_id,supermarket_id,location_id,run_status,sku_count,catalog_product_count,source_json_sha256 FROM scrape_runs WHERE scrape_run_id IN ({','.join('?' for _ in run_args)}) ORDER BY scrape_run_id'''
           runs = []
           for attempt in range(7):
               data = _pipeline(
@@ -318,8 +350,8 @@ jobs:
                   {'type':'close'},
               ],
           )
-          open_by_location = _execute_rows(data['results'][0])
-          los_andes_open = _execute_rows(data['results'][1])
+          open_by_location = _execute_rows(data['results'][0]) if 'la_colonia' in accepted else []
+          los_andes_open = _execute_rows(data['results'][1]) if 'los_andes' in accepted else []
           if [row[0] for row in open_by_location] != [row[0] for row in expected_open_by_location]:
               raise SystemExit(f'current_location_mismatch:expected={expected_open_by_location}:actual={open_by_location}')
           if any(actual[1] < expected[1] for actual, expected in zip(open_by_location, expected_open_by_location, strict=True)):
@@ -332,6 +364,7 @@ jobs:
           PY
 
       - name: Verificar nuevos retailers y Paiz en Turso
+        if: ${{ contains(format(',{0},', env.DAILY_RETAILERS), ',paiz,') || contains(format(',{0},', env.DAILY_RETAILERS), ',colonial,') || contains(format(',{0},', env.DAILY_RETAILERS), ',walmart,') || contains(format(',{0},', env.DAILY_RETAILERS), ',pricesmart,') }}
         shell: bash
         env:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
@@ -354,7 +387,11 @@ jobs:
           expected_runs = []
           expected_current = {}
 
+          accepted = set(os.environ['DAILY_RETAILERS'].split(','))
+
           def add(path, supermarket, suffix, validator):
+              if supermarket not in accepted:
+                  return
               raw = Path(path).read_bytes()
               snapshot = validator(raw)
               expected_runs.append([
