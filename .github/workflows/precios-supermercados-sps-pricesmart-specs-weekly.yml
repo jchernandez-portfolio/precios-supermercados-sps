@@ -11,7 +11,7 @@ name: Precios SPS - Especificaciones PriceSmart semanal
 
 on:
   schedule:
-    - cron: "37 11 * * 6" # sábado 05:37 America/Tegucigalpa, después del corte diario 01:43
+    - cron: "37 16 * * 6" # sábado 10:37 America/Tegucigalpa, después del corte diario 05:17 (no leer PriceSmart en paralelo)
   workflow_dispatch:
     inputs:
       force:

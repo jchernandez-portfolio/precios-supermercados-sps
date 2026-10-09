@@ -22,8 +22,8 @@ La ficha pública trae esos atributos en "Detalles de producto y especificacione
   Para revocar: `live_read_only_authorized: false`; el workflow y el script
   fallan antes de cualquier request.
 - Workflow: `.github/workflows/precios-supermercados-sps-pricesmart-specs-weekly.yml`,
-  sábado **05:37 Honduras** (`37 11 * * 6`, minuto con jitter; el corte diario es
-  01:43 y la integridad semanal domingo 04:23) + `workflow_dispatch` (opción
+  sábado **10:37 Honduras** (`37 16 * * 6`, minuto con jitter; después del corte
+  diario de las 05:17 para no leer PriceSmart en paralelo; la integridad semanal domingo 04:23) + `workflow_dispatch` (opción
   `force`). Permisos `actions: read` (descargar el artifact de la corrida diaria)
   y `contents: read`; secrets sólo `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN`.
 
