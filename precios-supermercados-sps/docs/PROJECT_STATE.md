@@ -358,6 +358,15 @@ Se agregó la traducción `bacon`→`tocino` al acuerdo de nombre. Sin snapshot
 completo de Comisariato en el repositorio, el impacto en grupos comparables se
 mide tras el primer refresh.
 
+## Árbol maestro de categorías v1 (2026-10-08)
+
+Aprobado por el responsable. Detalle: [`homologation/master-category-tree-v1.md`](homologation/master-category-tree-v1.md).
+
+- Problema: un 24 % de los productos de Walmart, 55 % de Comisariato, 48 % de PriceSmart y 17 % de La Colonia se publicaban sin categoría, aunque todos traen la categoría de su supermercado: la tabla interna sólo conocía unas pocas categorías y sólo 7 categorías públicas (sin ropa, juguetes, electrónica, etc.).
+- Solución: árbol propio de 4 niveles alineado a GS1 GPC (14 departamentos, 180 subcategorías) + tabla de equivalencias versionada con las 1,311 categorías que publican los seis súper. Sólo con la tabla, el 98 % de los productos queda al menos en un departamento y el 72 % llega a subcategoría; el resto lo refina el tipo por nombre. Lo mezclado (p. ej. "Hogar" de PriceSmart) se decide por nombre; las tarjetas de regalo salen del catálogo.
+- Publicación: `category` = departamento; `product_type` = tipo de producto o, si no hay, subcategoría/categoría del árbol. Un grupo comparable comparte el nodo más específico de sus ofertas. La identidad y la comparabilidad no cambian.
+- Gobierno: categorías nuevas del súper aparecen como `taxonomy_unmapped_source_categories` en el log de publicación y se agregan al CSV.
+
 ## Especificaciones PriceSmart (semanal, 2026-10-01)
 
 Rama `rpi/pricesmart-specs` (no fusionada, sin corrida real). Detalle:

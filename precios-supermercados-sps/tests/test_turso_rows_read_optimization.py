@@ -168,7 +168,8 @@ def legacy_fetch_visible_offers(backend, scope, *, page_size: int = 2000):
                    h.is_promotion,h.availability,h.valid_from_utc,
                    hp.canonical_product_id,hp.category,hp.product_type,
                    hp.presentation_dimension,hp.presentation_total_base,
-                   hp.presentation_status,hp.comparison_status,hp.normalization_version
+                   hp.presentation_status,hp.comparison_status,hp.normalization_version,
+                   p.category
             FROM price_history AS h
             JOIN products AS p
               ON p.product_id=h.product_id AND p.supermarket_id=h.supermarket_id
@@ -190,7 +191,7 @@ def legacy_fetch_visible_offers(backend, scope, *, page_size: int = 2000):
                 location_id, current_price, regular_price, is_promotion, availability,
                 observed_at, canonical_product_id, category, product_type,
                 presentation_dimension, presentation_total_base, presentation_status,
-                comparison_status, normalization_version,
+                comparison_status, normalization_version, source_category,
             ) = row
             key = (product_id, str(location_id))
             if key in seen:
@@ -218,6 +219,7 @@ def legacy_fetch_visible_offers(backend, scope, *, page_size: int = 2000):
                     presentation_total_base=core._text(presentation_total_base),
                     presentation_status=str(presentation_status),
                     comparison_status=str(comparison_status),
+                    source_category=core._text(source_category),
                 )
             )
         cursor_product = int(rows[-1][0])

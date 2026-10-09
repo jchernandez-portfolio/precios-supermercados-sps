@@ -1,0 +1,1473 @@
+{
+ "schema": "precios-sps-master-category-tree/v1",
+ "version": "1.0.0",
+ "approved_by": "project_owner",
+ "approved_at": "2026-10-08",
+ "levels": [
+  "department",
+  "category",
+  "subcategory",
+  "product_type"
+ ],
+ "reference_standard": "GS1 GPC (Segment > Family > Class > Brick)",
+ "excluded_label": "Fuera del catálogo",
+ "departments": [
+  {
+   "code": "01",
+   "name": "Alimentos",
+   "gpc_reference": "Food/Beverage/Tobacco",
+   "categories": [
+    {
+     "code": "01.01",
+     "name": "Abarrotes",
+     "subcategories": [
+      {
+       "code": "01.01.01",
+       "name": "Aceites y grasas",
+       "product_types": [
+        "Aceite comestible",
+        "Margarina"
+       ]
+      },
+      {
+       "code": "01.01.02",
+       "name": "Arroz, granos y legumbres",
+       "product_types": [
+        "Arroz",
+        "Frijol"
+       ]
+      },
+      {
+       "code": "01.01.03",
+       "name": "Azúcar y endulzantes",
+       "product_types": [
+        "Azúcar"
+       ]
+      },
+      {
+       "code": "01.01.04",
+       "name": "Harinas y repostería",
+       "product_types": [
+        "Harina de maíz",
+        "Harina de trigo"
+       ]
+      },
+      {
+       "code": "01.01.05",
+       "name": "Pastas",
+       "product_types": [
+        "Pasta"
+       ]
+      },
+      {
+       "code": "01.01.06",
+       "name": "Sopas y comidas instantáneas",
+       "product_types": [
+        "Sopa"
+       ]
+      },
+      {
+       "code": "01.01.07",
+       "name": "Enlatados y conservas",
+       "product_types": [
+        "Atún",
+        "Sardina"
+       ]
+      },
+      {
+       "code": "01.01.08",
+       "name": "Salsas, aderezos y vinagres",
+       "product_types": [
+        "Aderezo",
+        "Ketchup",
+        "Mayonesa",
+        "Mostaza",
+        "Pasta de tomate",
+        "Salsa"
+       ]
+      },
+      {
+       "code": "01.01.09",
+       "name": "Especias y condimentos",
+       "product_types": [
+        "Sal"
+       ]
+      },
+      {
+       "code": "01.01.10",
+       "name": "Untables, mermeladas y miel",
+       "product_types": [
+        "Mantequilla de maní",
+        "Miel"
+       ]
+      },
+      {
+       "code": "01.01.11",
+       "name": "Cereales, avenas y barras",
+       "product_types": [
+        "Avena",
+        "Cereal"
+       ]
+      },
+      {
+       "code": "01.01.12",
+       "name": "Productos vegetales y especialidades",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "01.02",
+     "name": "Snacks y dulces",
+     "subcategories": [
+      {
+       "code": "01.02.01",
+       "name": "Papas, frituras y boquitas",
+       "product_types": []
+      },
+      {
+       "code": "01.02.02",
+       "name": "Frutos secos y fruta deshidratada",
+       "product_types": []
+      },
+      {
+       "code": "01.02.03",
+       "name": "Galletas",
+       "product_types": [
+        "Galleta"
+       ]
+      },
+      {
+       "code": "01.02.04",
+       "name": "Dulces y chocolates",
+       "product_types": [
+        "Chocolate"
+       ]
+      },
+      {
+       "code": "01.02.05",
+       "name": "Gelatinas, flanes y postres",
+       "product_types": [
+        "Gelatina"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "01.03",
+     "name": "Lácteos y huevos",
+     "subcategories": [
+      {
+       "code": "01.03.01",
+       "name": "Leche",
+       "product_types": [
+        "Leche",
+        "Leche condensada",
+        "Leche en polvo",
+        "Leche evaporada"
+       ]
+      },
+      {
+       "code": "01.03.02",
+       "name": "Quesos",
+       "product_types": [
+        "Queso"
+       ]
+      },
+      {
+       "code": "01.03.03",
+       "name": "Yogurt",
+       "product_types": [
+        "Yogurt"
+       ]
+      },
+      {
+       "code": "01.03.04",
+       "name": "Mantequillas, margarinas y cremas",
+       "product_types": [
+        "Mantequilla"
+       ]
+      },
+      {
+       "code": "01.03.05",
+       "name": "Huevos",
+       "product_types": [
+        "Huevo"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "01.04",
+     "name": "Carnes, aves y mariscos",
+     "subcategories": [
+      {
+       "code": "01.04.01",
+       "name": "Res",
+       "product_types": []
+      },
+      {
+       "code": "01.04.02",
+       "name": "Cerdo",
+       "product_types": []
+      },
+      {
+       "code": "01.04.03",
+       "name": "Pollo y pavo",
+       "product_types": []
+      },
+      {
+       "code": "01.04.04",
+       "name": "Pescados y mariscos",
+       "product_types": []
+      },
+      {
+       "code": "01.04.05",
+       "name": "Embutidos y carnes frías",
+       "product_types": []
+      },
+      {
+       "code": "01.04.06",
+       "name": "Proteínas vegetales",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "01.05",
+     "name": "Frutas y verduras",
+     "subcategories": [
+      {
+       "code": "01.05.01",
+       "name": "Frutas",
+       "product_types": []
+      },
+      {
+       "code": "01.05.02",
+       "name": "Verduras",
+       "product_types": []
+      },
+      {
+       "code": "01.05.03",
+       "name": "Hierbas y montes",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "01.06",
+     "name": "Panadería y tortillas",
+     "subcategories": [
+      {
+       "code": "01.06.01",
+       "name": "Pan salado y de molde",
+       "product_types": [
+        "Pan",
+        "Pan de molde"
+       ]
+      },
+      {
+       "code": "01.06.02",
+       "name": "Pan dulce, pasteles y repostería",
+       "product_types": []
+      },
+      {
+       "code": "01.06.03",
+       "name": "Tortillas",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "01.07",
+     "name": "Congelados y comidas preparadas",
+     "subcategories": [
+      {
+       "code": "01.07.01",
+       "name": "Comidas listas y congeladas",
+       "product_types": []
+      },
+      {
+       "code": "01.07.02",
+       "name": "Comida preparada y deli",
+       "product_types": []
+      },
+      {
+       "code": "01.07.03",
+       "name": "Helados y postres congelados",
+       "product_types": [
+        "Helado"
+       ]
+      },
+      {
+       "code": "01.07.04",
+       "name": "Frutas y verduras congeladas",
+       "product_types": []
+      },
+      {
+       "code": "01.07.05",
+       "name": "Hielo",
+       "product_types": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "02",
+   "name": "Bebidas y tabaco",
+   "gpc_reference": "Food/Beverage/Tobacco",
+   "categories": [
+    {
+     "code": "02.01",
+     "name": "Bebidas sin alcohol",
+     "subcategories": [
+      {
+       "code": "02.01.01",
+       "name": "Agua",
+       "product_types": [
+        "Agua"
+       ]
+      },
+      {
+       "code": "02.01.02",
+       "name": "Gaseosas",
+       "product_types": [
+        "Refresco"
+       ]
+      },
+      {
+       "code": "02.01.03",
+       "name": "Jugos y néctares",
+       "product_types": [
+        "Jugo"
+       ]
+      },
+      {
+       "code": "02.01.04",
+       "name": "Energizantes e hidratantes",
+       "product_types": []
+      },
+      {
+       "code": "02.01.05",
+       "name": "Café y té listos para beber",
+       "product_types": []
+      },
+      {
+       "code": "02.01.06",
+       "name": "Bebidas en polvo y concentrados",
+       "product_types": []
+      },
+      {
+       "code": "02.01.07",
+       "name": "Bebidas vegetales",
+       "product_types": [
+        "Bebida vegetal"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "02.02",
+     "name": "Café, té e infusiones",
+     "subcategories": [
+      {
+       "code": "02.02.01",
+       "name": "Café",
+       "product_types": [
+        "Café"
+       ]
+      },
+      {
+       "code": "02.02.02",
+       "name": "Té e infusiones",
+       "product_types": [
+        "Té"
+       ]
+      },
+      {
+       "code": "02.02.03",
+       "name": "Cremoras y endulzantes para café",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "02.03",
+     "name": "Bebidas alcohólicas",
+     "subcategories": [
+      {
+       "code": "02.03.01",
+       "name": "Cerveza",
+       "product_types": [
+        "Cerveza"
+       ]
+      },
+      {
+       "code": "02.03.02",
+       "name": "Vinos",
+       "product_types": [
+        "Vino"
+       ]
+      },
+      {
+       "code": "02.03.03",
+       "name": "Licores",
+       "product_types": [
+        "Ron"
+       ]
+      },
+      {
+       "code": "02.03.04",
+       "name": "Mezcladores",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "02.04",
+     "name": "Tabaco",
+     "subcategories": [
+      {
+       "code": "02.04.01",
+       "name": "Cigarrillos",
+       "product_types": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "03",
+   "name": "Cuidado personal y belleza",
+   "gpc_reference": "Beauty/Personal Care/Hygiene",
+   "categories": [
+    {
+     "code": "03.01",
+     "name": "Cuidado del cabello",
+     "subcategories": [
+      {
+       "code": "03.01.01",
+       "name": "Shampoo",
+       "product_types": [
+        "Shampoo"
+       ]
+      },
+      {
+       "code": "03.01.02",
+       "name": "Acondicionadores y tratamientos",
+       "product_types": [
+        "Acondicionador"
+       ]
+      },
+      {
+       "code": "03.01.03",
+       "name": "Cremas, geles y fijadores",
+       "product_types": []
+      },
+      {
+       "code": "03.01.04",
+       "name": "Tintes",
+       "product_types": [
+        "Tinte para cabello"
+       ]
+      },
+      {
+       "code": "03.01.05",
+       "name": "Cepillos y accesorios para cabello",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "03.02",
+     "name": "Higiene corporal",
+     "subcategories": [
+      {
+       "code": "03.02.01",
+       "name": "Jabones y geles de baño",
+       "product_types": [
+        "Jabón"
+       ]
+      },
+      {
+       "code": "03.02.02",
+       "name": "Desodorantes",
+       "product_types": [
+        "Desodorante"
+       ]
+      },
+      {
+       "code": "03.02.03",
+       "name": "Cremas y lociones corporales",
+       "product_types": []
+      },
+      {
+       "code": "03.02.04",
+       "name": "Protector solar",
+       "product_types": []
+      },
+      {
+       "code": "03.02.05",
+       "name": "Fragancias",
+       "product_types": []
+      },
+      {
+       "code": "03.02.06",
+       "name": "Accesorios de baño",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "03.03",
+     "name": "Cuidado facial",
+     "subcategories": [
+      {
+       "code": "03.03.01",
+       "name": "Limpieza y desmaquillantes",
+       "product_types": [
+        "Agua micelar"
+       ]
+      },
+      {
+       "code": "03.03.02",
+       "name": "Cremas y tratamientos faciales",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "03.04",
+     "name": "Higiene bucal",
+     "subcategories": [
+      {
+       "code": "03.04.01",
+       "name": "Pasta dental",
+       "product_types": [
+        "Pasta dental"
+       ]
+      },
+      {
+       "code": "03.04.02",
+       "name": "Cepillos dentales",
+       "product_types": [
+        "Cepillo dental"
+       ]
+      },
+      {
+       "code": "03.04.03",
+       "name": "Enjuague e hilo dental",
+       "product_types": [
+        "Enjuague bucal"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "03.05",
+     "name": "Maquillaje y uñas",
+     "subcategories": [
+      {
+       "code": "03.05.01",
+       "name": "Maquillaje",
+       "product_types": []
+      },
+      {
+       "code": "03.05.02",
+       "name": "Uñas",
+       "product_types": []
+      },
+      {
+       "code": "03.05.03",
+       "name": "Accesorios cosméticos",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "03.06",
+     "name": "Afeitado y depilación",
+     "subcategories": [
+      {
+       "code": "03.06.01",
+       "name": "Afeitado y depilación",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "03.07",
+     "name": "Higiene femenina e íntima",
+     "subcategories": [
+      {
+       "code": "03.07.01",
+       "name": "Toallas, protectores y tampones",
+       "product_types": [
+        "Protector diario",
+        "Toalla femenina"
+       ]
+      },
+      {
+       "code": "03.07.02",
+       "name": "Higiene íntima",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "03.08",
+     "name": "Básicos de higiene",
+     "subcategories": [
+      {
+       "code": "03.08.01",
+       "name": "Algodón, hisopos y pañuelos",
+       "product_types": []
+      },
+      {
+       "code": "03.08.02",
+       "name": "Kits de viaje",
+       "product_types": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "04",
+   "name": "Salud y farmacia",
+   "gpc_reference": "Healthcare",
+   "categories": [
+    {
+     "code": "04.01",
+     "name": "Medicamentos de venta libre",
+     "subcategories": [
+      {
+       "code": "04.01.01",
+       "name": "Dolor y fiebre",
+       "product_types": []
+      },
+      {
+       "code": "04.01.02",
+       "name": "Gripe, tos y alergias",
+       "product_types": []
+      },
+      {
+       "code": "04.01.03",
+       "name": "Sistema digestivo",
+       "product_types": []
+      },
+      {
+       "code": "04.01.04",
+       "name": "Dermatología",
+       "product_types": []
+      },
+      {
+       "code": "04.01.05",
+       "name": "Cuidado de pies",
+       "product_types": []
+      },
+      {
+       "code": "04.01.06",
+       "name": "Ojos y oídos",
+       "product_types": []
+      },
+      {
+       "code": "04.01.07",
+       "name": "Antiparasitarios",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "04.02",
+     "name": "Vitaminas y suplementos",
+     "subcategories": [
+      {
+       "code": "04.02.01",
+       "name": "Vitaminas y minerales",
+       "product_types": []
+      },
+      {
+       "code": "04.02.02",
+       "name": "Suplementos alimenticios",
+       "product_types": []
+      },
+      {
+       "code": "04.02.03",
+       "name": "Nutrición deportiva",
+       "product_types": []
+      },
+      {
+       "code": "04.02.04",
+       "name": "Control de diabetes",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "04.03",
+     "name": "Primeros auxilios",
+     "subcategories": [
+      {
+       "code": "04.03.01",
+       "name": "Primeros auxilios",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "04.04",
+     "name": "Salud sexual e incontinencia",
+     "subcategories": [
+      {
+       "code": "04.04.01",
+       "name": "Salud sexual",
+       "product_types": []
+      },
+      {
+       "code": "04.04.02",
+       "name": "Incontinencia adulto",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "04.05",
+     "name": "Óptica",
+     "subcategories": [
+      {
+       "code": "04.05.01",
+       "name": "Lentes y cuidado visual",
+       "product_types": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "05",
+   "name": "Bebé",
+   "gpc_reference": "Baby Care",
+   "categories": [
+    {
+     "code": "05.01",
+     "name": "Pañales y toallitas",
+     "subcategories": [
+      {
+       "code": "05.01.01",
+       "name": "Pañales",
+       "product_types": [
+        "Pañal"
+       ]
+      },
+      {
+       "code": "05.01.02",
+       "name": "Toallitas húmedas",
+       "product_types": [
+        "Toallita húmeda"
+       ]
+      }
+     ]
+    },
+    {
+     "code": "05.02",
+     "name": "Alimentación del bebé",
+     "subcategories": [
+      {
+       "code": "05.02.01",
+       "name": "Fórmulas y leches infantiles",
+       "product_types": []
+      },
+      {
+       "code": "05.02.02",
+       "name": "Colados, cereales y galletas infantiles",
+       "product_types": []
+      },
+      {
+       "code": "05.02.03",
+       "name": "Biberones y lactancia",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "05.03",
+     "name": "Baño y cuidado del bebé",
+     "subcategories": [
+      {
+       "code": "05.03.01",
+       "name": "Baño y cuidado del bebé",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "05.04",
+     "name": "Accesorios, coches y cunas",
+     "subcategories": [
+      {
+       "code": "05.04.01",
+       "name": "Accesorios, coches y cunas",
+       "product_types": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "06",
+   "name": "Limpieza",
+   "gpc_reference": "Cleaning/Hygiene Products",
+   "categories": [
+    {
+     "code": "06.01",
+     "name": "Lavandería",
+     "subcategories": [
+      {
+       "code": "06.01.01",
+       "name": "Detergentes",
+       "product_types": [
+        "Detergente"
+       ]
+      },
+      {
+       "code": "06.01.02",
+       "name": "Suavizantes",
+       "product_types": [
+        "Suavizante"
+       ]
+      },
+      {
+       "code": "06.01.03",
+       "name": "Jabón de lavandería",
+       "product_types": []
+      },
+      {
+       "code": "06.01.04",
+       "name": "Quitamanchas, blanqueadores y colorantes",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "06.02",
+     "name": "Limpieza del hogar",
+     "subcategories": [
+      {
+       "code": "06.02.01",
+       "name": "Cloro y desinfectantes",
+       "product_types": [
+        "Cloro",
+        "Desinfectante",
+        "Limpiador desinfectante"
+       ]
+      },
+      {
+       "code": "06.02.02",
+       "name": "Limpiadores multiusos y de cocina",
+       "product_types": [
+        "Limpiador"
+       ]
+      },
+      {
+       "code": "06.02.03",
+       "name": "Lavaplatos",
+       "product_types": [
+        "Lavaplatos"
+       ]
+      },
+      {
+       "code": "06.02.04",
+       "name": "Insecticidas y control de plagas",
+       "product_types": []
+      },
+      {
+       "code": "06.02.05",
+       "name": "Cuidado de pisos y calzado",
+       "product_types": []
+      },
+      {
+       "code": "06.02.06",
+       "name": "Accesorios de limpieza",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "06.03",
+     "name": "Papel y desechables",
+     "subcategories": [
+      {
+       "code": "06.03.01",
+       "name": "Papel higiénico",
+       "product_types": [
+        "Papel higiénico"
+       ]
+      },
+      {
+       "code": "06.03.02",
+       "name": "Papel toalla y servilletas",
+       "product_types": [
+        "Papel toalla",
+        "Servilleta"
+       ]
+      },
+      {
+       "code": "06.03.03",
+       "name": "Bolsas para basura",
+       "product_types": []
+      },
+      {
+       "code": "06.03.04",
+       "name": "Bolsas, aluminio y envolturas",
+       "product_types": []
+      },
+      {
+       "code": "06.03.05",
+       "name": "Platos, vasos y cubiertos desechables",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "06.04",
+     "name": "Aromatizantes",
+     "subcategories": [
+      {
+       "code": "06.04.01",
+       "name": "Aromatizantes",
+       "product_types": [
+        "Aromatizante"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "07",
+   "name": "Mascotas",
+   "gpc_reference": "Pet Care/Food",
+   "categories": [
+    {
+     "code": "07.01",
+     "name": "Perros",
+     "subcategories": [
+      {
+       "code": "07.01.01",
+       "name": "Alimento para perro",
+       "product_types": [
+        "Alimento para perro"
+       ]
+      },
+      {
+       "code": "07.01.02",
+       "name": "Snacks y premios para perro",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "07.02",
+     "name": "Gatos",
+     "subcategories": [
+      {
+       "code": "07.02.01",
+       "name": "Alimento para gato",
+       "product_types": [
+        "Alimento para gato"
+       ]
+      },
+      {
+       "code": "07.02.02",
+       "name": "Arena para gato",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "07.03",
+     "name": "Otras mascotas",
+     "subcategories": [
+      {
+       "code": "07.03.01",
+       "name": "Otras mascotas",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "07.04",
+     "name": "Accesorios e higiene de mascotas",
+     "subcategories": [
+      {
+       "code": "07.04.01",
+       "name": "Accesorios y juguetes para mascotas",
+       "product_types": []
+      },
+      {
+       "code": "07.04.02",
+       "name": "Higiene y salud de mascotas",
+       "product_types": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "08",
+   "name": "Hogar y cocina",
+   "gpc_reference": "Kitchen Merchandise / Household Furniture/Furnishings",
+   "categories": [
+    {
+     "code": "08.01",
+     "name": "Cocina",
+     "subcategories": [
+      {
+       "code": "08.01.01",
+       "name": "Utensilios de cocina y repostería",
+       "product_types": []
+      },
+      {
+       "code": "08.01.02",
+       "name": "Ollas y sartenes",
+       "product_types": []
+      },
+      {
+       "code": "08.01.03",
+       "name": "Recipientes, termos y botellas",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "08.02",
+     "name": "Mesa",
+     "subcategories": [
+      {
+       "code": "08.02.01",
+       "name": "Vajillas, vasos y cubiertos",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "08.03",
+     "name": "Blancos",
+     "subcategories": [
+      {
+       "code": "08.03.01",
+       "name": "Sábanas, edredones y cobijas",
+       "product_types": []
+      },
+      {
+       "code": "08.03.02",
+       "name": "Toallas",
+       "product_types": []
+      },
+      {
+       "code": "08.03.03",
+       "name": "Almohadas y colchones",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "08.04",
+     "name": "Decoración",
+     "subcategories": [
+      {
+       "code": "08.04.01",
+       "name": "Decoración del hogar",
+       "product_types": []
+      },
+      {
+       "code": "08.04.02",
+       "name": "Velas y aromaterapia",
+       "product_types": []
+      },
+      {
+       "code": "08.04.03",
+       "name": "Decoración de temporada",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "08.05",
+     "name": "Organización y lavandería",
+     "subcategories": [
+      {
+       "code": "08.05.01",
+       "name": "Organización y almacenamiento",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "08.06",
+     "name": "Muebles",
+     "subcategories": [
+      {
+       "code": "08.06.01",
+       "name": "Muebles",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "08.07",
+     "name": "Jardín y exteriores",
+     "subcategories": [
+      {
+       "code": "08.07.01",
+       "name": "Jardinería",
+       "product_types": []
+      },
+      {
+       "code": "08.07.02",
+       "name": "Muebles, parrillas y exteriores",
+       "product_types": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "09",
+   "name": "Ferretería y autos",
+   "gpc_reference": "Tools/Equipment / Automotive",
+   "categories": [
+    {
+     "code": "09.01",
+     "name": "Ferretería",
+     "subcategories": [
+      {
+       "code": "09.01.01",
+       "name": "Herramientas",
+       "product_types": []
+      },
+      {
+       "code": "09.01.02",
+       "name": "Electricidad e iluminación",
+       "product_types": []
+      },
+      {
+       "code": "09.01.03",
+       "name": "Pilas y baterías",
+       "product_types": []
+      },
+      {
+       "code": "09.01.04",
+       "name": "Pintura",
+       "product_types": []
+      },
+      {
+       "code": "09.01.05",
+       "name": "Plomería, pegamentos y selladores",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "09.02",
+     "name": "Autos y motos",
+     "subcategories": [
+      {
+       "code": "09.02.01",
+       "name": "Aceites y lubricantes",
+       "product_types": []
+      },
+      {
+       "code": "09.02.02",
+       "name": "Llantas",
+       "product_types": []
+      },
+      {
+       "code": "09.02.03",
+       "name": "Baterías para auto",
+       "product_types": []
+      },
+      {
+       "code": "09.02.04",
+       "name": "Limpieza y accesorios para auto",
+       "product_types": []
+      },
+      {
+       "code": "09.02.05",
+       "name": "Motos",
+       "product_types": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "10",
+   "name": "Electrónica y electrodomésticos",
+   "gpc_reference": "Audio Visual / Computing / Communications / Home Appliances",
+   "categories": [
+    {
+     "code": "10.01",
+     "name": "Electrónica",
+     "subcategories": [
+      {
+       "code": "10.01.01",
+       "name": "Televisores y accesorios",
+       "product_types": []
+      },
+      {
+       "code": "10.01.02",
+       "name": "Audio",
+       "product_types": []
+      },
+      {
+       "code": "10.01.03",
+       "name": "Celulares y accesorios",
+       "product_types": []
+      },
+      {
+       "code": "10.01.04",
+       "name": "Computación y tablets",
+       "product_types": []
+      },
+      {
+       "code": "10.01.05",
+       "name": "Videojuegos",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "10.02",
+     "name": "Electrodomésticos",
+     "subcategories": [
+      {
+       "code": "10.02.01",
+       "name": "Pequeños electrodomésticos",
+       "product_types": []
+      },
+      {
+       "code": "10.02.02",
+       "name": "Línea blanca",
+       "product_types": []
+      },
+      {
+       "code": "10.02.03",
+       "name": "Climatización",
+       "product_types": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "11",
+   "name": "Ropa, calzado y accesorios",
+   "gpc_reference": "Clothing / Footwear / Personal Accessories",
+   "categories": [
+    {
+     "code": "11.01",
+     "name": "Ropa",
+     "subcategories": [
+      {
+       "code": "11.01.01",
+       "name": "Hombre",
+       "product_types": []
+      },
+      {
+       "code": "11.01.02",
+       "name": "Mujer",
+       "product_types": []
+      },
+      {
+       "code": "11.01.03",
+       "name": "Niños",
+       "product_types": []
+      },
+      {
+       "code": "11.01.04",
+       "name": "Niñas",
+       "product_types": []
+      },
+      {
+       "code": "11.01.05",
+       "name": "Bebé",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "11.02",
+     "name": "Calzado",
+     "subcategories": [
+      {
+       "code": "11.02.01",
+       "name": "Calzado",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "11.03",
+     "name": "Accesorios y equipaje",
+     "subcategories": [
+      {
+       "code": "11.03.01",
+       "name": "Accesorios y equipaje",
+       "product_types": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "12",
+   "name": "Juguetes",
+   "gpc_reference": "Toys/Games",
+   "categories": [
+    {
+     "code": "12.01",
+     "name": "Juguetes",
+     "subcategories": [
+      {
+       "code": "12.01.01",
+       "name": "Muñecas y peluches",
+       "product_types": []
+      },
+      {
+       "code": "12.01.02",
+       "name": "Figuras de acción y coleccionables",
+       "product_types": []
+      },
+      {
+       "code": "12.01.03",
+       "name": "Vehículos y control remoto",
+       "product_types": []
+      },
+      {
+       "code": "12.01.04",
+       "name": "Juegos de mesa y rompecabezas",
+       "product_types": []
+      },
+      {
+       "code": "12.01.05",
+       "name": "Bloques y construcción",
+       "product_types": []
+      },
+      {
+       "code": "12.01.06",
+       "name": "Bebé y preescolar",
+       "product_types": []
+      },
+      {
+       "code": "12.01.07",
+       "name": "Educativos, arte y manualidades",
+       "product_types": []
+      },
+      {
+       "code": "12.01.08",
+       "name": "Juegos de exterior",
+       "product_types": []
+      },
+      {
+       "code": "12.01.09",
+       "name": "Juegos de roles",
+       "product_types": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "13",
+   "name": "Deportes y aire libre",
+   "gpc_reference": "Sports Equipment / Camping",
+   "categories": [
+    {
+     "code": "13.01",
+     "name": "Deportes",
+     "subcategories": [
+      {
+       "code": "13.01.01",
+       "name": "Fitness y ejercicio",
+       "product_types": []
+      },
+      {
+       "code": "13.01.02",
+       "name": "Artículos deportivos",
+       "product_types": []
+      },
+      {
+       "code": "13.01.03",
+       "name": "Bicicletas, scooters y patines",
+       "product_types": []
+      },
+      {
+       "code": "13.01.04",
+       "name": "Natación y piscinas",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "13.02",
+     "name": "Aire libre",
+     "subcategories": [
+      {
+       "code": "13.02.01",
+       "name": "Campismo",
+       "product_types": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "14",
+   "name": "Papelería, oficina y fiestas",
+   "gpc_reference": "Stationery/Office Machinery/Occasion Supplies",
+   "categories": [
+    {
+     "code": "14.01",
+     "name": "Papelería y oficina",
+     "subcategories": [
+      {
+       "code": "14.01.01",
+       "name": "Útiles escolares y de oficina",
+       "product_types": []
+      },
+      {
+       "code": "14.01.02",
+       "name": "Mochilas",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "14.02",
+     "name": "Libros y entretenimiento",
+     "subcategories": [
+      {
+       "code": "14.02.01",
+       "name": "Libros, música y películas",
+       "product_types": []
+      }
+     ]
+    },
+    {
+     "code": "14.03",
+     "name": "Fiestas y regalos",
+     "subcategories": [
+      {
+       "code": "14.03.01",
+       "name": "Artículos para fiesta y envolturas",
+       "product_types": []
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
