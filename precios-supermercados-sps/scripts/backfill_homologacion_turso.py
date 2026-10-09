@@ -45,6 +45,7 @@ from precios_supermercados.product_identity_decisions import (  # noqa: E402
     ProductIdentityDecisionError,
     load_reviewed_decisions,
 )
+from precios_supermercados.matching.attribute_links import engine_attribute_links  # noqa: E402
 from precios_supermercados.product_master import (  # noqa: E402
     DEFAULT_POLICY_PATH,
     MasterPolicy,
@@ -597,6 +598,14 @@ def _sync_master(
         members = member_profiles(derived, names)
         decisions = load_reviewed_decisions(decisions_path) if decisions_path.is_file() else ()
         reviewed, reviewed_diagnostics = reviewed_decision_links(decisions, products, policy=policy)
+        engine: list = []
+        engine_diagnostics: dict[str, object] = {}
+        if policy.method_active("engine_auto"):
+            try:
+                engine, engine_diagnostics = engine_attribute_links(products, members)
+            except Exception as exc:  # noqa: BLE001 - la regla nunca bloquea el maestro
+                engine_diagnostics = {"status": "error", "error_type": type(exc).__name__, "error": str(exc)[:300]}
+                print(f"engine_attribute_links_failed:{type(exc).__name__}:{exc}", file=sys.stderr)
         result = sync_product_master(
             TursoMasterStore(database_url, auth_token),
             members,
@@ -609,10 +618,13 @@ def _sync_master(
             ),
             changed_product_ids=[row.product_id for row in changed],
             reviewed_links=reviewed,
+            engine_links=engine,
             apply=apply,
         )
         if reviewed_diagnostics:
             result["reviewed_decisions"] = reviewed_diagnostics
+        if engine_diagnostics:
+            result["engine_attribute_links"] = engine_diagnostics
         result["status"] = "ok"
         return result
     except Exception as exc:  # noqa: BLE001 - capa auxiliar: nunca bloquea los perfiles

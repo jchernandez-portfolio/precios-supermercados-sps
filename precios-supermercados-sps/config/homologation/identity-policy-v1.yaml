@@ -95,10 +95,13 @@ product_master:
     gtin_sku_derived: active
     reviewed_decision: active
     manual_review: active
-    engine_auto: disabled
+    # Regla A por atributos (PriceSmart y Los Andes → maestro GTIN de otra
+    # cadena), aprobada 2026-10-09: 98.8 % medido en 387 pares + revisión del
+    # responsable 50/50. Ver src/precios_supermercados/matching/attribute_links.py.
+    engine_auto: active
   # Vínculos curados que los exportadores superponen a la identidad GTIN para
-  # volver comparable una fila (decisión humana "Mismo" con evidencia). Lista
-  # vacía = los vínculos curados se guardan pero no cambian el catálogo.
-  serving_link_methods: [manual_review, reviewed_decision]
+  # volver comparable una fila (decisión humana "Mismo" con evidencia o regla
+  # del motor aprobada). Lista vacía = se guardan pero no cambian el catálogo.
+  serving_link_methods: [manual_review, reviewed_decision, engine_auto]
   # Un single_source con otro GTIN válido nunca se vincula automáticamente.
   different_valid_gtin: review_only

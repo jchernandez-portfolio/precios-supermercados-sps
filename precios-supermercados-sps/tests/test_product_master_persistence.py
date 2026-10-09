@@ -209,8 +209,11 @@ def test_daily_refresh_writes_masters_with_bounded_turso_reads(db: Path, monkeyp
     first = homologation.backfill_turso("libsql://offline.example", "offline", updated_at_utc=NOW)
     master = first["product_master"]
     assert master["status"] == "ok" and master["mode"] == "full", master
-    assert master["masters"] == 8 and master["active_links"] == 16
-    assert master["plan"]["links_inserted"] == 16
+    # 16 vínculos GTIN + 2 de la regla A por atributos (Café Dorao PriceSmart y
+    # Leche Sula Los Andes → maestro GTIN de Walmart).
+    assert master["masters"] == 8 and master["active_links"] == 18
+    assert master["plan"]["links_inserted"] == 18
+    assert master["engine_attribute_links"]["links"] == 2
 
     # Segundo día sin cambios: perfiles no-op y maestro no-op con lecturas mínimas.
     fake.sql.clear()
@@ -218,7 +221,10 @@ def test_daily_refresh_writes_masters_with_bounded_turso_reads(db: Path, monkeyp
     second = homologation.backfill_turso("libsql://offline.example", "offline", updated_at_utc="2026-09-21T12:00:00Z")
     assert second["no_op"] is True
     assert second["product_master"]["mode"] == "noop"
-    assert second["product_master"]["rows_read"] <= len(pm.SCHEMA_OBJECTS) + 1
+    # Esquema + estado + por cada vínculo de la regla A: el vínculo persistido y
+    # su maestro destino (2 vínculos en el fixture → 4 filas).
+    engine_links = first["product_master"]["engine_attribute_links"]["links"]
+    assert second["product_master"]["rows_read"] <= len(pm.SCHEMA_OBJECTS) + 1 + 2 * engine_links
     master_reads = [s for s in fake.sql if "master_" in s and s.startswith("SELECT")]
     assert not any("ORDER BY master_product_id LIMIT" in s or "ORDER BY product_id LIMIT" in s for s in master_reads)
     assert not any(s.startswith(("INSERT", "UPDATE", "DELETE")) and "master_" in s for s in fake.sql)

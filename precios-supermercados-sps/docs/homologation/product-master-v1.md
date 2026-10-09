@@ -62,7 +62,7 @@ Una fila por decisión, con historial (`status`: `active` · `rejected` ·
 | `gtin_sku_derived` | `system` — GTIN derivado del SKU (Colonial) o del código (Comisariato) | sí |
 | `reviewed_decision` | `human:<revisor>` — decisión aprobada y vigente de `reviewed-decisions-v1.json` | sí (registro hoy vacío) |
 | `manual_review` | `human:<revisor>` — "Mismo" importado desde CSV | sí |
-| `engine_auto` | `engine:<versión>` | **no** (`disabled`) |
+| `engine_auto` | `engine:<versión>` | sí, sólo la regla A por atributos (activo 2026-10-09) |
 
 Restricciones por índice único parcial: **un vínculo activo por producto** y
 **un vínculo activo por cadena dentro de un maestro** (como un producto fuente
@@ -245,9 +245,7 @@ esas cadenas están sobrestimados.
 
 ## 8. Límites y pendientes
 
-- `engine_auto` deshabilitado: promoverlo exige golden set etiquetado y
-  precisión medida por par de cadenas (ver `matching-engine-v1.md` §9) y un
-  cambio explícito de política.
+- `engine_auto` activo desde 2026-10-09 sólo para la regla A por atributos (regla 23 del estándar de identidad): golden set de 387 pares etiquetados (98.8 %) y revisión del responsable 50/50. Cualquier otra regla automática exige su propio golden set y aprobación.
 - No hay herramienta de *merge* de maestros (el esquema la soporta:
   `status='merged'`, `merged_into`).
 - `exportar_rpi_marts.py`/`exportar_modelo_analitico.py` siguen usando sólo
