@@ -138,9 +138,44 @@ def test_ounces_convert_to_grams_only_for_solid_product_types() -> None:
     cheese = signature("Queso Crema Philadelphia Original 8 Oz", supermarket="la_colonia")
     assert cheese.dimension == "mass_g"
     assert presentations_compatible(cheese, signature("Queso Crema Philadelphia Original 226 g"))
-    # Aderezo / jugo: la onza puede ser de volumen; queda sin convertir.
+    # Aderezo: subcategoría mixta (salsas y aderezos); la onza queda sin convertir.
     assert signature("Aderezo Kraft Ranch Classic 8 Oz").dimension == "ounce"
-    assert signature("Jugo Welch's Uva 64 oz").dimension == "ounce"
+
+
+def test_ounces_in_liquid_subcategories_convert_to_milliliters() -> None:
+    """Regla 21 (v2.7): bebidas, leche, shampoo... usan onza líquida."""
+    juice = signature("Jugo Welch's Uva 64 oz")
+    assert juice.dimension == "volume_ml"
+    assert juice.declared_ounces == Decimal("64")
+    assert presentations_compatible(juice, signature("Jugo Welch's Uva 1.89 L", supermarket="colonial"))
+    beer = resolve_presentation_v2(
+        SourceProductRecord(
+            source_record_id="comisariato_los_andes:cusquena",
+            supermarket_id="comisariato_los_andes",
+            source_name="Cerveza cusqueña 11.2 oz",
+            source_category="LICORES",
+        )
+    )[0]
+    assert beer.dimension == "volume_ml" and round(beer.total_base) == 331
+
+
+def test_ounce_basis_follows_master_tree_and_skips_ambiguous_cases() -> None:
+    snack = resolve_presentation_v2(
+        SourceProductRecord(source_record_id="colonial:1", supermarket_id="colonial",
+                            source_name="Boom Chicka Pop White Cheddar 4oz", source_category="Snack")
+    )[0]
+    assert snack.dimension == "mass_g"
+    # Condensada declara peso neto aunque esté en "Leche".
+    assert signature("Leche Condensada La Lechera 14 oz").dimension == "mass_g"
+    # Aerosoles: peso neto aunque sea aceite.
+    spray = resolve_presentation_v2(
+        SourceProductRecord(source_record_id="la_colonia:1", supermarket_id="la_colonia",
+                            source_name="Aceite de Cocina de Canola En Spray 6Oz",
+                            source_category="Supermercado > Abarrotes > Aceites")
+    )[0]
+    assert spray.dimension == "ounce"
+    # Sin categoría ni tipo: no se adivina.
+    assert signature("Boom Chicka Pop White Cheddar 4oz").dimension == "ounce"
 
 
 def test_converted_ounces_remain_compatible_with_ounce_only_sources() -> None:
@@ -201,7 +236,7 @@ def test_public_presentation_rounds_and_reads_thousands() -> None:
         presentation_dimension=None,
         presentation_total_base=None,
         presentation_status="conflict",
-    ) == "1400 ml"
+    ) == "1.4 L"
 
 
 @pytest.mark.parametrize(

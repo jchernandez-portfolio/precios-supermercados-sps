@@ -25,7 +25,7 @@ import json
 import re
 import unicodedata
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 from typing import Iterable
@@ -36,6 +36,8 @@ CROSSWALK_PATH = PROJECT_ROOT / "config" / "homologation" / "source-category-cro
 TREE_SCHEMA = "precios-sps-master-category-tree/v1"
 LEVELS = ("department", "category", "subcategory")
 CROSSWALK_LEVELS = frozenset({"subcategory", "category", "department", "by_name", "excluded"})
+OUNCE_BASES = frozenset({"mass", "fluid"})
+UNIT_REFERENCES = frozenset({"per_100"})
 
 # Departamentos de la taxonomía interna previa (v2.x) -> departamento del árbol.
 # Sólo se usa como último recurso cuando no hay equivalencia ni tipo.
@@ -97,6 +99,8 @@ class Taxonomy:
     type_nodes: dict[str, Node]
     crosswalk: dict[tuple[str, str], CrosswalkEntry]
     excluded_label: str
+    # Atributos por subcategoría: {"ounce": "mass"|"fluid", "unit_reference": "per_100"}.
+    attributes: dict[tuple[str, str, str], dict[str, str]] = field(default_factory=dict)
 
 
 def _load_tree(path: Path) -> dict:
@@ -111,6 +115,7 @@ def load(tree_path: Path = TREE_PATH, crosswalk_path: Path = CROSSWALK_PATH) -> 
     tree = _load_tree(tree_path)
     paths: set[tuple[str, str, str]] = set()
     type_nodes: dict[str, Node] = {}
+    attributes: dict[tuple[str, str, str], dict[str, str]] = {}
     for department in tree["departments"]:
         for category in department["categories"]:
             for subcategory in category["subcategories"]:
@@ -118,6 +123,10 @@ def load(tree_path: Path = TREE_PATH, crosswalk_path: Path = CROSSWALK_PATH) -> 
                 if path in paths:
                     raise MasterTaxonomyError("master_tree_duplicate_node")
                 paths.add(path)
+                attrs = {key: subcategory[key] for key in ("ounce", "unit_reference") if key in subcategory}
+                if attrs.get("ounce", "mass") not in OUNCE_BASES or attrs.get("unit_reference", "per_100") not in UNIT_REFERENCES:
+                    raise MasterTaxonomyError(f"master_tree_attribute_invalid:{path}")
+                attributes[path] = attrs
                 for product_type in subcategory.get("product_types", []):
                     if product_type in type_nodes:
                         raise MasterTaxonomyError(f"master_tree_duplicate_product_type:{product_type}")
@@ -142,7 +151,7 @@ def load(tree_path: Path = TREE_PATH, crosswalk_path: Path = CROSSWALK_PATH) -> 
                 raise MasterTaxonomyError(f"crosswalk_duplicate:{key}")
             crosswalk[key] = CrosswalkEntry(level, node)
     return Taxonomy(tree, frozenset(paths), categories, departments, type_nodes, crosswalk,
-                    str(tree.get("excluded_label") or "Fuera del catálogo"))
+                    str(tree.get("excluded_label") or "Fuera del catálogo"), attributes)
 
 
 @dataclass(frozen=True, slots=True)
@@ -220,3 +229,50 @@ def unmapped_source_categories(pairs: Iterable[tuple[str, str | None]], taxonomy
     tax = taxonomy or load()
     missing = {(sm, cat) for sm, cat in pairs if cat and (sm, fold_key(cat)) not in tax.crosswalk}
     return sorted(missing)
+
+
+def node_attribute(node: Node | None, key: str, taxonomy: Taxonomy | None = None) -> str | None:
+    """Atributo de subcategoría (``ounce``/``unit_reference``) de un nodo.
+
+    Un nodo a nivel categoría o departamento sólo hereda el atributo si TODAS
+    sus subcategorías lo comparten (si no, es ambiguo y se devuelve ``None``).
+    """
+    if node is None or node.department is None:
+        return None
+    tax = taxonomy or load()
+    if node.subcategory is not None:
+        return tax.attributes.get((node.department, node.category, node.subcategory), {}).get(key)
+    values = {
+        attrs.get(key)
+        for path, attrs in tax.attributes.items()
+        if path[0] == node.department and (node.category is None or path[1] == node.category)
+    }
+    return values.pop() if len(values) == 1 else None
+
+
+def ounce_basis(
+    supermarket_id: str,
+    source_category: str | None,
+    product_type: str | None,
+    taxonomy: Taxonomy | None = None,
+) -> str | None:
+    """"mass" (oz de peso), "fluid" (oz líquida) o ``None`` (no convertir)."""
+    assignment = assign_offer(supermarket_id, source_category, product_type, taxonomy=taxonomy)
+    return node_attribute(assignment.node, "ounce", taxonomy)
+
+
+_UNIT_REFERENCE = {
+    ("mass_g", None): (1000, "kg"),
+    ("mass_g", "per_100"): (100, "100 g"),
+    ("volume_ml", None): (1000, "L"),
+    ("volume_ml", "per_100"): (100, "100 ml"),
+    ("count", None): (1, "unidad"),
+    ("count", "per_100"): (1, "unidad"),
+}
+
+
+def unit_reference(node: Node | None, dimension: str | None, taxonomy: Taxonomy | None = None) -> tuple[int, str] | None:
+    """(cantidad base, etiqueta) del precio unitario público: fija por subcategoría."""
+    if dimension is None:
+        return None
+    return _UNIT_REFERENCE.get((dimension, node_attribute(node, "unit_reference", taxonomy)))

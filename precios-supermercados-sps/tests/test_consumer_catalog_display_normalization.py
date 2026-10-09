@@ -232,7 +232,7 @@ def test_non_shell_egg_names_do_not_trigger_grade_override() -> None:
         presentation_dimension="volume_ml",
         presentation_total_base="1774",
         presentation_status="confirmed",
-    ) == "1774 ml"
+    ) == "1.774 L"
 
 
 def test_common_unmodeled_unit_is_normalized_without_becoming_unknown() -> None:

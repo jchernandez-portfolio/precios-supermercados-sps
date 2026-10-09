@@ -1,6 +1,6 @@
 {
  "schema": "precios-sps-master-category-tree/v1",
- "version": "1.0.0",
+ "version": "1.1.0",
  "approved_by": "project_owner",
  "approved_at": "2026-10-08",
  "levels": [
@@ -35,14 +35,16 @@
        "product_types": [
         "Arroz",
         "Frijol"
-       ]
+       ],
+       "ounce": "mass"
       },
       {
        "code": "01.01.03",
        "name": "Azúcar y endulzantes",
        "product_types": [
         "Azúcar"
-       ]
+       ],
+       "ounce": "mass"
       },
       {
        "code": "01.01.04",
@@ -50,21 +52,24 @@
        "product_types": [
         "Harina de maíz",
         "Harina de trigo"
-       ]
+       ],
+       "ounce": "mass"
       },
       {
        "code": "01.01.05",
        "name": "Pastas",
        "product_types": [
         "Pasta"
-       ]
+       ],
+       "ounce": "mass"
       },
       {
        "code": "01.01.06",
        "name": "Sopas y comidas instantáneas",
        "product_types": [
         "Sopa"
-       ]
+       ],
+       "ounce": "mass"
       },
       {
        "code": "01.01.07",
@@ -72,7 +77,9 @@
        "product_types": [
         "Atún",
         "Sardina"
-       ]
+       ],
+       "ounce": "mass",
+       "unit_reference": "per_100"
       },
       {
        "code": "01.01.08",
@@ -84,14 +91,17 @@
         "Mostaza",
         "Pasta de tomate",
         "Salsa"
-       ]
+       ],
+       "unit_reference": "per_100"
       },
       {
        "code": "01.01.09",
        "name": "Especias y condimentos",
        "product_types": [
         "Sal"
-       ]
+       ],
+       "ounce": "mass",
+       "unit_reference": "per_100"
       },
       {
        "code": "01.01.10",
@@ -99,7 +109,9 @@
        "product_types": [
         "Mantequilla de maní",
         "Miel"
-       ]
+       ],
+       "ounce": "mass",
+       "unit_reference": "per_100"
       },
       {
        "code": "01.01.11",
@@ -107,12 +119,14 @@
        "product_types": [
         "Avena",
         "Cereal"
-       ]
+       ],
+       "ounce": "mass"
       },
       {
        "code": "01.01.12",
        "name": "Productos vegetales y especialidades",
-       "product_types": []
+       "product_types": [],
+       "ounce": "mass"
       }
      ]
     },
@@ -123,33 +137,43 @@
       {
        "code": "01.02.01",
        "name": "Papas, frituras y boquitas",
-       "product_types": []
+       "product_types": [],
+       "ounce": "mass",
+       "unit_reference": "per_100"
       },
       {
        "code": "01.02.02",
        "name": "Frutos secos y fruta deshidratada",
-       "product_types": []
+       "product_types": [],
+       "ounce": "mass",
+       "unit_reference": "per_100"
       },
       {
        "code": "01.02.03",
        "name": "Galletas",
        "product_types": [
         "Galleta"
-       ]
+       ],
+       "ounce": "mass",
+       "unit_reference": "per_100"
       },
       {
        "code": "01.02.04",
        "name": "Dulces y chocolates",
        "product_types": [
         "Chocolate"
-       ]
+       ],
+       "ounce": "mass",
+       "unit_reference": "per_100"
       },
       {
        "code": "01.02.05",
        "name": "Gelatinas, flanes y postres",
        "product_types": [
         "Gelatina"
-       ]
+       ],
+       "ounce": "mass",
+       "unit_reference": "per_100"
       }
      ]
     },
@@ -165,21 +189,25 @@
         "Leche condensada",
         "Leche en polvo",
         "Leche evaporada"
-       ]
+       ],
+       "ounce": "fluid"
       },
       {
        "code": "01.03.02",
        "name": "Quesos",
        "product_types": [
         "Queso"
-       ]
+       ],
+       "ounce": "mass",
+       "unit_reference": "per_100"
       },
       {
        "code": "01.03.03",
        "name": "Yogurt",
        "product_types": [
         "Yogurt"
-       ]
+       ],
+       "ounce": "mass"
       },
       {
        "code": "01.03.04",
@@ -204,32 +232,39 @@
       {
        "code": "01.04.01",
        "name": "Res",
-       "product_types": []
+       "product_types": [],
+       "ounce": "mass"
       },
       {
        "code": "01.04.02",
        "name": "Cerdo",
-       "product_types": []
+       "product_types": [],
+       "ounce": "mass"
       },
       {
        "code": "01.04.03",
        "name": "Pollo y pavo",
-       "product_types": []
+       "product_types": [],
+       "ounce": "mass"
       },
       {
        "code": "01.04.04",
        "name": "Pescados y mariscos",
-       "product_types": []
+       "product_types": [],
+       "ounce": "mass"
       },
       {
        "code": "01.04.05",
        "name": "Embutidos y carnes frías",
-       "product_types": []
+       "product_types": [],
+       "ounce": "mass",
+       "unit_reference": "per_100"
       },
       {
        "code": "01.04.06",
        "name": "Proteínas vegetales",
-       "product_types": []
+       "product_types": [],
+       "ounce": "mass"
       }
      ]
     },
@@ -240,17 +275,20 @@
       {
        "code": "01.05.01",
        "name": "Frutas",
-       "product_types": []
+       "product_types": [],
+       "ounce": "mass"
       },
       {
        "code": "01.05.02",
        "name": "Verduras",
-       "product_types": []
+       "product_types": [],
+       "ounce": "mass"
       },
       {
        "code": "01.05.03",
        "name": "Hierbas y montes",
-       "product_types": []
+       "product_types": [],
+       "ounce": "mass"
       }
      ]
     },
@@ -264,17 +302,20 @@
        "product_types": [
         "Pan",
         "Pan de molde"
-       ]
+       ],
+       "ounce": "mass"
       },
       {
        "code": "01.06.02",
        "name": "Pan dulce, pasteles y repostería",
-       "product_types": []
+       "product_types": [],
+       "ounce": "mass"
       },
       {
        "code": "01.06.03",
        "name": "Tortillas",
-       "product_types": []
+       "product_types": [],
+       "ounce": "mass"
       }
      ]
     },
@@ -285,12 +326,14 @@
       {
        "code": "01.07.01",
        "name": "Comidas listas y congeladas",
-       "product_types": []
+       "product_types": [],
+       "ounce": "mass"
       },
       {
        "code": "01.07.02",
        "name": "Comida preparada y deli",
-       "product_types": []
+       "product_types": [],
+       "ounce": "mass"
       },
       {
        "code": "01.07.03",
@@ -302,7 +345,8 @@
       {
        "code": "01.07.04",
        "name": "Frutas y verduras congeladas",
-       "product_types": []
+       "product_types": [],
+       "ounce": "mass"
       },
       {
        "code": "01.07.05",
@@ -327,43 +371,51 @@
        "name": "Agua",
        "product_types": [
         "Agua"
-       ]
+       ],
+       "ounce": "fluid"
       },
       {
        "code": "02.01.02",
        "name": "Gaseosas",
        "product_types": [
         "Refresco"
-       ]
+       ],
+       "ounce": "fluid"
       },
       {
        "code": "02.01.03",
        "name": "Jugos y néctares",
        "product_types": [
         "Jugo"
-       ]
+       ],
+       "ounce": "fluid"
       },
       {
        "code": "02.01.04",
        "name": "Energizantes e hidratantes",
-       "product_types": []
+       "product_types": [],
+       "ounce": "fluid"
       },
       {
        "code": "02.01.05",
        "name": "Café y té listos para beber",
-       "product_types": []
+       "product_types": [],
+       "ounce": "fluid"
       },
       {
        "code": "02.01.06",
        "name": "Bebidas en polvo y concentrados",
-       "product_types": []
+       "product_types": [],
+       "ounce": "mass",
+       "unit_reference": "per_100"
       },
       {
        "code": "02.01.07",
        "name": "Bebidas vegetales",
        "product_types": [
         "Bebida vegetal"
-       ]
+       ],
+       "ounce": "fluid"
       }
      ]
     },
@@ -376,19 +428,24 @@
        "name": "Café",
        "product_types": [
         "Café"
-       ]
+       ],
+       "ounce": "mass",
+       "unit_reference": "per_100"
       },
       {
        "code": "02.02.02",
        "name": "Té e infusiones",
        "product_types": [
         "Té"
-       ]
+       ],
+       "ounce": "mass",
+       "unit_reference": "per_100"
       },
       {
        "code": "02.02.03",
        "name": "Cremoras y endulzantes para café",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       }
      ]
     },
@@ -401,26 +458,30 @@
        "name": "Cerveza",
        "product_types": [
         "Cerveza"
-       ]
+       ],
+       "ounce": "fluid"
       },
       {
        "code": "02.03.02",
        "name": "Vinos",
        "product_types": [
         "Vino"
-       ]
+       ],
+       "ounce": "fluid"
       },
       {
        "code": "02.03.03",
        "name": "Licores",
        "product_types": [
         "Ron"
-       ]
+       ],
+       "ounce": "fluid"
       },
       {
        "code": "02.03.04",
        "name": "Mezcladores",
-       "product_types": []
+       "product_types": [],
+       "ounce": "fluid"
       }
      ]
     },
@@ -451,31 +512,38 @@
        "name": "Shampoo",
        "product_types": [
         "Shampoo"
-       ]
+       ],
+       "ounce": "fluid",
+       "unit_reference": "per_100"
       },
       {
        "code": "03.01.02",
        "name": "Acondicionadores y tratamientos",
        "product_types": [
         "Acondicionador"
-       ]
+       ],
+       "ounce": "fluid",
+       "unit_reference": "per_100"
       },
       {
        "code": "03.01.03",
        "name": "Cremas, geles y fijadores",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       },
       {
        "code": "03.01.04",
        "name": "Tintes",
        "product_types": [
         "Tinte para cabello"
-       ]
+       ],
+       "unit_reference": "per_100"
       },
       {
        "code": "03.01.05",
        "name": "Cepillos y accesorios para cabello",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       }
      ]
     },
@@ -488,34 +556,40 @@
        "name": "Jabones y geles de baño",
        "product_types": [
         "Jabón"
-       ]
+       ],
+       "unit_reference": "per_100"
       },
       {
        "code": "03.02.02",
        "name": "Desodorantes",
        "product_types": [
         "Desodorante"
-       ]
+       ],
+       "unit_reference": "per_100"
       },
       {
        "code": "03.02.03",
        "name": "Cremas y lociones corporales",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       },
       {
        "code": "03.02.04",
        "name": "Protector solar",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       },
       {
        "code": "03.02.05",
        "name": "Fragancias",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       },
       {
        "code": "03.02.06",
        "name": "Accesorios de baño",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       }
      ]
     },
@@ -528,12 +602,14 @@
        "name": "Limpieza y desmaquillantes",
        "product_types": [
         "Agua micelar"
-       ]
+       ],
+       "unit_reference": "per_100"
       },
       {
        "code": "03.03.02",
        "name": "Cremas y tratamientos faciales",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       }
      ]
     },
@@ -546,21 +622,25 @@
        "name": "Pasta dental",
        "product_types": [
         "Pasta dental"
-       ]
+       ],
+       "unit_reference": "per_100"
       },
       {
        "code": "03.04.02",
        "name": "Cepillos dentales",
        "product_types": [
         "Cepillo dental"
-       ]
+       ],
+       "unit_reference": "per_100"
       },
       {
        "code": "03.04.03",
        "name": "Enjuague e hilo dental",
        "product_types": [
         "Enjuague bucal"
-       ]
+       ],
+       "ounce": "fluid",
+       "unit_reference": "per_100"
       }
      ]
     },
@@ -571,17 +651,20 @@
       {
        "code": "03.05.01",
        "name": "Maquillaje",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       },
       {
        "code": "03.05.02",
        "name": "Uñas",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       },
       {
        "code": "03.05.03",
        "name": "Accesorios cosméticos",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       }
      ]
     },
@@ -592,7 +675,8 @@
       {
        "code": "03.06.01",
        "name": "Afeitado y depilación",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       }
      ]
     },
@@ -606,12 +690,14 @@
        "product_types": [
         "Protector diario",
         "Toalla femenina"
-       ]
+       ],
+       "unit_reference": "per_100"
       },
       {
        "code": "03.07.02",
        "name": "Higiene íntima",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       }
      ]
     },
@@ -645,37 +731,44 @@
       {
        "code": "04.01.01",
        "name": "Dolor y fiebre",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       },
       {
        "code": "04.01.02",
        "name": "Gripe, tos y alergias",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       },
       {
        "code": "04.01.03",
        "name": "Sistema digestivo",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       },
       {
        "code": "04.01.04",
        "name": "Dermatología",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       },
       {
        "code": "04.01.05",
        "name": "Cuidado de pies",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       },
       {
        "code": "04.01.06",
        "name": "Ojos y oídos",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       },
       {
        "code": "04.01.07",
        "name": "Antiparasitarios",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       }
      ]
     },
@@ -686,22 +779,26 @@
       {
        "code": "04.02.01",
        "name": "Vitaminas y minerales",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       },
       {
        "code": "04.02.02",
        "name": "Suplementos alimenticios",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       },
       {
        "code": "04.02.03",
        "name": "Nutrición deportiva",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       },
       {
        "code": "04.02.04",
        "name": "Control de diabetes",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       }
      ]
     },
@@ -712,7 +809,8 @@
       {
        "code": "04.03.01",
        "name": "Primeros auxilios",
-       "product_types": []
+       "product_types": [],
+       "unit_reference": "per_100"
       }
      ]
     },
@@ -777,12 +875,16 @@
       {
        "code": "05.02.01",
        "name": "Fórmulas y leches infantiles",
-       "product_types": []
+       "product_types": [],
+       "ounce": "mass",
+       "unit_reference": "per_100"
       },
       {
        "code": "05.02.02",
        "name": "Colados, cereales y galletas infantiles",
-       "product_types": []
+       "product_types": [],
+       "ounce": "mass",
+       "unit_reference": "per_100"
       },
       {
        "code": "05.02.03",
@@ -836,7 +938,8 @@
        "name": "Suavizantes",
        "product_types": [
         "Suavizante"
-       ]
+       ],
+       "ounce": "fluid"
       },
       {
        "code": "06.01.03",
@@ -861,7 +964,8 @@
         "Cloro",
         "Desinfectante",
         "Limpiador desinfectante"
-       ]
+       ],
+       "ounce": "fluid"
       },
       {
        "code": "06.02.02",
@@ -959,12 +1063,15 @@
        "name": "Alimento para perro",
        "product_types": [
         "Alimento para perro"
-       ]
+       ],
+       "ounce": "mass"
       },
       {
        "code": "07.01.02",
        "name": "Snacks y premios para perro",
-       "product_types": []
+       "product_types": [],
+       "ounce": "mass",
+       "unit_reference": "per_100"
       }
      ]
     },
@@ -977,12 +1084,14 @@
        "name": "Alimento para gato",
        "product_types": [
         "Alimento para gato"
-       ]
+       ],
+       "ounce": "mass"
       },
       {
        "code": "07.02.02",
        "name": "Arena para gato",
-       "product_types": []
+       "product_types": [],
+       "ounce": "mass"
       }
      ]
     },
@@ -1469,5 +1578,9 @@
     }
    ]
   }
- ]
+ ],
+ "attributes": {
+  "ounce": "Subcategoría: \"mass\" = una \"oz\" sin \"fl\" es onza de peso (28.3495 g); \"fluid\" = onza líquida (29.5735 ml). Sin atributo la onza queda sin convertir.",
+  "unit_reference": "Subcategoría: \"per_100\" = precio por 100 g/100 ml; sin atributo = por kg/L. Conteos siempre por unidad."
+ }
 }

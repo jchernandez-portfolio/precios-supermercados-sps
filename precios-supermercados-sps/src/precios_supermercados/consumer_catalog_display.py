@@ -206,6 +206,23 @@ def _egg_count(product_name: object, source_presentation: object, product_type: 
     return value if value > 0 else None
 
 
+def _thousandths(base: Decimal) -> str:
+    """g/ml → kg/L con hasta 3 decimales: 1774 ml = 1.774 L, sin perder precisión."""
+    value = (base / 1000).quantize(Decimal("0.001")).normalize()
+    return format(value, "f")
+
+
+def _amount(dimension: object, base: Decimal) -> str | None:
+    """Cantidad pública estándar: g/ml bajo 1000 y kg/L desde 1000 (≤ 2 decimales)."""
+    if dimension == "mass_g":
+        return f"{_thousandths(base)} kg" if base >= 1000 else f"{display_quantity(base)} g"
+    if dimension == "volume_ml":
+        return f"{_thousandths(base)} L" if base >= 1000 else f"{display_quantity(base)} ml"
+    if dimension == "ounce":
+        return f"{display_quantity(base)} oz"
+    return None
+
+
 def _from_dimension(dimension: object, total_base: object) -> str | None:
     total = _decimal(total_base)
     if total is None:
@@ -214,17 +231,25 @@ def _from_dimension(dimension: object, total_base: object) -> str | None:
         if total != total.to_integral_value():
             return None
         return f"{int(total)} unidades"
-    if dimension == "mass_g":
-        if total >= 1000 and total % 1000 == 0:
-            return f"{_format_decimal(total / 1000)} kg"
-        return f"{_format_decimal(total)} g"
-    if dimension == "volume_ml":
-        if total >= 1000 and total % 1000 == 0:
-            return f"{_format_decimal(total / 1000)} L"
-        return f"{_format_decimal(total)} ml"
-    if dimension == "ounce":
-        return f"{_format_decimal(total)} oz"
-    return None
+    return _amount(dimension, total)
+
+
+_MULTIPACK_DISPLAY_RE = re.compile(r"^\s*(?P<count>\d{1,4})\s*×\s*(?P<amount>\d+(?:\.\d+)?)\s*(?P<unit>g|ml|oz)\s*$")
+
+
+def _multipack(dimension: object, total_base: object, display: object) -> str | None:
+    """"12 × 946 ml" desde la presentación del perfil si cuadra con el total."""
+    match = _MULTIPACK_DISPLAY_RE.match(_clean(display) or "")
+    total = _decimal(total_base)
+    if match is None or total is None or dimension not in {"mass_g", "volume_ml", "ounce"}:
+        return None
+    count, unit_amount = int(match.group("count")), _decimal(match.group("amount"))
+    expected_unit = {"mass_g": "g", "volume_ml": "ml", "ounce": "oz"}[str(dimension)]
+    if count < 2 or unit_amount is None or match.group("unit") != expected_unit:
+        return None
+    if abs(unit_amount * count - total) > max(Decimal("1"), total * Decimal("0.01")):
+        return None
+    return f"{count} × {_amount(dimension, unit_amount)}"
 
 
 def _from_text(value: object) -> str | None:
@@ -283,7 +308,9 @@ def canonical_presentation(
         return f"{egg_count} unidades"
 
     if presentation_status in _VALID_PROFILE_PRESENTATION:
-        normalized = _from_dimension(presentation_dimension, presentation_total_base)
+        normalized = _multipack(presentation_dimension, presentation_total_base, source_presentation) or _from_dimension(
+            presentation_dimension, presentation_total_base
+        )
         if normalized is not None:
             return normalized
 
@@ -297,3 +324,30 @@ def canonical_presentation(
     if source is not None and (_fold(source) or "") not in _GENERIC_PRESENTATIONS:
         return source
     return None
+
+
+def unit_price(
+    *,
+    price: object,
+    presentation_dimension: object,
+    presentation_total_base: object,
+    presentation_status: object,
+    reference: tuple[int, str] | None,
+) -> dict[str, str] | None:
+    """Precio por unidad de referencia fija (``{"amount": "13.28", "per": "100 g"}``).
+
+    Sólo con presentación aceptada (mismos estados que la presentación pública)
+    y una referencia de la subcategoría; la onza sin convertir no tiene precio
+    unitario (no es comparable con g/ml).
+    """
+    if reference is None or presentation_status not in _VALID_PROFILE_PRESENTATION:
+        return None
+    if presentation_dimension not in {"mass_g", "volume_ml", "count"}:
+        return None
+    total = _decimal(presentation_total_base)
+    amount = _decimal(price)
+    if total is None or amount is None or total <= 0 or amount <= 0:
+        return None
+    base, label = reference
+    value = (amount * Decimal(base) / total).quantize(Decimal("0.01"))
+    return {"amount": format(value, "f"), "per": label}

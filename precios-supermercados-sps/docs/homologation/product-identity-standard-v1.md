@@ -51,9 +51,10 @@ confirman identidad por sí mismos.
 2. Dos GTIN válidos diferentes bloquean una identidad exacta.
 3. Un conflicto explícito de marca, tipo, presentación, variante, sabor o empaque
    bloquea la unión. Un dato ausente no constituye conflicto.
-4. `oz` no se convierte automáticamente a mililitros: debe demostrarse que el
-   empaque declara `fl oz`. Desde v2.5 sí se convierte a gramos (onza de peso)
-   cuando el tipo de producto es sólido (regla 15).
+4. `oz` no se adivina: se convierte a gramos (onza de peso) o a mililitros
+   (onza líquida) sólo cuando el tipo de producto o la subcategoría del árbol
+   maestro lo determinan (reglas 15 y 21, v2.7). En subcategorías mixtas, sin
+   tipo ni categoría, o en aerosoles, queda como `oz`.
 5. Una equivalencia sin GTIN requiere decisión revisada, evidencia citada,
    producto maestro explícito y huellas vigentes de ambos registros.
 6. Si cambia cualquiera de los registros fuente o la versión del motor, la
@@ -209,6 +210,24 @@ confirman identidad por sí mismos.
     supervivencia documentadas (marca fuente > inferida, métrico > imperial,
     más frecuente) y un atributo fijado por una persona nunca se sobrescribe.
     Política en la sección `product_master` de `identity-policy-v1.yaml`.
+21. **Onza de peso o líquida por categoría (v2.7, aprobado 2026-10-09).**
+    Además de los tipos sólidos de la regla 15 (más `Leche condensada`, que
+    declara peso neto), una presentación sólo-onzas se convierte según el
+    atributo `ounce` de la subcategoría del árbol maestro a la que lleva la
+    categoría del súper o el tipo por nombre: `mass` → 28.3495 g (abarrotes
+    secos, snacks, carnes, panadería, quesos, yogurt, café, alimento de
+    mascota...); `fluid` → 29.5735 ml (bebidas, cerveza y licores, leche,
+    shampoo, enjuague bucal, suavizante, cloro). `Aceite comestible` es
+    líquido aunque su subcategoría sea mixta. Subcategorías mixtas (salsas y
+    aderezos, aceites y grasas, cremas, detergentes, helados) y nombres con
+    spray/aerosol/atomizador no se convierten. Las onzas declaradas se
+    conservan (`declared_ounces`) para seguir siendo compatibles con fuentes
+    sólo-onzas.
+22. **Multipacks de PriceSmart (v2.7).** El nombre "N Unidades / X" (o "N
+    Unidades X" sin separador) con una presentación fuente igual al total
+    (N × X) se acepta como paquete de N × X; antes se leía como conflicto y el
+    producto quedaba sin tamaño. Sin separador sólo vale si la fuente confirma
+    el total.
 
 ## Casos iniciales
 

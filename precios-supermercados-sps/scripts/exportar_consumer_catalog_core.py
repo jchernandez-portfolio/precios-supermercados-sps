@@ -23,7 +23,7 @@ from exportar_modelo_analitico import (  # noqa: E402
 )
 from exportar_rpi_marts import _parse_utc, fetch_freshness  # noqa: E402
 from generar_mvp_sqlite_la_colonia import HISTORY_INDEX_NAME  # noqa: E402
-from precios_supermercados import master_taxonomy  # noqa: E402
+from precios_supermercados import consumer_catalog_display, master_taxonomy  # noqa: E402
 from precios_supermercados.price_analytics import ComparisonScope  # noqa: E402
 from precios_supermercados.price_history_analytics import (  # noqa: E402
     HistoricalPriceObservation,
@@ -578,22 +578,38 @@ def _representative(group: Sequence[VisibleOffer]) -> VisibleOffer:
             offer.supermarket_id,
         ),
     )[0]
-def _public_taxonomy(group: Sequence[VisibleOffer]) -> tuple[str | None, str | None] | None:
-    """Categoría pública del árbol maestro v1 para un grupo; ``None`` = excluir.
-
-    El grupo comparable comparte un solo nodo (paso "mismo producto en otro
-    súper"); cada oferta aporta su equivalencia de categoría y su tipo por nombre.
-    """
+def _public_assignment(group: Sequence[VisibleOffer]) -> "master_taxonomy.Assignment":
+    """Nodo del árbol maestro v1 de un grupo (comparte el más específico)."""
     assignments = [
         master_taxonomy.assign_offer(
             offer.supermarket_id, offer.source_category, offer.product_type, offer.category
         )
         for offer in group
     ]
-    chosen = master_taxonomy.assign_group(assignments)
+    return master_taxonomy.assign_group(assignments)
+
+
+def _public_taxonomy(group: Sequence[VisibleOffer]) -> tuple[str | None, str | None] | None:
+    """Categoría pública del árbol maestro v1 para un grupo; ``None`` = excluir.
+
+    El grupo comparable comparte un solo nodo (paso "mismo producto en otro
+    súper"); cada oferta aporta su equivalencia de categoría y su tipo por nombre.
+    """
+    chosen = _public_assignment(group)
     if chosen.source == "excluded":
         return None
     return master_taxonomy.public_fields(chosen.node)
+
+
+def _unit_price(offer: VisibleOffer, node: "master_taxonomy.Node | None") -> dict[str, str] | None:
+    """Precio unitario público con la referencia fija de la subcategoría."""
+    return consumer_catalog_display.unit_price(
+        price=_money(offer.current_price_minor),
+        presentation_dimension=offer.presentation_dimension,
+        presentation_total_base=offer.presentation_total_base,
+        presentation_status=offer.presentation_status,
+        reference=master_taxonomy.unit_reference(node, offer.presentation_dimension),
+    )
 
 
 def build_rows(
@@ -611,6 +627,9 @@ def build_rows(
         identity_value = canonical_id or representative.source_product_id
         mode = _comparability_today(identity_mode, group)
         states = _relative_states(mode, group, freshness_by_scope)
+        assignment = _public_assignment(group)
+        if assignment.source == "excluded":
+            continue  # fuera del catálogo (p. ej. tarjetas de regalo)
         public_offers = []
         for offer in sorted(group, key=lambda item: EXPECTED_SCOPE.index((item.supermarket_id, item.location_id))):
             freshness = freshness_by_scope[(offer.supermarket_id, offer.location_id)]
@@ -626,6 +645,7 @@ def build_rows(
                     "observed_at": offer.observed_at,
                     "freshness_status": freshness,
                     "relative_price_state": states[offer.source_product_id],
+                    "unit_price": _unit_price(offer, assignment.node),
                     "historical_summary": _historical_summary(
                         offer,
                         history_by_offer.get((offer.source_product_id, offer.location_id), ()),
@@ -633,10 +653,7 @@ def build_rows(
                     ),
                 }
             )
-        public = _public_taxonomy(group)
-        if public is None:
-            continue  # fuera del catálogo (p. ej. tarjetas de regalo)
-        category, public_type = public
+        category, public_type = master_taxonomy.public_fields(assignment.node)
         row = {
             "row_id": _row_id("product" if canonical_id else "source", identity_value),
             "canonical_product_id": canonical_id,

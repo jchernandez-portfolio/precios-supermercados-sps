@@ -245,7 +245,7 @@ def test_candidate_graph_does_not_create_transitive_canonical_identity() -> None
 
 
 def test_identity_v2_is_versioned_without_changing_persisted_v1() -> None:
-    assert IDENTITY_NORMALIZATION_VERSION == "product-homologation-v2.6"
+    assert IDENTITY_NORMALIZATION_VERSION == "product-homologation-v2.7"
 
 
 def test_canonical_presentation_fields_preserve_raw_and_separate_pack() -> None:
@@ -465,9 +465,11 @@ def test_natural_language_multipack_keeps_pack_structure() -> None:
     )
     single, _ = resolve_presentation_v2(product("b", "y", "Cerveza Imperial 12oz"))
     assert multi is not None and single is not None
-    assert multi.dimension == "ounce"
+    # Regla 21 (v2.7): la cerveza es subcategoría líquida; 12 oz = 354.88 ml.
+    assert multi.dimension == "volume_ml"
     assert multi.pack_count == 6
-    assert multi.total_base == Decimal("72")
+    assert multi.declared_ounces == Decimal("12")
+    assert round(multi.total_base, 1) == Decimal("2129.3")
     assert not candidate_presentations_compatible(multi, single)
 
 
