@@ -1,17 +1,19 @@
+# Snapshot histórico — estado al 2026-10-09
+
+> Copia congelada de `PROJECT_STATE.md` tal como estaba el 2026-10-09, antes de actualizar el checkpoint. El estado vigente está en [`PROJECT_STATE.md`](PROJECT_STATE.md).
+
 # Estado actual — Retail Price Intelligence / Precios de Supermercados SPS
 
-GitHub `main`, GitHub Actions, los artifacts productivos, Turso y la rama `portfolio-data` son la fuente de verdad técnica. Este archivo contiene únicamente el estado **vigente**; los estados anteriores se conservan como snapshots (el más reciente: [`PROJECT_STATE_HISTORY_2026-10-09.md`](PROJECT_STATE_HISTORY_2026-10-09.md)).
+GitHub `main`, GitHub Actions, los artifacts productivos, Turso y la rama `portfolio-data` son la fuente de verdad técnica. Este archivo contiene únicamente el estado **vigente**; los estados anteriores se conservan como snapshots (el más reciente: [`PROJECT_STATE_HISTORY_2026-09-10.md`](PROJECT_STATE_HISTORY_2026-09-10.md)).
 
-## Checkpoint vigente — 2026-10-09
+## Checkpoint vigente — 2026-09-30
 
 | Tema | Estado |
 | --- | --- |
-| Producto | Compra Inteligente B2C en **dos ciudades** (San Pedro Sula y Tegucigalpa) con pestañas **Análisis** y **Compra Inteligente**, Business Mart B2B para Power BI. Homologación v2.7 (medidas estandarizadas), árbol maestro de categorías v1.1, producto maestro con vínculos GTIN, decisiones revisadas y regla A por atributos (`engine_auto`). |
-| Operación diaria | **Activa.** Cortes aceptados todos los días desde el 2026-10-01 salvo el 05-oct (Paiz falló sus 3 intentos y entonces se bloqueaba todo). Última publicación: 2026-10-09 (run `37949953697`). |
-| Disparo | **05:17 Honduras** desde el Worker de Cloudflare `precios-sps-daily-trigger` (`17 11 * * *` UTC, secreto `GITHUB_DISPATCH_TOKEN`, token fine-grained que vence el 2027-10-10). Respaldo: el operador arranca el corte a las 08:17 si no existe. |
-| Persistencia | **Parcial**: se guardan y publican las cadenas aceptadas aunque otra falle; la fallida queda STALE y el operador la reintenta (08:17/12:17, máx. 3 intentos). |
-| Especificaciones PriceSmart | Semanal (sábado 10:37). Primera corrida real 2026-10-09: 584/600 fichas, guardadas en Turso; la homologación diaria ya las usa para completar marca/presentación. |
-| Repositorio | `jchernandez-portfolio/precios-supermercados-sps` (migración del monorepo completada; secrets `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN`). |
+| Producto | Implementado: Compra Inteligente B2C en **dos ciudades** (San Pedro Sula y Tegucigalpa) con pestañas **Análisis** y **Compra Inteligente**, Business Mart B2B para Power BI, identidad de producto v2.3 auditada. |
+| Último corte público aceptado | **2026-09-21** (run `35612789207`, `as_of = 2026-09-21T19:56Z`). |
+| Operación diaria | **Detenida desde el 2026-09-22.** Nueve corridas programadas seguidas (22–30 sep) terminaron en `failure` tras sus tres intentos. Ver [Incidente vigente](#incidente-vigente--sin-cortes-aceptados-desde-el-2026-09-22). |
+| Repositorio | Desde el 2026-09-30 el proyecto vive en `jchernandez-portfolio/precios-supermercados-sps`, separado del antiguo monorepo `Jchernand3z19/Portafolio` con su historial. Ver [Migración de repositorio](#migración-de-repositorio-2026-09-30). |
 
 ## Incidente 2026-10-02 — La Colonia lista productos sin precio
 
@@ -30,13 +32,14 @@ Impacto medido sobre el corte publicado del 2026-10-01 (`portfolio-data` 84722dc
 - **Colonial `commercial_sources_disagree` (2026-10-02 relanzada y 2026-10-03 programada).** El JSON `products.json` se lee al inicio y las ~140 páginas de tarjetas HTML durante ~8 minutos; un cambio de precio en ese intervalo rechazaba todo Colonial y, como la persistencia exige las seis cadenas, ese día no se publicaba nada. Arreglo (rama `rpi/colonial-recheck`, aprobado por el responsable): se releen sólo los productos en desacuerdo (`/products/<handle>.json` y su página HTML con `recheck=1`) y, si las fuentes frescas coinciden, se usa el precio actual. Sigue fallando cerrado si no coinciden, si cambió la identidad, si la tarjeta se movió de página o si hay más de 25 en desacuerdo (`MAX_COMMERCIAL_RECHECKS`).
 - **Especificaciones PriceSmart: 0 de 900 fichas parseadas** (run `37132418500`, 889 `no_specifications`, 10 `not_found`). El HTML del servidor (Nuxt SSR) no trae los valores: la página los carga después en el navegador. Nada se persistió (fail-closed). Arreglo aprobado por el responsable (2026-10-03): abrir la ficha pública con Chromium headless (Playwright), una página a la vez, cookies borradas por ficha, sólo requests a `www.pricesmart.com`, sin imágenes/fuentes/medios. El parser existente lee la tabla `td.specification`/`td.specification-data` del DOM renderizado (fixture real reducido `RENDERED-breadco-415586.html`); se quita la raíz "PriceSmart" del breadcrumb (`pricesmart-specs-parser/v2`). Corte temprano: si las primeras 30 fichas evaluables fallan > 80 %, se detiene (antes gastó 913 requests). 600 ítems por corrida.
 
-## Incidente 2026-09-22 a 09-30 — sin cortes aceptados (resuelto)
+## Incidente vigente — sin cortes aceptados desde el 2026-09-22
 
-Resuelto el 2026-09-30/10-01 (optimización de lecturas de Turso y extractor de Colonial). Se conserva el diagnóstico de lecturas porque sigue guiando el costo diario. Causas:
+El diseño fail-closed funcionó: ninguna corrida fallida reemplazó el último estado válido, por eso el sitio sigue mostrando el corte del 21 de septiembre con su fecha. Las causas observadas en los logs de GitHub Actions son dos y se suman:
 
 1. **Cuota de lecturas de Turso agotada (22–23 sep).** El job `persist` falló en el paso *Asegurar esquema Paiz en Turso* con `SQL read operations are forbidden (reads are blocked, do you need to upgrade your plan?)` (código `BLOCKED`). El plan Starter no tiene excedentes: al agotar las filas leídas del mes, Turso bloquea toda lectura. Ya había ocurrido en agosto (ver `PROJECT_STATE_HISTORY_2026-09-02.md`).
 2. **Extractor de Colonial roto (desde el 24 sep) — corregido en código el 2026-09-30.** El job `acquire (colonial)` fallaba en los tres intentos con `ColonialError: card_shape_invalid`. Causa observada en vivo (con autorización del usuario): el botón disponible de la tarjeta cambió de `addtocart-btn` a `add_to_cart_btn_cls`, el agotado quedó sólo con `cp-sold-out` (`disabled`, `aria-disabled="true"`) y el precio regular pasó de `<del>` a `<s class="lc-pcard__price-was">`. El total (`9137 productos`), la grilla, el input `id` y el enlace `/products/` no cambiaron. En 40 páginas (960 tarjetas) cada tarjeta tiene exactamente un botón de acción. El extractor acepta el markup nuevo y el anterior y sigue siendo fail-closed (fixture `collection-section-2026-09-30.html`). Como la persistencia exige handoffs de **todas** las cadenas, mientras estuvo roto bloqueó el corte completo.
 
+El punto 1 requiere reducir lecturas (sección siguiente) o un plan de Turso con más cuota.
 
 ### Consumo de lecturas de Turso (diagnóstico 2026-09-30)
 
@@ -89,10 +92,10 @@ La información se actualiza **una sola vez al día**:
 | Paso | Veces por día |
 | --- | --- |
 | Scraping (6 cadenas, 11 contextos) | 1, a las **05:17** de Honduras, disparado por el Worker de Cloudflare `edge/daily-trigger` (`17 11 * * *` UTC, `workflow_dispatch`); el cron de GitHub se quitó porque llegaba 5–9 h tarde. Respaldo: si a las 08:17 no hay corte del día, el operador lo arranca. Sólo si una cadena falla, el operador re-ejecuta **esa** cadena a las 08:17 y 12:17 (máximo 3 intentos en total). |
-| Persistencia en Turso | 1 (las cadenas con handoff aceptado; una fallida no bloquea a las demás) |
+| Persistencia en Turso | 1 (sólo cuando todas las cadenas tienen handoff aceptado) |
 | Homologación + publicación RPI + `portfolio-data` | 1, encadenadas por `workflow_run`; los intentos fallidos sólo generan ejecuciones `skipped` |
 
-Además, `precios-supermercados-sps-turso-weekly-integrity.yml` lee Turso una vez por semana (domingo 04:23 de Honduras, `23 10 * * 0`) para las verificaciones completas de integridad, y `precios-supermercados-sps-pricesmart-specs-weekly.yml` captura especificaciones de fichas PriceSmart una vez por semana (sábado 10:37 de Honduras, `37 16 * * 6`, después del corte para no leer PriceSmart en paralelo; ver [Especificaciones PriceSmart](#especificaciones-pricesmart-semanal-2026-10-01)). No existen otros crons de este proyecto que hagan scraping o lean Turso. Los crons de GitHub `17 11` y `30 12` que aparecían en el monorepo pertenecen al proyecto Mundial 2026 (el `17 11 * * *` del corte diario vive en Cloudflare, no en GitHub).
+Además, `precios-supermercados-sps-turso-weekly-integrity.yml` lee Turso una vez por semana (domingo 04:23 de Honduras, `23 10 * * 0`) para las verificaciones completas de integridad, y `precios-supermercados-sps-pricesmart-specs-weekly.yml` (rama `rpi/pricesmart-specs`) captura especificaciones de fichas PriceSmart una vez por semana (sábado 10:37 de Honduras, `37 16 * * 6`, después del corte para no leer PriceSmart en paralelo; ver [Especificaciones PriceSmart](#especificaciones-pricesmart-semanal-2026-10-01)). No existen otros crons de este proyecto que hagan scraping o lean Turso. Los crons de GitHub `17 11` y `30 12` que aparecían en el monorepo pertenecen al proyecto Mundial 2026 (el `17 11 * * *` del corte diario vive en Cloudflare, no en GitHub).
 
 Evidencia del esquema de recuperación (#455 + #461 + #462): entre el **12 y el 21 de septiembre** hubo **10 cortes programados aceptados seguidos**. Sólo 3 pasaron en el primer intento; 6 necesitaron la primera recuperación y 1 la segunda. El mecanismo funciona, y a la vez muestra que el intento inicial falla con frecuencia por inestabilidad de las fuentes.
 
@@ -100,11 +103,11 @@ Recuperación vigente:
 
 - la adquisición diaria se ejecuta de forma aislada por cadena, con `fail-fast` desactivado para permitir que las demás fuentes terminen aunque una falle;
 - cada cadena sólo entrega un handoff reutilizable después de superar sus validaciones de completitud/ubicación;
-- la persistencia sigue siendo fail-closed por cadena: persiste las cadenas con handoff aceptado y deja STALE la que falló (antes del 2026-10-09 exigía las seis);
+- la persistencia global sigue siendo fail-closed y sólo comienza cuando existe un handoff aceptado de todas las cadenas;
 - los artifacts quedan ligados a `run_id` + `run_attempt`, por lo que una recuperación puede reutilizar las capturas válidas de intentos anteriores;
-- el operador revisa el corte del mismo día a las **08:17** y **12:17** de Honduras;
+- el operador revisa el run programado del mismo día a las **08:17** y **12:17** de Honduras;
 - sólo `failure`/`timed_out` son recuperables automáticamente y el límite es **tres intentos totales** (inicial + hasta dos recuperaciones);
-- la recuperación vuelve a ejecutar los jobs fallidos y sus dependencias; si a las 08:17 no existe el corte del día (el Worker no disparó), el operador lo arranca.
+- la recuperación vuelve a ejecutar los jobs fallidos y sus dependencias, no crea un crawl programado nuevo si el run diario no existe.
 
 Walmart aplica además una recuperación local y acotada cuando el total de una categoría cambia durante la comprobación final. El extractor espera 120 segundos, exige dos lecturas concordantes —facetas y búsqueda— separadas por 60 segundos y vuelve a descargar únicamente la categoría afectada. Si las fuentes aún discrepan o cambian durante la recaptura, realiza un segundo y último ciclo después de 600 segundos. Nunca mezcla páginas anteriores y posteriores al cambio; si no logra una membresía exacta y una confirmación final estable, conserva el último snapshot válido y deja que el operador global reintente sólo el job fallido.
 
@@ -395,7 +398,7 @@ Aprobado por el responsable ("tenemos que estandarizar esto y hacerlo fácil par
 
 ## Especificaciones PriceSmart (semanal, 2026-10-01)
 
-Fusionada; primera corrida real exitosa el 2026-10-09. Detalle:
+Rama `rpi/pricesmart-specs` (no fusionada, sin corrida real). Detalle:
 [`supermercados/pricesmart-especificaciones.md`](supermercados/pricesmart-especificaciones.md).
 
 - **Cadencia semanal aprobada por el responsable** (registro en
@@ -417,10 +420,6 @@ Fusionada; primera corrida real exitosa el 2026-10-09. Detalle:
 - 2026-10-03: la primera corrida real mostró que el HTML del servidor no trae
   las especificaciones; la captura pasa a navegador headless (ver
   [Incidente 2026-10-03](#incidente-2026-10-03--colonial-y-primera-corrida-de-especificaciones-pricesmart)).
-- 2026-10-09 (run `37998155177`, manual, con navegador): catálogo 2.793 ítems,
-  600 intentados, **584 parseados** (97 %), 12 `no_specifications`, 4 `not_found`;
-  584 filas insertadas en Turso. A 600 ítems por corrida, la primera pasada
-  completa toma ~5 semanas.
 
 ## Producto maestro v1 (2026-10-01)
 
@@ -493,7 +492,14 @@ La publicación pública incluye Consumer Mart v2, Consumer Catalog v3 por ciuda
 
 ## Migración de repositorio (2026-09-30)
 
-Completada. Nuevo repositorio `jchernandez-portfolio/precios-supermercados-sps` con historial; el código sigue en `precios-supermercados-sps/`. El historial de ramas del monorepo permanece en `jchernandez-portfolio/Portafolio`. Secrets vigentes: `TURSO_DATABASE_URL` y `TURSO_AUTH_TOKEN`. No se recrearon los environments `cloudflare-probe` ni `la-colonia-live`: la sonda Cloudflare (`edge/cloudflare`) y los recorridos manuales de La Colonia están inactivos en este repo.
+- Nuevo repositorio: `jchernandez-portfolio/precios-supermercados-sps`, con historial; el código sigue en `precios-supermercados-sps/` para no cambiar rutas de workflows, tests ni datos.
+- Ramas: sólo `main` y `portfolio-data`. El historial completo de ramas del monorepo permanece en `jchernandez-portfolio/Portafolio`.
+- Las referencias a `Jchernand3z19/Portafolio` (gates `github.repository`, OIDC de Cloudflare, URLs raw de `portfolio-data`, tests) se cambiaron a `jchernandez-portfolio/precios-supermercados-sps`.
+- **Pendiente para reanudar la operación en el repo nuevo:**
+  - volver a crear los secrets; GitHub no los copia entre repos. Para la operación diaria sólo se necesitan **`TURSO_DATABASE_URL`** y **`TURSO_AUTH_TOKEN`** (también los usan la homologación, la publicación RPI y la integridad semanal). `CLOUDFLARE_PROBE_GATEWAY_URL` y `CLOUDFLARE_PROBE_OBSERVABILITY_TOKEN` (environment `cloudflare-probe`) son sólo para la sonda manual; el environment `la-colonia-live` es manual. Este proyecto **no** usa BigQuery ni Google Sheets: sus workflows (`*-bigquery-first-load.yml`, `*-google-sheets-storage.yml`) pertenecían a otro proyecto y se eliminaron;
+  - actualizar en Cloudflare la confianza OIDC y redesplegar el Worker de `edge/cloudflare` con el nuevo nombre del repo;
+  - habilitar notificaciones de Actions para este repo.
+- Hasta completar esos pasos, las corridas programadas del repo nuevo fallarán por falta de credenciales.
 
 ## Límites vigentes
 
@@ -505,12 +511,11 @@ Completada. Nuevo repositorio `jchernandez-portfolio/precios-supermercados-sps` 
 
 ## Próximos pasos
 
-1. Confirmar el primer disparo de Cloudflare a las 05:17 (2026-10-10) y el efecto del primer corte con v2.7, vínculos `engine_auto` y especificaciones PriceSmart.
-2. Homologación: "otras presentaciones" (validar la relación entre cadenas con muestra etiquetada; marcar tamaños > 5×), huecos de categoría (PriceSmart Hogar/temporada, Colonial segundo nivel), marcas faltantes de Los Andes, alternativas/sustitutos y control mensual de precisión.
-3. Confiabilidad del scraping: reintentos cortos por página ante HTTP 5xx o catálogo cambiante; operador disparado al terminar el corte.
-4. Costo Turso: homologación incremental y publicar desde artifacts del día.
-5. Limpieza: workflows que nunca corrieron en este repo, código experimental no alcanzable desde producción y capturas crudas de `reports/`.
-6. Rediseño de Compra Inteligente estilo comparador (búsqueda, fichas, "Dónde comprar / Otras presentaciones / Alternativas / Historial").
+1. Configurar secrets/environments y Cloudflare en el repo nuevo.
+2. Revisar y fusionar la [Optimización Turso](#optimización-turso-2026-09-30); tras el primer ciclo diario confirmar en Turso que existe `idx_ph_loc_hist` y vigilar las filas leídas del mes. Pendiente: homologación incremental.
+3. Con autorización explícita, diagnosticar y corregir el extractor de Colonial (`card_shape_invalid`).
+4. Revisar la homologación entre supermercados (cobertura de identidades comparables y prácticas de matching).
+5. Tras fusionar el producto maestro: confirmar en el primer refresco `product_master.mode = full` y luego `noop`/`incremental`, generar la cola contra maestros y empezar la revisión humana por la banda alta.
 
 ## Motor de homologación (shadow) 2026-09-30
 
