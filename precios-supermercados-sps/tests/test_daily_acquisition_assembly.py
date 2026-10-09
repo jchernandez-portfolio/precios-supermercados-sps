@@ -110,3 +110,35 @@ def test_missing_retailer_and_invalid_run_id_fail_closed(tmp_path: Path) -> None
         module.select_handoffs(root, run_id=run_id)
     with pytest.raises(module.AssemblyError, match="daily_acquisition_run_id_invalid"):
         module.select_handoffs(root, run_id="not-a-run")
+
+
+# --- Persistencia parcial (2026-10-09) -------------------------------------
+
+
+def test_partial_assembly_keeps_accepted_retailers_and_lists_the_missing(tmp_path: Path) -> None:
+    """Paiz falló todo el día (como el 5-oct): las demás cadenas igual se ensamblan."""
+    run_id = "34500000000"
+    root = tmp_path / "handoffs"
+    for retailer in module.EXPECTED:
+        if retailer != "paiz":
+            _handoff(root, retailer, run_id, 1)
+    output = tmp_path / "out"
+
+    with pytest.raises(module.AssemblyError, match="accepted_retailer_handoff_missing:paiz"):
+        module.assemble(root, output, run_id=run_id)
+
+    evidence = module.assemble(root, output, run_id=run_id, allow_missing=True)
+    assert evidence["missing_retailers"] == ["paiz"]
+    assert set(evidence["retailers"]) == set(module.EXPECTED) - {"paiz"}
+    assert not (output / "paiz").exists()
+    assert (output / "walmart/snapshot-walmart-sps.json").is_file()
+
+
+def test_partial_assembly_still_requires_at_least_one_retailer(tmp_path: Path) -> None:
+    with pytest.raises(module.AssemblyError, match="accepted_retailer_handoff_missing:all"):
+        module.assemble(tmp_path / "empty", tmp_path / "out", run_id="34500000000", allow_missing=True)
+
+
+def test_complete_assembly_reports_no_missing_retailers(tmp_path: Path) -> None:
+    evidence = module.assemble(_complete_root(tmp_path), tmp_path / "out", run_id="34500000000")
+    assert evidence["missing_retailers"] == []

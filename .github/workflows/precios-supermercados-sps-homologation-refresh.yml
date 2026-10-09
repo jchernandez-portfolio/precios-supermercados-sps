@@ -21,13 +21,55 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  refresh:
+  # Persistencia parcial (2026-10-09): un corte que terminó en failure porque
+  # una cadena no se capturó igual persistió las demás. Se refresca/publica si
+  # el job persist de ese intento terminó bien (lectura de jobs, sin escritura).
+  daily-gate:
     if: >-
       ${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' &&
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.head_branch == 'main' &&
+          (github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure') &&
+          (github.event.workflow_run.event == 'schedule' || github.event.workflow_run.event == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    outputs:
+      proceed: ${{ steps.gate.outputs.proceed }}
+    steps:
+      - name: Confirmar que el corte persistió (total o parcial)
+        id: gate
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v8.0.0
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            if (run.conclusion === 'success') {
+              core.setOutput('proceed', 'true');
+              core.info('daily_gate_full_success');
+              return;
+            }
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRunAttempt, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: run.id,
+              attempt_number: run.run_attempt,
+              per_page: 100,
+            });
+            const persist = jobs.find((job) => job.name === 'persist');
+            const proceed = Boolean(persist && persist.conclusion === 'success');
+            core.setOutput('proceed', proceed ? 'true' : 'false');
+            core.info(proceed ? 'daily_gate_partial_persisted' : 'daily_gate_nothing_persisted');
+
+  refresh:
+    needs: daily-gate
+    if: >-
+      ${{ !cancelled() &&
+          github.repository == 'jchernandez-portfolio/precios-supermercados-sps' &&
           (github.event_name == 'workflow_dispatch' ||
            (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
            (github.event_name == 'workflow_run' &&
-            github.event.workflow_run.conclusion == 'success' &&
+            (github.event.workflow_run.conclusion == 'success' || needs.daily-gate.outputs.proceed == 'true') &&
             github.event.workflow_run.head_branch == 'main' &&
             (github.event.workflow_run.event == 'schedule' || github.event.workflow_run.event == 'workflow_dispatch'))) }}
     runs-on: ubuntu-latest

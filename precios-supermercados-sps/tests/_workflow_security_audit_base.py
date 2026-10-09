@@ -95,6 +95,10 @@ ALLOWED_JOB_PERMISSIONS = {
     LIVE_WORKFLOW: {
         LIVE_FACET_JOB: {"contents": "read", "id-token": "write"},
     },
+    # Lectura de jobs del corte para publicar persistencias parciales (2026-10-09).
+    HOMOLOGATION_REFRESH_WORKFLOW: {
+        "daily-gate": {"actions": "read"},
+    },
 }
 
 EXPECTED_TRIGGERS = {
