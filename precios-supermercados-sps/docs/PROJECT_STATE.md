@@ -370,6 +370,15 @@ Aprobado por el responsable. Detalle: [`homologation/master-category-tree-v1.md`
 - El aviso de esa corrida listó 18 categorías nuevas (verduras, pruebas de embarazo, macetas, etc.); se agregaron al CSV (1,329 filas) con una prueba que exige que Paiz y Walmart mapeen igual la misma ruta.
 - Pendiente: PriceSmart sigue con ~12 % sin departamento y 33 % sin segundo nivel porque sus categorías "Hogar" y "Productos de temporada" son mixtas y el nombre no siempre trae un tipo conocido.
 
+## Medidas estandarizadas v2.7 (2026-10-09)
+
+Aprobado por el responsable ("tenemos que estandarizar esto y hacerlo fácil para todos y que las marcas no se vean afectadas").
+
+- **Motor `product-homologation-v2.7`:** multipacks de PriceSmart "N Unidades / X" con fuente = total (regla 22 del estándar) y onza de peso o líquida según el atributo `ounce` del árbol maestro (regla 21). Registro de decisiones revisadas vacío: el cambio de versión no invalida decisiones. Reescribe los perfiles una vez (cambio de versión).
+- **Medición offline (catálogo publicado 2026-10-08, SPS):** PriceSmart con candidato por marca pasa de 233 a 414 productos; onzas que pasan a g/ml (estimado con la categoría publicada): Los Andes ~1,130 de 1,790, La Colonia ~430 de 840, Colonial ~110 de 680.
+- **Catálogo B2C:** `presentation` en un solo formato (`1.88 kg`, `12 × 946 ml`, `1.774 L`) y `unit_price` por oferta con referencia fija por subcategoría (`unit_reference` del árbol v1.1.0: por 100 g/ml, por kg/L o por unidad).
+- **Homologación sin GTIN (validación 2026-10-09):** 387 pares de PriceSmart/Los Andes etiquetados; la regla "banda alta + sin conflicto de variante + a lo sumo una palabra menor distinta" acierta 161/163 (98.8 %, IC95 95.6–99.7 %); revisión del responsable de 50 pares al azar: 50/50 de acuerdo. Su publicación (vínculos por atributos y "otras presentaciones") va en PRs siguientes.
+
 ## Especificaciones PriceSmart (semanal, 2026-10-01)
 
 Rama `rpi/pricesmart-specs` (no fusionada, sin corrida real). Detalle:

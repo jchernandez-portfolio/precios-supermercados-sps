@@ -582,6 +582,27 @@ def ounces_as_mass(signature: PresentationSignature | None) -> PresentationSigna
     )
 
 
+def ounces_as_volume(signature: PresentationSignature | None) -> PresentationSignature | None:
+    """Convierte una firma sólo-onzas a ml (onza líquida, 29.5735 ml).
+
+    Sólo para subcategorías líquidas (bebidas, leche, shampoo...), donde la
+    etiqueta en onzas es por convención ``fl oz``.
+    """
+
+    if signature is None or signature.dimension != "ounce":
+        return signature
+    unit_ounces = signature.unit_amount_base or signature.total_base / signature.pack_count
+    unit_ml = unit_ounces * _FLUID_OUNCE_TO_ML
+    return PresentationSignature(
+        dimension="volume_ml",
+        total_base=unit_ml * signature.pack_count,
+        pack_count=signature.pack_count,
+        unit_amount_base=unit_ml,
+        declared_ounces=unit_ounces,
+        imperial_derived=True,
+    )
+
+
 def _parse_presentation_text(
     value: str | None,
 ) -> tuple[PresentationSignature | None, bool]:
@@ -740,6 +761,66 @@ def presentations_compatible(
     return difference <= Decimal("1.5") or difference / larger <= relative_limit
 
 
+def _source_is_multipack_total(
+    source: PresentationSignature,
+    name: PresentationSignature,
+) -> bool:
+    """La fuente publica sólo el total de un multipack que el nombre desglosa."""
+
+    if name.pack_count <= 1 or source.pack_count != 1 or name.dimension != source.dimension:
+        return False
+    single = PresentationSignature(
+        dimension=name.dimension,
+        total_base=name.total_base,
+        pack_count=1,
+        unit_amount_base=name.total_base,
+        imperial_derived=name.imperial_derived,
+    )
+    return presentations_compatible(source, single)
+
+
+_UNIT_COUNT_RE = re.compile(r"(?<![\w.,/])(?P<count>\d{1,3})\s*unidades(?!\w)", re.IGNORECASE)
+
+
+def _counted_multipack(
+    raw_name: str,
+    source: PresentationSignature,
+    name: PresentationSignature,
+) -> PresentationSignature | None:
+    """Multipack escrito "N Unidades <cantidad>" sin separador.
+
+    Sólo se acepta cuando la presentación fuente es exactamente N × cantidad:
+    la fuente confirma la lectura y el nombre aporta el conteo.
+    """
+
+    if name.pack_count != 1 or source.pack_count != 1 or name.dimension != source.dimension:
+        return None
+    if name.dimension not in {"mass_g", "volume_ml"}:
+        return None
+    counts = {int(match.group("count")) for match in _UNIT_COUNT_RE.finditer(raw_name or "")}
+    if len(counts) != 1:
+        return None
+    (count,) = counts
+    if count < 2:
+        return None
+    candidate = PresentationSignature(
+        dimension=name.dimension,
+        total_base=name.total_base * count,
+        pack_count=1,
+        unit_amount_base=name.total_base * count,
+        imperial_derived=name.imperial_derived,
+    )
+    if not presentations_compatible(source, candidate):
+        return None
+    return PresentationSignature(
+        dimension=name.dimension,
+        total_base=name.total_base * count,
+        pack_count=count,
+        unit_amount_base=name.total_base,
+        imperial_derived=name.imperial_derived,
+    )
+
+
 def _dual_label_source_compatible(
     source: PresentationSignature,
     dual: PresentationSignature,
@@ -762,6 +843,7 @@ def resolve_presentation(
     record: SourceProductRecord,
     *,
     ounce_as_mass: bool = False,
+    ounce_as_volume: bool = False,
 ) -> tuple[PresentationSignature | None, str]:
     """Firma de presentación con su estado de evidencia.
 
@@ -774,6 +856,9 @@ def resolve_presentation(
     if ounce_as_mass:
         source = ounces_as_mass(source)
         name = ounces_as_mass(name)
+    elif ounce_as_volume:
+        source = ounces_as_volume(source)
+        name = ounces_as_volume(name)
 
     if name_ambiguous:
         return None, "ambiguous_multipack"
@@ -787,6 +872,14 @@ def resolve_presentation(
             if source.imperial_derived and not name.imperial_derived:
                 return name, "confirmed"
             return source, "confirmed"
+        if _source_is_multipack_total(source, name):
+            # PriceSmart: nombre "12 Unidades / 946 ml" y fuente "11352 ml" (el
+            # total del paquete). Misma etiqueta; el nombre aporta el conteo.
+            return name, "confirmed"
+        counted = _counted_multipack(record.source_name, source, name)
+        if counted is not None:
+            # "Sidra 3 Unidades 750 mL" con fuente "2250 ml": 3 × 750 ml.
+            return counted, "confirmed"
         if record.supermarket_id == "paiz":
             return name, "name_preferred_source_conflict"
         return None, "conflict"

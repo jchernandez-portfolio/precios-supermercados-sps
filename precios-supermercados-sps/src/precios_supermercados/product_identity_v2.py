@@ -28,6 +28,7 @@ from .gtin_policy import (
     restricted_circulation_reason,
     restricted_gtin_master_partition,
 )
+from . import master_taxonomy
 from .identifiers import generate_gtin_product_id
 from .product_homologation import (
     ExactGtinGroup,
@@ -46,7 +47,7 @@ from .product_homologation import (
     resolve_presentation,
 )
 
-IDENTITY_NORMALIZATION_VERSION = "product-homologation-v2.6"
+IDENTITY_NORMALIZATION_VERSION = "product-homologation-v2.7"
 
 _GENERIC_BRANDS = frozenset(
     {
@@ -134,7 +135,8 @@ _CONTAINER_ALIASES = (
 )
 _NATURAL_MULTIPACK_RE = re.compile(
     rf"(?<!\w)(?P<count>\d{{1,3}})\s*(?:{_COUNT_ALIASES}|{_CONTAINER_ALIASES})\s*"
-    r"(?:de|x)\s*(?P<amount>\d+(?:[.,]\d+)?)\s*"
+    # "de"/"x" o la barra de PriceSmart: "12 Unidades / 946 ml" = 12 × 946 ml.
+    r"(?:de|x|/)\s*(?P<amount>\d+(?:[.,]\d+)?)\s*"
     r"(?P<unit>mg|kg|grs?|gramos?|g|lbs?|libras?|oz|onzas?|ml|lts?|litros?|l)(?!\w)",
     re.IGNORECASE,
 )
@@ -1200,6 +1202,7 @@ OUNCE_MASS_PRODUCT_TYPES = frozenset(
         "Gelatina",
         "Harina de maíz",
         "Harina de trigo",
+        "Leche condensada",
         "Leche en polvo",
         "Mantequilla",
         "Mantequilla de maní",
@@ -1214,6 +1217,12 @@ OUNCE_MASS_PRODUCT_TYPES = frozenset(
         "Yogurt",
     }
 )
+
+
+# Tipos líquidos cuya subcategoría es mixta (aceites y grasas): su "oz" es
+# onza líquida por convención de etiqueta (``fl oz``). v2.7.
+OUNCE_FLUID_PRODUCT_TYPES = frozenset({"Aceite comestible"})
+_AEROSOL_RE = re.compile(r"(?<![a-z])(?:spray|aerosol|atomizador)(?![a-z])", re.IGNORECASE)
 
 
 def _drop_misread_source(name: str, source: str | None) -> str | None:
@@ -1248,10 +1257,32 @@ def resolve_presentation_v2(
         source_category=record.source_category,
         barcode=record.barcode,
     )
+    basis = ounce_basis_v2(record, taxonomy)
     return resolve_presentation(
         normalized,
-        ounce_as_mass=taxonomy.product_type in OUNCE_MASS_PRODUCT_TYPES,
+        ounce_as_mass=basis == "mass",
+        ounce_as_volume=basis == "fluid",
     )
+
+
+def ounce_basis_v2(record: SourceProductRecord, taxonomy: TaxonomyAssignment) -> str | None:
+    """Tipo de onza de un producto (regla 21, v2.7).
+
+    1. Tipos sólidos conocidos (``OUNCE_MASS_PRODUCT_TYPES``): onza de peso.
+    2. Si no, el atributo ``ounce`` de la subcategoría del árbol maestro a la
+       que lleva la categoría del súper (o el tipo por nombre): ``mass`` o
+       ``fluid``. Subcategorías mixtas (salsas, aceites, cremas, detergentes)
+       no tienen atributo y la onza queda sin convertir.
+    """
+
+    if taxonomy.product_type in OUNCE_MASS_PRODUCT_TYPES:
+        return "mass"
+    if _AEROSOL_RE.search(record.source_name or ""):
+        # Aerosoles y sprays declaran peso neto (NET WT) aunque sean líquidos.
+        return None
+    if taxonomy.product_type in OUNCE_FLUID_PRODUCT_TYPES:
+        return "fluid"
+    return master_taxonomy.ounce_basis(record.supermarket_id, record.source_category, taxonomy.product_type)
 
 
 def display_quantity(value: Decimal) -> str:

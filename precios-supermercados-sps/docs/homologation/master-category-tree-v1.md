@@ -7,6 +7,7 @@ Aprobado por el responsable del proyecto el 2026-10-08. Una sola clasificación 
 - `config/homologation/master-category-tree-v1.json`: el árbol (14 departamentos, 180 subcategorías) con el segmento GPC de referencia por departamento y los tipos de producto (nivel 4) que ya produce el motor de homologación.
 - `config/homologation/source-category-crosswalk-v1.csv`: tabla de equivalencias. Una fila por categoría publicada por cada supermercado (1,311 filas capturadas de la corrida diaria 37796223788 del 2026-10-08, más 18 que avisó la primera publicación: 1,329). Columnas: `supermarket_id, source_category, department, category, subcategory, level`. `level` = `subcategory` (1246), `category` (57), `department` (17), `by_name` (8: la categoría del súper mezcla cosas distintas) o `excluded` (1: fuera del catálogo, p. ej. tarjetas de regalo). La comparación de `source_category` ignora mayúsculas, acentos y espacios.
 - `src/precios_supermercados/master_taxonomy.py`: carga y valida ambos archivos y asigna el nodo público.
+- Atributos por subcategoría (v1.1.0, 2026-10-09): `ounce` (`mass` = onza de peso, `fluid` = onza líquida; sin atributo la onza no se convierte; 41 y 16 subcategorías) y `unit_reference` (`per_100` = precio unitario por 100 g/100 ml; sin atributo = por kg/L; conteos siempre por unidad; 52 subcategorías). Un nodo a nivel categoría hereda el atributo sólo si todas sus subcategorías lo comparten.
 
 ## Orden de asignación
 
@@ -21,6 +22,8 @@ Aprobado por el responsable del proyecto el 2026-10-08. Una sola clasificación 
 - `category` = **Departamento** del árbol.
 - `product_type` = segundo nivel navegable: el tipo de producto si existe; si no, la subcategoría; si no, la categoría del árbol.
 - Las filas `excluded` no se publican.
+- Cada oferta publica `unit_price` = `{"amount": "13.28", "per": "100 g"}` con la referencia fija de la subcategoría del grupo (igual para todas las marcas), sólo con presentación aceptada en g, ml o unidades (`null` si no).
+- `presentation` usa un solo formato: g/ml bajo 1000, kg/L desde 1000 (hasta 3 decimales: `1.774 L`), paquetes como `12 × 946 ml`, conteos como `30 unidades`.
 - La taxonomía interna del motor de homologación (guardas de identidad, tipo alimenticio/no alimenticio) **no cambia**: el árbol sólo decide la clasificación pública. El Business Mart B2B conserva por ahora la taxonomía interna.
 
 ## Gobierno
