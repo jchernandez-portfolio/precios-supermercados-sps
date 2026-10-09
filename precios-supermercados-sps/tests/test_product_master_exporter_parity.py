@@ -193,10 +193,10 @@ def test_manual_link_makes_row_comparable_and_reads_only_curated_links(tmp_path:
     # Lectura extra: sqlite_master + vínculos curados por índice, nunca GTIN.
     master_queries = [q for q in backend.queries if _is_master_query(q)]
     assert len(master_queries) == 2
-    assert "link_method IN (?,?)" in master_queries[1]
+    assert "link_method IN (?,?,?)" in master_queries[1]
     con = sqlite3.connect(db)
     try:
-        plan = str(con.execute("EXPLAIN QUERY PLAN " + master_queries[1].replace("(?,?)", "('manual_review','reviewed_decision')")).fetchall())
+        plan = str(con.execute("EXPLAIN QUERY PLAN " + master_queries[1].replace("(?,?,?)", "('engine_auto','manual_review','reviewed_decision')")).fetchall())
     finally:
         con.close()
     assert "idx_master_links_method" in plan

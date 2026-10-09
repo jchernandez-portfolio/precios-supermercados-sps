@@ -201,8 +201,9 @@ confirman identidad por sí mismos.
     que lo crea). Métodos: `gtin_exact` y `gtin_sku_derived`
     (`EXACT_TRADE_ITEM`, decididos por `system` y equivalentes 1:1 a los
     perfiles `ready`/`single_source`), `reviewed_decision` y `manual_review`
-    (`VERIFIED_EQUIVALENT`, `human:<id>`) y `engine_auto` (deshabilitado: el
-    motor sólo alimenta la cola de revisión). Un maestro admite un solo
+    (`VERIFIED_EQUIVALENT`, `human:<id>`) y `engine_auto` (activo desde
+    2026-10-09 sólo para la regla 23; el resto del motor sólo alimenta la cola
+    de revisión). Un maestro admite un solo
     vínculo activo por cadena. Un "Distinto" humano se guarda en
     `master_link_rejections` y no se vuelve a proponer. Un producto con otro
     GTIN válido nunca se vincula automáticamente a un maestro, aunque todos
@@ -228,6 +229,18 @@ confirman identidad por sí mismos.
     (N × X) se acepta como paquete de N × X; antes se leía como conflicto y el
     producto quedaba sin tamaño. Sin separador sólo vale si la fuente confirma
     el total.
+23. **Regla A por atributos (`engine_auto`, aprobada 2026-10-09).** PriceSmart y
+    Los Andes (sin GTIN compartido) se vinculan al maestro GTIN de otra cadena
+    sólo si: misma marca (nunca marca propia), puntaje de nombre ≥ 0.74, sin
+    conflicto de variante y a lo sumo una palabra menor distinta, mismo tamaño
+    y paquete (un "N Unidades" declarado exige paquete en ambos), sin conflicto
+    de tipo/departamento/códigos y nunca con otro GTIN válido. El maestro no
+    puede tener ya esa cadena; empates o dos aspirantes de una cadena = ninguno.
+    Precisión medida: 161/163 (98.8 %, IC95 95.6–99.7 %) en 387 pares + 50/50
+    del responsable. Se recalcula en cada refresco (`decided_by`
+    `engine:attribute-rule-a@1`, evidencia con socio, puntaje y etiquetas); un
+    vínculo manual o del registro siempre gana. Código:
+    `src/precios_supermercados/matching/attribute_links.py`.
 
 ## Casos iniciales
 

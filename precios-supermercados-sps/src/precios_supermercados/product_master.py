@@ -54,7 +54,10 @@ MASTER_TABLES = (MASTER_TABLE, LINK_TABLE, REJECTION_TABLE, STATE_TABLE, DIRTY_T
 LINK_METHODS = ("gtin_exact", "gtin_sku_derived", "engine_auto", "manual_review", "reviewed_decision")
 GTIN_LINK_METHODS = frozenset({"gtin_exact", "gtin_sku_derived"})
 # El refresco diario administra estos métodos (los recalcula y los reemplaza).
-SYNC_MANAGED_METHODS = frozenset({"gtin_exact", "gtin_sku_derived", "reviewed_decision"})
+# Métodos que el refresco recalcula y escribe en cada corrida (GTIN, registro
+# revisado y la regla del motor por atributos); ``manual_review`` sólo lo cambia
+# la herramienta de revisión.
+SYNC_MANAGED_METHODS = frozenset({"gtin_exact", "gtin_sku_derived", "reviewed_decision", "engine_auto"})
 # Vínculos curados: no se derivan del GTIN; los exportadores los superponen.
 CURATED_LINK_METHODS = frozenset({"manual_review", "reviewed_decision", "engine_auto"})
 LINK_STATUSES = ("active", "rejected", "superseded")
@@ -1419,7 +1422,7 @@ def diff_master_state(
         wanted = desired.links.get(product_id)
         current = existing_links.get(product_id)
         if current is not None and current.link_method not in SYNC_MANAGED_METHODS:
-            # manual_review / engine_auto: sólo los cambia la herramienta de revisión.
+            # manual_review: sólo lo cambia la herramienta de revisión.
             if wanted is None or wanted.link_hash != current.link_hash:
                 counts["curated_links_left_untouched"] += 1
             else:
@@ -1566,6 +1569,7 @@ def sync_product_master(
     new_profile_digest: str,
     changed_product_ids: Iterable[int] | None,
     reviewed_links: Sequence[MasterLink] = (),
+    engine_links: Sequence[MasterLink] = (),
     apply: bool = True,
     full_threshold: float = 0.25,
 ) -> dict[str, object]:
@@ -1590,15 +1594,18 @@ def sync_product_master(
     tables_exist = schema_ready or set(MASTER_TABLES) <= present
 
     state = read_sync_state(store) if tables_exist else None
-    curated_existing = read_curated_links(store, {"manual_review", "engine_auto"}) if tables_exist else ()
+    # ``engine_auto`` no se lee del store: se recalcula en cada corrida desde los
+    # perfiles (``engine_links``) y el diff borra los que dejaron de cumplir.
+    curated_existing = read_curated_links(store, {"manual_review"}) if tables_exist else ()
+    engine_existing = read_curated_links(store, {"engine_auto"}) if tables_exist else ()
     human = read_human_attributes(store) if tables_exist else {}
     dirty = read_dirty_masters(store) if tables_exist else set()
-    curated_targets = {link.master_product_id for link in (*curated_existing, *reviewed_links)}
+    curated_targets = {link.master_product_id for link in (*curated_existing, *reviewed_links, *engine_links)}
     target_meta: dict[str, tuple[str, str | None]] = {}
     if curated_targets and tables_exist:
         for master_id, master in read_masters_by_id(store, curated_targets).items():
             target_meta[master_id] = (master.origin_method, master.primary_gtin)
-    for link in reviewed_links:
+    for link in (*reviewed_links, *engine_links):
         if link.master_product_id not in target_meta:
             gtin = link.evidence.get("primary_gtin") if isinstance(link.evidence, Mapping) else None
             target_meta[link.master_product_id] = ("gtin", str(gtin)) if gtin else ("reviewed_decision", None)
@@ -1606,6 +1613,9 @@ def sync_product_master(
     # Un vínculo del registro no reemplaza uno manual del mismo producto.
     manual_products = {link.product_id for link in curated_existing}
     curated = list(curated_existing) + [link for link in reviewed_links if link.product_id not in manual_products]
+    # Un vínculo del motor nunca reemplaza uno manual ni del registro revisado.
+    decided = {link.product_id for link in curated}
+    curated += [link for link in engine_links if link.product_id not in decided]
     desired = build_desired_state(
         members,
         policy=policy,
@@ -1642,7 +1652,7 @@ def sync_product_master(
     elif mode == "incremental":
         assert changed is not None
         scope_products = set(changed) | {link.product_id for link in curated} | {
-            link.product_id for link in curated_existing
+            link.product_id for link in (*curated_existing, *engine_existing)
         }
         current_links = read_active_links_by_product(store, scope_products)
         scope_masters = set(dirty) | set(human)

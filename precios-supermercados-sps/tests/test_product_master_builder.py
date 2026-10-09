@@ -205,13 +205,18 @@ def test_curated_link_has_priority_and_respects_one_link_per_retailer(tmp_path: 
         pm.build_desired_state(members, policy=pm.load_master_policy(POLICY_PATH), curated_links=[unknown])
 
 
-def test_engine_auto_links_are_disabled_by_policy(tmp_path: Path) -> None:
+def test_engine_auto_links_follow_the_policy(tmp_path: Path) -> None:
     _, members, state = _fixture_state(tmp_path)
     policy = pm.load_master_policy(POLICY_PATH)
-    assert not policy.method_active("engine_auto")
-    assert "engine_auto" not in policy.serving_methods
+    # Aprobado 2026-10-09: la regla A por atributos está activa y es servible.
+    assert policy.method_active("engine_auto")
+    assert "engine_auto" in policy.serving_methods
     engine = pm.MasterLink(8, "pricesmart", state.links[7].master_product_id, "engine_auto", "engine:matching-engine-v1", confidence=0.99)
     result = pm.build_desired_state(members, policy=policy, curated_links=[engine])
+    assert result.links[8].master_product_id == state.links[7].master_product_id
+    # Con el método desactivado el vínculo del motor se ignora.
+    disabled = replace(policy, active_methods=policy.active_methods - {"engine_auto"}, serving_methods=policy.serving_methods - {"engine_auto"})
+    result = pm.build_desired_state(members, policy=disabled, curated_links=[engine])
     assert 8 not in result.links
     assert result.diagnostics["curated_link_inactive_engine_auto"] == 1
 
@@ -220,7 +225,7 @@ def test_policy_yaml_section_is_closed_and_gtin_only_reproduces_today() -> None:
     raw = yaml.safe_load(POLICY_PATH.read_text(encoding="utf-8"))
     policy = pm.MasterPolicy.from_mapping(raw)
     assert policy.enabled and policy.gtin_links_enabled
-    assert raw["product_master"]["link_methods"]["engine_auto"] == "disabled"
+    assert raw["product_master"]["link_methods"]["engine_auto"] == "active"
     assert policy.sku_derived_supermarkets == frozenset(raw["restricted_gtin"]["sku_derived_gtin_supermarkets"])
     without = dict(raw)
     without.pop("product_master")
@@ -231,7 +236,11 @@ def test_policy_yaml_section_is_closed_and_gtin_only_reproduces_today() -> None:
         pm.MasterPolicy.from_mapping(broken)
     enabling_engine = {
         **raw,
-        "product_master": {**raw["product_master"], "serving_link_methods": ["engine_auto"]},
+        "product_master": {
+            **raw["product_master"],
+            "link_methods": {**raw["product_master"]["link_methods"], "engine_auto": "disabled"},
+            "serving_link_methods": ["engine_auto"],
+        },
     }
     with pytest.raises(pm.ProductMasterError, match="serving_method_inactive"):
         pm.MasterPolicy.from_mapping(enabling_engine)
