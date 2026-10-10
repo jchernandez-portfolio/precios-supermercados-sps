@@ -195,6 +195,18 @@ validada: holdout ciego de 94 pares 98.5 % ponderado por estrato y revisión del
 responsable de 50 pares al azar. Un fallo de la regla no bloquea la publicación:
 el catálogo sale sin el campo y el motivo queda en stderr del exportador.
 
+## Índice de búsqueda `search.json` (aditivo, 2026-10-10)
+
+`manifest.search_file = "search.json"`, listado en `files` con SHA-256. Esquema
+`rpi-consumer-search/v1`: `columns` (orden fijo), `retailers` y `partitions`
+como tablas de referencia y `rows` como listas. Columnas: `id` (row_id sin
+prefijo), `product_name`, `brand`, `presentation`, `category`, `product_type`,
+`partition` (índice en `partitions`), `best_price` y `unit_amount`/`unit_per`
+de la oferta comprable más barata, `retailers` (índices), `promo` (0/1),
+`other_presentations` (cantidad) y `comparability` (`c` comparable, `s` una
+fuente, `i` individual). Se deriva de las particiones ya escritas y debe tener
+exactamente `visible_rows` filas; no cambia identidad ni el contrato v3.
+
 ## Serving particionado
 
 La publicación contiene:
