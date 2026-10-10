@@ -6,7 +6,9 @@ Aprobado por el responsable del proyecto el 2026-10-08. Una sola clasificación 
 
 - `config/homologation/master-category-tree-v1.json`: el árbol (14 departamentos, 180 subcategorías) con el segmento GPC de referencia por departamento y los tipos de producto (nivel 4) que ya produce el motor de homologación.
 - `config/homologation/source-category-crosswalk-v1.csv`: tabla de equivalencias. Una fila por categoría publicada por cada supermercado (1,311 filas capturadas de la corrida diaria 37796223788 del 2026-10-08, más 18 que avisó la primera publicación: 1,329). Columnas: `supermarket_id, source_category, department, category, subcategory, level`. `level` = `subcategory` (1246), `category` (57), `department` (17), `by_name` (8: la categoría del súper mezcla cosas distintas) o `excluded` (1: fuera del catálogo, p. ej. tarjetas de regalo). La comparación de `source_category` ignora mayúsculas, acentos y espacios.
+- `config/homologation/name-subcategory-rules-v1.csv`: reglas de subcategoría por nombre (paso 4b). Columnas `department, category, subcategory, keywords, excludes` (frases separadas por `|`, sin acentos ni mayúsculas; el orden importa).
 - `src/precios_supermercados/master_taxonomy.py`: carga y valida ambos archivos y asigna el nodo público.
+- `config/homologation/name-brand-prefixes-v1.csv` (2026-10-09): marcas curadas por prefijo del nombre para súper que no publican marca pero la escriben al inicio (Colonial: `LA HOGAZA Pan…` → La Hogaza). Sólo completa filas públicas sin marca; nunca deduce marcas nuevas.
 - Atributos por subcategoría (v1.1.0, 2026-10-09): `ounce` (`mass` = onza de peso, `fluid` = onza líquida; sin atributo la onza no se convierte; 41 y 16 subcategorías) y `unit_reference` (`per_100` = precio unitario por 100 g/100 ml; sin atributo = por kg/L; conteos siempre por unidad; 52 subcategorías). Un nodo a nivel categoría hereda el atributo sólo si todas sus subcategorías lo comparten.
 
 ## Orden de asignación
@@ -15,6 +17,7 @@ Aprobado por el responsable del proyecto el 2026-10-08. Una sola clasificación 
 2. Mismo producto en otro supermercado: un grupo comparable comparte el nodo más específico y más votado de sus ofertas.
 3. Tabla de equivalencias de la categoría que publica el súper.
 4. Tipo de producto por nombre (motor de homologación), sólo si cae dentro de la rama que da la equivalencia; si la contradice, gana la equivalencia.
+4b. Subcategoría por palabras clave del nombre (`config/homologation/name-subcategory-rules-v1.csv`, 2026-10-09) cuando los pasos anteriores no llegan a subcategoría: la primera regla compatible gana, sólo dentro de la rama que ya dio la equivalencia o el tipo (o sin rama si la categoría del súper es `by_name` o falta), con palabras que la vetan (`excludes`). Nunca reemplaza un nodo más específico ni toca la taxonomía interna de homologación (sin nombre, `assign_offer` se comporta igual). Validación sobre el catálogo del 2026-10-09: filas con subcategoría 24,029 → 27,498 de 32,020; sin categoría PriceSmart 346 → 88 y Los Andes 231 → 112; muestras revisadas a mano 96/100 y, tras corregir, 98/100.
 5. Sin evidencia: sin categoría (lista de revisión). Como último recurso se traduce el departamento de la taxonomía interna previa (p. ej. `Bebidas` → `Bebidas y tabaco`). Nunca se inventa una categoría.
 
 ## Publicación (catálogo B2C v3)

@@ -6,9 +6,12 @@ explícitos presentes en el nombre del producto.
 """
 from __future__ import annotations
 
+import csv
 import re
 import unicodedata
 from decimal import Decimal, InvalidOperation
+from functools import lru_cache
+from pathlib import Path
 
 from .product_identity_v2 import display_quantity, normalize_thousands_separators
 
@@ -153,6 +156,42 @@ def canonical_brand(raw_brand: object, product_name: object) -> str | None:
             return name_brand
         return raw_brand_display
     return name_brand
+
+
+BRAND_PREFIXES_PATH = Path(__file__).resolve().parents[2] / "config" / "homologation" / "name-brand-prefixes-v1.csv"
+
+
+@lru_cache(maxsize=1)
+def load_brand_prefixes(path: Path = BRAND_PREFIXES_PATH) -> dict[str, tuple[tuple[str, str], ...]]:
+    """Prefijos de marca curados por supermercado (el más largo primero)."""
+    by_supermarket: dict[str, list[tuple[str, str]]] = {}
+    with path.open(encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            prefix = _fold(row["prefix"])
+            brand = _clean(row["brand"])
+            if not prefix or not brand:
+                raise ValueError(f"brand_prefix_invalid:{row.get('prefix')}")
+            by_supermarket.setdefault(row["supermarket_id"], []).append((prefix, brand))
+    return {
+        supermarket: tuple(sorted(items, key=lambda item: (-len(item[0]), item[0])))
+        for supermarket, items in by_supermarket.items()
+    }
+
+
+def brand_from_prefix(supermarket_id: object, product_name: object) -> str | None:
+    """Marca de un nombre que empieza con un prefijo curado del súper.
+
+    Colonial escribe la marca al inicio en mayúsculas ("LA HOGAZA Pan…") pero
+    no la publica en su campo de marca. Sólo prefijos revisados a mano: nunca
+    se deduce una marca nueva.
+    """
+    name = _fold(product_name)
+    if not name or not isinstance(supermarket_id, str):
+        return None
+    for prefix, brand in load_brand_prefixes().get(supermarket_id, ()):
+        if name == prefix or name.startswith(prefix + " "):
+            return brand
+    return None
 
 
 def _is_shell_egg(product_name: object, product_type: object) -> bool:

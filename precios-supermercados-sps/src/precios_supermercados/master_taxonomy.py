@@ -13,6 +13,9 @@ Orden de asignación (de mayor a menor autoridad):
 3. Tabla de equivalencias de la categoría que publica el supermercado.
 4. Tipo de producto por nombre (motor de homologación), siempre dentro de un
    departamento compatible con la equivalencia.
+4b. Subcategoría por palabras clave del nombre (``name-subcategory-rules-v1.csv``)
+   cuando lo anterior no llega a subcategoría; sólo dentro de la rama que ya
+   dieron la equivalencia o el tipo, y nunca reemplaza un nodo más específico.
 5. Sin evidencia: queda sin categoría (lista de revisión). Nunca se inventa.
 
 Este módulo sólo decide la taxonomía **pública**; no toca identidad ni
@@ -33,6 +36,7 @@ from typing import Iterable
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TREE_PATH = PROJECT_ROOT / "config" / "homologation" / "master-category-tree-v1.json"
 CROSSWALK_PATH = PROJECT_ROOT / "config" / "homologation" / "source-category-crosswalk-v1.csv"
+NAME_RULES_PATH = PROJECT_ROOT / "config" / "homologation" / "name-subcategory-rules-v1.csv"
 TREE_SCHEMA = "precios-sps-master-category-tree/v1"
 LEVELS = ("department", "category", "subcategory")
 CROSSWALK_LEVELS = frozenset({"subcategory", "category", "department", "by_name", "excluded"})
@@ -155,9 +159,58 @@ def load(tree_path: Path = TREE_PATH, crosswalk_path: Path = CROSSWALK_PATH) -> 
 
 
 @dataclass(frozen=True, slots=True)
+class NameRule:
+    node: Node
+    keywords: tuple[str, ...]
+    excludes: tuple[str, ...]
+
+
+def _phrase(value: str) -> str:
+    return f" {fold_key(value)} "
+
+
+def name_text(product_name: object) -> str:
+    """Nombre normalizado para reglas: separa palabras pegadas ("JugoNaranja")."""
+    raw = product_name if isinstance(product_name, str) else ""
+    raw = re.sub(r"(?<=[a-záéíóúñ])(?=[A-ZÁÉÍÓÚÑ])", " ", raw.replace("&", " & "))
+    return f" {fold_key(raw)} "
+
+
+@lru_cache(maxsize=1)
+def load_name_rules(path: Path = NAME_RULES_PATH, tree_path: Path = TREE_PATH) -> tuple[NameRule, ...]:
+    """Reglas de subcategoría por nombre, en orden (la primera compatible gana)."""
+    paths = load(tree_path).paths
+    rules: list[NameRule] = []
+    with path.open(encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            node = Node(row["department"], row["category"], row["subcategory"])
+            if (node.department, node.category, node.subcategory) not in paths:
+                raise MasterTaxonomyError(f"name_rule_node_invalid:{row['subcategory']}")
+            keywords = tuple(_phrase(item) for item in row["keywords"].split("|") if item.strip())
+            excludes = tuple(_phrase(item) for item in (row.get("excludes") or "").split("|") if item.strip())
+            if not keywords:
+                raise MasterTaxonomyError(f"name_rule_without_keywords:{row['subcategory']}")
+            rules.append(NameRule(node, keywords, excludes))
+    return tuple(rules)
+
+
+def name_subcategory(product_name: object, within: Node | None, rules: Iterable[NameRule] | None = None) -> Node | None:
+    """Subcategoría por palabras clave del nombre dentro de ``within`` (o sin rama)."""
+    text = name_text(product_name)
+    if not text.strip():
+        return None
+    for rule in load_name_rules() if rules is None else rules:
+        if within is not None and not within.contains(rule.node):
+            continue
+        if any(keyword in text for keyword in rule.keywords) and not any(item in text for item in rule.excludes):
+            return rule.node
+    return None
+
+
+@dataclass(frozen=True, slots=True)
 class Assignment:
     node: Node | None
-    source: str  # crosswalk+type | crosswalk | type | legacy | excluded | unassigned
+    source: str  # crosswalk+type | crosswalk | type | legacy | excluded | unassigned (+name / name)
     crosswalk_level: str | None  # None = categoría del súper sin equivalencia
 
 
@@ -167,8 +220,32 @@ def assign_offer(
     product_type: str | None,
     identity_category: str | None = None,
     taxonomy: Taxonomy | None = None,
+    product_name: str | None = None,
 ) -> Assignment:
-    """Nodo público de una oferta individual (pasos 3 a 5)."""
+    """Nodo público de una oferta individual (pasos 3 a 5).
+
+    Con ``product_name`` aplica además el paso 4b (subcategoría por nombre) a
+    las asignaciones que no llegaron a subcategoría.
+    """
+    assignment = _assign_offer(supermarket_id, source_category, product_type, identity_category, taxonomy)
+    if product_name is None or assignment.source == "excluded":
+        return assignment
+    if assignment.node is not None and assignment.node.subcategory is not None:
+        return assignment
+    refined = name_subcategory(product_name, assignment.node)
+    if refined is None:
+        return assignment
+    source = "name" if assignment.node is None else f"{assignment.source}+name"
+    return Assignment(refined, source, assignment.crosswalk_level)
+
+
+def _assign_offer(
+    supermarket_id: str,
+    source_category: str | None,
+    product_type: str | None,
+    identity_category: str | None = None,
+    taxonomy: Taxonomy | None = None,
+) -> Assignment:
     tax = taxonomy or load()
     entry = tax.crosswalk.get((supermarket_id, fold_key(source_category))) if source_category else None
     level = entry.level if entry else None
