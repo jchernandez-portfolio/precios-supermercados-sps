@@ -110,6 +110,15 @@ Walmart aplica además una recuperación local y acotada cuando el total de una 
 
 Los correos de fallo de GitHub Actions son una preferencia de la cuenta de GitHub y no una propiedad del repositorio.
 
+## Súper Compras (rediseño, 2026-10-10)
+
+Nueva app de consumidor en [`super-compras/`](../super-compras/), estilo comparador (tarjetas con foto/ilustración, "desde L…", "Compara en N súper"). Una sola página para celular y computadora (barra inferior en el celular, menú superior en PC) e instalable como app (PWA: `manifest.webmanifest`, `sw.js`, íconos). Vistas: inicio (ofertas de hoy, los más comparados, departamentos), búsqueda con filtros (súper, departamento, oferta, orden por precio/precio por unidad), ficha de producto (dónde comprar, ¿es buen precio hoy?, otras presentaciones, alternativas de otras marcas) y Mi compra (total comprando cada cosa donde es más barata vs. todo en un súper; la lista queda en el dispositivo).
+
+- Datos: lee el mismo catálogo v3 de `portfolio-data`. El exportador agrega `search.json` (`rpi-consumer-search/v1`, una fila compacta por producto, ≈5 MB / 1.3 MB gzip) listado con SHA-256 en el manifest (`search_file`); la ficha completa se carga por partición al abrir un producto.
+- Imágenes: por ahora ilustraciones SVG por tipo de envase y color de marca (sin fotos de terceros). Fotos de Open Food Facts (CC-BY-SA, por GTIN) pendientes de medir cobertura.
+- Seguridad: sin `innerHTML`, CSP sin scripts en línea, `?catalogo=` sólo acepta rutas relativas del mismo sitio (vista previa local).
+- Compra Inteligente (`b2c/`) sigue publicada hasta reemplazarla en el portafolio.
+
 ## Compra Inteligente B2C
 
 La interfaz pública consume únicamente archivos estáticos publicados y valida tamaños/SHA-256. No consulta Turso y no hace matching en JavaScript. Es un **planificador de compra**, no una tienda ni un checkout. Se publica en el sitio del portafolio (`jchernandez-portfolio.github.io/Portafolio/precios-supermercados-sps/b2c/`) como copia de [`b2c/`](../b2c/) y lee los datos de la rama `portfolio-data` de este repositorio.

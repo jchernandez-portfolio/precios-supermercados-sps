@@ -261,7 +261,7 @@ def export_consumer_catalog(
     require_products: bool = False,
 ) -> dict[str, object]:
     _sync_core()
-    return _ORIGINAL_EXPORT(
+    manifest = _ORIGINAL_EXPORT(
         backend,
         scope,
         output_directory,
@@ -269,6 +269,92 @@ def export_consumer_catalog(
         freshness_window=freshness_window,
         require_products=require_products,
     )
+    return attach_search_index(output_directory, manifest)
+
+
+SEARCH_SCHEMA = "rpi-consumer-search/v1"
+SEARCH_FILE = "search.json"
+SEARCH_COLUMNS = (
+    "id", "product_name", "brand", "presentation", "category", "product_type",
+    "partition", "best_price", "unit_amount", "unit_per", "retailers", "promo",
+    "other_presentations", "comparability",
+)
+# id = hash del row_id sin prefijo; comparabilidad en una letra.
+_COMPARABILITY_CODES = {"comparable": "c", "single_source": "s", "individual": "i"}
+
+
+def _search_entry(row: dict[str, object], partition: int, retailer_index: dict[str, int]) -> list[object]:
+    prices = _eligible_prices(row)
+    best_price, best_offer = min(prices, key=lambda item: item[0]) if prices else (None, {})
+    unit = best_offer.get("unit_price") if isinstance(best_offer, dict) else None
+    retailers = sorted({
+        retailer_index[str(offer["supermarket_id"])]
+        for _, offer in prices
+        if str(offer.get("supermarket_id")) in retailer_index
+    })
+    promo = any(
+        offer.get("is_promotion") is True
+        or (
+            size_variants.parse_price(offer.get("reported_regular_price")) is not None
+            and size_variants.parse_price(offer.get("reported_regular_price")) > price
+        )
+        for price, offer in prices
+    )
+    return [
+        str(row["row_id"]).split("-", 1)[-1], row["product_name"], row.get("brand"), row.get("presentation"),
+        row.get("category"), row.get("product_type"), partition,
+        None if best_price is None else format(best_price, "f"),
+        unit.get("amount") if isinstance(unit, dict) else None,
+        unit.get("per") if isinstance(unit, dict) else None,
+        retailers, 1 if promo else 0, len(row.get("other_presentations") or ()),
+        _COMPARABILITY_CODES.get(str(row.get("comparability")), "i"),
+    ]
+
+
+def attach_search_index(output_directory: Path, manifest: dict[str, object]) -> dict[str, object]:
+    """Índice compacto de búsqueda para Súper Compras (``search.json``).
+
+    Una fila por producto público con lo que necesita una tarjeta de resultados
+    (nombre, marca, presentación, categoría, mejor precio, precio por unidad,
+    súper con oferta, oferta y otras presentaciones) y la partición donde está
+    la ficha completa. Se deriva de las particiones ya escritas: no cambia el
+    contrato v3 ni la identidad. Queda listado con SHA-256 en el manifest.
+    """
+    partitions = [
+        str(item["path"])
+        for item in manifest.get("files", [])  # type: ignore[union-attr]
+        if isinstance(item, dict) and str(item.get("path", "")).startswith("catalog/")
+    ]
+    retailers: list[str] = []
+    for item in manifest.get("scope", []):  # type: ignore[union-attr]
+        supermarket = str(item["supermarket_id"])
+        if supermarket not in retailers:
+            retailers.append(supermarket)
+    retailer_index = {supermarket: index for index, supermarket in enumerate(retailers)}
+    entries: list[list[object]] = []
+    for number, relative in enumerate(partitions):
+        document = json.loads((output_directory / relative).read_text(encoding="utf-8"))
+        for row in document.get("rows", []):
+            entries.append(_search_entry(row, number, retailer_index))
+    if len(entries) != manifest.get("visible_rows"):
+        raise ExportError("consumer_search_row_count_mismatch")
+    document = {
+        "schema": SEARCH_SCHEMA,
+        "as_of": manifest.get("as_of"),
+        "columns": list(SEARCH_COLUMNS),
+        "retailers": retailers,
+        "partitions": partitions,
+        "row_count": len(entries),
+        "rows": entries,
+    }
+    content = json.dumps(document, ensure_ascii=False, separators=(",", ":"), sort_keys=False).encode("utf-8")
+    _core._atomic_bytes(output_directory / SEARCH_FILE, content)
+    files = [item for item in manifest.get("files", []) if not (isinstance(item, dict) and item.get("path") == SEARCH_FILE)]  # type: ignore[union-attr]
+    files.append(_core._file_metadata(output_directory, SEARCH_FILE))
+    manifest["files"] = files
+    manifest["search_file"] = SEARCH_FILE
+    _core._atomic_bytes(output_directory / "manifest.json", _core._json_bytes(manifest))
+    return manifest
 
 
 def main(argv: Sequence[str] | None = None) -> int:
