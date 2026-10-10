@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 import exportar_consumer_catalog_core as _core  # noqa: E402
 from precios_supermercados.consumer_catalog_display import (  # noqa: E402
+    brand_from_prefix,
     canonical_brand,
     canonical_egg_size,
     canonical_presentation,
@@ -117,6 +118,8 @@ def build_rows(
     visible: list[dict[str, object]] = []
     for row in rows:
         row["brand"] = canonical_brand(row.get("brand"), row.get("product_name"))
+        if not row["brand"]:
+            row["brand"] = _prefix_brand(row, offers_by_key)
         _normalize_public_taxonomy(row)
         size = canonical_egg_size(row.get("product_name"), row.get("product_type"))
         if size is not None:
@@ -127,6 +130,17 @@ def build_rows(
             visible.append(row)
     attach_other_presentations(visible, offers_by_key)
     return visible
+
+
+def _prefix_brand(row: dict[str, object], offers_by_key: dict[tuple[str, str], VisibleOffer]) -> str | None:
+    """Marca curada por prefijo del nombre (p. ej. Colonial) para filas sin marca."""
+    for offer in row.get("offers") or ():
+        source = offers_by_key.get((str(offer.get("source_product_id")), str(offer.get("location_id"))))
+        if source is not None:
+            brand = brand_from_prefix(source.supermarket_id, source.product_name)
+            if brand:
+                return brand
+    return None
 
 
 def _eligible_prices(row: dict[str, object]) -> list[tuple[Decimal, dict[str, object]]]:
@@ -182,7 +196,7 @@ def attach_other_presentations(
                     key=str(row["row_id"]),
                     supermarket_id=representative.supermarket_id,
                     name=str(row["product_name"]),
-                    brand=representative.brand,
+                    brand=_text(row.get("brand")) or representative.brand,
                     presentation=representative.presentation or _text(row.get("presentation")),
                     category=representative.source_category,
                     price=min(prices) if prices else None,
