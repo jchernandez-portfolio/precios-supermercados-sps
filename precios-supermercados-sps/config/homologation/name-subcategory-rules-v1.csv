@@ -1,0 +1,96 @@
+department,category,subcategory,keywords,excludes
+"Ropa, calzado y accesorios",Calzado,Calzado,zapato|zapatos|tenis|teni|sandalia|sandalias|bota|botas|botin|botines|pantufla|pantuflas|chancla|chanclas|mocasin|mocasines|bailarina|bailarinas|zapatilla|zapatillas,estante|estantes|zapatera|organizador|rack|para zapatos|betun|esponja
+"Ropa, calzado y accesorios",Accesorios y equipaje,Accesorios y equipaje,bolso|bolsos|cartera|carteras|billetera|billeteras|cinturon|cinturones|gorra|gorras|sombrero|maleta|maletas|equipaje|reloj|bufanda|guantes de invierno,
+"Ropa, calzado y accesorios",Ropa,Bebé,para bebe|bebe nino|bebe nina|recien nacido|mameluco|mamelucos|body bebe,
+"Ropa, calzado y accesorios",Ropa,Niñas,para nina|para ninas|nina|ninas,
+"Ropa, calzado y accesorios",Ropa,Niños,para nino|para ninos|nino|ninos,
+"Ropa, calzado y accesorios",Ropa,Mujer,para mujer|mujer|dama|damas|para dama|blusa|blusas|sosten|sostenes|panti|pantis|vestido|vestidos|falda|faldas|leggings|brasier,nino|nina|ninos|ninas
+"Ropa, calzado y accesorios",Ropa,Hombre,para hombre|hombre|caballero|caballeros|calzoncillo|calzoncillos|boxer,nino|nina|ninos|ninas
+Alimentos,"Carnes, aves y mariscos",Embutidos y carnes frías,jamon|salchicha|salchichas|chorizo|chorizos|mortadela|salami|tocino|bacon|pepperoni|longaniza|carne fria|carnes frias|hot dog|weiner|salchichon,pan|bimbo|buns|pizza|queso
+Alimentos,"Carnes, aves y mariscos",Pescados y mariscos,camaron|camarones|tilapia|salmon|filete de pescado|pescado|mariscos|jaiba|almeja|almejas|pulpo|calamar|langosta|corvina|bacalao|merluza|surimi,lata|atun|sardina|enlatado|apanados|apanado|empanizado|empanizados|deditos|nuggets
+Alimentos,"Carnes, aves y mariscos",Pollo y pavo,pollo|pechuga|pechugas|alas de pollo|alitas|gallina|pavo|muslo|muslos|piernas de pollo,sopa|consome|caldo|sazon|cubito|knorr|maggi|lata|galleta|sabor|con pollo|frito|fritos|rostizado|empanizado|empanizados|tenders|deli|sandwich|burrito|pizza|huevo|huevos|comida|preparado|enchilada|tamal|tamales
+Alimentos,"Carnes, aves y mariscos",Cerdo,cerdo|chuleta|chuletas|costilla de cerdo|lomo de cerdo|pierna de cerdo|chicharron de cerdo,lata|sabor|chicharron de harina
+Alimentos,"Carnes, aves y mariscos",Res,res|bistec|lomito|lomo de res|carne molida|carne de res|costilla de res|ribeye|new york|t bone|sirloin|punta de res|arrachera|short rib|asado de tira|filete de res|ojo de bife,lata|sabor|consome|cubito|caldo
+Alimentos,Lácteos y huevos,Huevos,huevo|huevos,pascua|chocolate|kinder|fideo|fideos|pasta
+Alimentos,Lácteos y huevos,Yogurt,yogurt|yogur|yoghurt,
+Alimentos,Lácteos y huevos,Quesos,queso|quesos|quesillo|cuajada|requeson|mozzarella|cheddar|parmesano,galleta|galletas|nacho|nachos|doritos|cheetos|frituras|boquita|boquitas|pringles|salsa|pan|pizza|crackers|chips|macarrones|macarron|mac|pasta
+Alimentos,Lácteos y huevos,"Mantequillas, margarinas y cremas",mantequilla|crema acida|mantequilla crema|natilla,galleta|galletas|palomitas|mani|cacahuate|pan|sabor
+Alimentos,Lácteos y huevos,Leche,leche entera|leche descremada|leche deslactosada|leche semidescremada|leche uht|leche fluida|leche evaporada|leche condensada|leche en polvo,infantil|crecimiento|formula|chocolate|galleta|dulce de leche|cajeta
+Alimentos,Snacks y dulces,Frutos secos y fruta deshidratada,mani|manies|cacahuate|almendra|almendras|nuez|nueces|maranon|marañon|pistacho|pistachos|semillas|pasas|arandanos secos|mixed nuts|cashew|almonds|peanuts|trail mix,crema de mani|mantequilla de mani|chocolate|choco|galleta|galletas|dulce|leche|bebida|harina|flour|m&m|turron|barra|barras|granola|cereal|moscada|chia|ajonjoli|molida|molido|en polvo|avena
+Alimentos,Snacks y dulces,"Papas, frituras y boquitas",papas fritas|papa frita|chips|tajadas|tajaditas|platanitos|yuquitas|churro|churros|boquitas|boquita|nachos|frituras|fritura|palomitas|popcorn|doritos|cheetos|ranchitas|zambos|pringles|lays|tostacas|chicharron|chicharrones|pretzel|pretzels|tortilla chips,ahoy|chocolate chip|galleta|galletas
+Alimentos,Snacks y dulces,Galletas,galleta|galletas|cookies|cookie|crackers|oreo|club social|soda crackers|saltine|wafer|barquillo|barquillos|chips ahoy,gerber|infantil|bebe
+Alimentos,Snacks y dulces,"Gelatinas, flanes y postres",gelatina|gelatinas|flan|flanes|pudin|pudding|jell o,cabello|capilar
+Alimentos,Snacks y dulces,Dulces y chocolates,chocolate|chocolates|dulce|dulces|caramelo|caramelos|gomita|gomitas|chicle|chicles|paleta|paletas|malvavisco|malvaviscos|mentas|bombon|bombones|turron|confite|confites|candy|lollipop|tic tac|m&m|marshmallow|cajeta|bocadillo,leche|bebida|jarabe|syrup|cafe|pan dulce|polvo|cereal|harina|pastel|galleta|galletas|dulce de leche|maiz dulce|elote|papa dulce|camote|helado|helados|paleta helada|chispas|hornear|cobertura|cocoa
+Alimentos,Abarrotes,Aceites y grasas,aceite|manteca|margarina,oliva para cabello|cabello|corporal|bebe|motor|auto|carro|atun|sardina|sardinas|en aceite|aceitunas
+Alimentos,Abarrotes,"Arroz, granos y legumbres",arroz|frijol|frijoles|lenteja|lentejas|garbanzo|garbanzos|quinoa|maiz para palomitas,leche|bebida|harina|cereal|tostado|galleta|volteados|volteado|molidos|refritos|lata|rancheros|criollos|en salsa
+Alimentos,Abarrotes,Azúcar y endulzantes,azucar|endulzante|splenda|stevia|edulcorante|panela|rapadura,sin azucar|libre de azucar
+Alimentos,Abarrotes,Harinas y repostería,harina|harinas|polvo para hornear|polvo de hornear|levadura|mezcla para pastel|cake mix|mezcla para panqueques|pancake mix|maicena|maizena|fecula|bicarbonato|esencia de vainilla|chispas de chocolate|cocoa para hornear,
+Alimentos,Abarrotes,Pastas,spaghetti|espagueti|macarron|macarrones|tallarin|tallarines|lasagna|lasana|fideo|fideos|coditos|penne|fettuccine|pasta larga|pasta corta,sopa|tomate|dental|instantanea|ramen|maruchan
+Alimentos,Abarrotes,Sopas y comidas instantáneas,sopa|sopas|ramen|maruchan|sopa instantanea,
+Alimentos,Abarrotes,"Salsas, aderezos y vinagres",salsa|salsas|ketchup|catsup|mayonesa|mostaza|aderezo|aderezos|vinagre|chimichurri|salsa inglesa|salsa de soya|pasta de tomate|pure de tomate|bbq sauce|hot sauce|pepper sauce,papas|chips|tajadas|nachos|doritos|frituras|galleta
+Alimentos,Abarrotes,Especias y condimentos,pimienta|comino|canela|oregano|achiote|consome|cubito|cubitos|sazonador|sazon|condimento|adobo|paprika|curry|clavo de olor|laurel|nuez moscada|ajo en polvo|cebolla en polvo|sal de ajo|sal marina|sal yodada|sal refinada,
+Alimentos,Abarrotes,"Untables, mermeladas y miel",mermelada|jalea|miel|crema de mani|mantequilla de mani|nutella|crema de avellana|peanut butter|dulce de leche,papas|chips|mostaza|galleta|galletas|cereal|almibar|en miel|avena|tostado
+Alimentos,Abarrotes,"Cereales, avenas y barras",cereal|cereales|avena|granola|corn flakes|froot loops|zucaritas|barra de cereal|barras de cereal|barra de granola|barras de granola|cheerios|choco krispis,galleta|galletas|bebe|infantil|gerber|nestum|jabon|shampoo|crema
+Alimentos,Abarrotes,Enlatados y conservas,atun|sardina|sardinas|maiz dulce|elote|elotitos|chicharos|vegetales mixtos|frijoles volteados|aceituna|aceitunas|jalapeno|jalapenos|chiles en vinagre|duraznos en almibar|coctel de frutas|fruit cocktail|pineapple chunks|carne picada|spam|vienna,
+Alimentos,Panadería y tortillas,Tortillas,tortilla|tortillas,chips|nachos|tostada|tostadas
+Alimentos,Panadería y tortillas,Pan salado y de molde,pan de molde|pan molde|molde|baguette|pan integral|pan blanco|bollos|bollo|pan hamburguesa|pan para hamburguesa|pan hot dog|pan para hot dog|bagel|bagels|pan frances|medianoche|media noche|hogaza|masa madre|sourdough,dulce|cupcake|pastel
+Alimentos,Panadería y tortillas,"Pan dulce, pasteles y repostería",pan dulce|pastel|pasteles|torta|tortas|cupcake|cupcakes|muffin|muffins|dona|donas|donitas|quequito|quequitos|semita|semitas|croissant|brownie|brownies|cheesecake|rosca|roscas|rosquilla|rosquillas|empanada dulce|cinnamon roll|pie,mix|mezcla
+Bebidas y tabaco,Bebidas sin alcohol,Agua,agua purificada|agua pura|agua mineral|agua con gas|agua natural,coco|jamaica|micelar|oxigenada|destilada|ardiente|tonica
+Bebidas y tabaco,Bebidas sin alcohol,Energizantes e hidratantes,energizante|energizantes|bebida energetica|hidratante|isotonica|gatorade|powerade|red bull|monster|electrolit|suero oral,
+Bebidas y tabaco,Bebidas sin alcohol,Gaseosas,gaseosa|gaseosas|refresco|refrescos|soda|coca cola|pepsi|sprite|fanta|7up|mirinda|ginger ale,polvo|galleta|crackers|bicarbonato
+Bebidas y tabaco,Bebidas sin alcohol,Jugos y néctares,jugo|jugos|nectar|nectares|juice,sazonador|limpiador|maggi
+Bebidas y tabaco,Bebidas alcohólicas,Cerveza,cerveza|cervezas|beer|lager|hard seltzer,
+Bebidas y tabaco,Bebidas alcohólicas,Vinos,vino|vinos|wine|merlot|cabernet|malbec|chardonnay|sauvignon|pinot|rioja|champagne|espumante|sangria|prosecco,vinagre|cocina
+Bebidas y tabaco,Bebidas alcohólicas,Licores,vodka|whisky|whiskey|ron|tequila|ginebra|gin|aguardiente|guaro|brandy|cognac|licor|licores|mezcal|anis|crema de whisky|baileys,
+Cuidado personal y belleza,Cuidado del cabello,Shampoo,shampoo|champu|champoo,acondicionador|mascota|perro|gato|auto|carro|alfombra
+Cuidado personal y belleza,Cuidado del cabello,Acondicionadores y tratamientos,acondicionador|tratamiento capilar|mascarilla capilar|crema para peinar|keratina,
+Cuidado personal y belleza,Cuidado del cabello,Tintes,tinte|tintes|coloracion|decolorante,
+Cuidado personal y belleza,Cuidado del cabello,"Cremas, geles y fijadores",gel para cabello|gelatina para cabello|fijador|laca|cera para cabello|spray para cabello,
+Cuidado personal y belleza,Higiene bucal,Pasta dental,pasta dental|crema dental|dentifrico,
+Cuidado personal y belleza,Higiene bucal,Cepillos dentales,cepillo dental|cepillo de dientes|cepillos dentales|cepillo dientes,
+Cuidado personal y belleza,Higiene bucal,Enjuague e hilo dental,enjuague bucal|hilo dental|seda dental|listerine,
+Cuidado personal y belleza,Higiene corporal,Desodorantes,desodorante|desodorantes|antitranspirante|deo|deospray|deobarra,auto|carro|car|ambiental|inodoro
+Cuidado personal y belleza,Higiene corporal,Protector solar,protector solar|bloqueador|bloqueador solar|sunscreen|fps,facial|labial
+Cuidado personal y belleza,Higiene corporal,Fragancias,perfume|perfumes|colonia|body splash|body mist|eau de toilette|eau de parfum|fragancia,ambiental|ropa|suavizante|hogar
+Cuidado personal y belleza,Higiene corporal,Jabones y geles de baño,jabon de tocador|jabon tocador|jabon corporal|gel de bano|gel de ducha|body wash|jabon liquido para manos|jabon antibacterial,ropa|lavar|lavanderia|platos|lavaplatos|trastes
+Cuidado personal y belleza,Higiene corporal,Cremas y lociones corporales,crema corporal|locion corporal|crema humectante|body lotion|body butter|crema para manos|crema de manos|vaselina,
+Cuidado personal y belleza,Higiene femenina e íntima,"Toallas, protectores y tampones",toalla sanitaria|toallas sanitarias|toalla femenina|toallas femeninas|protector diario|protectores diarios|tampon|tampones|kotex|always|saba,
+Cuidado personal y belleza,Afeitado y depilación,Afeitado y depilación,rastrillo|rastrillos|afeitadora|maquina de afeitar|espuma de afeitar|gel de afeitar|crema depilatoria|cera depilatoria|depilador|gillette|prestobarba,
+Cuidado personal y belleza,Maquillaje y uñas,Uñas,esmalte|esmaltes|quitaesmalte|removedor de esmalte|lima de unas|cortaunas,
+Cuidado personal y belleza,Maquillaje y uñas,Maquillaje,maquillaje|labial|labiales|rimel|mascara de pestanas|delineador|sombra de ojos|base de maquillaje|base liquida|polvo compacto|rubor|corrector|brocha de maquillaje,
+Limpieza,Lavandería,Detergentes,detergente|detergentes,lavaplatos|trastes|platos
+Limpieza,Lavandería,Suavizantes,suavizante|suavizantes|suavitel|downy,cabello
+Limpieza,Lavandería,Jabón de lavandería,jabon para ropa|jabon de lavar|jabon para lavar|jabon de lavanderia|jabon en barra para ropa,
+Limpieza,Lavandería,"Quitamanchas, blanqueadores y colorantes",quitamanchas|quita manchas|removedor de manchas|removedor de mancha|oxi clean|oxiclean|blanqueador|tinte para ropa|clorox ropa,
+Limpieza,Limpieza del hogar,Lavaplatos,lavaplatos|lava platos|lavatrastes|lava trastes|jabon para platos|detergente para platos|axion,
+Limpieza,Limpieza del hogar,Insecticidas y control de plagas,insecticida|insecticidas|repelente|repelentes|raid|baygon|matamoscas|cucarachicida|raticida|veneno para,
+Limpieza,Limpieza del hogar,Cloro y desinfectantes,cloro|lejia|desinfectante|desinfectantes|lysol|clorox|pinol|fabuloso|toallas desinfectantes|toallitas desinfectantes,ropa|manos|bucal
+Limpieza,Limpieza del hogar,Cuidado de pisos y calzado,cera para pisos|abrillantador de pisos|betun|lustrador|limpiador de pisos,
+Limpieza,Limpieza del hogar,Accesorios de limpieza,esponja|esponjas|fibra|fibras|guantes|guante|cepillo|escoba|escobas|trapeador|trapeadores|mopa|recogedor|pano|panos|bayeta|scotch brite|scotchb|cubeta|balde,dental|dientes|cabello|maquillaje|bano para|facial|corporal|zapatos
+Limpieza,Papel y desechables,Papel higiénico,papel higienico|papel de bano,
+Limpieza,Papel y desechables,Papel toalla y servilletas,papel toalla|toalla de papel|toallas de papel|servilleta|servilletas|toalla de cocina|toallas de cocina,
+Limpieza,Papel y desechables,Bolsas para basura,bolsa para basura|bolsas para basura|bolsa de basura|bolsas de basura|bolsa basura|bolsas basura|bolsa negra|bolsas negras,
+Limpieza,Papel y desechables,"Bolsas, aluminio y envolturas",papel aluminio|aluminio|papel encerado|plastico adherente|film plastico|bolsas para alimentos|bolsas ziploc|ziploc|bolsa hermetica|bolsas hermeticas|papel parafinado,
+Limpieza,Papel y desechables,"Platos, vasos y cubiertos desechables",plato desechable|platos desechables|vaso desechable|vasos desechables|cubiertos desechables|cuchara desechable|cucharas desechables|tenedores desechables|vasos plasticos|vaso plastico|platos plasticos|plato plastico|plato de foam|platos de foam|vaso de foam|vasos de foam|party cup,
+Limpieza,Aromatizantes,Aromatizantes,aromatizante|aromatizantes|ambientador|ambientadores|glade|air wick|desodorante ambiental,auto|carro|car
+Mascotas,Perros,Alimento para perro,alimento para perro|comida para perro|croquetas para perro|dog chow|pedigree|beneful|dogui|perrarina,premio|premios|snack|galleta|juguete|shampoo
+Mascotas,Gatos,Alimento para gato,alimento para gato|comida para gato|cat chow|felix|whiskas|gati|friskies,arena|juguete|premio
+Mascotas,Gatos,Arena para gato,arena para gato|arena sanitaria|arena de gato,
+Mascotas,Accesorios e higiene de mascotas,Accesorios y juguetes para mascotas,plato para mascota|plato p mascota|plato para perro|correa|collar|juguete para perro|juguete para gato|cama para perro|transportadora|comedero|bebedero,
+Mascotas,Accesorios e higiene de mascotas,Higiene y salud de mascotas,shampoo para perro|shampoo para mascota|antipulgas|pulgas|desparasitante|toallitas para mascota|bolsas para desechos,
+Bebé,Pañales y toallitas,Pañales,panal|panales|pañal|pañales,adulto|adultos|incontinencia
+Bebé,Pañales y toallitas,Toallitas húmedas,toallitas humedas|toallitas|toallas humedas,desinfectante|desinfectantes|limpiadora facial|desmaquillante|clorox|lysol
+Bebé,Alimentación del bebé,Fórmulas y leches infantiles,formula infantil|formula lactea|leche infantil|leche de crecimiento|crecimiento|enfamil|enfagrow|nan|similac|nido|ceteco|nutrilon|milex|enfalac,
+Bebé,Alimentación del bebé,"Colados, cereales y galletas infantiles",colado|colados|papilla|papillas|gerber|nestum|cerelac|graduates|agu kids,
+Bebé,Alimentación del bebé,Biberones y lactancia,biberon|biberones|pacha|pachas|chupon|chupete|mamila|tetina|extractor de leche,
+Hogar y cocina,Blancos,"Sábanas, edredones y cobijas",sabana|sabanas|edredon|edredones|cobija|cobijas|manta|mantas|frazada|cubrecama|cubrecamas|duvet|juego de cama,bebe|mascota|perro|picnic
+Hogar y cocina,Blancos,Toallas,toalla de bano|toallas de bano|toalla de mano|juego de toallas|set de toallas|toallon,papel|humeda|humedas|sanitaria|sanitarias|femenina|cocina|microfibra para auto
+Hogar y cocina,Blancos,Almohadas y colchones,almohada|almohadas|colchon|colchones|protector de colchon|topper,viaje para auto
+Hogar y cocina,Decoración,Decoración de temporada,navidad|navideno|navidena|navidenas|navidenos|arbol de navidad|halloween|nacimiento|esferas|guirnalda|luces navidenas|santa claus|calabaza decorativa,dulce|dulces|candy|chocolate|galleta|galletas|cupcake|pastel|oz|onz|gr|g|fun size|pops|recipiente|pop
+Hogar y cocina,Decoración,Velas y aromaterapia,vela aromatica|velas aromaticas|difusor|difusores|aceite esencial|aceites esenciales|incienso,cumpleanos|auto|carro
+Hogar y cocina,Decoración,Decoración del hogar,cojin|cojines|cortina|cortinas|tapete decorativo|alfombra|alfombras|cuadro|cuadros|marco para fotos|portarretrato|florero|espejo decorativo|figura decorativa|figuras decorativas|lampara de mesa,auto|carro|bano antideslizante
+Hogar y cocina,Cocina,Ollas y sartenes,olla|ollas|sarten|sartenes|bateria de cocina|cacerola|cacerolas|wok|olla de presion|comal|parrilla para estufa,arrocera electrica|electrica|freidora
+Hogar y cocina,Cocina,"Recipientes, termos y botellas",recipiente|recipientes|contenedor|contenedores|tupper|termo|termos|botella para agua|botella termica|lonchera|loncheras|vaso termico|tazon con tapa|click clack|click|clack,basura|desechable|desechables|bebe
+Hogar y cocina,Cocina,Utensilios de cocina y repostería,cuchillo|cuchillos|tabla para picar|espatula|espatulas|cucharon|batidor|colador|rallador|molde para hornear|moldes para hornear|abrelatas|utensilios de cocina|set de utensilios,desechable|desechables|plastico desechable
+Hogar y cocina,Mesa,"Vajillas, vasos y cubiertos",vajilla|vajillas|juego de platos|set de platos|copa|copas|vaso de vidrio|vasos de vidrio|juego de vasos|cubiertos de acero|juego de cubiertos|taza|tazas|tazon|tazones|vaso cervecero,desechable|desechables|plastico|plasticos|foam|papel|party|mascota|perro|gato|termico|sanitario|inodoro
+Hogar y cocina,Organización y lavandería,Organización y almacenamiento,organizador|organizadores|caja organizadora|cajas organizadoras|canasta|canastas|cesto|cestos|gancho para ropa|ganchos para ropa|ganchos|perchero|zapatera|estante|estantes|repisa|repisas,pelo|cabello|auto|cocina

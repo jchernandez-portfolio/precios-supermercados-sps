@@ -582,7 +582,8 @@ def _public_assignment(group: Sequence[VisibleOffer]) -> "master_taxonomy.Assign
     """Nodo del árbol maestro v1 de un grupo (comparte el más específico)."""
     assignments = [
         master_taxonomy.assign_offer(
-            offer.supermarket_id, offer.source_category, offer.product_type, offer.category
+            offer.supermarket_id, offer.source_category, offer.product_type, offer.category,
+            product_name=offer.product_name,
         )
         for offer in group
     ]

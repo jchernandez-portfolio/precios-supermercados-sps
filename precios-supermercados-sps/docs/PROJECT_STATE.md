@@ -507,7 +507,7 @@ Completada. Nuevo repositorio `jchernandez-portfolio/precios-supermercados-sps` 
 ## Próximos pasos
 
 1. Confirmar el primer disparo de Cloudflare a las 05:17 (2026-10-10) y el efecto del primer corte con v2.7, vínculos `engine_auto` y especificaciones PriceSmart.
-2. Homologación: ~~"otras presentaciones"~~ (hecho 2026-10-09: regla V publicada como `other_presentations` en el catálogo v3; ~2,550 vínculos entre filas SPS), huecos de categoría (PriceSmart Hogar/temporada, Colonial segundo nivel), marcas faltantes de Los Andes, alternativas/sustitutos y control mensual de precisión.
+2. Homologación: ~~"otras presentaciones"~~ (hecho 2026-10-09: regla V publicada como `other_presentations` en el catálogo v3; ~2,550 vínculos entre filas SPS), ~~huecos de categoría~~ (hecho 2026-10-09: paso 4b, subcategoría por nombre; filas con subcategoría 75 % → 86 %), marcas faltantes de Los Andes, alternativas/sustitutos y control mensual de precisión.
 3. Confiabilidad del scraping: reintentos cortos por página ante HTTP 5xx o catálogo cambiante; operador disparado al terminar el corte.
 4. Costo Turso: homologación incremental y publicar desde artifacts del día.
 5. Limpieza: código experimental no alcanzable desde producción (≈29 scripts y ≈100 módulos, con sus pruebas) y capturas crudas de `reports/` (~96 MB).
