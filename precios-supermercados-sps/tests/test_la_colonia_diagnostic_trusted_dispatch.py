@@ -250,60 +250,11 @@ def test_full_sigue_prohibido():
     assert "full" in decision.reason
 
 
-def test_controlador_privilegiado_esta_bloqueado_y_usa_checkout_inmutable():
-    text = CONTROLLER.read_text(encoding="utf-8")
-    assert "actions: write" not in text
-    assert "ref: ${{ github.workflow_sha }}" in text
-    assert "persist-credentials: false" in text
-    assert "github.event.pull_request.head" not in text
 
 
-def test_controlador_no_contiene_dispatch_ni_autoridad_por_comentario():
-    text = CONTROLLER.read_text(encoding="utf-8")
-    assert "/actions/workflows/" not in text
-    assert "listComments" not in text
-    assert "issues: write" not in text
 
 
-def test_workflow_diagnostico_es_manual_y_cerrado():
-    text = DIAGNOSTIC.read_text(encoding="utf-8")
-    assert "workflow_dispatch:" in text
-    for trigger in (
-        "schedule:",
-        "push:",
-        "pull_request:",
-        "pull_request_target:",
-        "issue_comment:",
-    ):
-        assert trigger not in text
-    assert "timeout-minutes: 15" in text
-    assert "contents: read" in text
-    assert "frontier_380_399_v1" in text
-    assert '"1.5"' in text
 
 
-def test_workflow_diagnostico_no_expone_inputs_arbitrarios():
-    text = DIAGNOSTIC.read_text(encoding="utf-8")
-    for forbidden in (
-        "from:",
-        "to:",
-        "windows:",
-        "order_by:",
-        "max_requests:",
-        "URL:",
-        "query:",
-        "selectedFacets:",
-        "profile:",
-        "thresholds:",
-        "allow_full:",
-        "full:",
-    ):
-        assert forbidden not in text
 
 
-def test_workflow_diagnostico_mapea_codigos_tecnicos():
-    text = DIAGNOSTIC.read_text(encoding="utf-8")
-    assert '"0"|"2"' in text
-    assert '"3"|"4"|"5"' in text
-    assert "diagnostic-summary.json" in text
-    assert "diagnostic-summary.md" in text

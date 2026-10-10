@@ -10,14 +10,6 @@ CLI = REPO_ROOT / "precios-supermercados-sps/scripts/diagnosticar_binding_ubicac
 PROJECT_STATE = REPO_ROOT / "precios-supermercados-sps/docs/PROJECT_STATE.md"
 
 
-def test_location_binding_workflow_is_manual_and_fail_closed() -> None:
-    text = WORKFLOW.read_text(encoding="utf-8")
-
-    assert "workflow_dispatch:" in text
-    assert "if: ${{ false }}" in text
-    assert "\n  push:" not in text
-    assert "standing-request" not in text
-    assert "--standing-public-read-only" not in text
 
 
 def test_standing_location_binding_marker_is_absent() -> None:

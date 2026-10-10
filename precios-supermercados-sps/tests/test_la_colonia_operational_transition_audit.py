@@ -294,22 +294,8 @@ def test_invalid_or_missing_pr_number_is_rejected(facet_command):
     assert "número" in decision.reason
 
 
-def test_expected_event_and_paths_filter_are_declared_in_main_workflow():
-    text = COMMAND_WORKFLOW.read_text(encoding="utf-8")
-    assert "pull_request_target:" in text
-    assert "types: [synchronize]" in text
-    assert "paths:" in text
-    assert text.count(OPERATIONAL_PATH) == 1
-    assert "ref: ${{ github.workflow_sha }}" in text
-    assert "persist-credentials: false" in text
 
 
-def test_action_other_than_synchronize_is_not_in_the_trigger_allow_list():
-    text = COMMAND_WORKFLOW.read_text(encoding="utf-8")
-    trigger = text.split("pull_request_target:", 1)[1].split("permissions:", 1)[0]
-    assert "types: [synchronize]" in trigger
-    for action in ("opened", "reopened", "edited", "closed"):
-        assert action not in trigger
 
 
 def test_controller_recovers_commit_and_file_from_event_head_sha():
@@ -336,18 +322,6 @@ def test_comments_are_observability_only_and_controller_does_not_dispatch():
     assert "listComments" not in text
 
 
-def test_upload_artifact_runs_always_and_recovery_never_dispatches():
-    workflow = COMMAND_WORKFLOW.read_text(encoding="utf-8")
-    recovery = RECOVERY_WORKFLOW.read_text(encoding="utf-8")
-    observer = OBSERVER.read_text(encoding="utf-8")
-    assert "if: always()" in workflow
-    assert "dispatcher-result.json" in workflow
-    assert "workflow_run:" in recovery
-    assert "ref: ${{ github.workflow_sha }}" in recovery
-    assert "FACET_WORKFLOW" in observer
-    assert "RECOVERY_REQUIRED" in observer
-    assert "/dispatches" not in recovery
-    assert "/dispatches" not in observer
 
 
 def test_transition_audit_is_offline_only():

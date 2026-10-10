@@ -22,13 +22,6 @@ base.SAFE_ANALYTICS_WORKFLOW = "precios-supermercados-sps-safe-analytics-publica
 base.RPI_PUBLICATION_REQUEST = (
     "precios-supermercados-sps/.automation/rpi-publication-request.json"
 )
-base.TURSO_SCHEMA_MIGRATION_WORKFLOW = "precios-supermercados-sps-turso-schema-migration.yml"
-base.TURSO_SCHEMA_MIGRATION_OPERATOR_WORKFLOW = (
-    "precios-supermercados-sps-turso-schema-migration-operator.yml"
-)
-base.TURSO_SCHEMA_MIGRATION_REQUEST = (
-    "precios-supermercados-sps/.automation/turso-schema-migration-request.json"
-)
 base.PORTFOLIO_DATA_SYNC_WORKFLOW = "precios-supermercados-sps-portfolio-data-sync.yml"
 base.TURSO_WEEKLY_INTEGRITY_WORKFLOW = "precios-supermercados-sps-turso-weekly-integrity.yml"
 base.EXPECTED_PERMISSIONS[base.PRODUCTION_OPERATOR_WORKFLOW] = {
@@ -44,17 +37,6 @@ base.ALLOWED_SECRET_REFERENCES[base.SAFE_ANALYTICS_WORKFLOW] = {
     base.TURSO_DATABASE_URL_SECRET,
     base.TURSO_AUTH_TOKEN_SECRET,
 }
-base.EXPECTED_PERMISSIONS[base.TURSO_SCHEMA_MIGRATION_WORKFLOW] = {"contents": "read"}
-base.EXPECTED_TRIGGERS[base.TURSO_SCHEMA_MIGRATION_WORKFLOW] = {"workflow_dispatch"}
-base.ALLOWED_SECRET_REFERENCES[base.TURSO_SCHEMA_MIGRATION_WORKFLOW] = {
-    base.TURSO_DATABASE_URL_SECRET,
-    base.TURSO_AUTH_TOKEN_SECRET,
-}
-base.EXPECTED_PERMISSIONS[base.TURSO_SCHEMA_MIGRATION_OPERATOR_WORKFLOW] = {
-    "actions": "write",
-    "contents": "read",
-}
-base.EXPECTED_TRIGGERS[base.TURSO_SCHEMA_MIGRATION_OPERATOR_WORKFLOW] = {"push"}
 base.EXPECTED_PERMISSIONS[base.PORTFOLIO_DATA_SYNC_WORKFLOW] = {
     "actions": "read",
     "contents": "write",
@@ -89,38 +71,11 @@ def _checkout_identity_with_derived_workflows() -> None:
 
     derived_ref = "${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}"
     for path, workflow in base.workflows():
-        if path.name == base.PROBE_WORKFLOW:
-            probe_jobs = base.jobs(workflow)
-            privileged_checkout = [
-                step
-                for step in base.job_steps(probe_jobs["controlled-probe"])
-                if str(step.get("uses", "")).startswith("actions/checkout@")
-            ]
-            assert privileged_checkout == [], "El job con OIDC de sonda no debe ejecutar código del repositorio"
-            verifier_checkout = [
-                step
-                for step in base.job_steps(probe_jobs["verify-evidence"])
-                if str(step.get("uses", "")).startswith("actions/checkout@")
-            ]
-            assert len(verifier_checkout) == 1
-            assert verifier_checkout[0]["with"] == {
-                "ref": "${{ github.sha }}",
-                "persist-credentials": "false",
-            }
-            continue
-
         checkout_steps = [
             step
             for step in base.steps(workflow)
             if str(step.get("uses", "")).startswith("actions/checkout@")
         ]
-        if path.name == base.LOCATION_BINDING_WORKFLOW:
-            assert base.all_jobs_blocked(workflow)
-            assert checkout_steps == []
-            continue
-        if path.name == base.PRESERVE_INITIAL_SNAPSHOT_WORKFLOW:
-            assert checkout_steps == []
-            continue
         if path.name == base.PORTFOLIO_DATA_SYNC_WORKFLOW:
             assert len(checkout_steps) == 1
             assert checkout_steps[0]["uses"] == "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
@@ -146,16 +101,11 @@ def _checkout_identity_with_derived_workflows() -> None:
             }
             continue
 
-        expected_ref = (
-            "${{ github.workflow_sha }}"
-            if path.name in {base.COMMAND_WORKFLOW, base.RECOVERY_WORKFLOW}
-            else "${{ github.sha }}"
-        )
         assert checkout_steps, path.name
         for step in checkout_steps:
             inputs = step.get("with")
             assert isinstance(inputs, dict)
-            assert inputs == {"ref": expected_ref, "persist-credentials": "false"}
+            assert inputs == {"ref": "${{ github.sha }}", "persist-credentials": "false"}
 
 
 base.test_checkout_identity_is_immutable_and_credentials_are_not_persisted = (
@@ -368,102 +318,6 @@ def test_controlled_rpi_publication_request_is_closed_and_read_only() -> None:
         "read_only": True,
         "reason": "operator_requested_republication",
         "sequence": 8,
-    }
-
-
-def test_turso_schema_migration_is_manual_scoped_and_fail_closed() -> None:
-    path = base.WORKFLOW_DIR / base.TURSO_SCHEMA_MIGRATION_WORKFLOW
-    workflow = base.load_workflow(path)
-    assert workflow["permissions"] == {"contents": "read"}
-    assert set(workflow["on"]) == {"workflow_dispatch"}
-    dispatch = workflow["on"]["workflow_dispatch"]
-    assert isinstance(dispatch, dict)
-    authorization = dispatch["inputs"]["schema_migration_authorized"]
-    assert authorization["required"] == "true"
-    assert authorization["default"] == "false"
-    assert authorization["type"] == "boolean"
-    assert workflow["concurrency"] == {
-        "group": "precios-sps-turso-schema-migration",
-        "cancel-in-progress": "false",
-    }
-
-    workflow_jobs = base.jobs(workflow)
-    assert set(workflow_jobs) == {"migrate"}
-    migrate = workflow_jobs["migrate"]
-    assert migrate["if"] == (
-        "${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' && "
-        "inputs.schema_migration_authorized == true }}"
-    )
-    assert migrate["timeout-minutes"] == "15"
-    assert "permissions" not in migrate
-    assert "environment" not in migrate
-
-    raw = path.read_text(encoding="utf-8")
-    assert "scripts/migrar_mvp_turso_walmart_pricesmart.py" in raw
-    assert "TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}" in raw
-    assert "TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}" in raw
-    assert "pull_request:" not in raw
-    assert "pull_request_target:" not in raw
-    assert "issue_comment:" not in raw
-    assert "schedule:" not in raw
-    assert "id-token" not in raw
-    assert "contents: write" not in raw
-
-
-def test_turso_schema_migration_operator_is_main_only_closed_and_least_privilege() -> None:
-    path = base.WORKFLOW_DIR / base.TURSO_SCHEMA_MIGRATION_OPERATOR_WORKFLOW
-    workflow = base.load_workflow(path)
-    assert workflow["permissions"] == {"actions": "write", "contents": "read"}
-    assert workflow["concurrency"] == {
-        "group": "precios-sps-turso-schema-migration-operator",
-        "cancel-in-progress": "false",
-    }
-    assert workflow["on"] == {
-        "push": {
-            "branches": ["main"],
-            "paths": [base.TURSO_SCHEMA_MIGRATION_REQUEST],
-        }
-    }
-    workflow_jobs = base.jobs(workflow)
-    assert set(workflow_jobs) == {"dispatch"}
-    dispatch = workflow_jobs["dispatch"]
-    assert dispatch["if"] == (
-        "${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' && "
-        "github.ref == 'refs/heads/main' && github.event_name == 'push' }}"
-    )
-    assert dispatch["timeout-minutes"] == "5"
-    assert "permissions" not in dispatch
-    assert "environment" not in dispatch
-
-    raw = path.read_text(encoding="utf-8")
-    assert base.TURSO_SCHEMA_MIGRATION_REQUEST in raw
-    assert "precios-sps-turso-schema-migration-request/v1" in raw
-    assert "migrate_walmart_pricesmart_schema" in raw
-    assert "schema_migration_request_schema_closed_set_mismatch" in raw
-    assert "schema_migration_request_authorization_window_too_long" in raw
-    assert "schema_migration_request_authorization_not_current" in raw
-    assert "schema_migration_request_authority_missing" in raw
-    assert "createWorkflowDispatch" in raw
-    assert "precios-supermercados-sps-turso-schema-migration.yml" in raw
-    assert "schema_migration_authorized: 'true'" in raw
-    assert "ref: 'main'" in raw
-    assert "secrets." not in raw
-    assert "vars." not in raw
-    assert "pull_request:" not in raw
-    assert "pull_request_target:" not in raw
-    assert "issue_comment:" not in raw
-    assert "schedule:" not in raw
-    assert "id-token" not in raw
-
-    parsed = yaml.load(raw, Loader=yaml.BaseLoader)
-    checkout = next(
-        step
-        for step in parsed["jobs"]["dispatch"]["steps"]
-        if str(step.get("uses", "")).startswith("actions/checkout@")
-    )
-    assert checkout["with"] == {
-        "ref": "${{ github.sha }}",
-        "persist-credentials": "false",
     }
 
 

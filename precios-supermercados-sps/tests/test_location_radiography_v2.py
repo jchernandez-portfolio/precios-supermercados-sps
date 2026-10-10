@@ -52,16 +52,6 @@ def test_fingerprints_are_stable_and_do_not_expose_storage_values() -> None:
     assert fingerprint == module._fingerprint(raw)
 
 
-def test_radiography_v2_is_not_wired_into_closed_live_binding_workflow() -> None:
-    raw = WORKFLOW.read_text(encoding="utf-8")
-
-    assert "if: ${{ false }}" in raw
-    assert "radiografiar_ubicacion_la_colonia_v2.py" not in raw
-    assert "diagnostic-artifacts/location-radiography-v2" not in raw
-    assert "actions/upload-artifact@" not in raw
-    assert "secrets." not in raw
-    assert "id-token" not in raw
-    assert "actions: write" not in raw
 
 
 def test_radiography_persists_only_sanitized_context_shapes() -> None:

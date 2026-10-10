@@ -1,9 +1,0 @@
-{
-  "schema": "precios-sps-turso-schema-migration-request/v1",
-  "request_id": "migrate-turso-20260907-1715z",
-  "operation": "migrate_walmart_pricesmart_schema",
-  "authorized_at_utc": "2026-09-07T17:15:50Z",
-  "authorized_until_utc": "2026-09-08T17:15:50Z",
-  "schema_migration_authorized": true,
-  "requested_ref": "main"
-}

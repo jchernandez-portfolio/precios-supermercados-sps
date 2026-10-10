@@ -493,7 +493,7 @@ La publicación pública incluye Consumer Mart v2, Consumer Catalog v3 por ciuda
 
 ## Migración de repositorio (2026-09-30)
 
-Completada. Nuevo repositorio `jchernandez-portfolio/precios-supermercados-sps` con historial; el código sigue en `precios-supermercados-sps/`. El historial de ramas del monorepo permanece en `jchernandez-portfolio/Portafolio`. Secrets vigentes: `TURSO_DATABASE_URL` y `TURSO_AUTH_TOKEN`. No se recrearon los environments `cloudflare-probe` ni `la-colonia-live`: la sonda Cloudflare (`edge/cloudflare`) y los recorridos manuales de La Colonia están inactivos en este repo.
+Completada. Nuevo repositorio `jchernandez-portfolio/precios-supermercados-sps` con historial; el código sigue en `precios-supermercados-sps/`. El historial de ramas del monorepo permanece en `jchernandez-portfolio/Portafolio`. Secrets vigentes: `TURSO_DATABASE_URL` y `TURSO_AUTH_TOKEN`. No se recrearon los environments `cloudflare-probe` ni `la-colonia-live`. El 2026-10-09 se retiraron los 11 workflows que dependían de ellos o que nunca corrieron en este repo (sonda Cloudflare y su verificador, despachador/diagnóstico/recuperación/facets/live/binding manuales de La Colonia, snapshot inicial y migración de esquema Walmart/PriceSmart ya aplicada) y se borraron los Workers `precios-sps-controlled-probe`/`-origin`; el historial queda en git y `tests/_workflow_security_audit_base.py` impide que reaparezcan sin revisión. Workflows vigentes: corte diario, operador, homologación, publicación segura, sincronización `portfolio-data`, especificaciones PriceSmart, integridad semanal, auditoría de identidad y pruebas.
 
 ## Límites vigentes
 
@@ -509,7 +509,7 @@ Completada. Nuevo repositorio `jchernandez-portfolio/precios-supermercados-sps` 
 2. Homologación: "otras presentaciones" (validar la relación entre cadenas con muestra etiquetada; marcar tamaños > 5×), huecos de categoría (PriceSmart Hogar/temporada, Colonial segundo nivel), marcas faltantes de Los Andes, alternativas/sustitutos y control mensual de precisión.
 3. Confiabilidad del scraping: reintentos cortos por página ante HTTP 5xx o catálogo cambiante; operador disparado al terminar el corte.
 4. Costo Turso: homologación incremental y publicar desde artifacts del día.
-5. Limpieza: workflows que nunca corrieron en este repo, código experimental no alcanzable desde producción y capturas crudas de `reports/`.
+5. Limpieza: código experimental no alcanzable desde producción (≈29 scripts y ≈100 módulos, con sus pruebas) y capturas crudas de `reports/` (~96 MB).
 6. Rediseño de Compra Inteligente estilo comparador (búsqueda, fichas, "Dónde comprar / Otras presentaciones / Alternativas / Historial").
 
 ## Motor de homologación (shadow) 2026-09-30

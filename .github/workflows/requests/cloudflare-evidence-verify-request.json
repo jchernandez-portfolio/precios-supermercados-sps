@@ -1,8 +1,0 @@
-{
-  "schemaVersion": "precios-sps-cloudflare-evidence-verify-request/v1",
-  "sourceRunId": 32551882793,
-  "sourceRunAttempt": 1,
-  "sourceCommitSha": "cc15edef22709911beb1d1b027ae4c9992da1944",
-  "requestSequence": 1,
-  "authority": false
-}

@@ -45,56 +45,38 @@ PINNED_ACTIONS = {
     "actions/download-artifact": "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
 }
 
-PROBE_WORKFLOW = "precios-supermercados-sps-cloudflare-probe.yml"
 TEST_WORKFLOW = "precios-supermercados-sps-tests.yml"
 AUDIT_WORKFLOW = "precios-supermercados-sps-historical-branch-audit.yml"
-COMMAND_WORKFLOW = "precios-supermercados-sps-la-colonia-command.yml"
-RECOVERY_WORKFLOW = "precios-supermercados-sps-la-colonia-dispatch-recovery.yml"
-LA_DIAGNOSTIC_WORKFLOW = "precios-supermercados-sps-la-colonia-diagnostic.yml"
-FACET_WORKFLOW = "precios-supermercados-sps-la-colonia-facet-discovery.yml"
-LIVE_WORKFLOW = "precios-supermercados-sps-la-colonia-live.yml"
 MVP_UPDATE_WORKFLOW = "precios-supermercados-sps-la-colonia-mvp-update.yml"
-LIVE_MVP_JOB = "mvp-sample"
-LIVE_FACET_JOB = "context-bound-facet-entrypoint"
-LOCATION_BINDING_WORKFLOW = "precios-supermercados-sps-la-colonia-location-binding.yml"
-PRESERVE_INITIAL_SNAPSHOT_WORKFLOW = (
-    "precios-supermercados-sps-preserve-initial-snapshot.yml"
-)
 HOMOLOGATION_REFRESH_WORKFLOW = "precios-supermercados-sps-homologation-refresh.yml"
-LIVE_MVP_REQUEST = (
-    "precios-supermercados-sps/.automation/la-colonia-mvp-live-request.json"
-)
-PROBE_GATEWAY_SECRET = "CLOUDFLARE_PROBE_GATEWAY_URL"
-PROBE_OBSERVABILITY_SECRET = "CLOUDFLARE_PROBE_OBSERVABILITY_TOKEN"
-PROBE_PUBLIC_KEY_VAR = "CLOUDFLARE_PROBE_PUBLIC_KEY_SPKI_B64URL"
-CLOUDFLARE_ACCOUNT_VAR = "CLOUDFLARE_ACCOUNT_ID"
-EDGE_GATEWAY_VAR = "CLOUDFLARE_EDGE_GATEWAY_URL"
-EDGE_PUBLIC_KEY_VAR = "CLOUDFLARE_EDGE_RECEIPT_PUBLIC_KEY_SPKI_B64URL"
 TURSO_DATABASE_URL_SECRET = "TURSO_DATABASE_URL"
 TURSO_AUTH_TOKEN_SECRET = "TURSO_AUTH_TOKEN"
 
+# Workflows retirados el 2026-10-09: nunca corrieron en este repo y no podían
+# correr (sin environments `cloudflare-probe`/`la-colonia-live` ni secrets).
+# Su historial queda en git; no deben reaparecer sin una revisión explícita.
+REMOVED_WORKFLOWS = frozenset({
+    "cloudflare-controlled-probe-evidence-verify.yml",
+    "precios-supermercados-sps-cloudflare-probe.yml",
+    "precios-supermercados-sps-la-colonia-command.yml",
+    "precios-supermercados-sps-la-colonia-diagnostic.yml",
+    "precios-supermercados-sps-la-colonia-dispatch-recovery.yml",
+    "precios-supermercados-sps-la-colonia-facet-discovery.yml",
+    "precios-supermercados-sps-la-colonia-live.yml",
+    "precios-supermercados-sps-la-colonia-location-binding.yml",
+    "precios-supermercados-sps-preserve-initial-snapshot.yml",
+    "precios-supermercados-sps-turso-schema-migration.yml",
+    "precios-supermercados-sps-turso-schema-migration-operator.yml",
+})
+
 EXPECTED_PERMISSIONS = {
-    PROBE_WORKFLOW: {"contents": "read"},
     AUDIT_WORKFLOW: {"contents": "read", "pull-requests": "read"},
-    COMMAND_WORKFLOW: {"contents": "read", "pull-requests": "read"},
-    RECOVERY_WORKFLOW: {"actions": "read", "contents": "read"},
-    LA_DIAGNOSTIC_WORKFLOW: {"contents": "read"},
-    FACET_WORKFLOW: {"contents": "read"},
-    LIVE_WORKFLOW: {"contents": "read"},
     MVP_UPDATE_WORKFLOW: {"contents": "read"},
-    LOCATION_BINDING_WORKFLOW: {"contents": "read"},
-    PRESERVE_INITIAL_SNAPSHOT_WORKFLOW: {"actions": "read", "contents": "read"},
     HOMOLOGATION_REFRESH_WORKFLOW: {"contents": "read"},
     TEST_WORKFLOW: {"contents": "read"},
 }
 
 ALLOWED_JOB_PERMISSIONS = {
-    PROBE_WORKFLOW: {
-        "controlled-probe": {"contents": "read", "id-token": "write"},
-    },
-    LIVE_WORKFLOW: {
-        LIVE_FACET_JOB: {"contents": "read", "id-token": "write"},
-    },
     # Lectura de jobs del corte para publicar persistencias parciales (2026-10-09).
     HOMOLOGATION_REFRESH_WORKFLOW: {
         "daily-gate": {"actions": "read"},
@@ -102,32 +84,15 @@ ALLOWED_JOB_PERMISSIONS = {
 }
 
 EXPECTED_TRIGGERS = {
-    PROBE_WORKFLOW: {"workflow_dispatch"},
     AUDIT_WORKFLOW: {"workflow_dispatch", "push"},
-    COMMAND_WORKFLOW: {"pull_request_target"},
-    LA_DIAGNOSTIC_WORKFLOW: {"workflow_dispatch"},
-    RECOVERY_WORKFLOW: {"workflow_run"},
-    FACET_WORKFLOW: {"workflow_dispatch"},
-    LIVE_WORKFLOW: {"workflow_dispatch", "push"},
     # Desde 2026-10-09 lo dispara el Worker edge/daily-trigger (05:17) y, de
     # respaldo, el operador productivo; sin cron propio (llegaba 5–9 h tarde).
     MVP_UPDATE_WORKFLOW: {"workflow_dispatch"},
-    LOCATION_BINDING_WORKFLOW: {"workflow_dispatch"},
-    PRESERVE_INITIAL_SNAPSHOT_WORKFLOW: {"workflow_dispatch", "push"},
     HOMOLOGATION_REFRESH_WORKFLOW: {"workflow_dispatch", "workflow_run"},
     TEST_WORKFLOW: {"workflow_dispatch", "pull_request", "push"},
 }
 
-BLOCKED_ENTRYPOINTS = {
-    COMMAND_WORKFLOW,
-    LA_DIAGNOSTIC_WORKFLOW,
-    RECOVERY_WORKFLOW,
-    FACET_WORKFLOW,
-    LOCATION_BINDING_WORKFLOW,
-}
-
 ALLOWED_SECRET_REFERENCES = {
-    PROBE_WORKFLOW: {PROBE_GATEWAY_SECRET, PROBE_OBSERVABILITY_SECRET},
     MVP_UPDATE_WORKFLOW: {TURSO_DATABASE_URL_SECRET, TURSO_AUTH_TOKEN_SECRET},
     HOMOLOGATION_REFRESH_WORKFLOW: {TURSO_DATABASE_URL_SECRET, TURSO_AUTH_TOKEN_SECRET},
 }
@@ -138,11 +103,17 @@ OPTIONAL_SECRET_REFERENCE_GROUPS = {
         {TURSO_DATABASE_URL_SECRET, TURSO_AUTH_TOKEN_SECRET},
     ),
 }
-ALLOWED_VAR_REFERENCES = {
-    PROBE_WORKFLOW: {PROBE_PUBLIC_KEY_VAR, CLOUDFLARE_ACCOUNT_VAR},
-    LIVE_WORKFLOW: {EDGE_GATEWAY_VAR, EDGE_PUBLIC_KEY_VAR},
-}
+ALLOWED_VAR_REFERENCES: dict[str, set[str]] = {}
 
+# Scripts con tráfico live manual de La Colonia: ningún workflow los ejecuta.
+NETWORK_CAPABLE_SCRIPTS = (
+    "scripts/probar_la_colonia.py",
+    "scripts/probar_muestra_sps_la_colonia.py",
+    "scripts/diagnosticar_ventanas_la_colonia.py",
+    "scripts/descubrir_facets_la_colonia.py",
+    "scripts/diagnosticar_binding_ubicacion_la_colonia.py",
+    "scripts/ejecutar_facets_context_bound_la_colonia.py",
+)
 
 def load_workflow(path: Path) -> dict[str, Any]:
     """Parsea sin constructores de objetos y conserva `on` como string YAML."""
@@ -234,38 +205,11 @@ def test_permissions_are_exact_with_only_explicit_job_overrides_and_references()
 
 def test_checkout_identity_is_immutable_and_credentials_are_not_persisted():
     for path, workflow in workflows():
-        if path.name == PROBE_WORKFLOW:
-            probe_jobs = jobs(workflow)
-            privileged_checkout = [
-                step
-                for step in job_steps(probe_jobs["controlled-probe"])
-                if str(step.get("uses", "")).startswith("actions/checkout@")
-            ]
-            assert privileged_checkout == [], "El job con OIDC de sonda no debe ejecutar código del repositorio"
-            verifier_checkout = [
-                step
-                for step in job_steps(probe_jobs["verify-evidence"])
-                if str(step.get("uses", "")).startswith("actions/checkout@")
-            ]
-            assert len(verifier_checkout) == 1
-            assert verifier_checkout[0]["with"] == {
-                "ref": "${{ github.sha }}",
-                "persist-credentials": "false",
-            }
-            continue
-
         checkout_steps = [
             step
             for step in steps(workflow)
             if str(step.get("uses", "")).startswith("actions/checkout@")
         ]
-        if path.name == LOCATION_BINDING_WORKFLOW:
-            assert all_jobs_blocked(workflow)
-            assert checkout_steps == []
-            continue
-        if path.name == PRESERVE_INITIAL_SNAPSHOT_WORKFLOW:
-            assert checkout_steps == []
-            continue
         if path.name == AUDIT_WORKFLOW:
             assert len(checkout_steps) == 1
             assert checkout_steps[0]["with"] == {
@@ -283,128 +227,17 @@ def test_checkout_identity_is_immutable_and_credentials_are_not_persisted():
             }
             continue
 
-        expected_ref = (
-            "${{ github.workflow_sha }}"
-            if path.name in {COMMAND_WORKFLOW, RECOVERY_WORKFLOW}
-            else "${{ github.sha }}"
-        )
         assert checkout_steps, path.name
         for step in checkout_steps:
             inputs = step.get("with")
             assert isinstance(inputs, dict)
-            assert inputs == {"ref": expected_ref, "persist-credentials": "false"}
+            assert inputs == {"ref": "${{ github.sha }}", "persist-credentials": "false"}
 
 
-def test_privileged_and_mutating_entrypoints_are_globally_blocked():
-    by_name = {path.name: workflow for path, workflow in workflows()}
-    for name in BLOCKED_ENTRYPOINTS:
-        assert all_jobs_blocked(by_name[name]), name
-
-    command = by_name[COMMAND_WORKFLOW]
-    assert "actions" not in command["permissions"]
-    controller = (
-        REPO_ROOT
-        / "precios-supermercados-sps"
-        / "scripts"
-        / "controlar_solicitud_archivo_la_colonia.js"
-    ).read_text(encoding="utf-8")
-    assert "GLOBAL LIVE BLOCKED" in controller
-    assert "/actions/workflows/{workflow_id}/dispatches" not in controller
-    assert "github.request(" not in controller
-
-
-def test_mvp_sample_is_the_only_nonprivileged_live_catalog_path() -> None:
-    path = WORKFLOW_DIR / LIVE_WORKFLOW
-    workflow = load_workflow(path)
-    live_jobs = jobs(workflow)
-    assert set(live_jobs) == {LIVE_MVP_JOB, "live-crawl", LIVE_FACET_JOB}
-
-    sample = live_jobs[LIVE_MVP_JOB]
-    assert sample["if"] == (
-        "${{ (github.event_name == 'workflow_dispatch' && inputs.mode == 'mvp_sample' && "
-        "inputs.mvp_read_only_authorized == true) || (github.event_name == 'push' && "
-        "github.ref == 'refs/heads/main') }}"
-    )
-    assert sample["timeout-minutes"] == "15"
-    assert "environment" not in sample
-    assert "permissions" not in sample
-    assert sample["env"] == {
-        "PYTHONPATH": "${{ github.workspace }}/precios-supermercados-sps/src"
-    }
-    assert live_jobs["live-crawl"]["if"] == "${{ false }}"
-    assert live_jobs[LIVE_FACET_JOB]["if"] == "${{ false }}"
-
-    triggers = workflow["on"]
-    dispatch = triggers["workflow_dispatch"]
-    assert isinstance(dispatch, dict)
-    inputs = dispatch["inputs"]
-    assert inputs["mode"]["default"] == "mvp_sample"
-    assert inputs["mode"]["options"] == ["mvp_sample", "smoke", "staged", "full"]
-    assert inputs["mvp_sample_size"] == {
-        "description": "SKUs máximos conservados en la muestra MVP",
-        "required": "true",
-        "default": "10",
-        "type": "choice",
-        "options": ["5", "10"],
-    }
-    assert inputs["mvp_read_only_authorized"]["required"] == "true"
-    assert inputs["mvp_read_only_authorized"]["default"] == "false"
-    assert inputs["mvp_read_only_authorized"]["type"] == "boolean"
-
-    assert triggers["push"] == {
-        "branches": ["main"],
-        "paths": [LIVE_MVP_REQUEST],
-    }
-
-    sample_raw = "\n".join(str(step) for step in job_steps(sample))
-    assert "scripts/probar_muestra_sps_la_colonia.py" in sample_raw
-    assert "--live-read-only" in sample_raw
-    assert "--sample-size" in sample_raw
-    assert "actions/upload-artifact@" in sample_raw
-    assert "CLOUDFLARE" not in sample_raw
-    assert "id-token" not in sample_raw
-    assert "secrets." not in sample_raw
-    assert "vars." not in sample_raw
-    assert "GITHUB_EVENT_PATH" in sample_raw
-    assert "precios-sps-la-colonia-mvp-live-request/v1" in sample_raw
-    assert "trigger_pr_number" in sample_raw
-    assert "2026-08-25T01:20:22Z" in sample_raw
-    assert "Merge pull request #277 from" in sample_raw
-    assert "jchernandez-portfolio/feature/precios-sps-mvp-live-trigger" in sample_raw
-    assert "commercial_persistence" in sample_raw
-    assert "production_authority" in sample_raw
-
-
-def test_location_binding_entrypoint_is_manual_and_fail_closed() -> None:
-    path = WORKFLOW_DIR / LOCATION_BINDING_WORKFLOW
-    workflow = load_workflow(path)
-    assert workflow["permissions"] == {"contents": "read"}
-    assert set(jobs(workflow)) == {"binding"}
-    binding = jobs(workflow)["binding"]
-    assert binding["if"] == "${{ false }}"
-    assert binding["timeout-minutes"] == "1"
-    assert "environment" not in binding
-    assert "permissions" not in binding
-    assert workflow["concurrency"] == {
-        "group": "la-colonia-location-binding-read-only",
-        "cancel-in-progress": "false",
-    }
-    assert set(workflow["on"]) == {"workflow_dispatch"}
-
-    raw = path.read_text(encoding="utf-8")
-    assert "--standing-public-read-only" not in raw
-    assert "--authorization-id" not in raw
-    assert "standing-request" not in raw
-    assert "createCommitStatus" not in raw
-    assert "scripts/diagnosticar_binding_ubicacion_la_colonia.py" not in raw
-    assert "secrets." not in raw
-    assert "vars." not in raw
-    assert "id-token" not in raw
-    assert "actions: write" not in raw
-    assert "statuses: write" not in raw
-    assert "pull_request_target" not in raw
-    assert "issue_comment" not in raw
-    assert "schedule:" not in raw
+def test_removed_live_and_probe_entrypoints_stay_removed():
+    names = {path.name for path in ALL_WORKFLOW_FILES}
+    assert not names & REMOVED_WORKFLOWS
+    assert not (WORKFLOW_DIR / "requests").exists()
 
 
 def test_historical_branch_audit_is_read_only_reproducible_and_not_live() -> None:
@@ -446,93 +279,11 @@ def test_historical_branch_audit_is_read_only_reproducible_and_not_live() -> Non
     assert ".workers.dev" not in raw
 
 
-def test_controlled_probe_is_manual_isolated_and_verified_outside_oidc_job():
-    path = WORKFLOW_DIR / PROBE_WORKFLOW
-    workflow = load_workflow(path)
-    triggers = workflow["on"]
-    assert isinstance(triggers, dict)
-    assert set(triggers) == {"workflow_dispatch"}
-    assert triggers["workflow_dispatch"] in ("", None)
-
-    probe_jobs = jobs(workflow)
-    assert set(probe_jobs) == {"controlled-probe", "verify-evidence"}
-    privileged = probe_jobs["controlled-probe"]
-    verifier = probe_jobs["verify-evidence"]
-    assert privileged.get("environment") == "cloudflare-probe"
-    assert verifier.get("environment") == "cloudflare-probe"
-    assert privileged.get("if") != "${{ false }}"
-    assert verifier.get("needs") == "controlled-probe"
-    assert privileged["permissions"] == {"contents": "read", "id-token": "write"}
-    assert "permissions" not in verifier
-    assert workflow["permissions"] == {"contents": "read"}
-
-    privileged_raw = "\n".join(str(step) for step in job_steps(privileged))
-    verifier_raw = "\n".join(str(step) for step in job_steps(verifier))
-    raw = path.read_text(encoding="utf-8")
-    assert "actions/checkout@" not in privileged_raw
-    assert "CLOUDFLARE_PROBE_OBSERVABILITY_TOKEN" not in privileged_raw
-    assert "ACTIONS_ID_TOKEN_REQUEST_TOKEN" not in verifier_raw
-    assert "ACTIONS_ID_TOKEN_REQUEST_URL" not in verifier_raw
-    assert "cloudflare_controlled_probe_verifier" in verifier_raw
-    assert "cloudflare_controlled_probe_observability" in verifier_raw
-    assert "CloudflareObservabilityHttpTransport" in verifier_raw
-    assert "PROBE_OBSERVABILITY_TOKEN" in verifier_raw
-    assert "actions/download-artifact@" in verifier_raw
-    assert "${{ inputs." not in raw
-    assert "github.event.inputs" not in raw
-    assert "originUrl" not in raw
-    assert "scripts/probar_la_colonia.py" not in raw
-    assert "scripts/diagnosticar_ventanas_la_colonia.py" not in raw
-    assert "scripts/descubrir_facets_la_colonia.py" not in raw
-    assert "urn:precios-sps:cloudflare:probe:v1" in raw
-    assert "environment: cloudflare-probe" in raw
-    assert ".workers.dev" in raw
-    assert "--retry 0" in raw
-    assert "${PROBE_GATEWAY_URL%/}/v1/probe" in raw
-
-
-def test_only_explicit_oidc_jobs_can_request_write_permission():
-    allowed = {
-        (PROBE_WORKFLOW, "controlled-probe"),
-        (LIVE_WORKFLOW, LIVE_FACET_JOB),
-    }
-    observed: set[tuple[str, str]] = set()
+def test_no_workflow_requests_oidc_tokens():
     for path, workflow in workflows():
-        assert "id-token" not in workflow["permissions"]
+        assert "id-token" not in workflow["permissions"], path.name
         for name, job in jobs(workflow).items():
-            permissions = job.get("permissions", {})
-            if permissions.get("id-token") == "write":
-                observed.add((path.name, name))
-                assert (path.name, name) in allowed
-            else:
-                assert "id-token" not in permissions
-    assert observed == allowed
-
-
-def test_context_bound_facet_job_has_exact_privilege_and_stays_inert() -> None:
-    path = WORKFLOW_DIR / LIVE_WORKFLOW
-    workflow = load_workflow(path)
-    live_jobs = jobs(workflow)
-    assert set(live_jobs) == {LIVE_MVP_JOB, "live-crawl", LIVE_FACET_JOB}
-    facet = live_jobs[LIVE_FACET_JOB]
-    assert facet["if"] == "${{ false }}"
-    assert facet["environment"] == "la-colonia-live"
-    assert facet["permissions"] == {"contents": "read", "id-token": "write"}
-    assert facet["timeout-minutes"] == "15"
-    assert facet["env"] == {
-        "PYTHONPATH": "${{ github.workspace }}/precios-supermercados-sps/src",
-        EDGE_GATEWAY_VAR: "${{ vars.CLOUDFLARE_EDGE_GATEWAY_URL }}",
-        EDGE_PUBLIC_KEY_VAR: "${{ vars.CLOUDFLARE_EDGE_RECEIPT_PUBLIC_KEY_SPKI_B64URL }}",
-    }
-    raw = path.read_text(encoding="utf-8")
-    assert "facet_authorization_id:" in raw
-    assert "ejecutar_facets_context_bound_la_colonia.py" in raw
-    assert "--authorization-id \"${{ inputs.facet_authorization_id }}\"" in raw
-    assert "secrets." not in raw
-    assert "schedule:" not in raw
-    assert "pull_request:" not in raw
-    assert "pull_request_target:" not in raw
-    assert "issue_comment:" not in raw
+            assert "id-token" not in job.get("permissions", {}), (path.name, name)
 
 
 def test_trigger_sets_are_closed_without_issue_comment_authority():
@@ -543,47 +294,17 @@ def test_trigger_sets_are_closed_without_issue_comment_authority():
         assert "issue_comment" not in triggers
 
 
-def test_pull_request_target_never_checks_out_untrusted_pr_code():
-    for path, workflow in workflows():
-        triggers = workflow["on"]
-        if "pull_request_target" not in triggers:
-            continue
+def test_no_workflow_uses_pull_request_target():
+    for path in ALL_WORKFLOW_FILES:
+        workflow = load_workflow(path)
+        assert "pull_request_target" not in workflow["on"], path.name
+
+
+def test_network_capable_scripts_are_not_wired_into_any_workflow() -> None:
+    for path in ALL_WORKFLOW_FILES:
         raw = path.read_text(encoding="utf-8")
-        assert path.name in BLOCKED_ENTRYPOINTS
-        assert all_jobs_blocked(workflow)
-        assert "actions: write" not in raw
-        assert "github.head_ref" not in raw
-        assert "github.event.pull_request.head" not in raw
-        checkout = [
-            step
-            for step in steps(workflow)
-            if str(step.get("uses", "")).startswith("actions/checkout@")
-        ]
-        assert all(step["with"]["ref"] == "${{ github.workflow_sha }}" for step in checkout)
-
-
-def test_network_capable_scripts_are_blocked_without_current_live_authority() -> None:
-    blocked_commands = {
-        "scripts/probar_la_colonia.py",
-        "scripts/probar_muestra_sps_la_colonia.py",
-        "scripts/diagnosticar_ventanas_la_colonia.py",
-        "scripts/descubrir_facets_la_colonia.py",
-        "scripts/diagnosticar_binding_ubicacion_la_colonia.py",
-        "scripts/ejecutar_facets_context_bound_la_colonia.py",
-    }
-    for path, workflow in workflows():
-        commands = "\n".join(str(step.get("run", "")) for step in steps(workflow))
-        if any(command in commands for command in blocked_commands):
-            if path.name == LIVE_WORKFLOW:
-                live_jobs = jobs(workflow)
-                assert live_jobs["live-crawl"]["if"] == "${{ false }}"
-                assert live_jobs[LIVE_FACET_JOB]["if"] == "${{ false }}"
-                sample_raw = "\n".join(str(step) for step in job_steps(live_jobs[LIVE_MVP_JOB]))
-                assert "mvp_live_request_mismatch" in sample_raw
-                assert "mvp_live_merge_identity_mismatch" in sample_raw
-                continue
-            assert path.name in BLOCKED_ENTRYPOINTS
-            assert all_jobs_blocked(workflow)
+        for command in NETWORK_CAPABLE_SCRIPTS:
+            assert command not in raw, (path.name, command)
 
 
 def test_legacy_google_sheets_and_bigquery_workflows_are_removed():

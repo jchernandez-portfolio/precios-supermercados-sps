@@ -297,29 +297,8 @@ def test_comentario_de_rechazo_no_publica_contenido_inseguro():
     assert unsafe not in comment
 
 
-def test_no_ejecuta_contenido_proveniente_del_pr():
-    repo_root = Path(__file__).resolve().parents[2]
-    workflow = (
-        repo_root / ".github/workflows/precios-supermercados-sps-la-colonia-command.yml"
-    ).read_text(encoding="utf-8")
-    assert "pull_request_target:" in workflow
-    assert "ref: ${{ github.workflow_sha }}" in workflow
-    assert "persist-credentials: false" in workflow
-    assert "github.event.pull_request.head" not in workflow
-    assert "eval " not in workflow
-    assert "controlar_solicitud_archivo_la_colonia.js" in workflow
-    assert "issue_comment:" not in workflow
 
 
-def test_permisos_minimos_del_controlador():
-    repo_root = Path(__file__).resolve().parents[2]
-    workflow = (
-        repo_root / ".github/workflows/precios-supermercados-sps-la-colonia-command.yml"
-    ).read_text(encoding="utf-8")
-    for permission in ("contents: read", "pull-requests: read"):
-        assert permission in workflow
-    assert "issues: write" not in workflow
-    assert "actions: write" not in workflow
 
 
 def test_evento_reemplazado_no_despacha():

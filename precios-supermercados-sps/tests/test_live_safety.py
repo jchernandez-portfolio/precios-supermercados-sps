@@ -1235,12 +1235,3 @@ def test_persisted_local_only_failure_artifact_is_explicitly_synthetic(
     assert report.location_status == persisted["location_status"] == "offline_fixture"
 
 
-def test_live_workflow_jobs_are_unconditionally_blocked():
-    root = Path(__file__).resolve().parents[2]
-    for filename in (
-        "precios-supermercados-sps-la-colonia-live.yml",
-        "precios-supermercados-sps-la-colonia-diagnostic.yml",
-        "precios-supermercados-sps-la-colonia-facet-discovery.yml",
-    ):
-        text = (root / ".github/workflows" / filename).read_text(encoding="utf-8")
-        assert "if: ${{ false }}" in text
