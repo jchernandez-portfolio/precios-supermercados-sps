@@ -247,6 +247,24 @@ function createApp() {
     return wrap;
   }
 
+  function otherPresentations(row) {
+    const others = Array.isArray(row.other_presentations) ? row.other_presentations : [];
+    if (!others.length) return null;
+    const details = el("details", "other-presentations");
+    details.append(el("summary", null, `Otras presentaciones (${others.length})`));
+    const list = el("ul");
+    for (const other of others) {
+      const price = moneyToMinor(other.best_price);
+      const unit = other.best_unit_price ? ` · ${formatHnl(moneyToMinor(other.best_unit_price.amount))} / ${other.best_unit_price.per}` : "";
+      const item = el("li", null, `${other.presentation || other.product_name}: ${price === null ? "sin precio" : `desde ${formatHnl(price)}`}${unit}`);
+      item.title = other.product_name;
+      if (other.large_size === true) item.append(el("span", "large-size", "Tamaño grande"));
+      list.append(item);
+    }
+    details.append(list);
+    return details;
+  }
+
   function renderMatrix() {
     const results = ui.results;
     results.replaceChildren();
@@ -271,6 +289,8 @@ function createApp() {
         el("small", "product-meta", [row.brand, row.presentation].filter(Boolean).join(" · ") || "Datos de presentación no disponibles"),
         el("small", null, row.comparability === "comparable" ? "Comparación disponible" : "Oferta individual"),
       );
+      const others = otherPresentations(row);
+      if (others) product.append(others);
       tr.append(product);
       const quantity = el("td", "quantity-cell"); quantity.dataset.label = "Cantidad"; quantity.append(quantityControl(row, staged)); tr.append(quantity);
       const offers = offersByRetailer(row);

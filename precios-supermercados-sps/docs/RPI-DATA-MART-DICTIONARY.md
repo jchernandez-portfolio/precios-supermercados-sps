@@ -173,6 +173,28 @@ una fila `comparable`, cada oferta `out_of_stock` queda con
 victorias, brecha) y de Mi Compra. `availability = "unknown"` sigue comparable.
 Ver `docs/COMPARATOR-METHODOLOGY.md` (regla 2026-10-02).
 
+## Otras presentaciones (campo aditivo, 2026-10-09)
+
+`other_presentations` es opcional: sólo aparece en filas que tienen el mismo
+producto publicado en otro tamaño o paquete (regla V
+`size-variant-rule-v@1`, `src/precios_supermercados/matching/size_variants.py`).
+Es una relación de navegación, **no identidad**: nunca fusiona filas ni entra a
+ranking, mejor precio, PCI, canastas ni Mi Compra. Cada elemento trae:
+
+| Campo | Tipo | Definición |
+| --- | --- | --- |
+| `row_id` | texto | fila de la otra presentación |
+| `product_name` | texto | nombre representativo de esa fila |
+| `presentation` | texto | presentación pública de esa fila |
+| `best_price` | decimal-texto | menor precio vigente no agotado de esa fila |
+| `best_unit_price` | objeto | precio por unidad de referencia de esa oferta (`amount`, `per`) |
+| `large_size` | booleano | la otra presentación es ≥ 5 veces más grande (mayoreo) |
+
+Se listan hasta 12 (las de tamaño más cercano), ordenadas por tamaño. Precisión
+validada: holdout ciego de 94 pares 98.5 % ponderado por estrato y revisión del
+responsable de 50 pares al azar. Un fallo de la regla no bloquea la publicación:
+el catálogo sale sin el campo y el motivo queda en stderr del exportador.
+
 ## Serving particionado
 
 La publicación contiene:
