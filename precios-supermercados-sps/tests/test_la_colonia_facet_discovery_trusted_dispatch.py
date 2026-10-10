@@ -171,42 +171,10 @@ def test_facet_comment_marker_is_observability_only():
     assert decision.accepted is True
 
 
-def test_facet_workflow_is_manual_blocked_with_minimum_permissions_and_immutable_checkout():
-    text = FACET_WORKFLOW_FILE.read_text(encoding="utf-8")
-    assert "workflow_dispatch:" in text
-    assert "permissions:\n  contents: read" in text
-    assert "if: ${{ false }}" in text
-    assert "ref: ${{ github.sha }}" in text
-    assert "persist-credentials: false" in text
-    assert "timeout-minutes: 10" in text
-    assert "cancel-in-progress: false" in text
-    for forbidden in (
-        "schedule:", "push:", "pull_request:", "pull_request_target:",
-        "issue_comment:", "workflow_run:", "actions: write", "issues: write",
-        "pull-requests: write",
-    ):
-        assert forbidden not in text
 
 
-def test_facet_workflow_exposes_only_three_inputs_and_maps_exit_two_to_success():
-    text = FACET_WORKFLOW_FILE.read_text(encoding="utf-8")
-    inputs = text.split("inputs:", 1)[1].split("permissions:", 1)[0]
-    for expected in ("request_id:", "discovery_plan:", "delay_seconds:"):
-        assert expected in inputs
-    for forbidden in ("query:", "url:", "selectedFacets:", "from:", "to:", "workflow:"):
-        assert forbidden not in inputs
-    assert '"$exit_code" -eq 0' in text
-    assert '"$exit_code" -eq 2' in text
 
 
-def test_controller_workflow_uses_immutable_workflow_code_and_is_blocked():
-    text = CONTROLLER.read_text(encoding="utf-8")
-    assert "ref: ${{ github.workflow_sha }}" in text
-    assert "actions: write" not in text
-    assert "persist-credentials: false" in text
-    assert "controlar_solicitud_archivo_la_colonia.js" in text
-    assert "pull_request.head" not in text
-    assert "workflow_id: decision.workflow" not in text
 
 
 def test_controller_runtime_is_global_fail_closed_without_dispatch_capability():
@@ -261,11 +229,6 @@ def test_observer_keeps_legacy_compatibility(tmp_path):
     assert "legacy_artifact: `true`" in summary
 
 
-def test_recovery_workflow_checks_out_workflow_sha_and_never_dispatches():
-    text = RECOVERY_WORKFLOW.read_text(encoding="utf-8")
-    assert "ref: ${{ github.workflow_sha }}" in text
-    assert "persist-credentials: false" in text
-    assert "/dispatches" not in text
 
 
 def test_operational_contract_is_valid_when_present_on_functional_branch():

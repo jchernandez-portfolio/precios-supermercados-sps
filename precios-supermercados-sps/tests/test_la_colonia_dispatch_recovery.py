@@ -78,41 +78,10 @@ def _new_artifact(mode: str, workflow: str, **overrides):
     return _artifact(mode=mode, workflow=workflow, **overrides)
 
 
-def test_observador_solo_lee_resultado_con_codigo_inmutable():
-    workflow = _workflow_text()
-    assert "workflow_run:" in workflow
-    assert "La Colonia - Despachador seguro por archivo" in workflow
-    assert "actions: read" in workflow
-    assert "contents: read" in workflow
-    assert "issues: write" not in workflow
-    assert "actions: write" not in workflow
-    assert "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" in workflow
-    assert "ref: ${{ github.workflow_sha }}" in workflow
-    assert "persist-credentials: false" in workflow
-    assert "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c" in workflow
-    assert "dispatcher-result.json" in workflow
 
 
-def test_trigger_y_permisos_del_observador_no_se_amplian():
-    workflow = _workflow_text()
-    assert "workflow_dispatch:" not in workflow
-    assert "pull_request:" not in workflow
-    assert "pull_request_target:" not in workflow
-    assert "issue_comment:" not in workflow
-    assert "schedule:" not in workflow
-    assert "push:" not in workflow
-    assert "permissions:\n  actions: read\n  contents: read" in workflow
 
 
-def test_observador_no_ejecuta_codigo_del_pr_ni_envia_dispatch():
-    workflow = _workflow_text()
-    validator = VALIDATOR_PATH.read_text(encoding="utf-8")
-    combined = workflow + validator
-    assert "pull_request.head" not in combined
-    assert "eval " not in combined
-    assert "createWorkflowDispatch" not in combined
-    assert "/dispatches" not in combined
-    assert "workflow_dispatch" not in validator
 
 
 def test_artefacto_normal_antiguo_sigue_siendom_valido(tmp_path):

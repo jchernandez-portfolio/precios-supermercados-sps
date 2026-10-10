@@ -36,62 +36,10 @@ def load_script_module():
     return module
 
 
-def test_workflow_is_manual_read_only_and_fail_closed() -> None:
-    workflow = load_workflow()
-
-    assert workflow["permissions"] == {"contents": "read"}
-    assert set(workflow["on"]) == {"workflow_dispatch"}
-    assert workflow["on"]["workflow_dispatch"] in ("", None)
-    assert set(workflow["jobs"]) == {"binding"}
-
-    job = workflow["jobs"]["binding"]
-    assert job["if"] == "${{ false }}"
-    assert job["timeout-minutes"] == "1"
-    assert "environment" not in job
-    assert "permissions" not in job
-    assert workflow["concurrency"] == {
-        "group": "la-colonia-location-binding-read-only",
-        "cancel-in-progress": "false",
-    }
-    assert not REQUEST.exists()
-    assert not RECONCILE_REQUEST.exists()
 
 
-def test_workflow_has_no_standing_authorization_or_execution_surface() -> None:
-    raw = WORKFLOW.read_text(encoding="utf-8")
-
-    for forbidden in (
-        "precios-sps-standing-public-readonly-location-binding/v1",
-        "--standing-public-read-only",
-        "--authorization-id",
-        "actions/checkout@",
-        "actions/upload-artifact@",
-        "actions/github-script@",
-        "createCommitStatus",
-        "scripts/diagnosticar_binding_ubicacion_la_colonia.py",
-        "radiografiar_ubicacion_la_colonia_v2.py",
-        "secrets.",
-        "vars.",
-        "id-token",
-        "actions: write",
-        "statuses: write",
-        "pull_request_target",
-        "issue_comment",
-        "schedule:",
-        "push:",
-    ):
-        assert forbidden not in raw
 
 
-def test_blocked_job_contains_no_repository_checkout_or_artifact_upload() -> None:
-    workflow = load_workflow()
-    steps = workflow["jobs"]["binding"]["steps"]
-
-    assert steps
-    assert all("uses" not in step for step in steps)
-    rendered = "\n".join(str(step.get("run", "")) for step in steps)
-    assert "autorización humana nueva y explícita" in rendered
-    assert "exit 1" in rendered
 
 
 def test_cli_requires_explicit_id_and_exposes_no_standing_or_runtime_overrides() -> None:

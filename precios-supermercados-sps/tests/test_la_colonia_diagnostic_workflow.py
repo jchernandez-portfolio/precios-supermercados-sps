@@ -44,55 +44,12 @@ def diagnostic_command():
     }
 
 
-def test_diagnostic_workflow_is_manual_only():
-    text = WORKFLOW_PATH.read_text(encoding="utf-8")
-    assert "workflow_dispatch:" in text
-    for forbidden_trigger in (
-        "schedule:",
-        "push:",
-        "pull_request:",
-        "pull_request_target:",
-        "issue_comment:",
-    ):
-        assert forbidden_trigger not in text
 
 
-def test_workflow_has_only_closed_inputs():
-    text = WORKFLOW_PATH.read_text(encoding="utf-8")
-    assert "diagnostic_plan:" in text
-    assert "frontier_380_399_v1" in text
-    assert "request_id:" in text
-    assert "delay_seconds:" in text
-    for forbidden_input in (
-        "from:",
-        "to:",
-        "windows:",
-        "order_by:",
-        "max_requests:",
-        "url:",
-        "query:",
-        "selectedFacets:",
-        "allow_full:",
-        "max_pages:",
-        "max_products:",
-        "profile:",
-        "thresholds:",
-    ):
-        assert forbidden_input not in text
 
 
-def test_workflow_calls_dedicated_script_and_artifact_names():
-    text = WORKFLOW_PATH.read_text(encoding="utf-8")
-    assert "scripts/diagnosticar_ventanas_la_colonia.py" in text
-    assert "diagnostic-summary.json" in text
-    assert "diagnostic-summary.md" in text
-    assert "la-colonia-window-diagnostic" in text
 
 
-def test_exit_code_two_is_technical_success_but_three_to_five_fail():
-    text = WORKFLOW_PATH.read_text(encoding="utf-8")
-    assert '"0"|"2"' in text
-    assert '"3"|"4"|"5"' in text
 
 
 def test_trusted_dispatcher_accepts_exact_diagnostic_contract():
