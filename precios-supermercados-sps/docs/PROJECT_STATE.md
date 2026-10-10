@@ -392,6 +392,7 @@ Aprobado por el responsable ("tenemos que estandarizar esto y hacerlo fácil par
 - **Catálogo B2C:** `presentation` en un solo formato (`1.88 kg`, `12 × 946 ml`, `1.774 L`) y `unit_price` por oferta con referencia fija por subcategoría (`unit_reference` del árbol v1.1.0: por 100 g/ml, por kg/L o por unidad).
 - **Vínculos por atributos (regla A, `engine_auto`):** activos y servibles en la política; se recalculan en cada refresco diario desde los perfiles en memoria (sin lecturas extra salvo ~2 filas por vínculo) y el diff los escribe/retira (`engine_auto` pasa a ser método gestionado por el refresco). Medición offline sobre el catálogo 2026-10-08: **46 vínculos nuevos** (29 Los Andes, 17 PriceSmart); +13 maestros multi-cadena. Corrección: la estimación previa de ~580 incluía productos ya unidos por GTIN (no comparables ese día por stock); la mayor ganancia para PriceSmart es "otras presentaciones" (PR siguiente). Pendiente opcional: vincular a socios sin GTIN (maestro sembrado), ~20 más en SPS.
 - **Homologación sin GTIN (validación 2026-10-09):** 387 pares de PriceSmart/Los Andes etiquetados; la regla "banda alta + sin conflicto de variante + a lo sumo una palabra menor distinta" acierta 161/163 (98.8 %, IC95 95.6–99.7 %); revisión del responsable de 50 pares al azar: 50/50 de acuerdo. Su publicación (vínculos por atributos y "otras presentaciones") va en PRs siguientes.
+- **Otras presentaciones (regla V, 2026-10-09):** misma marca/nombre/variante en otro tamaño o paquete. Muestra de 240 pares para diseñar guardas (variante en un solo lado, talla/etapa y tamaño de huevo, objetos medidos por capacidad, tamaño fuera de rango, precio por unidad incoherente); holdout ciego de 94 pares: 98.5 % ponderado; revisión del responsable de 50 pares sin objeciones. Se calcula en el exportador del catálogo (≈100 s) y se publica como campo aditivo `other_presentations`; Compra Inteligente lo muestra bajo cada producto. No es identidad ni entra a comparaciones.
 
 ## Especificaciones PriceSmart (semanal, 2026-10-01)
 
@@ -506,7 +507,7 @@ Completada. Nuevo repositorio `jchernandez-portfolio/precios-supermercados-sps` 
 ## Próximos pasos
 
 1. Confirmar el primer disparo de Cloudflare a las 05:17 (2026-10-10) y el efecto del primer corte con v2.7, vínculos `engine_auto` y especificaciones PriceSmart.
-2. Homologación: "otras presentaciones" (validar la relación entre cadenas con muestra etiquetada; marcar tamaños > 5×), huecos de categoría (PriceSmart Hogar/temporada, Colonial segundo nivel), marcas faltantes de Los Andes, alternativas/sustitutos y control mensual de precisión.
+2. Homologación: ~~"otras presentaciones"~~ (hecho 2026-10-09: regla V publicada como `other_presentations` en el catálogo v3; ~2,550 vínculos entre filas SPS), huecos de categoría (PriceSmart Hogar/temporada, Colonial segundo nivel), marcas faltantes de Los Andes, alternativas/sustitutos y control mensual de precisión.
 3. Confiabilidad del scraping: reintentos cortos por página ante HTTP 5xx o catálogo cambiante; operador disparado al terminar el corte.
 4. Costo Turso: homologación incremental y publicar desde artifacts del día.
 5. Limpieza: código experimental no alcanzable desde producción (≈29 scripts y ≈100 módulos, con sus pruebas) y capturas crudas de `reports/` (~96 MB).
