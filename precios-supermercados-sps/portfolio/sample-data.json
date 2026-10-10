@@ -1,7 +1,7 @@
 {
   "comparison_policy": "fail_closed_strong_identity_and_commercial_consistency",
   "currency": "HNL",
-  "published_at_utc": "2026-10-09T15:14:08Z",
+  "published_at_utc": "2026-10-10T11:57:30Z",
   "row_count": 10,
   "rows": [
     {
@@ -36,6 +36,39 @@
       ],
       "savings_vs_highest": "42.95",
       "savings_vs_highest_pct": "15.07"
+    },
+    {
+      "best_price": "200.00",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "07891150103115",
+      "canonical_product_id": "prod_gtin_07891150103115",
+      "highest_price": "241.95",
+      "offers": [
+        {
+          "current_price": "241.95",
+          "is_best_price": false,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Dove",
+          "source_category": "Cuidado personal",
+          "source_name": "Acondicionador Dove Nutrición+Tri Oleos 370 Ml",
+          "source_presentation": "370 Ml",
+          "source_record_id": "la_colonia:59606",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "200.00",
+          "is_best_price": true,
+          "location_id": "walmart_sps",
+          "source_brand": "DOVE",
+          "source_category": "Cuidado personal",
+          "source_name": "Acondicionador Dove nutrición tri-óleos - 370 ml",
+          "source_presentation": null,
+          "source_record_id": "walmart:30385",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "41.95",
+      "savings_vs_highest_pct": "17.34"
     },
     {
       "best_price": "270.10",
@@ -236,39 +269,6 @@
       "savings_vs_highest_pct": "5.15"
     },
     {
-      "best_price": "275.35",
-      "best_supermarket_id": "la_colonia",
-      "canonical_gtin": "07804320985633",
-      "canonical_product_id": "prod_gtin_07804320985633",
-      "highest_price": "297.00",
-      "offers": [
-        {
-          "current_price": "275.35",
-          "is_best_price": true,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Casillero Del Diablo",
-          "source_category": "Bebidas",
-          "source_name": "Vino Casillero Del Diablo Merlot 750 Ml",
-          "source_presentation": "750 Ml",
-          "source_record_id": "la_colonia:6692",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "297.00",
-          "is_best_price": false,
-          "location_id": "walmart_sps",
-          "source_brand": "CASILLERO DEL DIABLO",
-          "source_category": "Bebidas",
-          "source_name": "Vino Casillero Del Diablo Merlot- 750 ml",
-          "source_presentation": null,
-          "source_record_id": "walmart:20171",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "21.65",
-      "savings_vs_highest_pct": "7.29"
-    },
-    {
       "best_price": "150.00",
       "best_supermarket_id": "walmart",
       "canonical_gtin": "07501008041703",
@@ -347,8 +347,8 @@
     }
   ],
   "selection_rule": "highest_absolute_savings_within_safe_common_comparable_universe",
-  "source_as_of": "2026-10-09T15:12:31.823804Z",
-  "source_head_sha": "50ebafc71207ff9c68a32a10dfc5aa4873945570",
+  "source_as_of": "2026-10-10T11:51:55.634417Z",
+  "source_head_sha": "3dd0c9440a2e7cd578e78882ca459cd2b804995f",
   "source_schema": "rpi-consumer-mart/v2",
-  "source_workflow_run_id": 37949953697
+  "source_workflow_run_id": 38049895280
 }
