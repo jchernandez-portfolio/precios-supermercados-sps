@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Súper Compras · Compara precios de súper en San Pedro Sula</title>
+  <meta name="description" content="Compara precios de La Colonia, Colonial, Walmart, PriceSmart y Los Andes en San Pedro Sula. Precios públicos actualizados cada día.">
+  <meta name="theme-color" content="#0E6B4F">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://raw.githubusercontent.com; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Súper Compras">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="styles.css?v=20261010-1">
+  <script type="module" src="app.js?v=20261010-1"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Ir al contenido</a>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="logo" href="#/" aria-label="Súper Compras, inicio">
+        <span class="logo-mark" aria-hidden="true">S</span>
+        <span>Súper Compras</span>
+      </a>
+      <nav class="desk-nav" aria-label="Principal">
+        <a href="#/" data-nav="inicio">Inicio</a>
+        <a href="#/buscar" data-nav="buscar">Buscar</a>
+        <a href="#/ofertas" data-nav="ofertas">Ofertas</a>
+      </nav>
+      <a class="cart-link" href="#/compra" data-nav="compra" aria-label="Mi compra">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h3l2.6 12.4a1 1 0 0 0 1 .8h9.7a1 1 0 0 0 1-.8L21 7H6M9 20a1 1 0 1 0 0 .01M18 20a1 1 0 1 0 0 .01"/></svg>
+        <span class="desk-only">Mi compra</span>
+        <span class="count" data-cart-count hidden>0</span>
+      </a>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <div class="page loading" aria-busy="true">
+      <div class="spinner" aria-hidden="true"></div>
+      <p>Cargando los precios de hoy…</p>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <p>Súper Compras compara precios públicos publicados en línea por cada supermercado. No vende productos ni está afiliado a ninguna cadena. Los precios pueden variar en tienda.</p>
+  </footer>
+
+  <nav class="tabbar" aria-label="Navegación">
+    <a href="#/" data-nav="inicio"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Inicio</span></a>
+    <a href="#/buscar" data-nav="buscar"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zm9 16-3.5-3.5"/></svg><span>Buscar</span></a>
+    <a href="#/ofertas" data-nav="ofertas"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8zM7.5 6a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/></svg><span>Ofertas</span></a>
+    <a href="#/compra" data-nav="compra"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h3l2.6 12.4a1 1 0 0 0 1 .8h9.7a1 1 0 0 0 1-.8L21 7H6M9 20a1 1 0 1 0 0 .01M18 20a1 1 0 1 0 0 .01"/></svg><span>Mi compra</span><span class="count" data-cart-count hidden>0</span></a>
+  </nav>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
