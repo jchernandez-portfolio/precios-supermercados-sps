@@ -1,9 +1,42 @@
 {
   "comparison_policy": "fail_closed_strong_identity_and_commercial_consistency",
   "currency": "HNL",
-  "published_at_utc": "2026-10-13T23:27:28Z",
+  "published_at_utc": "2026-10-14T11:57:56Z",
   "row_count": 10,
   "rows": [
+    {
+      "best_price": "200.00",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "07421800110172",
+      "canonical_product_id": "prod_gtin_07421800110172",
+      "highest_price": "258.35",
+      "offers": [
+        {
+          "current_price": "258.35",
+          "is_best_price": false,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Oro",
+          "source_category": "Bebidas",
+          "source_name": "Café Oro Soluble Liofilizado 170 Gr",
+          "source_presentation": "170 Gr",
+          "source_record_id": "la_colonia:7842",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "200.00",
+          "is_best_price": true,
+          "location_id": "walmart_sps",
+          "source_brand": "ORO",
+          "source_category": "Bebidas",
+          "source_name": "Cafe Oro Soluble  Liofilizado - 170 g",
+          "source_presentation": null,
+          "source_record_id": "walmart:27920",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "58.35",
+      "savings_vs_highest_pct": "22.59"
+    },
     {
       "best_price": "242.05",
       "best_supermarket_id": "la_colonia",
@@ -236,6 +269,39 @@
       "savings_vs_highest_pct": "33.04"
     },
     {
+      "best_price": "100.50",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "07500435183697",
+      "canonical_product_id": "prod_gtin_07500435183697",
+      "highest_price": "125.90",
+      "offers": [
+        {
+          "current_price": "125.90",
+          "is_best_price": false,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Old Spice",
+          "source_category": "Cuidado personal",
+          "source_name": "Desodorante Barra Old Spice Mar Profundo 85 Gr",
+          "source_presentation": "85 Gr",
+          "source_record_id": "la_colonia:2122",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "100.50",
+          "is_best_price": true,
+          "location_id": "walmart_sps",
+          "source_brand": "OLD SPICE",
+          "source_category": "Cuidado personal",
+          "source_name": "Barra Desodorante Old Spice Mar Profundo - 85 g",
+          "source_presentation": null,
+          "source_record_id": "walmart:21717",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "25.40",
+      "savings_vs_highest_pct": "20.17"
+    },
+    {
       "best_price": "420.95",
       "best_supermarket_id": "la_colonia",
       "canonical_gtin": "04022025811030",
@@ -267,72 +333,6 @@
       ],
       "savings_vs_highest": "22.85",
       "savings_vs_highest_pct": "5.15"
-    },
-    {
-      "best_price": "150.00",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "07501008041703",
-      "canonical_product_id": "prod_gtin_07501008041703",
-      "highest_price": "169.40",
-      "offers": [
-        {
-          "current_price": "169.40",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Kelloggs",
-          "source_category": "Alimentos",
-          "source_name": "Cereal Kelloggs Komplete Pasas 420 Gr",
-          "source_presentation": "420 Gr",
-          "source_record_id": "la_colonia:2935",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "150.00",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "KELLOGGS",
-          "source_category": "Alimentos",
-          "source_name": "Cereal Komplete con pasas kelloggs - 420 g",
-          "source_presentation": null,
-          "source_record_id": "walmart:22678",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "19.40",
-      "savings_vs_highest_pct": "11.45"
-    },
-    {
-      "best_price": "226.70",
-      "best_supermarket_id": "la_colonia",
-      "canonical_gtin": "07500435155847",
-      "canonical_product_id": "prod_gtin_07500435155847",
-      "highest_price": "246.00",
-      "offers": [
-        {
-          "current_price": "226.70",
-          "is_best_price": true,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Pantene",
-          "source_category": "Cuidado personal",
-          "source_name": "Shampoo Pantene Pro-V Bambu Nutre Y Crece 400 Ml",
-          "source_presentation": "400 Ml",
-          "source_record_id": "la_colonia:2543",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "246.00",
-          "is_best_price": false,
-          "location_id": "walmart_sps",
-          "source_brand": "PANTENE",
-          "source_category": "Cuidado personal",
-          "source_name": "Shampoo Pantene Pro-V Bambú Nutre Crece - 400 ml",
-          "source_presentation": null,
-          "source_record_id": "walmart:19217",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "19.30",
-      "savings_vs_highest_pct": "7.85"
     }
   ],
   "schema": "precios-sps-safe-portfolio-sample/v1",
@@ -347,8 +347,8 @@
     }
   ],
   "selection_rule": "highest_absolute_savings_within_safe_common_comparable_universe",
-  "source_as_of": "2026-10-13T23:21:43.960648Z",
+  "source_as_of": "2026-10-14T11:51:42.032972Z",
   "source_head_sha": "b9b716d27e76038abbfd1fb054ca7978c2b248de",
   "source_schema": "rpi-consumer-mart/v2",
-  "source_workflow_run_id": 38483732558
+  "source_workflow_run_id": 38559530193
 }
