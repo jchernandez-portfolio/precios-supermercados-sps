@@ -1,0 +1,104 @@
+name: Precios SPS - Publicar fotos de producto
+
+# Copia a la rama pública `product-images` las fotos WebP y el índice que dejó la
+# corrida semanal. No consulta Turso ni supermercados y no ejecuta contenido de la
+# rama: sólo valida el artifact (rutas, formato y tamaño) y hace un commit.
+
+on:
+  workflow_run:
+    workflows:
+      - "Precios SPS - Fotos de producto semanal"
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: precios-sps-product-images-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: >-
+      ${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' &&
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.head_branch == 'main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Descargar exactamente el artifact de fotos ya generado
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v5.0.0
+        with:
+          name: product-images-${{ github.event.workflow_run.id }}
+          path: /tmp/precios-sps-product-images
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Validar fotos e índice
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          root = Path('/tmp/precios-sps-product-images')
+          index = json.loads((root / 'index.json').read_text(encoding='utf-8'))
+          if index.get('schema') != 'super-compras-product-images/v1' or not isinstance(index.get('items'), dict):
+              raise SystemExit('product_images_index_invalid')
+          pattern = re.compile(r'img/([0-9a-z]{2})/([0-9a-z_-]+)\.webp')
+          count = 0
+          for path in sorted(root.rglob('*')):
+              if path.is_symlink():
+                  raise SystemExit(f'product_images_symlink:{path}')
+              if path.is_dir() or path.name == 'index.json' and path.parent == root:
+                  continue
+              relative = path.relative_to(root).as_posix()
+              match = pattern.fullmatch(relative)
+              if not match or not match.group(2).startswith(match.group(1)):
+                  raise SystemExit(f'product_images_path_invalid:{relative}')
+              data = path.read_bytes()
+              if not (data[:4] == b'RIFF' and data[8:12] == b'WEBP') or len(data) > 200_000:
+                  raise SystemExit(f'product_images_file_invalid:{relative}')
+              item = index['items'].get(match.group(2))
+              if not isinstance(item, dict) or type(item.get('v')) is not int:
+                  raise SystemExit(f'product_images_unindexed:{relative}')
+              count += 1
+          print(json.dumps({'new_images': count, 'indexed': len(index['items']), 'with_photo': index.get('with_photo')}))
+          PY
+
+      - name: Descargar rama de fotos sin ejecutar su contenido
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: product-images
+          path: product-images
+          fetch-depth: 1
+
+      - name: Publicar en un solo commit y push
+        env:
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          repository="$GITHUB_WORKSPACE/product-images"
+          if [ -L "$repository/img" ] || [ -L "$repository/index.json" ]; then
+            echo "product_images_symlink_boundary_invalid" >&2
+            exit 1
+          fi
+          mkdir -p "$repository/img"
+          if [ -d /tmp/precios-sps-product-images/img ]; then
+            cp -R /tmp/precios-sps-product-images/img/. "$repository/img/"
+          fi
+          cp /tmp/precios-sps-product-images/index.json "$repository/index.json"
+
+          git -C "$repository" config user.name "github-actions[bot]"
+          git -C "$repository" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$repository" add -A -- img index.json
+          if git -C "$repository" diff --cached --quiet; then
+            echo "product_images_already_current=true"
+            exit 0
+          fi
+          git -C "$repository" commit -q -m "data: product images from run $SOURCE_RUN_ID"
+          git -C "$repository" push origin HEAD:product-images

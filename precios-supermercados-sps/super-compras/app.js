@@ -1,9 +1,26 @@
 // Súper Compras: comparador de precios de supermercados (San Pedro Sula).
 // Vistas: inicio, búsqueda, ficha de producto, ofertas y Mi compra.
 import {
-  Catalog, RETAILER_COLORS, rowKey, RETAILER_INITIALS, RETAILER_NAMES, loadCart, money, saveCart,
+  Catalog, RETAILER_COLORS, rowKey, RETAILER_INITIALS, RETAILER_NAMES, loadCart, money, photoUrl, saveCart,
 } from "./data.js";
 import { productIllustration } from "./illustration.js";
+
+// Foto real si existe; si no hay o falla al cargar, la ilustración de siempre.
+function productVisual(product, { size = 118, decorative = true } = {}) {
+  const url = photoUrl(product);
+  if (!url) return productIllustration(product, { size, decorative });
+  const image = document.createElement("img");
+  image.className = "photo";
+  image.crossOrigin = "anonymous";
+  image.loading = "lazy";
+  image.decoding = "async";
+  image.width = 400;
+  image.height = 400;
+  image.alt = decorative ? "" : [product.brand, product.product_name, product.presentation].filter(Boolean).join(" ");
+  image.addEventListener("error", () => image.replaceWith(productIllustration(product, { size, decorative })), { once: true });
+  image.src = url;
+  return image;
+}
 
 const DEFAULT_CATALOG =
   "https://raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/portfolio-data/precios-supermercados-sps/published/rpi/v3/manifest.json";
@@ -153,7 +170,7 @@ function productCard(product) {
   return h("a", { class: "card", href: `#/p/${product.id}` },
     h("div", { class: "tile" },
       product.promo ? h("span", { class: "badge-offer" }, "Oferta") : null,
-      productIllustration(product, { size: 118 })),
+      productVisual(product, { size: 118 })),
     h("div", { class: "pills" }, sizePill(product.presentation)),
     h("strong", { class: "brand" }, product.brand || product.product_type || "Producto"),
     h("span", { class: "name" }, product.product_name),
@@ -283,7 +300,7 @@ function viewProduct(id, container) {
         },
       }, icon("share", 20))),
     h("div", { class: "product-layout" },
-      h("div", { class: "product-image" }, productIllustration(product, { size: 240, decorative: false })),
+      h("div", { class: "product-image" }, productVisual(product, { size: 240, decorative: false })),
       h("div", { class: "product-info" },
         h("div", { class: "product-title" },
           h("strong", { class: "brand-xl" }, product.brand || product.product_type || ""),
@@ -348,7 +365,7 @@ function viewProduct(id, container) {
       alternatives.length ? h("section", {},
         sectionHeader("Alternativas", h("span", { class: "muted small" }, "otras marcas, por precio por unidad")),
         h("div", { class: "alt-list" }, alternatives.map((alt) => h("a", { class: "alt", href: `#/p/${alt.id}` },
-          h("span", { class: "alt-tile" }, productIllustration(alt, { size: 52 })),
+          h("span", { class: "alt-tile" }, productVisual(alt, { size: 52 })),
           h("span", { class: "alt-main" }, h("strong", {}, alt.brand || ""), h("span", { class: "muted small" }, `${alt.product_name}`), storesLine(alt)),
           h("span", { class: "alt-price" }, h("strong", {}, money(alt.best_price)),
             h("span", { class: Number(alt.unit_amount) < Number(product.unit_amount) ? "good small" : "muted small" }, `${money(alt.unit_amount)} / ${alt.unit_per}`)))))) : null);
@@ -369,7 +386,7 @@ function viewCart(container) {
       h("section", { class: "cart-lines" },
         h("div", { class: "results-head" }, h("h1", {}, "Mi compra"), h("span", { class: "muted" }, `${cartCount()} artículos`)),
         lines.map((line) => h("div", { class: "line" },
-          h("span", { class: "alt-tile" }, productIllustration(line.product, { size: 52 })),
+          h("span", { class: "alt-tile" }, productVisual(line.product, { size: 52 })),
           h("div", { class: "line-body" },
             h("a", { class: "line-main", href: `#/p/${line.id}` },
               h("strong", {}, [line.product.brand, line.product.presentation].filter(Boolean).join(" · ") || line.product.product_name),

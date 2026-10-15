@@ -70,6 +70,33 @@ def test_search_index_rejects_row_count_mismatch(tmp_path: Path) -> None:
         MODULE.attach_search_index(output, manifest)
 
 
+def test_search_photo_column_comes_from_images_index(tmp_path: Path) -> None:
+    database = tmp_path / "source.sqlite"
+    output = tmp_path / "public"
+    build_db(database)
+    manifest = export(database, output)
+    search = _search(output)
+    column = {name: index for index, name in enumerate(search["columns"])}
+    assert {row[column["photo"]] for row in search["rows"]} == {0}
+
+    first, second = search["rows"][0][0], search["rows"][1][0]
+    index = tmp_path / "index.json"
+    index.write_text(json.dumps({"schema": "super-compras-product-images/v1", "items": {
+        first: {"sig": "a", "v": 3, "sm": "walmart"}, second: {"sig": "b", "none": 1}, "zz": {"v": "x"},
+    }}), encoding="utf-8")
+    assert MODULE.load_photo_versions(index) == {first: 3}
+    assert MODULE.load_photo_versions(tmp_path / "missing.json") == {}
+    (tmp_path / "bad.json").write_text("{", encoding="utf-8")
+    assert MODULE.load_photo_versions(tmp_path / "bad.json") == {}
+    MODULE._PHOTO_VERSIONS.update(MODULE.load_photo_versions(index))
+    try:
+        MODULE.attach_search_index(output, manifest)
+    finally:
+        MODULE._PHOTO_VERSIONS.clear()
+    photos = {row[0]: row[column["photo"]] for row in _search(output)["rows"]}
+    assert photos[first] == 3 and photos[second] == 0
+
+
 def test_app_shell_is_static_safe_and_installable() -> None:
     html = (APP_DIR / "index.html").read_text(encoding="utf-8")
     assert "<title>Súper Compras" in html
@@ -162,3 +189,26 @@ console.log(JSON.stringify({
         "soda": "bottle", "milk": "carton", "rice": "bag", "paste": "tube",
         "tuna": "can", "cereal": "box", "same": True,
     }
+
+
+def test_photo_url_uses_versioned_public_branch_and_falls_back(tmp_path: Path) -> None:
+    script = """
+import { photoUrl } from './data.js';
+console.log(JSON.stringify({
+  ok: photoUrl({ id: '675e7a84934e90e9d47c0f50', photo: 3 }),
+  none: photoUrl({ id: '675e7a84', photo: 0 }),
+  bad: photoUrl({ id: '../x', photo: 2 }),
+}));
+"""
+    result = json.loads(_node(script, tmp_path))
+    assert result["ok"] == (
+        "https://raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/"
+        "product-images/img/67/675e7a84934e90e9d47c0f50.webp?v=3"
+    )
+    assert result["none"] is None and result["bad"] is None
+    html = (APP_DIR / "index.html").read_text(encoding="utf-8")
+    assert "img-src 'self' data: https://raw.githubusercontent.com;" in html
+    app = (APP_DIR / "app.js").read_text(encoding="utf-8")
+    assert 'image.addEventListener("error", () => image.replaceWith(productIllustration(' in app
+    assert 'image.crossOrigin = "anonymous"' in app and 'image.loading = "lazy"' in app
+    assert "mix-blend-mode: multiply" in (APP_DIR / "styles.css").read_text(encoding="utf-8")
