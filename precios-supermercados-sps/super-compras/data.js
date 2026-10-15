@@ -55,7 +55,7 @@ function imperialText(grams, converted) {
   const half = converted ? Math.round(ounces * 2) / 2 : Math.round(ounces);
   if (half < 1 || Math.abs(ounces - half) / half > 0.003) return null;
   const pounds = half / 16;
-  if (pounds >= 2 && Number.isInteger(pounds)) return `${pounds} lb`;
+  if (pounds >= 2 && Number.isInteger(pounds * 2)) return `${pounds} lb`;
   return `${Number(half.toFixed(1))} oz`;
 }
 
@@ -74,6 +74,50 @@ export function presentationLabel(product) {
   const imperial = metricRound ? null : imperialText(grams, match[1].includes("."));
   if (imperial) return `${imperial} (${gramsText(grams)})`;
   return match[1].includes(".") && match[1].split(".")[1].length > 1 ? gramsText(grams) : text;
+}
+
+// Frutas y verduras: cada súper usa un tipo distinto (Frutas, Verduras, Frutas y
+// verduras) y a veces su propio nombre como marca; se muestran igual.
+const PRODUCE_TYPES = new Set(["frutas", "verduras", "frutas y verduras", "hierbas y montes"]);
+const PRODUCE_LABEL = "Frutas y verduras";
+const RETAILER_BRANDS = new Set(Object.values(RETAILER_NAMES).map((name) => fold(name)));
+// Unidad o libra al final del nombre ("Aguacate indio und", "Aguacate Liso Un",
+// "Aguacate hass libra") cuando el súper no publicó presentación.
+const UNIT_TAIL = /\s+(?:x\s*)?(?:und|unds|unid|un|u|unidad|c\/u)\.?$/i;
+const POUND_TAIL = /\s+(?:x\s*)?(?:lb|lbs|libra)\.?$/i;
+const POUND_WORD = /(?:^|\s)x\s*(?:lb|lbs|libra)(?:\s|$)/i;
+
+export function isProduce(product) {
+  return PRODUCE_TYPES.has(fold(product?.product_type));
+}
+
+// Nombre, presentación y marca para mostrar; la búsqueda sigue usando el nombre del súper.
+export function displayFields(product) {
+  let name = String(product.product_name ?? "").trim();
+  let presentation = product.presentation;
+  if (!presentation && UNIT_TAIL.test(name)) {
+    name = name.replace(UNIT_TAIL, "");
+    presentation = "1 unidad";
+  } else if (!presentation && POUND_TAIL.test(name)) {
+    name = name.replace(POUND_TAIL, "");
+    presentation = "por libra";
+  } else if (!presentation && POUND_WORD.test(name)) {
+    presentation = "por libra";
+  }
+  // Sin peso publicado, el precio por unidad o por libra es el mismo precio.
+  let unitAmount = product.unit_amount;
+  let unitPer = product.unit_per;
+  if (!unitAmount && product.best_price && (presentation === "1 unidad" || presentation === "por libra")) {
+    unitAmount = product.best_price;
+    unitPer = presentation === "1 unidad" ? "unidad" : "libra";
+  }
+  const produce = isProduce(product);
+  const brand = produce && RETAILER_BRANDS.has(fold(product.brand)) ? null : product.brand;
+  const brandLabel = brand || (produce ? PRODUCE_LABEL : product.product_type) || "Producto";
+  return {
+    display_name: name || product.product_name, presentation, brand, brand_label: brandLabel,
+    unit_amount: unitAmount, unit_per: unitPer,
+  };
 }
 
 // Tipos que no dicen qué es el producto: ahí decide el nombre.
@@ -157,7 +201,7 @@ export class Catalog {
         photo: column.photo === undefined ? 0 : Number(row[column.photo]) || 0,
       };
       product.text = fold([product.brand, product.product_name, product.presentation, product.product_type].join(" "));
-      return product;
+      return Object.assign(product, displayFields(product));
     });
     this.byId = new Map(this.products.map((product) => [product.id, product]));
     return this;
@@ -182,7 +226,7 @@ export class Catalog {
     const first = terms[0];
     if (!first) return 0;
     if (hasWord([product.product_type, product.category].join(" "), first) || fold(product.brand).startsWith(first)) return 0;
-    if (!GENERIC_TYPES.has(fold(product.product_type))) return 2;
+    if (!GENERIC_TYPES.has(fold(product.product_type)) && !isProduce(product)) return 2;
     const brand = fold(product.brand);
     let name = fold(product.product_name);
     if (brand && name.startsWith(`${brand} `)) name = name.slice(brand.length + 1);

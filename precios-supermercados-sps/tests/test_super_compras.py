@@ -243,12 +243,12 @@ import { presentationLabel } from './data.js';
 const l = (presentation, unit_per) => presentationLabel({ presentation, unit_per });
 console.log(JSON.stringify([l('453.59 g'), l('907.18 g'), l('226.8 g'), l('2.268 kg'), l('500 g'), l('1 kg'),
   l('16 oz'), l('16 oz', '100 g'), l('14.2 g'), l('15 unidades'), l('1.361 kg'), l('340.19 g'), l('170.1 g'),
-  l('1.134 kg'), l('2 kg'), l('454 g'), l('440 g')]));
+  l('1.134 kg'), l('2 kg'), l('454 g'), l('440 g'), l('680.39 g')]));
 """
     assert json.loads(_node(script, tmp_path)) == [
         "16 oz (454 g)", "2 lb (907 g)", "8 oz (227 g)", "5 lb (2.27 kg)", "500 g", "1 kg",
         "16 oz", "16 oz (454 g)", "14.2 g", "15 unidades", "3 lb (1.36 kg)", "12 oz (340 g)", "6 oz (170 g)",
-        "40 oz (1.13 kg)", "2 kg", "16 oz (454 g)", "440 g",
+        "2.5 lb (1.13 kg)", "2 kg", "16 oz (454 g)", "440 g", "24 oz (680 g)",
     ]
 
 
@@ -273,3 +273,27 @@ def test_app_offers_city_selector_store_choice_and_cheapest_default() -> None:
     assert "addToCart(product.id, offer.location_id, label)" in app
     assert '`${base}cities.json`' in data and '!city.manifest.includes("..")' in data
     assert "data-city" in (APP_DIR / "index.html").read_text(encoding="utf-8")
+
+
+def test_display_fields_unify_units_and_produce(tmp_path: Path) -> None:
+    script = """
+import { displayFields } from './data.js';
+const d = (product_name, extra = {}) => displayFields({ product_name, presentation: null, brand: null,
+  product_type: 'Verduras', best_price: '23.90', unit_amount: null, unit_per: null, ...extra });
+console.log(JSON.stringify([
+  d('Aguacate indio und'), d('Aguacate Liso Un', { brand: 'La Colonia', product_type: 'Frutas' }),
+  d('AGUACATE Hass Unidad', { product_type: 'Frutas y verduras' }), d('Aguacate hass libra'),
+  d('Aguacate hass xlb en red'), d('Leche Sula 1 L', { presentation: '1 L', brand: 'Sula', product_type: 'Leche' }),
+  d('Papel Un', { product_type: 'Papel higiénico', brand: 'La Colonia' }),
+]));
+"""
+    result = json.loads(_node(script, tmp_path))
+    assert [(r["display_name"], r["presentation"], r["brand_label"], r["unit_amount"], r["unit_per"]) for r in result] == [
+        ("Aguacate indio", "1 unidad", "Frutas y verduras", "23.90", "unidad"),
+        ("Aguacate Liso", "1 unidad", "Frutas y verduras", "23.90", "unidad"),
+        ("AGUACATE Hass", "1 unidad", "Frutas y verduras", "23.90", "unidad"),
+        ("Aguacate hass", "por libra", "Frutas y verduras", "23.90", "libra"),
+        ("Aguacate hass xlb en red", "por libra", "Frutas y verduras", "23.90", "libra"),
+        ("Leche Sula 1 L", "1 L", "Sula", None, None),
+        ("Papel", "1 unidad", "La Colonia", "23.90", "unidad"),
+    ]

@@ -202,8 +202,8 @@ function productCard(product) {
       product.promo ? h("span", { class: "badge-offer" }, "Oferta") : null,
       productVisual(product, { size: 118 })),
     h("div", { class: "pills" }, sizePill(product)),
-    h("strong", { class: "brand" }, product.brand || product.product_type || "Producto"),
-    h("span", { class: "name" }, product.product_name),
+    h("strong", { class: "brand" }, product.brand_label),
+    h("span", { class: "name" }, product.display_name),
     h("span", { class: "price" }, h("small", {}, "desde "), money(product.best_price)),
     product.unit_amount ? h("span", { class: "unit" }, `${money(product.unit_amount)} por ${product.unit_per}`) : h("span", { class: "unit" }, " "),
     storesLine(product));
@@ -347,8 +347,8 @@ function viewProduct(id, container) {
       h("div", { class: "product-image" }, productVisual(product, { size: 240, decorative: false })),
       h("div", { class: "product-info" },
         h("div", { class: "product-title" },
-          h("strong", { class: "brand-xl" }, product.brand || product.product_type || ""),
-          h("h1", {}, product.product_name),
+          h("strong", { class: "brand-xl" }, product.brand_label),
+          h("h1", {}, product.display_name),
           h("div", { class: "pills" }, sizePill(product),
             h("span", { class: "muted small" }, [product.category, product.product_type].filter(Boolean).join(" › ")))),
         h("section", { class: "offers", "aria-busy": "true" }, h("h2", {}, "Dónde comprar"), h("p", { class: "muted" }, "Cargando precios…")))),
@@ -419,7 +419,7 @@ function viewProduct(id, container) {
         sectionHeader("Alternativas", h("span", { class: "muted small" }, "otras marcas, por precio por unidad")),
         h("div", { class: "alt-list" }, alternatives.map((alt) => h("a", { class: "alt", href: `#/p/${alt.id}` },
           h("span", { class: "alt-tile" }, productVisual(alt, { size: 52 })),
-          h("span", { class: "alt-main" }, h("strong", {}, alt.brand || ""), h("span", { class: "muted small" }, `${alt.product_name}`), storesLine(alt)),
+          h("span", { class: "alt-main" }, h("strong", {}, alt.brand || ""), h("span", { class: "muted small" }, `${alt.display_name}`), storesLine(alt)),
           h("span", { class: "alt-price" }, h("strong", {}, money(alt.best_price)),
             h("span", { class: Number(alt.unit_amount) < Number(product.unit_amount) ? "good small" : "muted small" }, `${money(alt.unit_amount)} / ${alt.unit_per}`)))))) : null);
   }).catch((error) => {
@@ -473,7 +473,7 @@ function viewCart(container) {
         h("div", { class: "line-body" },
           h("a", { class: "line-main", href: `#/p/${line.id}` },
             h("strong", {}, [line.product.brand, presentationLabel(line.product)].filter(Boolean).join(" · ") || line.product.product_name),
-            h("span", { class: "muted small" }, line.product.product_name)),
+            h("span", { class: "muted small" }, line.product.display_name)),
           offers.length ? h("label", { class: "line-store" },
             h("span", { class: "sr-only" }, "Súper"),
             h("select", {
