@@ -54,10 +54,15 @@ WEIGHED_TYPE_WORDS = frozenset({
     "res", "cerdo", "pollo", "pavo", "carne", "carnes", "pescado", "pescados", "mariscos", "embutidos",
     "queso", "quesos", "jamon", "frutas", "verduras", "hierbas",
 })
+# Walmart lo trae como ean; Colonial (Shopify) como sku = reference ("2063710000000"
+# "NORTEÑO Pollo en Piezas 1/12" a L 46.99 la libra).
+_VARIABLE_CODE = "((length({c})=13 AND substr({c},1,1)='2') OR (length({c})=14 AND substr({c},1,2)='02'))"
 WEIGHED_SQL = (
-    "SELECT product_id FROM products WHERE supermarket_id='walmart' AND ean IS NOT NULL "
-    "AND ((length(ean)=13 AND substr(ean,1,1)='2') OR (length(ean)=14 AND substr(ean,1,2)='02'))"
+    "SELECT supermarket_id, product_id FROM products WHERE supermarket_id IN ('walmart','colonial') AND ("
+    + _VARIABLE_CODE.format(c="ean") + " OR " + _VARIABLE_CODE.format(c="reference") + ")"
 )
+# El súper a veces aclara lo contrario en el nombre ("Ayote Sazon ... - Precio Por Unidad").
+_PER_UNIT_NAME = re.compile(r"precio\s+por\s+unidad", re.IGNORECASE)
 _AEROSOL_RE = re.compile(r"(?<![a-z])(?:spray|aerosol|atomizador)(?![a-z])", re.IGNORECASE)
 
 
@@ -194,7 +199,7 @@ def _price_per_pound(row: dict[str, object]) -> None:
     """Ofertas de producto pesado en tienda: precio por libra, no por paquete."""
     offers = [offer for offer in row.get("offers") or () if isinstance(offer, dict)]
     weighed = [offer for offer in offers if str(offer.get("source_product_id")) in WEIGHED_BY_POUND]
-    if not weighed or not _weighed_type(row):
+    if not weighed or not _weighed_type(row) or _PER_UNIT_NAME.search(str(row.get("product_name") or "")):
         return
     for offer in weighed:
         price = offer.get("current_price")
@@ -334,8 +339,8 @@ def export_consumer_catalog(
     _sync_core()
     WEIGHED_BY_POUND.clear()
     columns = {str(row[0]) for row in backend.query("SELECT name FROM pragma_table_info('products')")}
-    if "ean" in columns:  # bases mínimas de prueba no traen ean
-        WEIGHED_BY_POUND.update(f"walmart:{row[0]}" for row in backend.query(WEIGHED_SQL))
+    if {"ean", "reference"} <= columns:  # bases mínimas de prueba no traen ean/reference
+        WEIGHED_BY_POUND.update(f"{row[0]}:{row[1]}" for row in backend.query(WEIGHED_SQL))
     manifest = _ORIGINAL_EXPORT(
         backend,
         scope,
