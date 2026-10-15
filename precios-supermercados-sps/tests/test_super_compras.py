@@ -308,3 +308,41 @@ def test_app_modules_are_versioned_with_the_shell() -> None:
     shell = (APP_DIR / "sw.js").read_text(encoding="utf-8")
     for asset in (f"app.js?v={version}", f"styles.css?v={version}", f"data.js?v={version}", f"illustration.js?v={version}"):
         assert f'"{asset}"' in shell, asset
+
+
+def test_size_from_name_reads_common_store_spellings(tmp_path: Path) -> None:
+    script = """
+import { displayFields } from './data.js';
+const d = (product_name, category = 'Alimentos', best_price = '100.00') => {
+  const r = displayFields({ product_name, presentation: null, brand: null, category, product_type: 'Abarrotes',
+    best_price, unit_amount: null, unit_per: null });
+  return [r.presentation, r.unit_amount, r.unit_per];
+};
+console.log(JSON.stringify([
+  d('ISOMIL 2 Plus 800 Grms'), d('MYTHOZ Café 12 onz'), d('Muellers mostaccioli pasta 16z'),
+  d('ANCHOR Leche Entera Polvo 1.92k'), d('Pack Nectar Del Monte Variado 8Unx200Ml'), d('Chiky galletas 12 pk', 'Alimentos', '96.00'),
+  d('KG Hummus de Kalamata'), d('Queso Gouda x 1/2 Lb', 'Alimentos', '50.00'), d('AYUNI Marmahon Medio Libra', 'Alimentos', '50.00'),
+  d('RES Molida Especial X Libra'), d('AXION LavaPlatosLemo235g 3Pack', 'Limpieza'),
+  d('Pantalla Samsung LED Smart 4K - 50 Pulgadas', 'Electrónica y electrodomésticos'),
+  d('Juego De 4 Piezas Tamanio Queen', 'Hogar y cocina'), d('Pollo frito 4 pzs', 'Alimentos', '200.00'),
+  d('EL CENTRO Pan Frances'),
+]));
+"""
+    assert json.loads(_node(script, tmp_path)) == [
+        ["800 g", "125.00", "kg"], ["12 oz", None, None], ["16 oz", None, None],
+        ["1.92 kg", "52.08", "kg"], ["8 × 200 ml", None, None], ["12 unidades", "8.00", "unidad"],
+        ["por kg", "100.00", "kg"], ["226.8 g", "220.46", "kg"], ["226.8 g", "220.46", "kg"],
+        ["por libra", "100.00", "libra"], ["3 × 235 g", "141.84", "kg"],
+        [None, None, None], [None, None, None], ["4 unidades", "50.00", "unidad"],
+        [None, None, None],
+    ]
+
+
+def test_size_from_name_uses_the_type_price_basis(tmp_path: Path) -> None:
+    script = """
+import { displayFields } from './data.js';
+const r = displayFields({ product_name: 'Jamón Pechuga De Pavo x 1/2 Lb', presentation: null, brand: null,
+  category: 'Alimentos', product_type: 'Embutidos y carnes frías', best_price: '64.90', unit_amount: null, unit_per: null }, '100 g');
+console.log(JSON.stringify([r.presentation, r.unit_amount, r.unit_per]));
+"""
+    assert json.loads(_node(script, tmp_path)) == ["226.8 g", "28.62", "100 g"]

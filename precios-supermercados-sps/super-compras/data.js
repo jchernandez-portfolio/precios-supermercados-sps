@@ -87,26 +87,107 @@ const UNIT_TAIL = /\s+(?:x\s*)?(?:und|unds|unid|un|u|unidad|c\/u)\.?$/i;
 const POUND_TAIL = /\s+(?:x\s*)?(?:lb|lbs|libra)\.?$/i;
 const POUND_WORD = /(?:^|\s)x\s*(?:lb|lbs|libra)(?:\s|$)/i;
 
+// Tamaño escrito en el nombre cuando el súper no publicó presentación
+// ("ISOMIL 2 Plus 800 Grms", "MYTHOZ Café 12 onz", "Kelloggs ... 8pk",
+// "Pack Nectar 8Unx200Ml", "KG Hummus"). Sólo se usa para mostrar.
+const NAME_UNITS = [
+  [/^(?:kg|kgs|k|kilo|kilos)$/i, "kg"], [/^(?:g|gr|grs|grm|grms|gramos?)$/i, "g"],
+  [/^(?:ml|mls)$/i, "ml"], [/^(?:l|lt|lts|litro|litros)$/i, "L"],
+  [/^(?:fl\s*oz|floz)$/i, "fl oz"], [/^(?:oz|onz|onzas?|z)$/i, "oz"], [/^(?:lb|lbs|lbr|libras?)$/i, "lb"],
+];
+const MEASURE = /(\d+(?:[.,]\d+)?)\s*(kgs?|kilos?|k|grms?|grs?|gramos?|g|mls?|lts?|litros?|l|fl\s*oz|floz|onzas?|onz|oz|z|lbs?|lbr|libras?)(?![a-z])/gi;
+const MULTIPACK = /(\d+)\s*(?:un|u|und|unds|uds)?\s*x\s*(\d+(?:[.,]\d+)?)\s*(ml|g|gr|oz|l|lt)(?![a-z])/i;
+const PACK = /(\d+)\s*(?:pk|pack|uds|unds|und)(?![a-z])/i;
+// "piezas" en un juego (sábanas, ollas) es un solo artículo; sólo cuenta en comida.
+const PIECES = /(\d+)\s*(?:pcs|pzs|pzas|pza|piezas|pieces)(?![a-z])/i;
+const FOOD_CATEGORIES = new Set(["alimentos", "bebidas y tabaco"]);
+
+function unitOf(token) {
+  const found = NAME_UNITS.find(([pattern]) => pattern.test(token.replace(/\s+/g, " ").trim()));
+  return found ? found[1] : null;
+}
+
+export function sizeFromName(name, category = "") {
+  const text = String(name ?? "");
+  const multi = text.match(MULTIPACK);
+  if (multi) {
+    const unit = unitOf(multi[3]);
+    if (unit) return { presentation: `${Number(multi[1])} × ${multi[2].replace(",", ".")} ${unit}` };
+  }
+  if (/^kg\s/i.test(text)) return { presentation: "por kg", per: "kg" };
+  const fraction = text.match(/(?:(\d+)\s*\/\s*(\d+)|\b(medi[ao]))\s*(?:lb|lbs|libras?)(?![a-z])/i);
+  if (fraction) {
+    const pounds = fraction[3] ? 0.5 : Number(fraction[1]) / Number(fraction[2]);
+    // Como el resto de pesos de libras: en gramos, que la app muestra "8 oz (227 g)".
+    if (pounds > 0 && pounds < 1) {
+      const grams = Number((pounds * 453.59237).toFixed(2));
+      return { presentation: `${grams} g`, value: grams, unit: "g" };
+    }
+  }
+  const measures = [...text.matchAll(MEASURE)].filter((match) =>
+    (!/^\d+(?:[.,]\d+)?\s*l$/i.test(match[0]) || /\s/.test(match[0]))
+    // "4K" es resolución, no kilos: "k" sola sólo con decimales ("1.92k").
+    && !(/^k$/i.test(match[2]) && !/[.,]/.test(match[1])));
+  const last = measures.at(-1);
+  const pack = text.match(PACK) || (FOOD_CATEGORIES.has(fold(category)) ? text.match(PIECES) : null);
+  if (last) {
+    const unit = unitOf(last[2]);
+    const value = Number(last[1].replace(",", "."));
+    const count = pack ? Number(pack[1]) : 1;
+    if (unit && value > 0 && count > 1) {
+      return { presentation: `${count} × ${value} ${unit}`, value: value * count, unit };
+    }
+    if (unit && value > 0) return { presentation: `${value} ${unit}`, value, unit };
+  }
+  if (pack && Number(pack[1]) > 1) return { presentation: `${Number(pack[1])} unidades`, count: Number(pack[1]) };
+  if (/(?:^|[\s(])(?:lb|lbs|libras?)(?:[\s)]|$)|por libra/i.test(text)) return { presentation: "por libra", per: "libra" };
+  return null;
+}
+
+// Precio por unidad en la misma base que usan los demás productos de ese tipo
+// ("por 100 g" en embutidos, "por kg" en carnes), para poder compararlos.
+function unitFromSize(size, price, basis) {
+  const amount = Number(price);
+  if (!size || !(amount > 0)) return null;
+  if (size.per) return { amount: price, per: size.per };
+  const grams = { g: 1, kg: 1000, lb: 453.59237 }[size.unit];
+  const millis = { ml: 1, L: 1000 }[size.unit];
+  if (grams) {
+    const per = basis === "100 g" ? 100 : 1000;
+    return { amount: (amount / (size.value * grams) * per).toFixed(2), per: per === 100 ? "100 g" : "kg" };
+  }
+  if (millis) {
+    const per = basis === "100 ml" ? 100 : 1000;
+    return { amount: (amount / (size.value * millis) * per).toFixed(2), per: per === 100 ? "100 ml" : "L" };
+  }
+  if (size.count) return { amount: (amount / size.count).toFixed(2), per: "unidad" };
+  return null;
+}
+
 export function isProduce(product) {
   return PRODUCE_TYPES.has(fold(product?.product_type));
 }
 
 // Nombre, presentación y marca para mostrar; la búsqueda sigue usando el nombre del súper.
-export function displayFields(product) {
+export function displayFields(product, basis = null) {
   let name = String(product.product_name ?? "").trim();
   let presentation = product.presentation;
+  let unitAmount = product.unit_amount;
+  let unitPer = product.unit_per;
   if (!presentation && UNIT_TAIL.test(name)) {
     name = name.replace(UNIT_TAIL, "");
     presentation = "1 unidad";
-  } else if (!presentation && POUND_TAIL.test(name)) {
-    name = name.replace(POUND_TAIL, "");
-    presentation = "por libra";
-  } else if (!presentation && POUND_WORD.test(name)) {
-    presentation = "por libra";
+  } else if (!presentation) {
+    const size = sizeFromName(name, product.category);
+    if (size?.presentation === "por libra" && POUND_TAIL.test(name)) name = name.replace(POUND_TAIL, "");
+    if (!size && POUND_WORD.test(name)) presentation = "por libra";
+    if (size) {
+      presentation = size.presentation;
+      const unit = unitAmount ? null : unitFromSize(size, product.best_price, basis);
+      if (unit) [unitAmount, unitPer] = [unit.amount, unit.per];
+    }
   }
   // Sin peso publicado, el precio por unidad o por libra es el mismo precio.
-  let unitAmount = product.unit_amount;
-  let unitPer = product.unit_per;
   if (!unitAmount && product.best_price && (presentation === "1 unidad" || presentation === "por libra")) {
     unitAmount = product.best_price;
     unitPer = presentation === "1 unidad" ? "unidad" : "libra";
@@ -201,8 +282,21 @@ export class Catalog {
         photo: column.photo === undefined ? 0 : Number(row[column.photo]) || 0,
       };
       product.text = fold([product.brand, product.product_name, product.presentation, product.product_type].join(" "));
-      return Object.assign(product, displayFields(product));
+      return product;
     });
+    // Base de precio unitario más común por tipo (para tamaños leídos del nombre).
+    const bases = new Map();
+    for (const product of this.products) {
+      if (!product.unit_per || !product.product_type) continue;
+      const counts = bases.get(product.product_type) || new Map();
+      counts.set(product.unit_per, (counts.get(product.unit_per) || 0) + 1);
+      bases.set(product.product_type, counts);
+    }
+    const basisOf = (type) => {
+      const counts = bases.get(type);
+      return counts ? [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0] : null;
+    };
+    for (const product of this.products) Object.assign(product, displayFields(product, basisOf(product.product_type)));
     this.byId = new Map(this.products.map((product) => [product.id, product]));
     return this;
   }
