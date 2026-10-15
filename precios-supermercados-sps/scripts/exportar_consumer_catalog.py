@@ -27,6 +27,7 @@ from precios_supermercados.consumer_catalog_display import (  # noqa: E402
     canonical_egg_size,
     canonical_presentation,
 )
+from precios_supermercados import master_taxonomy  # noqa: E402
 from precios_supermercados.matching import size_variants  # noqa: E402
 
 # Conserva la API histórica del script, incluidos helpers privados consumidos por
@@ -40,6 +41,12 @@ _ORIGINAL_EXPORT = _core.export_consumer_catalog
 _ORIGINAL_MAIN = _core.main
 # Tope de "otras presentaciones" por fila (las de tamaño más cercano).
 MAX_OTHER_PRESENTATIONS = 12
+# Onza de peso (avoirdupois) en gramos.
+GRAMS_PER_OUNCE = Decimal("28.349523125")
+# Subcategorías sin atributo ``ounce`` en el árbol cuyos productos se venden por
+# peso: el huevo líquido (Egg Beaters) declara "NET WT 16 OZ (1 LB) 454 g".
+EXPORT_OUNCE_MASS_SUBCATEGORIES = frozenset({"Huevos"})
+_AEROSOL_RE = re.compile(r"(?<![a-z])(?:spray|aerosol|atomizador)(?![a-z])", re.IGNORECASE)
 
 
 def _fold_public(value: object) -> str:
@@ -98,6 +105,38 @@ def _derived_presentation(offer: VisibleOffer) -> str | None:
     )
 
 
+def ounce_as_mass(offer: VisibleOffer) -> VisibleOffer:
+    """Onza sin convertir → gramos cuando la subcategoría pública es de peso.
+
+    El motor sólo convierte la onza cuando la categoría del súper lleva a una
+    subcategoría ``ounce: mass``; la asignación pública usa además el nombre y
+    la categoría, y suele llegar a ella (Colonial "EGG Beaters 16 oz" → Huevos).
+    Sólo cambia la lectura pública: presentación en g y precio por kg/100 g. No
+    toca identidad, perfiles ni comparabilidad. Aerosoles quedan sin convertir.
+    """
+    if offer.presentation_dimension != "ounce" or _AEROSOL_RE.search(offer.product_name or ""):
+        return offer
+    try:
+        ounces = Decimal(str(offer.presentation_total_base))
+    except (InvalidOperation, TypeError, ValueError):
+        return offer
+    if not ounces.is_finite() or ounces <= 0:
+        return offer
+    node = master_taxonomy.assign_offer(
+        offer.supermarket_id, offer.source_category, offer.product_type, offer.category,
+        product_name=offer.product_name,
+    ).node
+    if node is not None and node.subcategory is not None:
+        mass = master_taxonomy.node_attribute(node, "ounce") == "mass" or node.subcategory in EXPORT_OUNCE_MASS_SUBCATEGORIES
+    else:
+        # Misma evidencia explícita que _normalize_public_taxonomy: Egg Beaters es huevo.
+        mass = re.search(r"(?<!\w)egg\s+beaters(?!\w)", _fold_public(offer.product_name)) is not None
+    if not mass:
+        return offer
+    grams = (ounces * GRAMS_PER_OUNCE).quantize(Decimal("0.00001"))
+    return _core.replace(offer, presentation_dimension="mass_g", presentation_total_base=format(grams.normalize(), "f"))
+
+
 def build_rows(
     offers: Iterable[VisibleOffer],
     freshness_by_scope: dict[tuple[str, str], str],
@@ -107,7 +146,7 @@ def build_rows(
 ) -> list[dict[str, object]]:
     """Construye filas v3, limpia atributos públicos y añade otras presentaciones."""
     _core._derived_presentation = _derived_presentation
-    offers = tuple(offers)
+    offers = tuple(ounce_as_mass(offer) for offer in offers)
     offers_by_key = {(offer.source_product_id, offer.location_id): offer for offer in offers}
     rows = _ORIGINAL_BUILD_ROWS(
         offers,
