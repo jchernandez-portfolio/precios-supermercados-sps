@@ -297,3 +297,14 @@ console.log(JSON.stringify([
         ("Leche Sula 1 L", "1 L", "Sula", None, None),
         ("Papel", "1 unidad", "La Colonia", "23.90", "unidad"),
     ]
+
+
+def test_app_modules_are_versioned_with_the_shell() -> None:
+    """Un data.js viejo en caché con un app.js nuevo dejaba tarjetas vacías (2026-10-15)."""
+    html = (APP_DIR / "index.html").read_text(encoding="utf-8")
+    version = re.search(r'app\.js\?v=([0-9-]+)', html).group(1)
+    app = (APP_DIR / "app.js").read_text(encoding="utf-8")
+    assert f'from "./data.js?v={version}"' in app and f'from "./illustration.js?v={version}"' in app
+    shell = (APP_DIR / "sw.js").read_text(encoding="utf-8")
+    for asset in (f"app.js?v={version}", f"styles.css?v={version}", f"data.js?v={version}", f"illustration.js?v={version}"):
+        assert f'"{asset}"' in shell, asset
