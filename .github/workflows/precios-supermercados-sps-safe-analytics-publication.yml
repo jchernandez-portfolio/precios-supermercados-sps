@@ -143,6 +143,7 @@ jobs:
           set -euo pipefail
           python scripts/exportar_consumer_catalog_tgu.py \
             --turso \
+            --images-index run-artifacts/product-images-index.json \
             --output-directory run-artifacts/analytics/rpi-la-colonia-walmart-sps/consumer-v3-tgu \
             --require-products \
             | tee run-artifacts/analytics/rpi-consumer-v3-tgu-run.json

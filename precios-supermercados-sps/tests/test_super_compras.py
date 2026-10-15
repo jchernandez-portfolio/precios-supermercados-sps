@@ -212,3 +212,62 @@ console.log(JSON.stringify({
     assert 'image.addEventListener("error", () => image.replaceWith(productIllustration(' in app
     assert 'image.crossOrigin = "anonymous"' in app and 'image.loading = "lazy"' in app
     assert "mix-blend-mode: multiply" in (APP_DIR / "styles.css").read_text(encoding="utf-8")
+
+
+def test_search_puts_the_searched_product_first_and_related_mentions_after(tmp_path: Path) -> None:
+    script = """
+import { Catalog, fold } from './data.js';
+const c = Object.create(Catalog.prototype);
+const p = (id, name, brand, type, price) => ({
+  id, product_name: name, brand, product_type: type, category: 'Alimentos', best_price: price,
+  retailers: ['walmart'], promo: false, text: fold([brand, name, type].join(' ')) });
+c.products = [
+  p('toro', 'RES Huevos de Toro X Libra', 'Res', 'Res', '54.99'),
+  p('fideo', 'Fideos De Huevo Extra Anchos', 'Essential', 'Pasta', '20.00'),
+  p('rica', 'RICA YEMA Huevos 15u', 'Rica Yema', 'Huevo', '57.00'),
+  p('bonovo', 'Huevos Bonovo Cartón M 15Un', 'Bonovo', 'Abarrotes', '56.00'),
+  p('caro', 'Huevo de Gallina Jumbo 20 Unidades', 'Marketside', 'Huevo', '98.00'),
+];
+const r = c.search({ query: 'huevos' });
+console.log(JSON.stringify({ ids: r.items.map((x) => x.id), tiers: r.items.map((x) => x.tier), related: r.related }));
+"""
+    result = json.loads(_node(script, tmp_path))
+    assert result["ids"][:3] == ["bonovo", "rica", "caro"]  # huevos de verdad, del más barato al más caro
+    assert set(result["ids"][3:]) == {"toro", "fideo"} and result["related"] == 2
+    assert result["tiers"][:3] == [1, 0, 0]
+
+
+def test_presentation_labels_are_comparable(tmp_path: Path) -> None:
+    script = """
+import { presentationLabel } from './data.js';
+const l = (presentation, unit_per) => presentationLabel({ presentation, unit_per });
+console.log(JSON.stringify([l('453.59 g'), l('907.18 g'), l('226.8 g'), l('2.268 kg'), l('500 g'), l('1 kg'),
+  l('16 oz'), l('16 oz', '100 g'), l('14.2 g'), l('15 unidades'), l('1.361 kg')]));
+"""
+    assert json.loads(_node(script, tmp_path)) == [
+        "454 g (1 lb)", "907 g (2 lb)", "227 g (½ lb)", "2.27 kg (5 lb)", "500 g", "1 kg",
+        "16 oz", "454 g (16 oz)", "14.2 g", "15 unidades", "1.36 kg (3 lb)",
+    ]
+
+
+def test_store_labels_name_branches_only_when_a_chain_has_several(tmp_path: Path) -> None:
+    script = """
+import { storeLabel } from './data.js';
+const offers = [
+  { supermarket_id: 'walmart', location_id: 'walmart_tgu_ffaa' },
+  { supermarket_id: 'walmart', location_id: 'walmart_tgu_el_sauce' },
+  { supermarket_id: 'la_colonia', location_id: 'la_colonia_tgu' },
+];
+console.log(JSON.stringify([storeLabel(offers[0], offers), storeLabel(offers[2], offers), storeLabel(offers[0], [offers[0]])]));
+"""
+    assert json.loads(_node(script, tmp_path)) == ["Walmart FF.AA.", "La Colonia", "Walmart"]
+
+
+def test_app_offers_city_selector_store_choice_and_cheapest_default() -> None:
+    app = (APP_DIR / "app.js").read_text(encoding="utf-8")
+    data = (APP_DIR / "data.js").read_text(encoding="utf-8")
+    assert 'params.get("orden") || "price"' in app
+    assert "loadCities(url)" in app and "switchCity(event.target.value)" in app
+    assert "addToCart(product.id, offer.location_id, label)" in app
+    assert '`${base}cities.json`' in data and '!city.manifest.includes("..")' in data
+    assert "data-city" in (APP_DIR / "index.html").read_text(encoding="utf-8")
