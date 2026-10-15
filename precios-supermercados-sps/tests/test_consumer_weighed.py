@@ -43,6 +43,23 @@ def test_other_offers_types_and_codes_are_untouched() -> None:
     assert other["presentation"] == "5 lb"
 
 
-def test_weighed_query_targets_walmart_variable_measure_codes() -> None:
-    sql = MODULE.WEIGHED_SQL
-    assert "supermarket_id='walmart'" in sql and "substr(ean,1,1)='2'" in sql and "length(ean)=13" in sql
+def test_weighed_query_reads_walmart_ean_and_colonial_sku() -> None:
+    import sqlite3
+
+    connection = sqlite3.connect(":memory:")
+    connection.execute("CREATE TABLE products(product_id INT, supermarket_id TEXT, ean TEXT, reference TEXT)")
+    connection.executemany("INSERT INTO products VALUES (?,?,?,?)", [
+        (1, "walmart", "2598600000004", None), (2, "walmart", "7401234567890", None),
+        (3, "colonial", None, "2063710000000"), (4, "colonial", "7424101113507", "7424101113507"),
+        (5, "la_colonia", "2598600000004", None), (6, "walmart", "02598600000004", None),
+    ])
+    assert sorted(connection.execute(MODULE.WEIGHED_SQL).fetchall()) == [("colonial", 3), ("walmart", 1), ("walmart", 6)]
+
+
+def test_name_saying_per_unit_wins() -> None:
+    MODULE.WEIGHED_BY_POUND.clear()
+    MODULE.WEIGHED_BY_POUND.add("walmart:9")
+    item = row(("walmart:9", "7.70"), product_type="Frutas")
+    item["product_name"] = "Ayote Sazon Libra Ayote Sazon Amarillo Hortifruti - Precio Por Unidad"
+    MODULE._price_per_pound(item)
+    assert item["presentation"] == "5 lb" and item["offers"][0]["unit_price"]["per"] == "kg"
