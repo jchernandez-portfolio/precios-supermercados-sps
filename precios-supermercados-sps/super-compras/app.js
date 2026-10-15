@@ -1,7 +1,8 @@
-// Súper Compras: comparador de precios de supermercados (San Pedro Sula).
+// Súper Compras: comparador de precios de supermercados (San Pedro Sula y Tegucigalpa).
 // Vistas: inicio, búsqueda, ficha de producto, ofertas y Mi compra.
 import {
-  Catalog, RETAILER_COLORS, rowKey, RETAILER_INITIALS, RETAILER_NAMES, loadCart, money, photoUrl, saveCart,
+  Catalog, RETAILER_COLORS, rowKey, RETAILER_INITIALS, RETAILER_NAMES, loadCart, loadCities, loadCitySlug, money,
+  photoUrl, presentationLabel, saveCart, saveCitySlug, storeLabel,
 } from "./data.js";
 import { productIllustration } from "./illustration.js";
 
@@ -58,6 +59,7 @@ const ICONS = {
   back: "M15 18l-6-6 6-6",
   share: "M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13",
   pin: "M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21zM12 7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z",
+  plus: "M12 5v14M5 12h14",
 };
 
 function icon(name, size = 22) {
@@ -80,7 +82,9 @@ function icon(name, size = 22) {
 // ------------------------------------------------------------------ state
 const state = {
   catalog: null,
-  cart: loadCart(),
+  cities: [],
+  city: null,
+  cart: [],
   limit: PAGE_SIZE,
   lastQueryKey: "",
 };
@@ -108,18 +112,28 @@ function cartCount() {
   return state.cart.reduce((sum, line) => sum + line.qty, 0);
 }
 
-function addToCart(id) {
-  const line = state.cart.find((item) => item.id === id);
+// store = location_id del súper elegido; sin store, Mi compra usa el más barato.
+function addToCart(id, store = null, label = "") {
+  const line = state.cart.find((item) => item.id === id && (item.store || null) === store);
   if (line) line.qty += 1;
-  else state.cart.push({ id, qty: 1 });
-  saveCart(state.cart);
+  else state.cart.push(store ? { id, qty: 1, store } : { id, qty: 1 });
+  saveCart(state.cart, state.city.slug);
   renderChrome();
-  toast("Agregado a Mi compra");
+  toast(label ? `Agregado a Mi compra · ${label}` : "Agregado a Mi compra");
 }
 
-function setQty(id, qty) {
-  state.cart = state.cart.map((line) => (line.id === id ? { ...line, qty } : line)).filter((line) => line.qty > 0);
-  saveCart(state.cart);
+function updateLine(index, changes) {
+  state.cart = state.cart.map((line, position) => (position === index ? { ...line, ...changes } : line))
+    .map((line) => (line.store ? line : { id: line.id, qty: line.qty }))
+    .filter((line) => line.qty > 0);
+  // Une líneas repetidas del mismo producto y súper.
+  const merged = [];
+  for (const line of state.cart) {
+    const twin = merged.find((item) => item.id === line.id && (item.store || null) === (line.store || null));
+    if (twin) twin.qty += line.qty; else merged.push({ ...line });
+  }
+  state.cart = merged;
+  saveCart(state.cart, state.city.slug);
   if (route().path.startsWith("/compra")) render(); else renderChrome();
 }
 
@@ -156,8 +170,24 @@ function searchForm(value = "", { large = false } = {}) {
   }, icon("search", 18), input);
 }
 
-function sizePill(text) {
+function sizePill(product) {
+  const text = typeof product === "string" ? product : presentationLabel(product);
   return text ? h("span", { class: "pill" }, String(text).toUpperCase()) : null;
+}
+
+function cityName() {
+  return state.city?.name || "San Pedro Sula";
+}
+
+function citySelect() {
+  if (state.cities.length < 2) return null;
+  return h("label", { class: "city-select" },
+    icon("pin", 16),
+    h("span", { class: "sr-only" }, "Ciudad"),
+    h("select", {
+      "aria-label": "Ciudad",
+      onchange: (event) => switchCity(event.target.value),
+    }, state.cities.map((city) => h("option", { value: city.slug, selected: city.slug === state.city?.slug }, city.name))));
 }
 
 function storesLine(product) {
@@ -171,7 +201,7 @@ function productCard(product) {
     h("div", { class: "tile" },
       product.promo ? h("span", { class: "badge-offer" }, "Oferta") : null,
       productVisual(product, { size: 118 })),
-    h("div", { class: "pills" }, sizePill(product.presentation)),
+    h("div", { class: "pills" }, sizePill(product)),
     h("strong", { class: "brand" }, product.brand || product.product_type || "Producto"),
     h("span", { class: "name" }, product.product_name),
     h("span", { class: "price" }, h("small", {}, "desde "), money(product.best_price)),
@@ -197,7 +227,7 @@ function viewHome() {
     .slice(0, 12);
   return h("div", { class: "page" },
     h("section", { class: "hero" },
-      h("h1", {}, "Compara precios de súper en San Pedro Sula"),
+      h("h1", {}, `Compara precios de súper en ${cityName()}`),
       h("p", { class: "muted" }, `${catalog.products.length.toLocaleString("es-HN")} productos en ${catalog.retailers.map((id) => RETAILER_NAMES[id]).join(", ")}.`),
       h("div", { class: "hero-search" }, searchForm("", { large: true })),
       h("p", { class: "fresh" }, icon("pin", 14), freshnessText())),
@@ -225,10 +255,10 @@ function viewSearch(params, { offers = false } = {}) {
   const category = params.get("cat") || "";
   const retailer = params.get("super") || "";
   const promoOnly = offers || params.get("oferta") === "1";
-  const sort = params.get("orden") || (query ? "relevance" : "unit");
+  const sort = params.get("orden") || "price";
   const key = [query, category, retailer, promoOnly, sort].join("|");
   if (key !== state.lastQueryKey) { state.limit = PAGE_SIZE; state.lastQueryKey = key; }
-  const { total, items } = catalog.search({ query, category, retailer, promoOnly, sort, limit: state.limit });
+  const { total, items, related } = catalog.search({ query, category, retailer, promoOnly, sort, limit: state.limit });
 
   const update = (name, value) => {
     const next = new URLSearchParams(params);
@@ -241,7 +271,7 @@ function viewSearch(params, { offers = false } = {}) {
       options.map(([optionValue, text]) => h("option", { value: optionValue, selected: optionValue === value }, text))));
 
   const filters = h("div", { class: "filters" },
-    select("orden", "Ordenar", sort, [["relevance", "Más relevantes"], ["unit", "Más barato por kg/L"], ["price", "Precio más bajo"], ["stores", "Más súper para comparar"]]),
+    select("orden", "Ordenar", sort, [["price", "Precio más bajo"], ["unit", "Más barato por kg/L"], ["relevance", "Más relevantes"], ["stores", "Más súper para comparar"]]),
     select("super", "Supermercado", retailer, [["", "Todos los súper"], ...catalog.retailers.map((id) => [id, RETAILER_NAMES[id]])]),
     select("cat", "Departamento", category, [["", "Todos los departamentos"], ...catalog.departments().map((d) => [d.name, d.name])]),
     offers ? null : h("button", {
@@ -254,11 +284,25 @@ function viewSearch(params, { offers = false } = {}) {
     h("div", { class: "search-top" }, offers ? null : searchForm(query)),
     h("div", { class: "results-head" }, h("h1", {}, title), h("span", { class: "muted" }, `${total.toLocaleString("es-HN")} productos`)),
     filters,
-    total ? h("div", { class: "grid" }, items.map(productCard))
+    total ? resultGrid(items, query, related)
       : h("div", { class: "empty" }, h("strong", {}, "No encontramos productos con esa búsqueda."), h("p", {}, "Prueba con otra palabra, la marca o quita filtros.")),
     total > items.length ? h("button", {
       type: "button", class: "more", onclick: () => { state.limit += PAGE_SIZE; render(); },
     }, `Mostrar más (${(total - items.length).toLocaleString("es-HN")})`) : null);
+}
+
+// Lo que sólo menciona la palabra ("fideos de huevo") va aparte, después de lo buscado.
+function resultGrid(items, query, related) {
+  const main = items.filter((product) => product.tier !== 2);
+  const extra = items.filter((product) => product.tier === 2);
+  if (!query || !extra.length) return h("div", { class: "grid" }, items.map(productCard));
+  return [
+    main.length ? h("div", { class: "grid" }, main.map(productCard)) : null,
+    h("div", { class: "related-head" },
+      h("h2", {}, `También mencionan “${query}”`),
+      h("span", { class: "muted small" }, `${related.toLocaleString("es-HN")} productos de otros tipos`)),
+    h("div", { class: "grid" }, extra.map(productCard)),
+  ];
 }
 
 function historyBlock(offer) {
@@ -305,7 +349,7 @@ function viewProduct(id, container) {
         h("div", { class: "product-title" },
           h("strong", { class: "brand-xl" }, product.brand || product.product_type || ""),
           h("h1", {}, product.product_name),
-          h("div", { class: "pills" }, sizePill(product.presentation),
+          h("div", { class: "pills" }, sizePill(product),
             h("span", { class: "muted small" }, [product.category, product.product_type].filter(Boolean).join(" › ")))),
         h("section", { class: "offers", "aria-busy": "true" }, h("h2", {}, "Dónde comprar"), h("p", { class: "muted" }, "Cargando precios…")))),
     h("div", { class: "product-extra" }));
@@ -318,24 +362,33 @@ function viewProduct(id, container) {
       .filter((offer) => offer.current_price && offer.availability !== "out_of_stock")
       .sort((a, b) => Number(a.current_price) - Number(b.current_price));
     const cheapest = offers[0];
+    const cheapestLabel = cheapest ? storeLabel(cheapest, offers) : "";
     offersBox.removeAttribute("aria-busy");
     fill(offersBox, 
       h("h2", {}, "Dónde comprar"),
       offers.map((offer, index) => {
         const regular = Number(offer.reported_regular_price);
         const onSale = offer.is_promotion === true || (regular && regular > Number(offer.current_price));
+        const label = storeLabel(offer, offers);
         return h("div", { class: `offer${index === 0 && offers.length > 1 ? " best" : ""}` },
           h("span", { class: "store-badge", style: { background: RETAILER_COLORS[offer.supermarket_id] } }, RETAILER_INITIALS[offer.supermarket_id] || "?"),
           h("div", { class: "offer-main" },
-            h("div", {}, h("strong", {}, RETAILER_NAMES[offer.supermarket_id] || offer.supermarket_id),
+            h("div", {}, h("strong", {}, label),
               index === 0 && offers.length > 1 ? h("span", { class: "badge-best" }, "MÁS BARATO") : null),
             offer.unit_price ? h("span", { class: "muted small" }, `${money(offer.unit_price.amount)} por ${offer.unit_price.per}`) : null),
           h("div", { class: "offer-price" },
             h("strong", {}, money(offer.current_price)),
-            onSale && regular > Number(offer.current_price) ? h("span", { class: "sale" }, "Oferta · antes ", h("del", {}, money(regular))) : onSale ? h("span", { class: "sale" }, "Oferta") : null));
+            onSale && regular > Number(offer.current_price) ? h("span", { class: "sale" }, "Oferta · antes ", h("del", {}, money(regular))) : onSale ? h("span", { class: "sale" }, "Oferta") : null),
+          h("button", {
+            type: "button", class: "add-store", "aria-label": `Agregar a Mi compra en ${label}`, title: `Agregar en ${label}`,
+            onclick: () => addToCart(product.id, offer.location_id, label),
+          }, icon("plus", 18)));
       }),
-      h("p", { class: "muted small" }, "Precios en línea de hoy; pueden variar en tienda."),
-      h("button", { type: "button", class: "primary wide", onclick: () => addToCart(product.id) }, "Agregar a Mi compra"));
+      h("p", { class: "muted small" }, "Precios en línea de hoy; pueden variar en tienda. Usa + para elegir en qué súper comprarlo."),
+      h("button", {
+        type: "button", class: "primary wide",
+        onclick: () => addToCart(product.id, offers.length > 1 && cheapest ? cheapest.location_id : null, offers.length > 1 ? cheapestLabel : ""),
+      }, offers.length > 1 ? `Agregar a Mi compra · ${cheapestLabel}` : "Agregar a Mi compra"));
 
     const extra = page.querySelector(".product-extra");
     const priceHistory = historyBlock(cheapest);
@@ -355,7 +408,7 @@ function viewProduct(id, container) {
         h("div", { class: "row-scroll sizes" }, others.map(({ other, otherProduct }) => {
           const unit = Number(other.best_unit_price?.amount);
           return h("a", { class: `size-card${unit && unit === bestUnit ? " best" : ""}`, href: otherProduct ? `#/p/${otherProduct.id}` : "#" },
-            sizePill(other.presentation || "—"),
+            sizePill({ presentation: other.presentation || "—" }),
             h("strong", {}, money(other.best_price)),
             other.best_unit_price ? h("span", { class: "muted small" }, `${money(other.best_unit_price.amount)} / ${other.best_unit_price.per}`) : null,
             otherProduct ? h("span", { class: "muted small" }, otherProduct.retailers.map((r) => RETAILER_NAMES[r]).join(", ")) : null,
@@ -375,9 +428,14 @@ function viewProduct(id, container) {
   return null;
 }
 
+function liveOffers(row) {
+  return (row?.offers || []).filter((offer) => offer.current_price && offer.availability !== "out_of_stock")
+    .sort((a, b) => Number(a.current_price) - Number(b.current_price));
+}
+
 function viewCart(container) {
   const catalog = state.catalog;
-  const lines = state.cart.map((line) => ({ ...line, product: catalog.byId.get(line.id) })).filter((line) => line.product);
+  const lines = state.cart.map((line, index) => ({ ...line, index, product: catalog.byId.get(line.id) })).filter((line) => line.product);
   if (!lines.length) {
     return h("div", { class: "page empty" }, h("h1", {}, "Mi compra"), h("p", {}, "Todavía no agregaste productos."), h("a", { class: "primary", href: "#/buscar" }, "Buscar productos"));
   }
@@ -385,51 +443,79 @@ function viewCart(container) {
     h("div", { class: "cart-layout" },
       h("section", { class: "cart-lines" },
         h("div", { class: "results-head" }, h("h1", {}, "Mi compra"), h("span", { class: "muted" }, `${cartCount()} artículos`)),
-        lines.map((line) => h("div", { class: "line" },
-          h("span", { class: "alt-tile" }, productVisual(line.product, { size: 52 })),
-          h("div", { class: "line-body" },
-            h("a", { class: "line-main", href: `#/p/${line.id}` },
-              h("strong", {}, [line.product.brand, line.product.presentation].filter(Boolean).join(" · ") || line.product.product_name),
-              h("span", { class: "muted small" }, line.product.product_name)),
-            h("div", { class: "line-actions" },
-              h("div", { class: "qty" },
-                h("button", { type: "button", "aria-label": "Quitar uno", onclick: () => setQty(line.id, line.qty - 1) }, "−"),
-                h("span", {}, String(line.qty)),
-                h("button", { type: "button", "aria-label": "Agregar uno", onclick: () => setQty(line.id, line.qty + 1) }, "+")),
-              h("span", { class: "line-total" }, h("small", { class: "muted" }, "desde "), h("strong", {}, money(Number(line.product.best_price) * line.qty)))))))),
+        h("p", { class: "muted" }, "Cargando precios…")),
       h("aside", { class: "cart-summary" }, h("h2", {}, "¿Dónde me sale más barato?"), h("p", { class: "muted" }, "Calculando…"))));
   fill(container, page);
 
-  Promise.all(lines.map((line) => catalog.row(line.product).then((row) => ({ ...line, row })))).then((loaded) => {
+  Promise.all(lines.map((line) => catalog.row(line.product).then((row) => ({ ...line, offers: liveOffers(row) })))).then((loaded) => {
+    let chosenTotal = 0;
     let split = 0;
     const where = new Map();
     const perStore = new Map(catalog.retailers.map((id) => [id, { total: 0, missing: 0 }]));
-    for (const line of loaded) {
-      const offers = (line.row?.offers || []).filter((offer) => offer.current_price && offer.availability !== "out_of_stock");
-      const best = offers.reduce((a, b) => (!a || Number(b.current_price) < Number(a.current_price) ? b : a), null);
+    const lineViews = loaded.map((line) => {
+      const { offers } = line;
+      const best = offers[0] || null;
+      const picked = (line.store && offers.find((offer) => offer.location_id === line.store)) || null;
+      const used = picked || best;
+      if (used) chosenTotal += Number(used.current_price) * line.qty;
       if (best) {
         split += Number(best.current_price) * line.qty;
-        where.set(best.supermarket_id, [...(where.get(best.supermarket_id) || []), line.product.brand || line.product.product_name]);
+        const label = storeLabel(best, offers);
+        where.set(label, (where.get(label) || 0) + 1);
       }
       for (const [id, entry] of perStore) {
-        const offer = offers.filter((item) => item.supermarket_id === id).sort((a, b) => Number(a.current_price) - Number(b.current_price))[0];
+        const offer = offers.find((item) => item.supermarket_id === id);
         if (offer) entry.total += Number(offer.current_price) * line.qty; else entry.missing += 1;
       }
-    }
+      const gone = line.store && !picked;
+      return h("div", { class: "line" },
+        h("span", { class: "alt-tile" }, productVisual(line.product, { size: 52 })),
+        h("div", { class: "line-body" },
+          h("a", { class: "line-main", href: `#/p/${line.id}` },
+            h("strong", {}, [line.product.brand, presentationLabel(line.product)].filter(Boolean).join(" · ") || line.product.product_name),
+            h("span", { class: "muted small" }, line.product.product_name)),
+          offers.length ? h("label", { class: "line-store" },
+            h("span", { class: "sr-only" }, "Súper"),
+            h("select", {
+              "aria-label": `Súper para ${line.product.product_name}`,
+              onchange: (event) => updateLine(line.index, { store: event.target.value || undefined }),
+            },
+            h("option", { value: "", selected: !picked }, `Donde esté más barato (${best ? storeLabel(best, offers) : "—"})`),
+            offers.map((offer) => h("option", { value: offer.location_id, selected: picked === offer },
+              `${storeLabel(offer, offers)} · ${money(offer.current_price)}`)))) : h("span", { class: "warn small" }, "Sin precio hoy"),
+          gone ? h("span", { class: "warn small" }, "Ese súper ya no lo tiene hoy; usamos el más barato.") : null,
+          h("div", { class: "line-actions" },
+            h("div", { class: "qty" },
+              h("button", { type: "button", "aria-label": "Quitar uno", onclick: () => updateLine(line.index, { qty: line.qty - 1 }) }, "−"),
+              h("span", {}, String(line.qty)),
+              h("button", { type: "button", "aria-label": "Agregar uno", onclick: () => updateLine(line.index, { qty: line.qty + 1 }) }, "+")),
+            h("span", { class: "line-total" }, h("strong", {}, used ? money(Number(used.current_price) * line.qty) : "—")))));
+    });
+    fill(page.querySelector(".cart-lines"),
+      h("div", { class: "results-head" }, h("h1", {}, "Mi compra"), h("span", { class: "muted" }, `${cartCount()} artículos`)),
+      lineViews);
+
     const stores = [...perStore.entries()].filter(([, entry]) => entry.missing < loaded.length)
       .sort((a, b) => a[1].missing - b[1].missing || a[1].total - b[1].total);
-    fill(page.querySelector(".cart-summary"), 
-      h("h2", {}, "¿Dónde me sale más barato?"),
+    const saving = chosenTotal - split;
+    fill(page.querySelector(".cart-summary"),
+      h("h2", {}, "Tu compra"),
+      h("div", { class: "best-total chosen" },
+        h("span", { class: "badge-text" }, "CON LOS SÚPER QUE ELEGISTE"),
+        h("strong", {}, money(chosenTotal)),
+        saving > 0.005 ? h("span", { class: "warn small" }, `Podrías ahorrar ${money(saving)} comprando cada cosa donde es más barata.`) : h("span", { class: "good small" }, "Es lo más barato posible hoy.")),
       h("div", { class: "best-total" },
         h("span", { class: "badge-text" }, "COMPRANDO CADA COSA DONDE ES MÁS BARATA"),
         h("strong", {}, money(split)),
-        h("span", { class: "muted small" }, [...where.entries()].map(([id, items]) => `${RETAILER_NAMES[id]} (${items.length})`).join(" · "))),
+        h("span", { class: "muted small" }, [...where.entries()].map(([label, count]) => `${label} (${count})`).join(" · "))),
       stores.map(([id, entry]) => h("div", { class: "store-total" },
         h("i", { style: { background: RETAILER_COLORS[id] } }),
         h("span", { class: "store-total-main" }, h("strong", {}, `Todo en ${RETAILER_NAMES[id]}`),
           h("span", { class: entry.missing ? "warn small" : "muted small" }, entry.missing ? `Le ${entry.missing === 1 ? "falta 1 producto" : `faltan ${entry.missing} productos`}` : "Tiene todo")),
         h("strong", {}, money(entry.total)))),
-      h("p", { class: "muted small" }, "Total estimado con los precios públicos de hoy. Tu lista se guarda en este dispositivo."));
+      h("p", { class: "muted small" }, `Total estimado con los precios públicos de hoy en ${cityName()}. Tu lista se guarda en este dispositivo.`));
+  }).catch((error) => {
+    fill(page.querySelector(".cart-lines"), h("p", {}, `No pudimos cargar los precios: ${error.message}`));
   });
   return null;
 }
@@ -460,17 +546,46 @@ function render() {
   renderChrome();
 }
 
-async function start() {
+function pickCity(cities, fallback) {
+  const wanted = new URLSearchParams(location.search).get("ciudad") || loadCitySlug() || fallback;
+  return cities.find((city) => city.slug === wanted) || cities.find((city) => city.slug === fallback) || cities[0];
+}
+
+async function loadCity(city) {
   const main = document.getElementById("main");
+  fill(main, h("div", { class: "page loading", "aria-busy": "true" }, h("div", { class: "spinner", "aria-hidden": "true" }), h("p", {}, `Cargando los precios de ${city.name}…`)));
   try {
-    state.catalog = await new Catalog(catalogUrl()).load();
+    state.catalog = await new Catalog(city.url).load();
+    state.city = city;
+    state.limit = PAGE_SIZE;
+    state.lastQueryKey = "";
     const known = new Set(state.catalog.products.map((product) => product.id));
-    state.cart = state.cart.filter((line) => known.has(line.id));
+    state.cart = loadCart(city.slug).filter((line) => known.has(line.id));
+    document.title = `Súper Compras · Compara precios de súper en ${city.name}`;
+    for (const node of document.querySelectorAll("[data-city]")) fill(node, citySelect());
     render();
   } catch (error) {
     fill(main, h("div", { class: "page empty" }, h("strong", {}, "No pudimos cargar los precios."), h("p", {}, error.message),
       h("button", { type: "button", class: "primary", onclick: () => location.reload() }, "Reintentar")));
   }
+}
+
+async function switchCity(slug) {
+  const city = state.cities.find((item) => item.slug === slug);
+  if (!city || city.slug === state.city?.slug) return;
+  saveCitySlug(city.slug);
+  if (location.hash.startsWith("#/p/") || location.hash.startsWith("#/compra")) location.hash = "#/";
+  await loadCity(city);
+}
+
+async function start() {
+  const url = catalogUrl();
+  // Una vista previa con ?catalogo= usa sólo ese catálogo; el sitio publicado lee cities.json.
+  const { cities, fallback } = url === DEFAULT_CATALOG || url === document.body.dataset.catalogUrl
+    ? await loadCities(url)
+    : { cities: [{ slug: "san-pedro-sula", name: "San Pedro Sula", url }], fallback: "san-pedro-sula" };
+  state.cities = cities;
+  await loadCity(pickCity(cities, fallback));
 }
 
 window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); });

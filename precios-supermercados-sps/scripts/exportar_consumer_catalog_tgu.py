@@ -267,6 +267,9 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--as-of-utc")
     result.add_argument("--freshness-hours", type=int, default=48)
     result.add_argument("--require-products", action="store_true")
+    # Fotos de Súper Compras: mismo índice que SPS (la fila pública tiene la misma
+    # clave cuando el producto es el mismo); opcional y sin efecto si falta.
+    result.add_argument("--images-index", type=Path)
     return result
 
 
@@ -288,6 +291,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             os.environ.get("TURSO_DATABASE_URL", ""),
             os.environ.get("TURSO_AUTH_TOKEN", ""),
         )
+    base._PHOTO_VERSIONS.clear()
+    base._PHOTO_VERSIONS.update(base.load_photo_versions(args.images_index))
     try:
         manifest = export_tgu_catalog(
             backend,
@@ -298,6 +303,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     finally:
         backend.close()
+        base._PHOTO_VERSIONS.clear()
     print(json.dumps(manifest, ensure_ascii=False, sort_keys=True))
     return 0
 

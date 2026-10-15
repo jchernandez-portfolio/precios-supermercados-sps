@@ -14,6 +14,19 @@ export const RETAILER_INITIALS = {
   la_colonia: "LC", colonial: "CO", walmart: "WM", pricesmart: "PS", comisariato_los_andes: "LA", paiz: "PZ",
 };
 
+// Sucursales: sólo se nombran cuando una cadena tiene más de una en la ciudad.
+export const LOCATION_NAMES = {
+  walmart_tgu_ffaa: "FF.AA.", walmart_tgu_el_sauce: "El Sauce",
+  paiz_tgu_multiplaza: "Multiplaza", paiz_tgu_proceres: "Próceres",
+};
+
+export function storeLabel(offer, offers = []) {
+  const name = RETAILER_NAMES[offer.supermarket_id] || offer.supermarket_id;
+  const siblings = new Set(offers.filter((other) => other.supermarket_id === offer.supermarket_id).map((other) => other.location_id));
+  const branch = LOCATION_NAMES[offer.location_id];
+  return siblings.size > 1 && branch ? `${name} ${branch}` : name;
+}
+
 export function fold(value) {
   return String(value ?? "").normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase()
     .replace(/[^a-z0-9]+/g, " ").trim();
@@ -22,6 +35,55 @@ export function fold(value) {
 export function money(value) {
   const number = Number(value);
   return Number.isFinite(number) ? `L ${number.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—";
+}
+
+// Presentación legible y comparable: "453.59 g" (1 lb convertida) → "454 g (1 lb)";
+// gramos con decimales largos se redondean; onzas con precio por gramo muestran gramos.
+const GRAMS_PER_LB = 453.59237;
+const LB_TEXT = { 0.25: "¼ lb", 0.5: "½ lb", 0.75: "¾ lb" };
+
+function lbText(pounds) {
+  return LB_TEXT[pounds] || `${Number(pounds.toFixed(2))} lb`;
+}
+
+function gramsText(grams) {
+  if (grams >= 1000) return `${Number((grams / 1000).toFixed(2))} kg`;
+  return grams >= 100 ? `${Math.round(grams)} g` : `${Number(grams.toFixed(1))} g`;
+}
+
+export function presentationLabel(product) {
+  const text = String(product?.presentation ?? "").trim();
+  const match = text.match(/^(\d+(?:\.\d+)?)\s*(g|kg|oz)$/i);
+  if (!match) return text;
+  const value = Number(match[1]);
+  const unit = match[2].toLowerCase();
+  if (unit === "oz") {
+    const perMass = /^(100 g|kg)$/.test(String(product?.unit_per ?? ""));
+    return perMass ? `${gramsText(value * 28.349523)} (${text})` : text;
+  }
+  const grams = unit === "kg" ? value * 1000 : value;
+  const pounds = grams / GRAMS_PER_LB;
+  const quarter = Math.round(pounds * 4) / 4;
+  const metricRound = grams % 50 === 0 || (unit === "kg" && (value * 10) % 1 === 0);
+  if (quarter > 0 && !metricRound && Math.abs(pounds - quarter) / quarter < 0.004) {
+    return `${gramsText(grams)} (${lbText(quarter)})`;
+  }
+  return match[1].includes(".") && match[1].split(".")[1].length > 1 ? gramsText(grams) : text;
+}
+
+// Tipos que no dicen qué es el producto: ahí decide el nombre.
+const GENERIC_TYPES = new Set(["", "abarrotes", "otros", "varios", "comidas listas y congeladas", "congelados y comidas preparadas"]);
+
+// Palabras con su raíz simple (huevos → huevo, panes → pan) para comparar búsquedas.
+function stem(word) {
+  if (word.length > 4 && word.endsWith("es") && !word.endsWith("ses")) return word.slice(0, -2);
+  if (word.length > 3 && word.endsWith("s")) return word.slice(0, -1);
+  return word;
+}
+
+function hasWord(text, term) {
+  const target = stem(term);
+  return fold(text).split(" ").some((word) => word && stem(word) === target);
 }
 
 async function sha256Hex(buffer) {
@@ -107,14 +169,31 @@ export class Catalog {
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }));
   }
 
-  search({ query = "", category = "", retailer = "", promoOnly = false, sort = "relevance", limit = 60 } = {}) {
+  // Nivel de coincidencia: 0 = es ese tipo de producto o esa marca (huevos al buscar
+  // "huevo"); 1 = sin tipo específico pero el nombre empieza por la palabra ("Huevos
+  // Bonovo" en Abarrotes); 2 = sólo la menciona o es de otro tipo ("fideos de huevo",
+  // "huevos de toro" en Res). 0 y 1 se muestran juntos; 2 va después.
+  matchTier(product, terms) {
+    const first = terms[0];
+    if (!first) return 0;
+    if (hasWord([product.product_type, product.category].join(" "), first) || fold(product.brand).startsWith(first)) return 0;
+    if (!GENERIC_TYPES.has(fold(product.product_type))) return 2;
+    const brand = fold(product.brand);
+    let name = fold(product.product_name);
+    if (brand && name.startsWith(`${brand} `)) name = name.slice(brand.length + 1);
+    const lead = name.split(" ").slice(0, 2).join(" ");
+    return hasWord(lead, first) ? 1 : 2;
+  }
+
+  search({ query = "", category = "", retailer = "", promoOnly = false, sort = "price", limit = 60 } = {}) {
     const terms = fold(query).split(" ").filter(Boolean);
     let results = this.products.filter((product) => {
       if (category && product.category !== category) return false;
       if (retailer && !product.retailers.includes(retailer)) return false;
       if (promoOnly && !product.promo) return false;
       if (!product.best_price) return false;
-      return terms.every((term) => product.text.includes(term));
+      // "huevos" también encuentra "huevo" (y al revés por prefijo).
+      return terms.every((term) => product.text.includes(stem(term)));
     });
     const first = terms[0] || "";
     const wordHit = (value) => (first && ` ${fold(value)} `.includes(` ${first} `) ? 0 : 1);
@@ -122,16 +201,24 @@ export class Catalog {
     const typeHit = (product) => wordHit(product.product_type);
     const nameHit = (product) => wordHit(product.product_name);
     const unitValue = (product) => (product.unit_amount ? Number(product.unit_amount) : Number.POSITIVE_INFINITY);
+    const priceValue = (product) => Number(product.best_price);
     const comparators = {
       relevance: (a, b) => Math.min(brandHit(a), typeHit(a)) - Math.min(brandHit(b), typeHit(b))
         || nameHit(a) - nameHit(b) || b.retailers.length - a.retailers.length
         || a.product_name.length - b.product_name.length,
       unit: (a, b) => unitValue(a) - unitValue(b) || Number(a.best_price) - Number(b.best_price),
-      price: (a, b) => Number(a.best_price) - Number(b.best_price),
+      price: (a, b) => priceValue(a) - priceValue(b) || b.retailers.length - a.retailers.length,
       stores: (a, b) => b.retailers.length - a.retailers.length || Number(a.best_price) - Number(b.best_price),
     };
-    results.sort(comparators[sort] || comparators.relevance);
-    return { total: results.length, items: results.slice(0, limit) };
+    const compare = comparators[sort] || comparators.price;
+    const tiers = new Map(results.map((product) => [product.id, this.matchTier(product, terms)]));
+    // Primero lo que es el producto buscado; dentro de cada grupo, el orden elegido.
+    const group = (product) => (tiers.get(product.id) === 2 ? 1 : 0);
+    results.sort((a, b) => group(a) - group(b)
+      || (sort === "relevance" ? tiers.get(a.id) - tiers.get(b.id) : 0) || compare(a, b));
+    const items = results.slice(0, limit).map((product) => Object.assign(product, { tier: tiers.get(product.id) }));
+    const related = results.filter((product) => tiers.get(product.id) === 2).length;
+    return { total: results.length, items, related };
   }
 
   alternatives(product, limit = 6) {
@@ -157,18 +244,52 @@ export class Catalog {
   }
 }
 
-// Mi compra: lista guardada en este navegador.
-const CART_KEY = "super-compras:cart:v1";
+// Ciudades publicadas (cities.json junto al manifest de San Pedro Sula).
+export const DEFAULT_CITY = { slug: "san-pedro-sula", name: "San Pedro Sula", manifest: "manifest.json" };
 
-export function loadCart() {
+export async function loadCities(manifestUrl) {
+  const base = manifestUrl.replace(/manifest\.json(\?.*)?$/, "");
   try {
-    const value = JSON.parse(localStorage.getItem(CART_KEY) || "[]");
-    return Array.isArray(value) ? value.filter((line) => line && typeof line.id === "string") : [];
+    const response = await fetch(`${base}cities.json`, { cache: "no-cache" });
+    if (!response.ok) throw new Error(String(response.status));
+    const index = await response.json();
+    const cities = (index.cities || []).filter((city) => /^[a-z0-9-]+$/.test(city.slug || "")
+      && /^[\w/.-]*manifest\.json$/.test(city.manifest || "") && !city.manifest.includes(".."));
+    if (!cities.length) throw new Error("vacío");
+    return { cities: cities.map((city) => ({ ...city, url: base + city.manifest })), fallback: index.default_city || cities[0].slug };
+  } catch {
+    return { cities: [{ ...DEFAULT_CITY, url: manifestUrl }], fallback: DEFAULT_CITY.slug };
+  }
+}
+
+const CITY_KEY = "super-compras:city";
+
+export function loadCitySlug() {
+  try { return localStorage.getItem(CITY_KEY) || ""; } catch { return ""; }
+}
+
+export function saveCitySlug(slug) {
+  try { localStorage.setItem(CITY_KEY, slug); } catch { /* sin guardar */ }
+}
+
+// Mi compra: lista guardada en este navegador, una por ciudad. Cada línea puede fijar
+// el súper elegido (`store` = location_id); sin él se usa el más barato.
+function cartKey(city = DEFAULT_CITY.slug) {
+  return city === DEFAULT_CITY.slug ? "super-compras:cart:v1" : `super-compras:cart:v1:${city}`;
+}
+
+export function loadCart(city) {
+  try {
+    const value = JSON.parse(localStorage.getItem(cartKey(city)) || "[]");
+    return Array.isArray(value)
+      ? value.filter((line) => line && typeof line.id === "string" && Number.isInteger(line.qty) && line.qty > 0)
+        .map((line) => ({ id: line.id, qty: line.qty, ...(typeof line.store === "string" ? { store: line.store } : {}) }))
+      : [];
   } catch {
     return [];
   }
 }
 
-export function saveCart(lines) {
-  try { localStorage.setItem(CART_KEY, JSON.stringify(lines)); } catch { /* modo privado: sin guardar */ }
+export function saveCart(lines, city) {
+  try { localStorage.setItem(cartKey(city), JSON.stringify(lines)); } catch { /* modo privado: sin guardar */ }
 }
