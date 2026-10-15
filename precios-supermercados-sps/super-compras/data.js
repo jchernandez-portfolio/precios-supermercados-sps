@@ -115,6 +115,8 @@ export function sizeFromName(name, category = "") {
     if (unit) return { presentation: `${Number(multi[1])} × ${multi[2].replace(",", ".")} ${unit}` };
   }
   if (/^kg\s/i.test(text)) return { presentation: "por kg", per: "kg" };
+  // "Ayote Sazon Libra ... - Precio Por Unidad": manda lo que aclara el súper.
+  if (/precio\s+por\s+unidad/i.test(text)) return { presentation: "1 unidad", per: "unidad" };
   const fraction = text.match(/(?:(\d+)\s*\/\s*(\d+)|\b(medi[ao]))\s*(?:lb|lbs|libras?)(?![a-z])/i);
   if (fraction) {
     const pounds = fraction[3] ? 0.5 : Number(fraction[1]) / Number(fraction[2]);

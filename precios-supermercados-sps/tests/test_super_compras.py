@@ -325,7 +325,7 @@ console.log(JSON.stringify([
   d('RES Molida Especial X Libra'), d('AXION LavaPlatosLemo235g 3Pack', 'Limpieza'),
   d('Pantalla Samsung LED Smart 4K - 50 Pulgadas', 'Electrónica y electrodomésticos'),
   d('Juego De 4 Piezas Tamanio Queen', 'Hogar y cocina'), d('Pollo frito 4 pzs', 'Alimentos', '200.00'),
-  d('EL CENTRO Pan Frances'),
+  d('EL CENTRO Pan Frances'), d('Ayote Sazon Libra Ayote Sazon Amarillo Hortifruti - Precio Por Unidad', 'Alimentos', '7.70'),
 ]));
 """
     assert json.loads(_node(script, tmp_path)) == [
@@ -334,7 +334,7 @@ console.log(JSON.stringify([
         ["por kg", "100.00", "kg"], ["226.8 g", "220.46", "kg"], ["226.8 g", "220.46", "kg"],
         ["por libra", "100.00", "libra"], ["3 × 235 g", "141.84", "kg"],
         [None, None, None], [None, None, None], ["4 unidades", "50.00", "unidad"],
-        [None, None, None],
+        [None, None, None], ["1 unidad", "7.70", "unidad"],
     ]
 
 

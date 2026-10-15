@@ -62,7 +62,8 @@ WEIGHED_SQL = (
     + _VARIABLE_CODE.format(c="ean") + " OR " + _VARIABLE_CODE.format(c="reference") + ")"
 )
 # El súper a veces aclara lo contrario en el nombre ("Ayote Sazon ... - Precio Por Unidad").
-_PER_UNIT_NAME = re.compile(r"precio\s+por\s+unidad", re.IGNORECASE)
+# (o "COLONIAL Encurtido Rojo und": termina en unidad).
+_PER_UNIT_NAME = re.compile(r"precio\s+por\s+unidad|\s(?:und|unds|unid|unidad|un|c/u)\.?\s*$", re.IGNORECASE)
 _AEROSOL_RE = re.compile(r"(?<![a-z])(?:spray|aerosol|atomizador)(?![a-z])", re.IGNORECASE)
 
 

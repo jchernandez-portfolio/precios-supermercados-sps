@@ -63,3 +63,12 @@ def test_name_saying_per_unit_wins() -> None:
     item["product_name"] = "Ayote Sazon Libra Ayote Sazon Amarillo Hortifruti - Precio Por Unidad"
     MODULE._price_per_pound(item)
     assert item["presentation"] == "5 lb" and item["offers"][0]["unit_price"]["per"] == "kg"
+
+
+def test_name_ending_in_unit_wins() -> None:
+    MODULE.WEIGHED_BY_POUND.clear()
+    MODULE.WEIGHED_BY_POUND.add("colonial:7")
+    item = row(("colonial:7", "44.99"), product_type="Frutas y verduras")
+    item["product_name"] = "COLONIAL Encurtido Rojo und"
+    MODULE._price_per_pound(item)
+    assert item["presentation"] == "5 lb"
