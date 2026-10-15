@@ -37,18 +37,26 @@ export function money(value) {
   return Number.isFinite(number) ? `L ${number.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—";
 }
 
-// Presentación legible y comparable: "453.59 g" (1 lb convertida) → "454 g (1 lb)";
-// gramos con decimales largos se redondean; onzas con precio por gramo muestran gramos.
-const GRAMS_PER_LB = 453.59237;
-const LB_TEXT = { 0.25: "¼ lb", 0.5: "½ lb", 0.75: "¾ lb" };
-
-function lbText(pounds) {
-  return LB_TEXT[pounds] || `${Number(pounds.toFixed(2))} lb`;
-}
+// Presentación legible y comparable. Un peso que viene de onzas o libras
+// ("453.59 g" = 16 oz) se muestra como en la etiqueta, con los gramos al lado:
+// "16 oz (454 g)"; desde 2 lb enteras, "2 lb (907 g)". Los pesos métricos redondos
+// (500 g, 1 kg) quedan igual y los gramos con decimales largos se redondean.
+const GRAMS_PER_OZ = 28.349523125;
 
 function gramsText(grams) {
   if (grams >= 1000) return `${Number((grams / 1000).toFixed(2))} kg`;
   return grams >= 100 ? `${Math.round(grams)} g` : `${Number(grams.toFixed(1))} g`;
+}
+
+// Medias onzas sólo si el peso vino convertido (gramos con decimales): "440 g" es
+// métrico, no 15.5 oz.
+function imperialText(grams, converted) {
+  const ounces = grams / GRAMS_PER_OZ;
+  const half = converted ? Math.round(ounces * 2) / 2 : Math.round(ounces);
+  if (half < 1 || Math.abs(ounces - half) / half > 0.003) return null;
+  const pounds = half / 16;
+  if (pounds >= 2 && Number.isInteger(pounds)) return `${pounds} lb`;
+  return `${Number(half.toFixed(1))} oz`;
 }
 
 export function presentationLabel(product) {
@@ -59,15 +67,12 @@ export function presentationLabel(product) {
   const unit = match[2].toLowerCase();
   if (unit === "oz") {
     const perMass = /^(100 g|kg)$/.test(String(product?.unit_per ?? ""));
-    return perMass ? `${gramsText(value * 28.349523)} (${text})` : text;
+    return perMass ? `${Number(value.toFixed(2))} oz (${gramsText(value * GRAMS_PER_OZ)})` : text;
   }
   const grams = unit === "kg" ? value * 1000 : value;
-  const pounds = grams / GRAMS_PER_LB;
-  const quarter = Math.round(pounds * 4) / 4;
   const metricRound = grams % 50 === 0 || (unit === "kg" && (value * 10) % 1 === 0);
-  if (quarter > 0 && !metricRound && Math.abs(pounds - quarter) / quarter < 0.004) {
-    return `${gramsText(grams)} (${lbText(quarter)})`;
-  }
+  const imperial = metricRound ? null : imperialText(grams, match[1].includes("."));
+  if (imperial) return `${imperial} (${gramsText(grams)})`;
   return match[1].includes(".") && match[1].split(".")[1].length > 1 ? gramsText(grams) : text;
 }
 
