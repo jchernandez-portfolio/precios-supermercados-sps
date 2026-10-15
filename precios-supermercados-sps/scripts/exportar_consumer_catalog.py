@@ -277,10 +277,31 @@ SEARCH_FILE = "search.json"
 SEARCH_COLUMNS = (
     "id", "product_name", "brand", "presentation", "category", "product_type",
     "partition", "best_price", "unit_amount", "unit_per", "retailers", "promo",
-    "other_presentations", "comparability",
+    "other_presentations", "comparability", "photo",
 )
-# id = hash del row_id sin prefijo; comparabilidad en una letra.
+# id = hash del row_id sin prefijo; comparabilidad en una letra; photo = versión
+# de la foto en la rama ``product-images`` (0 = sin foto, la app dibuja la ilustración).
+PHOTO_INDEX_SCHEMA = "super-compras-product-images/v1"
+_PHOTO_VERSIONS: dict[str, int] = {}
 _COMPARABILITY_CODES = {"comparable": "c", "single_source": "s", "individual": "i"}
+
+
+def load_photo_versions(path: Path | None) -> dict[str, int]:
+    """Lee ``index.json`` de fotos; si falta o no cuadra, el catálogo sale sin fotos."""
+    if path is None or not path.is_file():
+        return {}
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    items = document.get("items") if isinstance(document, dict) and document.get("schema") == PHOTO_INDEX_SCHEMA else None
+    if not isinstance(items, dict):
+        return {}
+    return {
+        str(key): value["v"]
+        for key, value in items.items()
+        if isinstance(value, dict) and not value.get("none") and type(value.get("v")) is int and value["v"] > 0
+    }
 
 
 def _search_entry(row: dict[str, object], partition: int, retailer_index: dict[str, int]) -> list[object]:
@@ -300,14 +321,16 @@ def _search_entry(row: dict[str, object], partition: int, retailer_index: dict[s
         )
         for price, offer in prices
     )
+    key = str(row["row_id"]).split("-", 1)[-1]
     return [
-        str(row["row_id"]).split("-", 1)[-1], row["product_name"], row.get("brand"), row.get("presentation"),
+        key, row["product_name"], row.get("brand"), row.get("presentation"),
         row.get("category"), row.get("product_type"), partition,
         None if best_price is None else format(best_price, "f"),
         unit.get("amount") if isinstance(unit, dict) else None,
         unit.get("per") if isinstance(unit, dict) else None,
         retailers, 1 if promo else 0, len(row.get("other_presentations") or ()),
         _COMPARABILITY_CODES.get(str(row.get("comparability")), "i"),
+        _PHOTO_VERSIONS.get(key, 0),
     ]
 
 
@@ -358,6 +381,18 @@ def attach_search_index(output_directory: Path, manifest: dict[str, object]) -> 
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    # ``--images-index`` es opcional y propio de este envoltorio: el núcleo no lo ve.
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    images_index = None
+    if "--images-index" in arguments:
+        position = arguments.index("--images-index")
+        if position + 1 >= len(arguments):
+            raise SystemExit("--images-index requiere una ruta")
+        images_index = Path(arguments[position + 1])
+        del arguments[position:position + 2]
+    _PHOTO_VERSIONS.clear()
+    _PHOTO_VERSIONS.update(load_photo_versions(images_index))
+    argv = arguments
     _sync_core()
     previous_export = _core.export_consumer_catalog
     _core.export_consumer_catalog = export_consumer_catalog

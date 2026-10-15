@@ -30,6 +30,16 @@ async function sha256Hex(buffer) {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+// Fotos normalizadas (WebP 400×400, fondo blanco) en la rama pública product-images.
+export const PHOTO_BASE = "https://raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/product-images/img/";
+
+export function photoUrl(product) {
+  const id = String(product?.id ?? "");
+  const version = Number(product?.photo) || 0;
+  if (!version || !/^[0-9a-z_-]{3,}$/.test(id)) return null;
+  return `${PHOTO_BASE}${id.slice(0, 2)}/${id}.webp?v=${version}`;
+}
+
 // id público = row_id sin su prefijo ("source-…", "canonical-…").
 export function rowKey(rowId) {
   const text = String(rowId ?? "");
@@ -77,6 +87,7 @@ export class Catalog {
         retailers: (row[column.retailers] || []).map((index) => search.retailers[index]),
         promo: row[column.promo] === 1, other_count: row[column.other_presentations] || 0,
         comparability: row[column.comparability],
+        photo: column.photo === undefined ? 0 : Number(row[column.photo]) || 0,
       };
       product.text = fold([product.brand, product.product_name, product.presentation, product.product_type].join(" "));
       return product;

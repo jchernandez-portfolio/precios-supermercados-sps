@@ -5,3 +5,5 @@ cryptography==50.0.0
 google-auth==2.56.3
 google-cloud-bigquery==3.44.0
 requests==2.34.2
+numpy==2.3.3
+Pillow==11.3.0

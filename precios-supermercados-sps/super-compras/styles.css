@@ -95,6 +95,9 @@ main { outline: none; }
 .tile { position: relative; aspect-ratio: 1 / 1; border-radius: var(--radius); background: var(--tile); display: grid; place-items: center; overflow: hidden; margin-bottom: 6px; transition: transform .15s ease; }
 .card:hover .tile { transform: translateY(-2px); }
 .tile .illustration { width: 58%; height: auto; filter: drop-shadow(0 6px 8px rgba(16,32,26,.12)); }
+/* Fotos con fondo blanco: multiply funde el blanco con el color del recuadro. */
+.photo { display: block; width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply; }
+.tile .photo { width: 92%; height: 92%; }
 .badge-offer { position: absolute; top: 8px; left: 8px; background: var(--amber); color: var(--ink); font-size: .7rem; font-weight: 800; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; }
 .pills { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 22px; }
 .pill { display: inline-block; background: var(--ink); color: #fff; font-size: .7rem; font-weight: 800; padding: 2px 8px; border-radius: 999px; letter-spacing: .02em; }
@@ -142,6 +145,7 @@ main { outline: none; }
 .product-layout { display: grid; gap: 16px; margin-top: 8px; }
 .product-image { aspect-ratio: 16 / 10; max-height: 300px; width: 100%; border-radius: 20px; background: var(--tile); display: grid; place-items: center; }
 .product-image .illustration { height: 78%; width: auto; filter: drop-shadow(0 10px 14px rgba(16,32,26,.14)); }
+.product-image .photo { height: 92%; width: auto; max-width: 92%; aspect-ratio: 1 / 1; }
 .product-title { display: grid; gap: 6px; }
 .brand-xl { font-size: .95rem; font-weight: 800; color: var(--green); text-transform: uppercase; letter-spacing: .03em; }
 .product-title h1 { font-size: 1.35rem; line-height: 1.2; }
@@ -174,6 +178,7 @@ main { outline: none; }
 .alt, .line { display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius); }
 .alt-tile { width: 56px; height: 56px; border-radius: 10px; background: var(--tile); display: grid; place-items: center; flex: none; }
 .alt-tile .illustration { height: 44px; width: auto; }
+.alt-tile .photo { width: 52px; height: 52px; }
 .alt-main, .line-main { flex: 1; min-width: 0; display: grid; gap: 1px; }
 .alt-main .small, .line-main .small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .alt-price { text-align: right; display: grid; }

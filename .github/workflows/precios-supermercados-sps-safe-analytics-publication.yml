@@ -110,11 +110,23 @@ jobs:
             --require-products \
             | tee run-artifacts/analytics/rpi-la-colonia-walmart-sps-run.json
 
+      - name: Leer índice público de fotos de producto (opcional)
+        working-directory: precios-supermercados-sps
+        run: |
+          set -uo pipefail
+          mkdir -p run-artifacts
+          # Rama pública `product-images`; si falla, el catálogo sale sin fotos.
+          curl --fail --silent --show-error --location --max-time 60 \
+            --output run-artifacts/product-images-index.json \
+            https://raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/product-images/index.json \
+            || rm -f run-artifacts/product-images-index.json
+
       - name: Exportar catálogo público B2C de cinco supermercados SPS
         working-directory: precios-supermercados-sps
         run: |
           set -euo pipefail
           python scripts/exportar_consumer_catalog.py \
+            --images-index run-artifacts/product-images-index.json \
             --turso \
             --scope la_colonia=la_colonia_sps \
             --scope colonial=colonial_sps \

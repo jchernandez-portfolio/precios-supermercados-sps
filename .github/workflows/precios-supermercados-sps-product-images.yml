@@ -1,0 +1,74 @@
+name: Precios SPS - Fotos de producto semanal
+
+# Corrida semanal incremental de fotos para Súper Compras. Autorizada por el
+# responsable del proyecto en
+# precios-supermercados-sps/.automation/product-images-capture-authorization.json.
+# Lee el catálogo público ya publicado, resuelve llaves exactas en Turso (sólo
+# lectura), pide las direcciones de foto a los endpoints públicos de cada súper y
+# normaliza una foto por producto. No escribe en el repositorio: deja un artifact
+# que publica el workflow "Precios SPS - Publicar fotos de producto".
+
+on:
+  schedule:
+    - cron: "29 17 * * 3" # miércoles 11:29 America/Tegucigalpa, lejos del corte diario
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: precios-sps-product-images
+  cancel-in-progress: false
+
+jobs:
+  photos:
+    if: ${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    defaults:
+      run:
+        working-directory: precios-supermercados-sps
+    env:
+      PYTHONPATH: ${{ github.workspace }}/precios-supermercados-sps/src
+
+    steps:
+      - name: Descargar revisión inmutable
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Configurar Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias fijadas
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check requests==2.34.2 numpy==2.3.3 Pillow==11.3.0
+
+      - name: Elegir y normalizar fotos (sólo filas nuevas o cambiadas)
+        shell: bash
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          rm -rf run-artifacts/product-images
+          python scripts/actualizar_fotos_productos.py \
+            --authorization .automation/product-images-capture-authorization.json \
+            --output-dir run-artifacts/product-images \
+            --max-products 4000 \
+            --api-delay 1.0 \
+            --image-delay 0.15 \
+            --max-image-requests 12000
+
+      - name: Guardar fotos nuevas e índice
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: product-images-${{ github.run_id }}
+          path: precios-supermercados-sps/run-artifacts/product-images
+          if-no-files-found: error
+          retention-days: 7

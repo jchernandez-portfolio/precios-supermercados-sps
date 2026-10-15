@@ -1,0 +1,24 @@
+{
+  "schema": "precios-sps-product-images-authorization/v1",
+  "authorization_id": "product-images-weekly-20261015",
+  "operation": "weekly_product_images",
+  "approved_by": "project_owner",
+  "approved_at_utc": "2026-10-15T00:00:00Z",
+  "cadence": "weekly",
+  "live_read_only_authorized": true,
+  "publication_target": "git:product-images",
+  "allowed_api_origins": [
+    "https://www.walmart.com.hn",
+    "https://www.lacolonia.com",
+    "https://supercolonial.com",
+    "https://andes.aveapplications.com",
+    "https://www.pricesmart.com"
+  ],
+  "min_api_delay_seconds": 1.0,
+  "min_image_delay_seconds": 0.15,
+  "max_products_per_run": 4000,
+  "max_image_requests_per_run": 12000,
+  "concurrency": 1,
+  "requested_ref": "main",
+  "note": "Aprobación explícita del responsable del proyecto (octubre 2026) para mostrar en Súper Compras fotos de producto tomadas de las fichas públicas de cada supermercado. Read-only, sin login, una solicitud a la vez, sin evadir 403/429/anti-bot. Se elige una foto por producto, se normaliza a WebP 400x400 y se publica en la rama product-images. El responsable aceptó el riesgo de derechos de imagen: si un supermercado lo pide se retiran sus fotos y la app vuelve a las ilustraciones. Revocar cambiando live_read_only_authorized a false."
+}
