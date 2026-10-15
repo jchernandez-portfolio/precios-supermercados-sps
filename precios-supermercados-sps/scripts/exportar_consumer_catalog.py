@@ -46,6 +46,18 @@ GRAMS_PER_OUNCE = Decimal("28.349523125")
 # Subcategorías sin atributo ``ounce`` en el árbol cuyos productos se venden por
 # peso: el huevo líquido (Egg Beaters) declara "NET WT 16 OZ (1 LB) 454 g".
 EXPORT_OUNCE_MASS_SUBCATEGORIES = frozenset({"Huevos"})
+# Productos pesados en tienda (código de barras de medida variable "2…"): el súper
+# publica el precio por libra aunque el nombre diga el peso del paquete
+# ("Pollo Entero Norteño ... - 5 lb" a L 42.00). Se llena en export_consumer_catalog.
+WEIGHED_BY_POUND: set[str] = set()
+WEIGHED_TYPE_WORDS = frozenset({
+    "res", "cerdo", "pollo", "pavo", "carne", "carnes", "pescado", "pescados", "mariscos", "embutidos",
+    "queso", "quesos", "jamon", "frutas", "verduras", "hierbas",
+})
+WEIGHED_SQL = (
+    "SELECT product_id FROM products WHERE supermarket_id='walmart' AND ean IS NOT NULL "
+    "AND ((length(ean)=13 AND substr(ean,1,1)='2') OR (length(ean)=14 AND substr(ean,1,2)='02'))"
+)
 _AEROSOL_RE = re.compile(r"(?<![a-z])(?:spray|aerosol|atomizador)(?![a-z])", re.IGNORECASE)
 
 
@@ -167,8 +179,28 @@ def build_rows(
             row["variant"] = size
         if _row_is_shoppable(row):
             visible.append(row)
+    for row in visible:
+        _price_per_pound(row)
     attach_other_presentations(visible, offers_by_key)
     return visible
+
+
+def _weighed_type(row: dict[str, object]) -> bool:
+    words = set(_fold_public(" ".join(str(row.get(key) or "") for key in ("category", "product_type"))).split())
+    return bool(words & WEIGHED_TYPE_WORDS)
+
+
+def _price_per_pound(row: dict[str, object]) -> None:
+    """Ofertas de producto pesado en tienda: precio por libra, no por paquete."""
+    offers = [offer for offer in row.get("offers") or () if isinstance(offer, dict)]
+    weighed = [offer for offer in offers if str(offer.get("source_product_id")) in WEIGHED_BY_POUND]
+    if not weighed or not _weighed_type(row):
+        return
+    for offer in weighed:
+        price = offer.get("current_price")
+        offer["unit_price"] = {"amount": price, "per": "libra"} if price else None
+    if len(weighed) == len(offers):
+        row["presentation"] = "por libra"
 
 
 def _prefix_brand(row: dict[str, object], offers_by_key: dict[tuple[str, str], VisibleOffer]) -> str | None:
@@ -300,6 +332,10 @@ def export_consumer_catalog(
     require_products: bool = False,
 ) -> dict[str, object]:
     _sync_core()
+    WEIGHED_BY_POUND.clear()
+    columns = {str(row[0]) for row in backend.query("SELECT name FROM pragma_table_info('products')")}
+    if "ean" in columns:  # bases mínimas de prueba no traen ean
+        WEIGHED_BY_POUND.update(f"walmart:{row[0]}" for row in backend.query(WEIGHED_SQL))
     manifest = _ORIGINAL_EXPORT(
         backend,
         scope,
