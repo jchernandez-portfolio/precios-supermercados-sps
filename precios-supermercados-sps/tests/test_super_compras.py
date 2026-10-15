@@ -242,11 +242,13 @@ def test_presentation_labels_are_comparable(tmp_path: Path) -> None:
 import { presentationLabel } from './data.js';
 const l = (presentation, unit_per) => presentationLabel({ presentation, unit_per });
 console.log(JSON.stringify([l('453.59 g'), l('907.18 g'), l('226.8 g'), l('2.268 kg'), l('500 g'), l('1 kg'),
-  l('16 oz'), l('16 oz', '100 g'), l('14.2 g'), l('15 unidades'), l('1.361 kg')]));
+  l('16 oz'), l('16 oz', '100 g'), l('14.2 g'), l('15 unidades'), l('1.361 kg'), l('340.19 g'), l('170.1 g'),
+  l('1.134 kg'), l('2 kg'), l('454 g'), l('440 g')]));
 """
     assert json.loads(_node(script, tmp_path)) == [
-        "454 g (1 lb)", "907 g (2 lb)", "227 g (½ lb)", "2.27 kg (5 lb)", "500 g", "1 kg",
-        "16 oz", "454 g (16 oz)", "14.2 g", "15 unidades", "1.36 kg (3 lb)",
+        "16 oz (454 g)", "2 lb (907 g)", "8 oz (227 g)", "5 lb (2.27 kg)", "500 g", "1 kg",
+        "16 oz", "16 oz (454 g)", "14.2 g", "15 unidades", "3 lb (1.36 kg)", "12 oz (340 g)", "6 oz (170 g)",
+        "40 oz (1.13 kg)", "2 kg", "16 oz (454 g)", "440 g",
     ]
 
 
