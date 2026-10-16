@@ -1,10 +1,10 @@
 {
-  "as_of": "2026-10-16T06:33:18.918977Z",
+  "as_of": "2026-10-16T07:03:27.595618Z",
   "blocked_reasons": [],
   "comparison_policy": "fail_closed_strong_identity_and_commercial_consistency",
   "comparison_status": "COMPARABLE",
   "coverage": {
-    "as_of": "2026-10-16T06:33:18.918977Z",
+    "as_of": "2026-10-16T07:03:27.595618Z",
     "comparable_count": 136,
     "coverage_pct": "67.65",
     "excluded_count": 3533,
