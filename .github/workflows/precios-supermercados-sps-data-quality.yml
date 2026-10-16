@@ -1,0 +1,88 @@
+name: Precios SPS - Auditoría de calidad de datos
+
+# Después de cada sincronización del catálogo público revisa lo que muestra Súper
+# Compras (misma lógica de la app) y actualiza la rama pública `calidad-datos`:
+#   README.md                 resumen por ciudad, supermercado y problema
+#   errores_detectados.csv    todo lo que la revisión automática encuentra hoy
+#   errores_confirmados.csv   copia del registro manual docs/calidad/errores-confirmados.csv
+#   historial.csv             cuántos errores había en cada publicación
+# Sólo lee datos públicos ya publicados; no consulta Turso ni supermercados y no
+# ejecuta contenido de las ramas de datos.
+
+on:
+  workflow_run:
+    workflows:
+      - "Precios SPS - Sincronizar datos estáticos del portafolio"
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: precios-sps-data-quality
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    if: >-
+      ${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' &&
+          (github.event_name == 'workflow_dispatch' ||
+           (github.event.workflow_run.conclusion == 'success' &&
+            github.event.workflow_run.head_branch == 'main')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Descargar código de la auditoría (main)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          path: source
+          persist-credentials: false
+
+      - name: Descargar catálogo publicado sin ejecutar su contenido
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: portfolio-data
+          path: data
+          fetch-depth: 1
+          sparse-checkout: precios-supermercados-sps/published/rpi/v3
+          persist-credentials: false
+
+      - name: Descargar rama de calidad sin ejecutar su contenido
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: calidad-datos
+          path: calidad
+          fetch-depth: 1
+
+      - name: Auditar catálogo
+        run: |
+          set -euo pipefail
+          node --version
+          rm -rf /tmp/calidad
+          node source/precios-supermercados-sps/scripts/auditar_calidad_catalogo.mjs \
+            --data data --previous calidad --out /tmp/calidad
+
+      - name: Publicar en un solo commit y push
+        env:
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id || github.run_id }}
+        run: |
+          set -euo pipefail
+          repository="$GITHUB_WORKSPACE/calidad"
+          for name in README.md errores_detectados.csv errores_confirmados.csv historial.csv; do
+            if [ -L "$repository/$name" ]; then echo "calidad_symlink_boundary_invalid:$name" >&2; exit 1; fi
+          done
+          cp /tmp/calidad/resumen.md "$repository/README.md"
+          cp /tmp/calidad/errores_detectados.csv /tmp/calidad/historial.csv "$repository/"
+          cp source/precios-supermercados-sps/docs/calidad/errores-confirmados.csv "$repository/errores_confirmados.csv"
+          git -C "$repository" config user.name "github-actions[bot]"
+          git -C "$repository" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$repository" add -A -- README.md errores_detectados.csv errores_confirmados.csv historial.csv
+          if git -C "$repository" diff --cached --quiet; then
+            echo "calidad_already_current=true"
+            exit 0
+          fi
+          git -C "$repository" commit -q -m "data: auditoría de calidad (run $SOURCE_RUN_ID)"
+          git -C "$repository" push origin HEAD:calidad-datos

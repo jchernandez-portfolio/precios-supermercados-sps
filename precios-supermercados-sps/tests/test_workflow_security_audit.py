@@ -80,6 +80,15 @@ base.EXPECTED_PERMISSIONS[base.PRODUCT_IMAGES_SYNC_WORKFLOW] = {
     "contents": "write",
 }
 base.EXPECTED_TRIGGERS[base.PRODUCT_IMAGES_SYNC_WORKFLOW] = {"workflow_run"}
+base.DATA_QUALITY_WORKFLOW = "precios-supermercados-sps-data-quality.yml"
+base.EXPECTED_PERMISSIONS[base.DATA_QUALITY_WORKFLOW] = {"contents": "write"}
+base.EXPECTED_TRIGGERS[base.DATA_QUALITY_WORKFLOW] = {"workflow_run", "workflow_dispatch"}
+DATA_QUALITY_CHECKOUTS = [
+    {"ref": "main", "path": "source", "persist-credentials": "false"},
+    {"ref": "portfolio-data", "path": "data", "fetch-depth": "1",
+     "sparse-checkout": "precios-supermercados-sps/published/rpi/v3", "persist-credentials": "false"},
+    {"ref": "calidad-datos", "path": "calidad", "fetch-depth": "1"},
+]
 
 
 def _checkout_identity_with_derived_workflows() -> None:
@@ -108,6 +117,11 @@ def _checkout_identity_with_derived_workflows() -> None:
                 "path": "product-images",
                 "fetch-depth": "1",
             }
+            continue
+        if path.name == base.DATA_QUALITY_WORKFLOW:
+            # Código de main sin credenciales; ramas de datos sólo como archivos; sólo
+            # la rama `calidad-datos` conserva credenciales para su commit.
+            assert [step["with"] for step in checkout_steps] == DATA_QUALITY_CHECKOUTS
             continue
         if path.name == base.AUDIT_WORKFLOW:
             assert len(checkout_steps) == 1
@@ -588,3 +602,11 @@ def test_product_images_sync_publishes_validated_artifact_without_secrets() -> N
     assert "git -C \"$repository\" push origin HEAD:product-images" in raw
     for forbidden in ("TURSO", "pip install", "python scripts/", "pull_request", "id-token", "vars."):
         assert forbidden not in raw, forbidden
+
+
+def test_data_quality_audit_only_publishes_public_derivations_without_secrets() -> None:
+    path = next(item for item in base.WORKFLOWS if item.name == base.DATA_QUALITY_WORKFLOW)
+    text = path.read_text(encoding="utf-8")
+    assert "secrets." not in text and "TURSO" not in text
+    assert "git -C \"$repository\" push origin HEAD:calidad-datos" in text
+    assert text.count("push origin") == 1
