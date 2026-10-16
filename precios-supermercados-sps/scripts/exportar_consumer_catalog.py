@@ -129,6 +129,8 @@ def _row_is_shoppable(row: dict[str, object]) -> bool:
 
 
 def _derived_presentation(offer: VisibleOffer) -> str | None:
+    if offer.presentation_status == "rejected_implausible":
+        return None
     return canonical_presentation(
         source_presentation=offer.presentation,
         product_name=offer.product_name,
@@ -137,6 +139,56 @@ def _derived_presentation(offer: VisibleOffer) -> str | None:
         presentation_total_base=offer.presentation_total_base,
         presentation_status=offer.presentation_status,
     )
+
+
+# Medidas del nombre que el motor lee mal (sólo cambian la lectura pública):
+# "CloroRegular 1/2G" es medio galón, no medio gramo; "Badia albahaca .75 oz" son
+# 0.75 oz, no 75; "Dramamine 50 mg caja 24 tabletas" es la dosis, no el contenido;
+# "Fitamin ... 60 Gomas" con 181 kg publicados son 60 gomitas.
+ML_PER_GALLON = Decimal("3785.411784")
+_HALF_GALLON_RE = re.compile(r"(?<![\d.])1\s*/\s*2\s*(?:g|gl|gal|gal[oó]n)(?![a-z])|medio\s+gal[oó]n", re.IGNORECASE)
+_LEADING_DOT_OZ_RE = re.compile(r"(?<![\d.,])\.(\d+)\s*(?:oz|onz|onzas?)(?![a-z])", re.IGNORECASE)
+_DOSE_RE = re.compile(r"\d+(?:[.,]\d+)?\s*(?:mg|mcg|µg|ui)(?![a-z])", re.IGNORECASE)
+_PIECES_RE = re.compile(
+    r"(\d+)\s*(?:tabletas|tabs?|c[aá]psulas|caps|comprimidos|gomas|gomitas|sobres|softgels|grageas)(?![a-z])",
+    re.IGNORECASE,
+)
+# Más de 50 kg no es un producto de súper, salvo equipo de gimnasio o sacos.
+MAX_PLAUSIBLE_GRAMS = Decimal("50000")
+MAX_PLAUSIBLE_ML = Decimal("60000")
+_HEAVY_OK_RE = re.compile(r"m[aá]quina|estaci[oó]n|banco|pesa|mancuerna|disco|saco|cemento|alimento para|concentrado", re.IGNORECASE)
+
+
+def fix_name_measures(offer: VisibleOffer) -> VisibleOffer:
+    """Corrige lecturas del nombre que dan tamaños imposibles (ver constantes arriba)."""
+    name = offer.product_name or ""
+    if _HALF_GALLON_RE.search(name):
+        half = (ML_PER_GALLON / 2).quantize(Decimal("0.01"))
+        return _core.replace(offer, presentation_dimension="volume_ml", presentation_total_base=format(half, "f"),
+                             presentation_status="name_only")
+    dot = _LEADING_DOT_OZ_RE.search(name)
+    if dot:
+        return _core.replace(offer, presentation_dimension="ounce", presentation_total_base="0." + dot.group(1),
+                             presentation_status="name_only")
+    if offer.presentation_dimension not in {"mass_g", "volume_ml"}:
+        return offer
+    try:
+        total = Decimal(str(offer.presentation_total_base))
+    except (InvalidOperation, TypeError, ValueError):
+        return offer
+    mass = offer.presentation_dimension == "mass_g"
+    dose = mass and _DOSE_RE.search(name) is not None and total < 5
+    limit = MAX_PLAUSIBLE_GRAMS if mass else MAX_PLAUSIBLE_ML
+    huge = total > limit and not _HEAVY_OK_RE.search(name)
+    if not dose and not huge:
+        return offer
+    pieces = _PIECES_RE.search(name)
+    if pieces and int(pieces.group(1)) > 0:
+        return _core.replace(offer, presentation_dimension="count", presentation_total_base=pieces.group(1),
+                             presentation_status="name_only", presentation=None)
+    # Sin conteo en el nombre: mejor sin tamaño que un tamaño falso.
+    return _core.replace(offer, presentation_dimension=None, presentation_total_base=None,
+                         presentation_status="rejected_implausible", presentation=None)
 
 
 def ounce_as_mass(offer: VisibleOffer) -> VisibleOffer:
@@ -180,7 +232,7 @@ def build_rows(
 ) -> list[dict[str, object]]:
     """Construye filas v3, limpia atributos públicos y añade otras presentaciones."""
     _core._derived_presentation = _derived_presentation
-    offers = tuple(ounce_as_mass(offer) for offer in offers)
+    offers = tuple(ounce_as_mass(fix_name_measures(offer)) for offer in offers)
     offers_by_key = {(offer.source_product_id, offer.location_id): offer for offer in offers}
     rows = _ORIGINAL_BUILD_ROWS(
         offers,

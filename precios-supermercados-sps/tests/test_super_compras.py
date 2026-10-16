@@ -403,3 +403,29 @@ console.log(JSON.stringify([
         ["1 unidad", None, None],
         ["2 lb (907 g)", "50.00", "libra"],
     ]
+
+
+def test_implausible_sizes_and_unit_prices_are_hidden_but_kept(tmp_path: Path) -> None:
+    """Red de seguridad: la web no muestra "Sprite 1100 L" ni L 318,000 por 100 g."""
+    script = """
+import { hideImplausible } from './data.js';
+const p = (id, product_name, presentation, unit_amount, unit_per, product_type = 'Refresco') => ({
+  id, product_name, presentation, unit_amount, unit_per, product_type, best_price: '30.70' });
+const products = [
+  ...Array.from({ length: 10 }, (_, i) => p('n' + i, 'Gaseosa ' + i, '2 L', '25.00', 'L')),
+  p('a', 'Gaseosa Sprite 1100 Lt Pet', '1100 L', '0.03', 'L'),
+  p('b', 'Gaseosa barata', '500 ml', '0.50', 'L'),
+  p('c', 'Gaseosa cara', '355 ml', '600.00', 'L'),
+  p('d', 'Estación de Fuerza Capacidad 100 kg', '100 kg', null, null, 'Gimnasio'),
+  p('e', 'Gaseosa unidad', '1 unidad', '30.70', 'unidad'),
+];
+hideImplausible(products);
+console.log(JSON.stringify(products.slice(10).map((x) => [x.id, x.presentation, x.unit_amount, !!x.suspect, x.hidden?.presentation ?? null])));
+"""
+    assert json.loads(_node(script, tmp_path)) == [
+        ["a", None, None, True, "1100 L"],
+        ["b", None, None, True, "500 ml"],
+        ["c", "355 ml", "600.00", False, None],
+        ["d", "100 kg", None, False, None],
+        ["e", "1 unidad", "30.70", False, None],
+    ]

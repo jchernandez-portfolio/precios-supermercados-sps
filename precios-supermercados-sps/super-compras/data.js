@@ -126,6 +126,8 @@ const CUT_OUNCES = /\s(\d+(?:[.,]\d+)?)\s*o$/i;
 // Termina en un número sin unidad ("Ensure 237"): no se inventa la unidad.
 const BARE_NUMBER = /\s\d+(?:[.,]\d+)?\s*$/;
 const N_IN_ONE = /\sen\s+\d+\s*$/i;
+// Aerosoles (aceite en spray, desodorante): la etiqueta dice onzas de peso.
+const AEROSOL = /(?<![a-z])(?:spray|aerosol|atomizador)(?![a-z])/i;
 const FOOD_CATEGORIES = new Set(["alimentos", "bebidas y tabaco"]);
 
 function unitOf(token) {
@@ -217,7 +219,7 @@ export function displayFields(product, basis = null) {
     if (!size && POUND_WORD.test(name)) presentation = "por libra";
     // "oz" en el nombre: onzas de peso, salvo en tipos que se miden en volumen
     // (vainilla, bebidas), donde son onzas líquidas (GS1 distingue ONZ y OZA).
-    if (size?.unit === "oz" && /^(?:100 ml|L)$/.test(basis ?? "")) {
+    if (size?.unit === "oz" && /^(?:100 ml|L)$/.test(basis ?? "") && !AEROSOL.test(name)) {
       Object.assign(size, { unit: "fl oz", presentation: `${size.value} fl oz` });
     }
     if (size) {
@@ -230,7 +232,7 @@ export function displayFields(product, basis = null) {
   // las del nombre, a gramos o mililitros según el tipo, para comparar precio.
   const ounces = !unitAmount && String(presentation ?? "").match(/^(\d+(?:\.\d+)?)\s*(oz|fl oz)$/i);
   if (ounces) {
-    const liquid = /fl/i.test(ounces[2]) || /^(?:100 ml|L)$/.test(basis ?? "");
+    const liquid = /fl/i.test(ounces[2]) || (/^(?:100 ml|L)$/.test(basis ?? "") && !AEROSOL.test(name));
     const size = { value: Number(ounces[1]), unit: liquid ? "fl oz" : "oz" };
     presentation = `${size.value} ${size.unit}`;
     const unit = unitFromSize(size, product.best_price, basis);
@@ -252,6 +254,57 @@ export function displayFields(product, basis = null) {
     display_name: name || product.product_name, presentation, brand, brand_label: brandLabel,
     unit_amount: unitAmount, unit_per: unitPer,
   };
+}
+
+// Red de seguridad: un tamaño imposible (más de 50 kg o 60 L) o un precio por
+// kg/L 100 veces mayor o 20 veces menor que el normal de su tipo es un dato mal
+// publicado. La tarjeta muestra sólo el precio; el dato queda en `hidden` para la
+// auditoría de calidad (scripts/auditar_calidad_catalogo.mjs).
+const HEAVY_OK = /(m[aá]quina|estaci[oó]n|banco|pesa|mancuerna|disco|saco|cemento|alimento para|concentrado|purina|dog chow|cat chow)/i;
+
+export function implausibleSize(product) {
+  const size = String(product.presentation ?? "").match(/^(\d+(?:\.\d+)?)\s*(kg|g|L|ml)$/);
+  if (!size) return false;
+  const value = Number(size[1]);
+  const kg = size[2] === "kg" ? value : size[2] === "g" ? value / 1000 : null;
+  const liters = size[2] === "L" ? value : size[2] === "ml" ? value / 1000 : null;
+  return (kg !== null && kg > 50 && !HEAVY_OK.test(product.product_name ?? "")) || (liters !== null && liters > 60);
+}
+
+export function unitPriceMedians(products) {
+  const groups = new Map();
+  for (const product of products) {
+    if (!product.unit_amount || !product.product_type || product.unit_per === "unidad") continue;
+    const key = `${product.product_type}|${product.unit_per}`;
+    (groups.get(key) || groups.set(key, []).get(key)).push(Number(product.unit_amount));
+  }
+  const medians = new Map();
+  for (const [key, values] of groups) {
+    if (values.length < 8) continue;
+    values.sort((a, b) => a - b);
+    medians.set(key, values[Math.floor(values.length / 2)]);
+  }
+  return medians;
+}
+
+export function unitPriceRatio(product, medians) {
+  const reference = medians.get(`${product.product_type}|${product.unit_per}`);
+  const amount = Number(product.unit_amount);
+  return reference && amount > 0 && product.unit_per !== "unidad" ? amount / reference : null;
+}
+
+export function hideImplausible(products) {
+  const medians = unitPriceMedians(products);
+  for (const product of products) {
+    const ratio = unitPriceRatio(product, medians);
+    if (!implausibleSize(product) && !(ratio !== null && (ratio >= 100 || ratio <= 1 / 20))) continue;
+    product.hidden = { presentation: product.presentation, unit_amount: product.unit_amount, unit_per: product.unit_per };
+    product.suspect = true;
+    product.presentation = null;
+    product.unit_amount = null;
+    product.unit_per = null;
+  }
+  return products;
 }
 
 // Tipos que no dicen qué es el producto: ahí decide el nombre.
@@ -350,6 +403,7 @@ export class Catalog {
       return counts ? [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0] : null;
     };
     for (const product of this.products) Object.assign(product, displayFields(product, basisOf(product.product_type)));
+    hideImplausible(this.products);
     this.byId = new Map(this.products.map((product) => [product.id, product]));
     return this;
   }

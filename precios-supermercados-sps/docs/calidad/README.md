@@ -14,10 +14,14 @@ ciudad y supermercado.
 - **[`errores-confirmados.csv`](errores-confirmados.csv)** (aquí, en `main`): errores
   revisados a mano, de dónde vienen (`Súper` = el supermercado lo publica mal;
   `Súper Compras` = lo leemos o mostramos mal) y su estado (`Pendiente`, `Corregido`,
-  `Sin cambio`), con el PR que lo corrigió. Se actualiza en cada PR que encuentra o
+  `Oculto en la web`, `Sin cambio`), con el PR que lo corrigió. Se actualiza en cada PR que encuentra o
   corrige un error.
 
 La revisión automática (`scripts/auditar_calidad_catalogo.mjs`) usa la misma lógica de
 presentación que la app (`super-compras/data.js`) y busca: pesos o volúmenes
 imposibles, precio por kg/L fuera de rango para su tipo, medidas mal escritas por el
 súper, productos que salen distinto entre ciudades y productos sin presentación.
+
+La web esconde el tamaño y el precio por unidad de los productos con un tamaño imposible
+o un precio por kg/L 100 veces mayor o 20 veces menor que el de su tipo (`hideImplausible`
+en `super-compras/data.js`); la auditoría los sigue listando con el dato original.

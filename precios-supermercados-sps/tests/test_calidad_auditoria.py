@@ -65,5 +65,5 @@ def test_confirmed_registry_is_a_valid_table() -> None:
     assert header == ["fecha", "ciudad", "supermercado", "producto", "problema", "detalle", "origen", "estado",
                       "solucion", "referencia"]
     assert body and all(len(row) == len(header) for row in body)
-    assert {row[7] for row in body} <= {"Pendiente", "Corregido", "Sin cambio"}
+    assert {row[7] for row in body} <= {"Pendiente", "Corregido", "Sin cambio", "Oculto en la web"}
     assert {row[6] for row in body} <= {"Súper", "Súper Compras", "Revisión"}
