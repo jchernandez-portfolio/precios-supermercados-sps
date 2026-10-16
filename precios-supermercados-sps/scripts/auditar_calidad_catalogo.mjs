@@ -15,7 +15,9 @@
 // que cada error apareció por primera vez.
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { Catalog, presentationLabel, RETAILER_NAMES } from "../super-compras/data.js";
+import {
+  Catalog, presentationLabel, RETAILER_NAMES, implausibleSize, unitPriceMedians, unitPriceRatio,
+} from "../super-compras/data.js";
 
 export const DATA_BASE =
   "https://raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/portfolio-data/precios-supermercados-sps/published/rpi/v3/";
@@ -48,13 +50,7 @@ export const PROBLEMS = {
   },
 };
 const ORDER = Object.keys(PROBLEMS);
-const HEAVY_OK = /(m[aá]quina|estaci[oó]n|banco|pesa|mancuerna|disco|saco|cemento|alimento para|concentrado|purina|dog chow|cat chow)/i;
 const SPACED_MEASURE = /\d+\s+0\s*(?:ml|l|gr|g|kg)\b/i;
-
-function median(values) {
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.floor(sorted.length / 2)] || 0;
-}
 
 function money(value) {
   const number = Number(value);
@@ -64,37 +60,25 @@ function money(value) {
 // Problemas de un catálogo ya cargado (productos con displayFields aplicado).
 export function auditProducts(products, city) {
   const found = [];
+  // Lo que la web esconde (hideImplausible) se audita con el dato original.
+  const views = products.map((product) => (product.suspect ? { ...product, ...product.hidden } : product));
   const add = (product, problem, detail) => found.push({ product, problem, detail, city });
-  const groups = new Map();
-  for (const product of products) {
-    if (!product.unit_amount || !product.product_type || product.unit_per === "unidad") continue;
-    const key = `${product.product_type}|${product.unit_per}`;
-    (groups.get(key) || groups.set(key, []).get(key)).push(Number(product.unit_amount));
-  }
-  const medians = new Map([...groups].filter(([, values]) => values.length >= 8).map(([key, values]) => [key, median(values)]));
-  for (const product of products) {
-    const label = presentationLabel(product);
-    const size = String(product.presentation ?? "").match(/^(\d+(?:\.\d+)?)\s*(kg|g|L|ml)$/);
-    if (size) {
-      const value = Number(size[1]);
-      const kg = size[2] === "kg" ? value : size[2] === "g" ? value / 1000 : null;
-      const liters = size[2] === "L" ? value : size[2] === "ml" ? value / 1000 : null;
-      if ((kg !== null && kg > 50 && !HEAVY_OK.test(product.product_name)) || (liters !== null && liters > 60)) {
-        add(product, "peso_imposible", `Se muestra ${label}.`);
-      }
-    }
-    if (!product.presentation) add(product, "sin_presentacion", "El nombre termina en un número sin unidad.");
-    const spaced = product.presentation === "1 unidad" && String(product.product_name).match(SPACED_MEASURE);
+  const medians = unitPriceMedians(views);
+  views.forEach((view, index) => {
+    const product = products[index];
+    const hidden = product.suspect ? " En la web se esconde el tamaño y el precio por unidad." : "";
+    if (implausibleSize(view)) add(product, "peso_imposible", `Se muestra ${presentationLabel(view)}.${hidden}`);
+    if (!view.presentation) add(product, "sin_presentacion", "El nombre termina en un número sin unidad.");
+    const spaced = view.presentation === "1 unidad" && String(view.product_name).match(SPACED_MEASURE);
     if (spaced) add(product, "medida_mal_escrita", `El nombre dice "${spaced[0]}".`);
-    const reference = medians.get(`${product.product_type}|${product.unit_per}`);
-    const amount = Number(product.unit_amount);
-    if (reference && amount > 0 && product.unit_per !== "unidad") {
-      const ratio = amount / reference;
-      const text = `L ${amount.toFixed(2)} por ${product.unit_per}; lo normal en ${product.product_type} es L ${reference.toFixed(2)}`;
-      if (ratio >= 100 || ratio <= 1 / 20) add(product, "precio_unidad_error", `${text} (${ratio >= 1 ? `${Math.round(ratio)} veces más` : `${Math.round(1 / ratio)} veces menos`}).`);
+    const ratio = unitPriceRatio(view, medians);
+    if (ratio !== null) {
+      const reference = Number(view.unit_amount) / ratio;
+      const text = `L ${Number(view.unit_amount).toFixed(2)} por ${view.unit_per}; lo normal en ${view.product_type} es L ${reference.toFixed(2)}`;
+      if (ratio >= 100 || ratio <= 1 / 20) add(product, "precio_unidad_error", `${text} (${ratio >= 1 ? `${Math.round(ratio)} veces más` : `${Math.round(1 / ratio)} veces menos`}).${hidden}`);
       else if (ratio >= 20) add(product, "precio_unidad_revisar", `${text} (${Math.round(ratio)} veces más).`);
     }
-  }
+  });
   return found;
 }
 
