@@ -91,15 +91,24 @@ const POUND_WORD = /(?:^|\s)x\s*(?:lb|lbs|libra)(?:\s|$)/i;
 // ("ISOMIL 2 Plus 800 Grms", "MYTHOZ Café 12 onz", "Kelloggs ... 8pk",
 // "Pack Nectar 8Unx200Ml", "KG Hummus"). Sólo se usa para mostrar.
 const NAME_UNITS = [
-  [/^(?:kg|kgs|k|kilo|kilos)$/i, "kg"], [/^(?:g|gr|grs|grm|grms|gramos?)$/i, "g"],
+  [/^(?:kg|kgs|k|kilo|kilos)$/i, "kg"], [/^(?:g|gr|grs|grx|grm|grms|gramos?)$/i, "g"],
   [/^(?:ml|mls)$/i, "ml"], [/^(?:l|lt|lts|litro|litros)$/i, "L"],
   [/^(?:fl\s*oz|floz)$/i, "fl oz"], [/^(?:oz|onz|onzas?|z)$/i, "oz"], [/^(?:lb|lbs|lbr|libras?)$/i, "lb"],
 ];
-const MEASURE = /(\d+(?:[.,]\d+)?)\s*(kgs?|kilos?|k|grms?|grs?|gramos?|g|mls?|lts?|litros?|l|fl\s*oz|floz|onzas?|onz|oz|z|lbs?|lbr|libras?)(?![a-z])/gi;
+const MEASURE = /(\d+(?:[.,]\d+)?)\s*(kgs?|kilos?|k|grms?|grx|grs?|gramos?|g|mls?|lts?|litros?|l|fl\s*oz|floz|onzas?|onz|oz|z|lbs?|lbr|libras?)(?![a-z])/gi;
 const MULTIPACK = /(\d+)\s*(?:un|u|und|unds|uds)?\s*x\s*(\d+(?:[.,]\d+)?)\s*(ml|g|gr|oz|l|lt)(?![a-z])/i;
 const PACK = /(\d+)\s*(?:pk|pack|uds|unds|und)(?![a-z])/i;
-// "piezas" en un juego (sábanas, ollas) es un solo artículo; sólo cuenta en comida.
-const PIECES = /(\d+)\s*(?:pcs|pzs|pzas|pza|piezas|pieces)(?![a-z])/i;
+// Conteos (GS1: contenido neto en piezas): "18ct", "20 Ct", "15ea", "12 count". Con
+// un peso al lado ("100 ct 40.7 oz") manda el peso, que es el total del paquete.
+const COUNT = /(\d+)\s*(?:ct|cts|count|ea)(?![a-z])/i;
+// "piezas" en un juego (sábanas, ollas) es un solo artículo: en comida son unidades
+// con precio por unidad; en lo demás se muestra "4 piezas" sin precio por pieza.
+const PIECES = /(\d+)\s*(?:pcs|pz|pzs|pzas|pza|piezas|pieces)(?![a-z])/i;
+// Onzas cortadas al final del nombre (Los Andes): "Organic oatmeal 8 o", "12.8 o".
+const CUT_OUNCES = /\s(\d+(?:[.,]\d+)?)\s*o$/i;
+// Termina en un número sin unidad ("Ensure 237"): no se inventa la unidad.
+const BARE_NUMBER = /\s\d+(?:[.,]\d+)?\s*$/;
+const N_IN_ONE = /\sen\s+\d+\s*$/i;
 const FOOD_CATEGORIES = new Set(["alimentos", "bebidas y tabaco"]);
 
 function unitOf(token) {
@@ -130,8 +139,11 @@ export function sizeFromName(name, category = "") {
     (!/^\d+(?:[.,]\d+)?\s*l$/i.test(match[0]) || /\s/.test(match[0]))
     // "4K" es resolución, no kilos: "k" sola sólo con decimales ("1.92k").
     && !(/^k$/i.test(match[2]) && !/[.,]/.test(match[1])));
+  const cut = text.match(CUT_OUNCES);
+  if (cut && !measures.length) measures.push([cut[0], cut[1], "oz"]);
   const last = measures.at(-1);
-  const pack = text.match(PACK) || (FOOD_CATEGORIES.has(fold(category)) ? text.match(PIECES) : null);
+  const food = FOOD_CATEGORIES.has(fold(category));
+  const pack = text.match(PACK) || (food ? text.match(PIECES) : null);
   if (last) {
     const unit = unitOf(last[2]);
     const value = Number(last[1].replace(",", "."));
@@ -141,8 +153,11 @@ export function sizeFromName(name, category = "") {
     }
     if (unit && value > 0) return { presentation: `${value} ${unit}`, value, unit };
   }
-  if (pack && Number(pack[1]) > 1) return { presentation: `${Number(pack[1])} unidades`, count: Number(pack[1]) };
-  if (/(?:^|[\s(])(?:lb|lbs|libras?)(?:[\s)]|$)|por libra/i.test(text)) return { presentation: "por libra", per: "libra" };
+  const counted = pack || text.match(COUNT);
+  if (counted && Number(counted[1]) > 1) return { presentation: `${Number(counted[1])} unidades`, count: Number(counted[1]) };
+  const pieces = food ? null : text.match(PIECES);
+  if (pieces && Number(pieces[1]) > 1) return { presentation: `${Number(pieces[1])} piezas` };
+  if (/(?:^|[\s(-])(?:lb|lbs|libras?)(?:[\s)]|$)|por libra/i.test(text)) return { presentation: "por libra", per: "libra" };
   return null;
 }
 
@@ -189,6 +204,10 @@ export function displayFields(product, basis = null) {
       if (unit) [unitAmount, unitPer] = [unit.amount, unit.per];
     }
   }
+  // Regla GS1 de contenido neto: todo artículo lleva cantidad y unidad. Lo que no
+  // trae peso, volumen ni conteo se vende por pieza ("1 unidad"); un número suelto
+  // al final ("Ensure 237") queda sin presentación porque no se sabe qué mide.
+  if (!presentation && !unitAmount && name && (!BARE_NUMBER.test(name) || N_IN_ONE.test(name))) presentation = "1 unidad";
   // Sin peso publicado, el precio por unidad o por libra es el mismo precio.
   if (!unitAmount && product.best_price && (presentation === "1 unidad" || presentation === "por libra")) {
     unitAmount = product.best_price;
