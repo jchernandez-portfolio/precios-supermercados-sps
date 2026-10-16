@@ -36,8 +36,9 @@ def test_half_gallon_and_leading_dot_ounces() -> None:
 def test_dose_and_impossible_sizes_use_the_count_or_hide_the_size() -> None:
     assert shown(offer("Dramamine 50 mg caja 24 tabletas", "mass_g", "0.05")) == ("24 unidades", "count", "24")
     assert shown(offer("Fitamin Regulación del Sueño 60 Gomas", "mass_g", "181437")) == ("60 unidades", "count", "60")
-    assert shown(offer("Eckrich Chopped Ham Water Added 410 Lb", "mass_g", "185973")) == (None, None, None)
-    assert shown(offer("Gaseosa Sprite 1100 Lt Pet", "volume_ml", "1100000")) == (None, None, None)
+    assert shown(offer("Vitamina D 1000 UI", "mass_g", "0.025")) == (None, None, None)
+    # Sin conteo: se publica tal cual para que la app lo corrija o lo esconda.
+    assert shown(offer("Gaseosa Sprite 1100 Lt Pet", "volume_ml", "1100000"))[1:] == ("volume_ml", "1100000")
 
 
 def test_plausible_and_heavy_items_are_untouched() -> None:

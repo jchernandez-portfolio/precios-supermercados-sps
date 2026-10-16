@@ -423,9 +423,45 @@ hideImplausible(products);
 console.log(JSON.stringify(products.slice(10).map((x) => [x.id, x.presentation, x.unit_amount, !!x.suspect, x.hidden?.presentation ?? null])));
 """
     assert json.loads(_node(script, tmp_path)) == [
-        ["a", None, None, True, "1100 L"],
+        ["a", "1.1 L", "27.91", False, None],
         ["b", None, None, True, "500 ml"],
         ["c", "355 ml", "600.00", False, None],
         ["d", "100 kg", None, False, None],
         ["e", "1 unidad", "30.70", False, None],
     ]
+
+
+def test_store_measure_errors_with_a_clear_pattern_are_repaired(tmp_path: Path) -> None:
+    """ "1100 Lt", "3 78lt", "397 Oz" (gramos), "3.78 Ml", "48 Unidades / 960 g" y capacidad."""
+    script = """
+import { hideImplausible, repairedUnitPrice, displayFields } from './data.js';
+const p = (id, product_name, presentation, unit_amount, unit_per, product_type, best_price, category = 'Alimentos') => ({
+  id, product_name, presentation, unit_amount, unit_per, product_type, best_price, category });
+const filler = (type, per, amount, n = 10) => Array.from({ length: n }, (_, i) => p(type + i, type + ' ' + i, '1 L', amount, per, type, amount));
+const products = [
+  ...filler('Jugo', 'L', '45.00'), ...filler('Enlatados', '100 g', '25.00'), ...filler('Snacks', '100 g', '60.00'),
+  ...filler('Ponche', 'L', '40.00'),
+  p('a', 'Jugo Naranja Sula Clasico 3 78lt', '78 L', '1.99', 'L', 'Jugo', '155.00', 'Bebidas y tabaco'),
+  p('b', 'Maíz Miguels Dulce Enlatado 425 Oz', '12.049 kg', '0.39', '100 g', 'Enlatados', '46.95'),
+  p('c', 'Pringles Surtidos 48 Unidades /960 g', '48 × 960 g', '1.63', '100 g', 'Snacks', '749.95'),
+  p('d', 'Bebida Fristy Ponche De Frutas 3.78 Ml', '3.78 ml', '15066.14', 'L', 'Ponche', '56.95', 'Bebidas y tabaco'),
+  p('e', 'Refrigeradora Oster 409 L Dos puertas', '409 L', '30.00', 'L', 'Línea blanca', '12279.00', 'Electrónica y electrodomésticos'),
+  p('f', 'Ms Vela Surf y Coco 240g o 8oz', '240 g', '45.00', 'kg', 'Decoración del hogar', '10.80', 'Hogar y cocina'),
+];
+hideImplausible(products);
+const shown = products.slice(-6).map((x) => [x.id, x.presentation, x.unit_amount, x.unit_per, x.repaired?.reason ?? null, !!x.suspect]);
+const name = displayFields({ product_name: 'Desinfectante Family Guard Lavanda 40 0Ml', presentation: null, category: 'Limpieza',
+  product_type: 'Desinfectante', best_price: '126.36', unit_amount: null, unit_per: null }).presentation;
+console.log(JSON.stringify({ shown, offer: repairedUnitPrice(products.at(-6), '160.00'), name }));
+"""
+    result = json.loads(_node(script, tmp_path))
+    assert result["shown"] == [
+        ["a", "3.78 L", "41.01", "L", "decimal escrito con espacio", False],
+        ["b", "425 g", "11.05", "100 g", "gramos escritos como onzas", False],
+        ["c", "960 g", "78.12", "100 g", "el total es el del paquete, no por unidad", False],
+        ["d", "3.78 L", "15.07", "L", "litros escritos como mililitros", False],
+        ["e", "1 unidad", "12279.00", "unidad", "capacidad, no contenido", False],
+        ["f", "240 g", "45.00", "kg", None, False],
+    ]
+    assert result["offer"] == {"amount": "42.33", "per": "L"}
+    assert result["name"] == "400 ml"
