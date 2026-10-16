@@ -59,8 +59,24 @@ function imperialText(grams, converted) {
   return `${Number(half.toFixed(1))} oz`;
 }
 
+const ML_PER_FL_OZ = 29.5735295625;
+const ML_PER_GAL = 3785.411784;
+
+function litersText(millis) {
+  return millis >= 1000 ? `${Number((millis / 1000).toFixed(2))} L` : `${Math.round(millis)} ml`;
+}
+
 export function presentationLabel(product) {
   const text = String(product?.presentation ?? "").trim();
+  if (/^1\s+unidades$/i.test(text)) return "1 unidad";
+  // Medidas en galones, onzas líquidas o libras: con su equivalente métrico al lado.
+  const liquid = text.match(/^(\d+(?:\.\d+)?)\s*(fl oz|gal)$/i);
+  if (liquid) {
+    const value = Number(liquid[1]);
+    return `${value} ${liquid[2].toLowerCase()} (${litersText(value * (/gal/i.test(liquid[2]) ? ML_PER_GAL : ML_PER_FL_OZ))})`;
+  }
+  const pounds = text.match(/^(\d+(?:\.\d+)?)\s*lb$/i);
+  if (pounds) return `${Number(pounds[1])} lb (${gramsText(Number(pounds[1]) * 453.59237)})`;
   const match = text.match(/^(\d+(?:\.\d+)?)\s*(g|kg|oz)$/i);
   if (!match) return text;
   const value = Number(match[1]);
@@ -93,9 +109,10 @@ const POUND_WORD = /(?:^|\s)x\s*(?:lb|lbs|libra)(?:\s|$)/i;
 const NAME_UNITS = [
   [/^(?:kg|kgs|k|kilo|kilos)$/i, "kg"], [/^(?:g|gr|grs|grx|grm|grms|gramos?)$/i, "g"],
   [/^(?:ml|mls)$/i, "ml"], [/^(?:l|lt|lts|litro|litros)$/i, "L"],
-  [/^(?:fl\s*oz|floz)$/i, "fl oz"], [/^(?:oz|onz|onzas?|z)$/i, "oz"], [/^(?:lb|lbs|lbr|libras?)$/i, "lb"],
+  [/^(?:gal|gl|gal[oó]n|galones)$/i, "gal"], [/^(?:fl\s*oz|floz)$/i, "fl oz"], [/^(?:oz|onz|onzas?|z)$/i, "oz"], [/^(?:lb|lbs|lbr|libras?)$/i, "lb"],
 ];
-const MEASURE = /(\d+(?:[.,]\d+)?)\s*(kgs?|kilos?|k|grms?|grx|grs?|gramos?|g|mls?|lts?|litros?|l|fl\s*oz|floz|onzas?|onz|oz|z|lbs?|lbr|libras?)(?![a-z])/gi;
+// "240 - g", "50-ml" y "1Gal" también; "20w50" es el grado de un aceite, no una medida.
+const MEASURE = /(?<![\d.,])(?<!\dw)(\d+(?:[.,]\d+)?)\s*(?:-\s*)?(gal[oó]n|galones|gal|gl|kgs?|kilos?|k|grms?|grx|grs?|gramos?|g|mls?|lts?|litros?|l|fl\s*oz|floz|onzas?|onz|oz|z|lbs?|lbr|libras?)(?![a-z])/gi;
 const MULTIPACK = /(\d+)\s*(?:un|u|und|unds|uds)?\s*x\s*(\d+(?:[.,]\d+)?)\s*(ml|g|gr|oz|l|lt)(?![a-z])/i;
 const PACK = /(\d+)\s*(?:pk|pack|uds|unds|und)(?![a-z])/i;
 // Conteos (GS1: contenido neto en piezas): "18ct", "20 Ct", "15ea", "12 count". Con
@@ -167,8 +184,8 @@ function unitFromSize(size, price, basis) {
   const amount = Number(price);
   if (!size || !(amount > 0)) return null;
   if (size.per) return { amount: price, per: size.per };
-  const grams = { g: 1, kg: 1000, lb: 453.59237 }[size.unit];
-  const millis = { ml: 1, L: 1000 }[size.unit];
+  const grams = { g: 1, kg: 1000, lb: 453.59237, oz: GRAMS_PER_OZ }[size.unit];
+  const millis = { ml: 1, L: 1000, "fl oz": ML_PER_FL_OZ, gal: ML_PER_GAL }[size.unit];
   if (grams) {
     const per = basis === "100 g" ? 100 : 1000;
     return { amount: (amount / (size.value * grams) * per).toFixed(2), per: per === 100 ? "100 g" : "kg" };
@@ -198,11 +215,26 @@ export function displayFields(product, basis = null) {
     const size = sizeFromName(name, product.category);
     if (size?.presentation === "por libra" && POUND_TAIL.test(name)) name = name.replace(POUND_TAIL, "");
     if (!size && POUND_WORD.test(name)) presentation = "por libra";
+    // "oz" en el nombre: onzas de peso, salvo en tipos que se miden en volumen
+    // (vainilla, bebidas), donde son onzas líquidas (GS1 distingue ONZ y OZA).
+    if (size?.unit === "oz" && /^(?:100 ml|L)$/.test(basis ?? "")) {
+      Object.assign(size, { unit: "fl oz", presentation: `${size.value} fl oz` });
+    }
     if (size) {
       presentation = size.presentation;
       const unit = unitAmount ? null : unitFromSize(size, product.best_price, basis);
       if (unit) [unitAmount, unitPer] = [unit.amount, unit.per];
     }
+  }
+  // Onzas publicadas por el súper sin base de precio ("10 oz" en Los Andes): igual que
+  // las del nombre, a gramos o mililitros según el tipo, para comparar precio.
+  const ounces = !unitAmount && String(presentation ?? "").match(/^(\d+(?:\.\d+)?)\s*(oz|fl oz)$/i);
+  if (ounces) {
+    const liquid = /fl/i.test(ounces[2]) || /^(?:100 ml|L)$/.test(basis ?? "");
+    const size = { value: Number(ounces[1]), unit: liquid ? "fl oz" : "oz" };
+    presentation = `${size.value} ${size.unit}`;
+    const unit = unitFromSize(size, product.best_price, basis);
+    if (unit) [unitAmount, unitPer] = [unit.amount, unit.per];
   }
   // Regla GS1 de contenido neto: todo artículo lleva cantidad y unidad. Lo que no
   // trae peso, volumen ni conteo se vende por pieza ("1 unidad"); un número suelto

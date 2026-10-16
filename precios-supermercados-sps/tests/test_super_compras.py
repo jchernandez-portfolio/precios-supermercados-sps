@@ -329,7 +329,7 @@ console.log(JSON.stringify([
 ]));
 """
     assert json.loads(_node(script, tmp_path)) == [
-        ["800 g", "125.00", "kg"], ["12 oz", None, None], ["16 oz", None, None],
+        ["800 g", "125.00", "kg"], ["12 oz", "293.95", "kg"], ["16 oz", "220.46", "kg"],
         ["1.92 kg", "52.08", "kg"], ["8 × 200 ml", None, None], ["12 unidades", "8.00", "unidad"],
         ["por kg", "100.00", "kg"], ["226.8 g", "220.46", "kg"], ["226.8 g", "220.46", "kg"],
         ["por libra", "100.00", "libra"], ["3 × 235 g", "141.84", "kg"],
@@ -360,8 +360,8 @@ console.log(JSON.stringify([
     assert json.loads(_node(script, tmp_path)) == [
         ["1 unidad", "100.00", "unidad"], ["1 unidad", "100.00", "unidad"], ["18 unidades", "5.56", "unidad"],
         ["20 unidades", "5.00", "unidad"], ["15 unidades", "6.67", "unidad"],
-        ["40.7 oz", None, None], ["2 piezas", None, None],
-        ["8 oz", None, None], ["18 g", "5555.56", "kg"],
+        ["40.7 oz", "86.67", "kg"], ["2 piezas", None, None],
+        ["8 oz", "440.92", "kg"], ["18 g", "5555.56", "kg"],
         [None, None, None], ["1 unidad", "100.00", "unidad"],
         ["1 unidad", "100.00", "unidad"], ["por libra", "100.00", "libra"],
         [None, "200.00", "kg"],
@@ -376,3 +376,30 @@ const r = displayFields({ product_name: 'Jamón Pechuga De Pavo x 1/2 Lb', prese
 console.log(JSON.stringify([r.presentation, r.unit_amount, r.unit_per]));
 """
     assert json.loads(_node(script, tmp_path)) == ["226.8 g", "28.62", "100 g"]
+
+
+def test_presentations_are_coherent_across_sources(tmp_path: Path) -> None:
+    """Misma forma y equivalente métrico venga la medida del súper o del nombre."""
+    script = """
+import { displayFields, presentationLabel } from './data.js';
+const d = (product_name, basis = 'kg', extra = {}) => {
+  const p = { product_name, presentation: null, brand: null, category: 'Alimentos', product_type: 'Abarrotes',
+    best_price: '100.00', unit_amount: null, unit_per: null, ...extra };
+  const r = { ...p, ...displayFields(p, basis) };
+  return [presentationLabel(r), r.unit_amount, r.unit_per];
+};
+console.log(JSON.stringify([
+  d('Kame plain noodles 8z.'), d('Louana aceite vegetal 48z', 'L'), d('BLUE RIBBON ChocolateChip1Gal', 'L'),
+  d('Gomitas Guandy Gusanitos Ácidos 100 - g', '100 g'), d('Pasta Dental Colgate 50-ml', '100 ml'),
+  d('Aceite Quaker State Advdur 20w50gl', 'L'), d('Al dente fettucine', 'kg', { presentation: '10 oz' }),
+  d('LA CORPENITA Semilla Marañon 1u', 'kg', { presentation: '1 unidades' }),
+  d('Camarón Panamei Precocido 16/20 X 2 Lb', 'kg', { presentation: '2 lb', unit_amount: '50.00', unit_per: 'libra' }),
+]));
+"""
+    assert json.loads(_node(script, tmp_path)) == [
+        ["8 oz (227 g)", "440.92", "kg"], ["48 fl oz (1.42 L)", "70.45", "L"], ["1 gal (3.79 L)", "26.42", "L"],
+        ["100 g", "100.00", "100 g"], ["50 ml", "200.00", "100 ml"],
+        ["1 unidad", "100.00", "unidad"], ["10 oz (283 g)", "352.74", "kg"],
+        ["1 unidad", None, None],
+        ["2 lb (907 g)", "50.00", "libra"],
+    ]
