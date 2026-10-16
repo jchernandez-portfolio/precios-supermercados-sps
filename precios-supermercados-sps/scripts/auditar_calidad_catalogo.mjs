@@ -48,6 +48,10 @@ export const PROBLEMS = {
     label: "Sin presentación", severity: "baja",
     help: "El nombre termina en un número sin unidad (\"Ensure 237\"): no se sabe qué mide.",
   },
+  corregido_en_web: {
+    label: "Corregido en la web", severity: "info",
+    help: "El súper publica mal la medida (\"1100 Lt\", \"397 Oz\" que son gramos) y la web la corrige con un patrón seguro; sigue mal en el súper.",
+  },
 };
 const ORDER = Object.keys(PROBLEMS);
 const SPACED_MEASURE = /\d+\s+0\s*(?:ml|l|gr|g|kg)\b/i;
@@ -67,6 +71,9 @@ export function auditProducts(products, city) {
   views.forEach((view, index) => {
     const product = products[index];
     const hidden = product.suspect ? " En la web se esconde el tamaño y el precio por unidad." : "";
+    if (product.repaired?.total) {
+      add(product, "corregido_en_web", `El súper publica ${presentationLabel({ ...product, presentation: product.repaired.from })}; la web muestra ${presentationLabel(product)} (${product.repaired.reason}).`);
+    }
     if (implausibleSize(view)) add(product, "peso_imposible", `Se muestra ${presentationLabel(view)}.${hidden}`);
     if (!view.presentation) add(product, "sin_presentacion", "El nombre termina en un número sin unidad.");
     const spaced = view.presentation === "1 unidad" && String(view.product_name).match(SPACED_MEASURE);

@@ -136,7 +136,8 @@ function unitOf(token) {
 }
 
 export function sizeFromName(name, category = "") {
-  const text = String(name ?? "");
+  // "Desinfectante 40 0Ml", "Lysol 34 0gr": el súper metió un espacio en el número.
+  const text = String(name ?? "").replace(/(\d+)\s+0\s*(ml|gr|g)(?![a-z])/gi, (_, digits, unit) => `${digits}0 ${unit}`);
   const multi = text.match(MULTIPACK);
   if (multi) {
     const unit = unitOf(multi[3]);
@@ -293,11 +294,92 @@ export function unitPriceRatio(product, medians) {
   return reference && amount > 0 && product.unit_per !== "unidad" ? amount / reference : null;
 }
 
+// Errores del súper con patrón claro: se corrige la medida sólo si el resultado
+// queda en el rango normal de precio por kg/L de su tipo. Lo demás se esconde.
+// En electrodomésticos, hogar, deportes, ropa y juguetes los litros o kilos son
+// capacidad (refrigeradora 409 L, silla para 136 kg), no contenido: va por unidad.
+const CAPACITY_DEPARTMENTS = new Set(["electronica y electrodomesticos", "ropa calzado y accesorios"]);
+// En hogar, deportes y juguetes sólo en tipos de recipientes, aparatos o equipo; las
+// velas, el carbón, el pegamento o la plastilina sí traen contenido neto.
+const CAPACITY_TYPES = new Set(["recipientes termos y botellas", "vajillas vasos y cubiertos", "organizacion y almacenamiento",
+  "utensilios de cocina y reposteria", "ollas y sartenes", "cocina", "fitness y ejercicio", "articulos deportivos",
+  "natacion y piscinas", "juegos de exterior"]);
+const LIQUID_DEPARTMENTS = new Set(["bebidas y tabaco", "limpieza"]);
+const MASS_PER = new Set(["100 g", "kg"]);
+const VOLUME_PER = new Set(["100 ml", "L"]);
+
+function parsedSize(presentation) {
+  const text = String(presentation ?? "");
+  const multi = text.match(/^(\d+)\s*×\s*(\d+(?:\.\d+)?)\s*(kg|g|L|ml)$/);
+  const single = text.match(/^(\d+(?:\.\d+)?)\s*(kg|g|L|ml)$/);
+  const [count, value, unit] = multi ? [Number(multi[1]), Number(multi[2]), multi[3]] : single ? [1, Number(single[1]), single[2]] : [];
+  if (!unit) return null;
+  const base = unit === "kg" || unit === "g" ? "g" : "ml";
+  const each = unit === "kg" || unit === "L" ? value * 1000 : value;
+  return { base, count, each, total: each * count };
+}
+
+function totalText(base, total) {
+  return base === "g" ? gramsText(total) : litersText(total);
+}
+
+function sizedUnit(product, base, total) {
+  const allowed = base === "g" ? MASS_PER : VOLUME_PER;
+  const per = allowed.has(product.unit_per) ? product.unit_per : base === "g" ? "kg" : "L";
+  const factor = per.startsWith("100") ? 100 : 1000;
+  return { per, factor, amount: (Number(product.best_price) / total * factor).toFixed(2) };
+}
+
+function repairCandidates(product, size, ratio) {
+  const name = String(product.product_name ?? "");
+  const out = [];
+  const add = (reason, base, total, label) => out.push({ reason, base, total, label: label ?? totalText(base, total) });
+  const spaced = name.match(/(?:^|\s)(\d)\s+(\d{2})\s*(?:lt|l)(?![a-z])/i);
+  if (spaced) add("decimal escrito con espacio", "ml", Number(`${spaced[1]}.${spaced[2]}`) * 1000);
+  const ounces = name.match(/(\d+(?:\.\d+)?)\s*(?:oz|onz)(?![a-z])/i);
+  if (size.base === "g" && ounces && Number(ounces[1]) > 100) add("gramos escritos como onzas", "g", Number(ounces[1]));
+  if (size.count > 1 && ratio !== null && ratio <= 1 / 20) add("el total es el del paquete, no por unidad", size.base, size.each);
+  // Sólo con un tamaño imposible: un precio bajo puede venir de una mediana del tipo
+  // sesgada (cosméticos pequeños), no de un error de unidad.
+  const tooBig = size.base === "g" ? size.total > 50000 : size.total > 60000;
+  if (tooBig) add(size.base === "g" ? "gramos escritos como kilos" : "mililitros escritos como litros", size.base, size.total / 1000);
+  if (size.base === "ml" && size.total < 20 && ratio !== null && ratio >= 100 && LIQUID_DEPARTMENTS.has(fold(product.category))) {
+    add("litros escritos como mililitros", "ml", size.total * 1000);
+  }
+  const pack = name.match(/(\d+)\s*(?:sobres|und|uds|unidades|ct)(?![a-z])/i);
+  if (size.base === "g" && size.count === 1 && size.total < 10 && pack && ratio !== null && ratio >= 100) {
+    const count = Number(pack[1]);
+    add("peso de cada sobre, no del paquete", "g", size.total * count, `${count} × ${totalText("g", size.total)}`);
+  }
+  return out;
+}
+
 export function hideImplausible(products) {
   const medians = unitPriceMedians(products);
   for (const product of products) {
+    const size = parsedSize(product.presentation);
+    if (size && (CAPACITY_DEPARTMENTS.has(fold(product.category)) || CAPACITY_TYPES.has(fold(product.product_type)))) {
+      product.repaired = { from: product.presentation, reason: "capacidad, no contenido" };
+      Object.assign(product, { presentation: "1 unidad", unit_amount: product.best_price, unit_per: "unidad" });
+      continue;
+    }
     const ratio = unitPriceRatio(product, medians);
     if (!implausibleSize(product) && !(ratio !== null && (ratio >= 100 || ratio <= 1 / 20))) continue;
+    const reference = ratio !== null ? Number(product.unit_amount) / ratio : null;
+    const fixed = size && repairCandidates(product, size, ratio).find((candidate) => {
+      const unit = sizedUnit(product, candidate.base, candidate.total);
+      if (implausibleSize({ ...product, presentation: candidate.label })) return false;
+      const normal = reference && product.unit_per === unit.per ? reference : null;
+      if (normal === null) return false;
+      const next = Number(unit.amount) / normal;
+      return next > 1 / 20 && next < 20;
+    });
+    if (fixed) {
+      const unit = sizedUnit(product, fixed.base, fixed.total);
+      product.repaired = { from: product.presentation, reason: fixed.reason, base: fixed.base, total: fixed.total, factor: unit.factor };
+      Object.assign(product, { presentation: fixed.label, unit_amount: unit.amount, unit_per: unit.per });
+      continue;
+    }
     product.hidden = { presentation: product.presentation, unit_amount: product.unit_amount, unit_per: product.unit_per };
     product.suspect = true;
     product.presentation = null;
@@ -305,6 +387,13 @@ export function hideImplausible(products) {
     product.unit_per = null;
   }
   return products;
+}
+
+// Precio por unidad de una oferta cuando la web corrigió la medida del súper.
+export function repairedUnitPrice(product, price) {
+  const repair = product?.repaired;
+  if (!repair?.total || !(Number(price) > 0)) return null;
+  return { amount: (Number(price) / repair.total * repair.factor).toFixed(2), per: product.unit_per };
 }
 
 // Tipos que no dicen qué es el producto: ahí decide el nombre.

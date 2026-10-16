@@ -2,9 +2,9 @@
 // Vistas: inicio, búsqueda, ficha de producto, ofertas y Mi compra.
 import {
   Catalog, RETAILER_COLORS, rowKey, RETAILER_INITIALS, RETAILER_NAMES, loadCart, loadCities, loadCitySlug, money,
-  photoUrl, presentationLabel, saveCart, saveCitySlug, storeLabel,
-} from "./data.js?v=20261016-1";
-import { productIllustration } from "./illustration.js?v=20261016-1";
+  photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, storeLabel,
+} from "./data.js?v=20261016-2";
+import { productIllustration } from "./illustration.js?v=20261016-2";
 
 // Foto real si existe; si no hay o falla al cargar, la ilustración de siempre.
 function productVisual(product, { size = 118, decorative = true } = {}) {
@@ -168,6 +168,14 @@ function searchForm(value = "", { large = false } = {}) {
       go("/buscar", params);
     },
   }, icon("search", 18), input);
+}
+
+// Precio por unidad de una oferta: el del súper, el recalculado si la web corrigió
+// la medida, o ninguno si la medida era imposible (ver hideImplausible).
+function offerUnitPrice(product, offer) {
+  if (!offer || product.suspect) return null;
+  if (product.repaired) return repairedUnitPrice(product, offer.current_price);
+  return offer.unit_price || null;
 }
 
 function sizePill(product) {
@@ -370,12 +378,13 @@ function viewProduct(id, container) {
         const regular = Number(offer.reported_regular_price);
         const onSale = offer.is_promotion === true || (regular && regular > Number(offer.current_price));
         const label = storeLabel(offer, offers);
+        const unitPrice = offerUnitPrice(product, offer);
         return h("div", { class: `offer${index === 0 && offers.length > 1 ? " best" : ""}` },
           h("span", { class: "store-badge", style: { background: RETAILER_COLORS[offer.supermarket_id] } }, RETAILER_INITIALS[offer.supermarket_id] || "?"),
           h("div", { class: "offer-main" },
             h("div", {}, h("strong", {}, label),
               index === 0 && offers.length > 1 ? h("span", { class: "badge-best" }, "MÁS BARATO") : null),
-            offer.unit_price && !product.suspect ? h("span", { class: "muted small" }, `${money(offer.unit_price.amount)} por ${offer.unit_price.per}`) : null),
+            unitPrice ? h("span", { class: "muted small" }, `${money(unitPrice.amount)} por ${unitPrice.per}`) : null),
           h("div", { class: "offer-price" },
             h("strong", {}, money(offer.current_price)),
             onSale && regular > Number(offer.current_price) ? h("span", { class: "sale" }, "Oferta · antes ", h("del", {}, money(regular))) : onSale ? h("span", { class: "sale" }, "Oferta") : null),
@@ -401,7 +410,7 @@ function viewProduct(id, container) {
     const bestUnit = others.reduce((best, item) => {
       const value = Number(item.other.best_unit_price?.amount);
       return value && (!best || value < best) ? value : best;
-    }, product.suspect ? null : Number(cheapest?.unit_price?.amount) || null);
+    }, Number(offerUnitPrice(product, cheapest)?.amount) || null);
     const alternatives = catalog.alternatives(product);
     fill(extra, 
       priceHistory,

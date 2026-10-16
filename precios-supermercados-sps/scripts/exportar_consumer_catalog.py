@@ -186,9 +186,13 @@ def fix_name_measures(offer: VisibleOffer) -> VisibleOffer:
     if pieces and int(pieces.group(1)) > 0:
         return _core.replace(offer, presentation_dimension="count", presentation_total_base=pieces.group(1),
                              presentation_status="name_only", presentation=None)
-    # Sin conteo en el nombre: mejor sin tamaño que un tamaño falso.
-    return _core.replace(offer, presentation_dimension=None, presentation_total_base=None,
-                         presentation_status="rejected_implausible", presentation=None)
+    if dose:
+        # Dosis sin conteo en el nombre: mejor sin tamaño que un tamaño falso.
+        return _core.replace(offer, presentation_dimension=None, presentation_total_base=None,
+                             presentation_status="rejected_implausible", presentation=None)
+    # Tamaño imposible sin conteo ("Sprite 1100 Lt"): se publica tal cual; la app lo
+    # corrige con un patrón seguro o lo esconde, y la auditoría lo reporta.
+    return offer
 
 
 def ounce_as_mass(offer: VisibleOffer) -> VisibleOffer:
