@@ -1,6 +1,6 @@
 # Errores de datos en Súper Compras
 
-Actualizado automáticamente el 2026-10-16 a partir del catálogo publicado (San Pedro Sula: 2026-10-16T04:58:08.045602Z; Tegucigalpa: 2026-10-16T04:59:51.795922Z).
+Actualizado automáticamente el 2026-10-16 a partir del catálogo publicado (San Pedro Sula: 2026-10-16T06:33:40.373552Z; Tegucigalpa: 2026-10-16T06:36:16.771769Z).
 
 - [`errores_detectados.csv`](errores_detectados.csv): todo lo que la revisión automática encuentra hoy, una fila por producto y supermercado, con enlace al producto.
 - [`errores_confirmados.csv`](errores_confirmados.csv): errores revisados a mano, de dónde vienen (súper o Súper Compras) y su estado.
@@ -10,9 +10,9 @@ Actualizado automáticamente el 2026-10-16 a partir del catálogo publicado (San
 
 | Problema | Colonial | La Colonia | Los Andes | PriceSmart | Walmart | Total |
 |---|---:|---:|---:|---:|---:|---:|
-| Peso o volumen imposible | 0 | 0 | 0 | 18 | 29 | 47 |
-| Precio por unidad: probable error | 13 | 11 | 13 | 3 | 31 | 71 |
-| Precio por unidad: revisar | 22 | 24 | 15 | 6 | 33 | 100 |
+| Peso o volumen imposible | 0 | 0 | 0 | 9 | 24 | 33 |
+| Precio por unidad: probable error | 10 | 11 | 9 | 2 | 25 | 57 |
+| Precio por unidad: revisar | 22 | 25 | 15 | 6 | 31 | 99 |
 | Medida mal escrita por el súper | 0 | 1 | 1 | 0 | 1 | 3 |
 | Sin presentación | 83 | 44 | 109 | 20 | 332 | 588 |
 
@@ -20,9 +20,9 @@ Actualizado automáticamente el 2026-10-16 a partir del catálogo publicado (San
 
 | Problema | La Colonia | Paiz | PriceSmart | Walmart | Total |
 |---|---:|---:|---:|---:|---:|
-| Peso o volumen imposible | 0 | 7 | 18 | 47 | 72 |
-| Precio por unidad: probable error | 16 | 48 | 4 | 45 | 113 |
-| Precio por unidad: revisar | 21 | 25 | 4 | 37 | 87 |
+| Peso o volumen imposible | 0 | 4 | 9 | 43 | 56 |
+| Precio por unidad: probable error | 16 | 43 | 3 | 36 | 98 |
+| Precio por unidad: revisar | 22 | 22 | 4 | 34 | 82 |
 | Medida mal escrita por el súper | 0 | 0 | 0 | 2 | 2 |
 | Distinto entre ciudades | 12 | 0 | 0 | 2 | 14 |
 | Sin presentación | 27 | 36 | 22 | 586 | 671 |

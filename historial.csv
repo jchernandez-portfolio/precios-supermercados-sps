@@ -1,13 +1,13 @@
 fecha,ciudad,catalogo,problema,cantidad
-2026-10-16,San Pedro Sula,2026-10-16T04:58:08.045602Z,Peso o volumen imposible,47
-2026-10-16,San Pedro Sula,2026-10-16T04:58:08.045602Z,Precio por unidad: probable error,71
-2026-10-16,San Pedro Sula,2026-10-16T04:58:08.045602Z,Precio por unidad: revisar,100
-2026-10-16,San Pedro Sula,2026-10-16T04:58:08.045602Z,Medida mal escrita por el súper,3
-2026-10-16,San Pedro Sula,2026-10-16T04:58:08.045602Z,Distinto entre ciudades,0
-2026-10-16,San Pedro Sula,2026-10-16T04:58:08.045602Z,Sin presentación,588
-2026-10-16,Tegucigalpa,2026-10-16T04:59:51.795922Z,Peso o volumen imposible,72
-2026-10-16,Tegucigalpa,2026-10-16T04:59:51.795922Z,Precio por unidad: probable error,113
-2026-10-16,Tegucigalpa,2026-10-16T04:59:51.795922Z,Precio por unidad: revisar,87
-2026-10-16,Tegucigalpa,2026-10-16T04:59:51.795922Z,Medida mal escrita por el súper,2
-2026-10-16,Tegucigalpa,2026-10-16T04:59:51.795922Z,Distinto entre ciudades,14
-2026-10-16,Tegucigalpa,2026-10-16T04:59:51.795922Z,Sin presentación,671
+2026-10-16,San Pedro Sula,2026-10-16T06:33:40.373552Z,Peso o volumen imposible,33
+2026-10-16,San Pedro Sula,2026-10-16T06:33:40.373552Z,Precio por unidad: probable error,57
+2026-10-16,San Pedro Sula,2026-10-16T06:33:40.373552Z,Precio por unidad: revisar,99
+2026-10-16,San Pedro Sula,2026-10-16T06:33:40.373552Z,Medida mal escrita por el súper,3
+2026-10-16,San Pedro Sula,2026-10-16T06:33:40.373552Z,Distinto entre ciudades,0
+2026-10-16,San Pedro Sula,2026-10-16T06:33:40.373552Z,Sin presentación,588
+2026-10-16,Tegucigalpa,2026-10-16T06:36:16.771769Z,Peso o volumen imposible,56
+2026-10-16,Tegucigalpa,2026-10-16T06:36:16.771769Z,Precio por unidad: probable error,98
+2026-10-16,Tegucigalpa,2026-10-16T06:36:16.771769Z,Precio por unidad: revisar,82
+2026-10-16,Tegucigalpa,2026-10-16T06:36:16.771769Z,Medida mal escrita por el súper,2
+2026-10-16,Tegucigalpa,2026-10-16T06:36:16.771769Z,Distinto entre ciudades,14
+2026-10-16,Tegucigalpa,2026-10-16T06:36:16.771769Z,Sin presentación,671
