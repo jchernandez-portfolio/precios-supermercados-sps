@@ -47,13 +47,46 @@ def test_weighed_query_reads_walmart_ean_and_colonial_sku() -> None:
     import sqlite3
 
     connection = sqlite3.connect(":memory:")
-    connection.execute("CREATE TABLE products(product_id INT, supermarket_id TEXT, ean TEXT, reference TEXT)")
-    connection.executemany("INSERT INTO products VALUES (?,?,?,?)", [
-        (1, "walmart", "2598600000004", None), (2, "walmart", "7401234567890", None),
-        (3, "colonial", None, "2063710000000"), (4, "colonial", "7424101113507", "7424101113507"),
-        (5, "la_colonia", "2598600000004", None), (6, "walmart", "02598600000004", None),
+    connection.execute("CREATE TABLE products(product_id INT, supermarket_id TEXT, ean TEXT, reference TEXT, presentation TEXT)")
+    connection.executemany("INSERT INTO products VALUES (?,?,?,?,?)", [
+        (1, "walmart", "2598600000004", None, None), (2, "walmart", "7401234567890", None, None),
+        (3, "colonial", None, "2063710000000", None), (4, "colonial", "7424101113507", "7424101113507", None),
+        (5, "la_colonia", "2020006000000", None, None), (6, "walmart", "02598600000004", None, None),
+        (7, "paiz", "2045128000000", None, None), (8, "pricesmart", "2598600000004", None, None),
+        (9, "comisariato_los_andes", None, "0001-000028436000000", "UN"),
+        (10, "comisariato_los_andes", None, "0001-000742410110011", "LB"),
+        (11, "comisariato_los_andes", None, "0001-000742411011006", "UN"),
     ])
-    assert sorted(connection.execute(MODULE.WEIGHED_SQL).fetchall()) == [("colonial", 3), ("walmart", 1), ("walmart", 6)]
+    assert sorted(connection.execute(MODULE.WEIGHED_SQL).fetchall()) == [
+        ("colonial", 3), ("comisariato_los_andes", 9), ("la_colonia", 5), ("paiz", 7), ("walmart", 1), ("walmart", 6),
+    ]
+    assert connection.execute(MODULE.SOURCE_POUND_SQL).fetchall() == [("comisariato_los_andes", 10)]
+
+
+def test_los_andes_pound_unit_skips_the_type_check() -> None:
+    MODULE.WEIGHED_BY_POUND.clear()
+    MODULE.SOURCE_POUND.clear()
+    MODULE.SOURCE_POUND.add("comisariato_los_andes:10")
+    item = row(("comisariato_los_andes:10", "179.00"), product_type="Comida preparada y deli")
+    item["product_name"] = "Alitas fritas en salsa barbacoa"
+    MODULE._price_per_pound(item)
+    assert item["presentation"] == "por libra" and item["offers"][0]["unit_price"]["per"] == "libra"
+    MODULE.SOURCE_POUND.clear()
+
+
+def test_closed_packages_and_unit_trays_are_not_per_pound() -> None:
+    MODULE.WEIGHED_BY_POUND.clear()
+    MODULE.WEIGHED_BY_POUND.update({"colonial:8", "comisariato_los_andes:9", "comisariato_los_andes:12"})
+    for name, sp in (("MH ShortRib AsadoTira CoreanoPaq", "colonial:8"),
+                     ("Torta p/hamburguesa  bandeja 4und", "comisariato_los_andes:9")):
+        item = row((sp, "683.99"), product_type="Res")
+        item["product_name"] = name
+        MODULE._price_per_pound(item)
+        assert item["presentation"] == "5 lb", name
+    puyazo = row(("comisariato_los_andes:12", "303.50"), product_type="Res")
+    puyazo["product_name"] = "Del corral puyazo paq x libra plu 210"
+    MODULE._price_per_pound(puyazo)
+    assert puyazo["presentation"] == "por libra"
 
 
 def test_name_saying_per_unit_wins() -> None:

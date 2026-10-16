@@ -54,16 +54,32 @@ WEIGHED_TYPE_WORDS = frozenset({
     "res", "cerdo", "pollo", "pavo", "carne", "carnes", "pescado", "pescados", "mariscos", "embutidos",
     "queso", "quesos", "jamon", "frutas", "verduras", "hierbas",
 })
-# Walmart lo trae como ean; Colonial (Shopify) como sku = reference ("2063710000000"
-# "NORTEÑO Pollo en Piezas 1/12" a L 46.99 la libra).
+# Walmart, Paiz y La Colonia (VTEX) lo traen como ean; Colonial (Shopify) como sku =
+# reference ("2063710000000" "NORTEÑO Pollo en Piezas 1/12" a L 46.99 la libra); Los
+# Andes en su código ("0001-000028436000000" = PLU 2843600000 "carne para bistec").
 _VARIABLE_CODE = "((length({c})=13 AND substr({c},1,1)='2') OR (length({c})=14 AND substr({c},1,2)='02'))"
+_ANDES_BODY = "ltrim(substr(reference,6),'0')"
 WEIGHED_SQL = (
-    "SELECT supermarket_id, product_id FROM products WHERE supermarket_id IN ('walmart','colonial') AND ("
-    + _VARIABLE_CODE.format(c="ean") + " OR " + _VARIABLE_CODE.format(c="reference") + ")"
+    "SELECT supermarket_id, product_id FROM products WHERE (supermarket_id IN ('walmart','paiz','la_colonia','colonial') AND ("
+    + _VARIABLE_CODE.format(c="ean") + " OR " + _VARIABLE_CODE.format(c="reference") + "))"
+    " OR (supermarket_id='comisariato_los_andes' AND substr(reference,1,5)='0001-'"
+    f" AND length({_ANDES_BODY})=11 AND substr({_ANDES_BODY},1,1)='2')"
+)
+# Los Andes publica la unidad de venta (unitMeasureCode): "LB" es precio por libra
+# aunque el nombre no lo diga ("Alitas fritas en salsa barbacoa" a L 179).
+SOURCE_POUND: set[str] = set()
+SOURCE_POUND_SQL = (
+    "SELECT supermarket_id, product_id FROM products WHERE supermarket_id='comisariato_los_andes'"
+    " AND upper(trim(presentation)) IN ('LB','LBS','LIBRA')"
 )
 # El súper a veces aclara lo contrario en el nombre ("Ayote Sazon ... - Precio Por Unidad").
 # (o "COLONIAL Encurtido Rojo und": termina en unidad).
-_PER_UNIT_NAME = re.compile(r"precio\s+por\s+unidad|\s(?:und|unds|unid|unidad|un|c/u)\.?\s*$", re.IGNORECASE)
+# Un paquete cerrado sin libra en el nombre ("MH ShortRib AsadoTira CoreanoPaq" a L 719.99)
+# o una bandeja con N unidades ("Torta p/hamburguesa bandeja 4und") también va por unidad.
+_PER_UNIT_NAME = re.compile(
+    r"precio\s+por\s+unidad|\s(?:und|unds|unid|unidad|un|c/u)\.?\s*$|paq(?:uete)?\.?\s*$|\d\s*(?:und|unds|unidades)\b",
+    re.IGNORECASE,
+)
 _AEROSOL_RE = re.compile(r"(?<![a-z])(?:spray|aerosol|atomizador)(?![a-z])", re.IGNORECASE)
 
 
@@ -199,8 +215,11 @@ def _weighed_type(row: dict[str, object]) -> bool:
 def _price_per_pound(row: dict[str, object]) -> None:
     """Ofertas de producto pesado en tienda: precio por libra, no por paquete."""
     offers = [offer for offer in row.get("offers") or () if isinstance(offer, dict)]
-    weighed = [offer for offer in offers if str(offer.get("source_product_id")) in WEIGHED_BY_POUND]
-    if not weighed or not _weighed_type(row) or _PER_UNIT_NAME.search(str(row.get("product_name") or "")):
+    source = [offer for offer in offers if str(offer.get("source_product_id")) in SOURCE_POUND]
+    coded = [offer for offer in offers if str(offer.get("source_product_id")) in WEIGHED_BY_POUND
+             and offer not in source] if _weighed_type(row) else []
+    weighed = source + coded
+    if not weighed or _PER_UNIT_NAME.search(str(row.get("product_name") or "")):
         return
     for offer in weighed:
         price = offer.get("current_price")
@@ -339,9 +358,12 @@ def export_consumer_catalog(
 ) -> dict[str, object]:
     _sync_core()
     WEIGHED_BY_POUND.clear()
+    SOURCE_POUND.clear()
     columns = {str(row[0]) for row in backend.query("SELECT name FROM pragma_table_info('products')")}
     if {"ean", "reference"} <= columns:  # bases mínimas de prueba no traen ean/reference
         WEIGHED_BY_POUND.update(f"{row[0]}:{row[1]}" for row in backend.query(WEIGHED_SQL))
+    if "presentation" in columns:
+        SOURCE_POUND.update(f"{row[0]}:{row[1]}" for row in backend.query(SOURCE_POUND_SQL))
     manifest = _ORIGINAL_EXPORT(
         backend,
         scope,
