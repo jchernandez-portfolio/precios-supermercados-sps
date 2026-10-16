@@ -3,8 +3,8 @@
 import {
   Catalog, RETAILER_COLORS, rowKey, RETAILER_INITIALS, RETAILER_NAMES, loadCart, loadCities, loadCitySlug, money,
   photoUrl, presentationLabel, saveCart, saveCitySlug, storeLabel,
-} from "./data.js?v=20261015-7";
-import { productIllustration } from "./illustration.js?v=20261015-7";
+} from "./data.js?v=20261015-8";
+import { productIllustration } from "./illustration.js?v=20261015-8";
 
 // Foto real si existe; si no hay o falla al cargar, la ilustración de siempre.
 function productVisual(product, { size = 118, decorative = true } = {}) {

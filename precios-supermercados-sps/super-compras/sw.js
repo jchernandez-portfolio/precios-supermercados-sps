@@ -1,11 +1,11 @@
 // Service worker de Súper Compras: guarda la app para abrirla sin conexión.
 // Los datos (raw.githubusercontent.com) van primero a la red y caen a la copia
 // guardada si no hay internet, así nunca se muestran precios viejos sin necesidad.
-const VERSION = "super-compras-20261015-7";
+const VERSION = "super-compras-20261015-8";
 // Las fotos llevan ?v=<versión>: una vez guardadas no cambian (primero caché).
 const PHOTOS = "super-compras-fotos-1";
 const MAX_PHOTOS = 600;
-const SHELL = ["./", "index.html", "styles.css?v=20261015-7", "app.js?v=20261015-7", "data.js?v=20261015-7", "illustration.js?v=20261015-7",
+const SHELL = ["./", "index.html", "styles.css?v=20261015-8", "app.js?v=20261015-8", "data.js?v=20261015-8", "illustration.js?v=20261015-8",
   "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png"];
 
 self.addEventListener("install", (event) => {

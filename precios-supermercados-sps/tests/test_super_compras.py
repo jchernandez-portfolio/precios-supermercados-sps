@@ -333,8 +333,38 @@ console.log(JSON.stringify([
         ["1.92 kg", "52.08", "kg"], ["8 × 200 ml", None, None], ["12 unidades", "8.00", "unidad"],
         ["por kg", "100.00", "kg"], ["226.8 g", "220.46", "kg"], ["226.8 g", "220.46", "kg"],
         ["por libra", "100.00", "libra"], ["3 × 235 g", "141.84", "kg"],
-        [None, None, None], [None, None, None], ["4 unidades", "50.00", "unidad"],
-        [None, None, None], ["1 unidad", "7.70", "unidad"],
+        ["1 unidad", "100.00", "unidad"], ["4 piezas", None, None], ["4 unidades", "50.00", "unidad"],
+        ["1 unidad", "100.00", "unidad"], ["1 unidad", "7.70", "unidad"],
+    ]
+
+
+def test_gs1_net_content_rule_fills_missing_presentations(tmp_path: Path) -> None:
+    """Regla GS1 de contenido neto: cantidad + unidad; sin medida se vende por pieza."""
+    script = """
+import { displayFields } from './data.js';
+const d = (product_name, category = 'Alimentos', extra = {}) => {
+  const r = displayFields({ product_name, presentation: null, brand: null, category, product_type: 'Abarrotes',
+    best_price: '100.00', unit_amount: null, unit_per: null, ...extra });
+  return [r.presentation, r.unit_amount, r.unit_per];
+};
+console.log(JSON.stringify([
+  d('Rabano Rojo Mazo'), d('Cuna Mainstays de madera', 'Bebé'), d('BIGELOW Botanic BlackRaspHib 18ct'),
+  d('TWININGS Wild Berries 20 ct'), d('Set Snapclips Bandan Y Ligas Equate 15ea', 'Cuidado personal y belleza'),
+  d('Candy assortment 100 ct 40.7 oz'), d('Cucharas Para Bebe 2 Pz', 'Bebé'),
+  d('Organic oatmeal single grain cereal 8 o'), d('Chicharrones picositos del rancho 18 grx'),
+  d('ENSURE Liquido Vainilla 237'), d('Silla De Comer Hudson Graco 5 En 1', 'Bebé'),
+  d('Kit Todo en 1', 'Cuidado personal y belleza'), d('Tajo Res Molido 90/10 Corral Fresco Paquete-Lb'),
+  d('Mora En Fruta Juicy Fruits', 'Alimentos', { unit_amount: '200.00', unit_per: 'kg' }),
+]));
+"""
+    assert json.loads(_node(script, tmp_path)) == [
+        ["1 unidad", "100.00", "unidad"], ["1 unidad", "100.00", "unidad"], ["18 unidades", "5.56", "unidad"],
+        ["20 unidades", "5.00", "unidad"], ["15 unidades", "6.67", "unidad"],
+        ["40.7 oz", None, None], ["2 piezas", None, None],
+        ["8 oz", None, None], ["18 g", "5555.56", "kg"],
+        [None, None, None], ["1 unidad", "100.00", "unidad"],
+        ["1 unidad", "100.00", "unidad"], ["por libra", "100.00", "libra"],
+        [None, "200.00", "kg"],
     ]
 
 
