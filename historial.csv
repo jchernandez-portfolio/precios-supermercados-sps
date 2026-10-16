@@ -1,13 +1,15 @@
 fecha,ciudad,catalogo,problema,cantidad
-2026-10-16,San Pedro Sula,2026-10-16T06:33:40.373552Z,Peso o volumen imposible,33
-2026-10-16,San Pedro Sula,2026-10-16T06:33:40.373552Z,Precio por unidad: probable error,57
-2026-10-16,San Pedro Sula,2026-10-16T06:33:40.373552Z,Precio por unidad: revisar,99
-2026-10-16,San Pedro Sula,2026-10-16T06:33:40.373552Z,Medida mal escrita por el súper,3
-2026-10-16,San Pedro Sula,2026-10-16T06:33:40.373552Z,Distinto entre ciudades,0
-2026-10-16,San Pedro Sula,2026-10-16T06:33:40.373552Z,Sin presentación,588
-2026-10-16,Tegucigalpa,2026-10-16T06:36:16.771769Z,Peso o volumen imposible,56
-2026-10-16,Tegucigalpa,2026-10-16T06:36:16.771769Z,Precio por unidad: probable error,98
-2026-10-16,Tegucigalpa,2026-10-16T06:36:16.771769Z,Precio por unidad: revisar,82
-2026-10-16,Tegucigalpa,2026-10-16T06:36:16.771769Z,Medida mal escrita por el súper,2
-2026-10-16,Tegucigalpa,2026-10-16T06:36:16.771769Z,Distinto entre ciudades,14
-2026-10-16,Tegucigalpa,2026-10-16T06:36:16.771769Z,Sin presentación,671
+2026-10-16,San Pedro Sula,2026-10-16T07:03:49.809451Z,Peso o volumen imposible,14
+2026-10-16,San Pedro Sula,2026-10-16T07:03:49.809451Z,Precio por unidad: probable error,39
+2026-10-16,San Pedro Sula,2026-10-16T07:03:49.809451Z,Precio por unidad: revisar,98
+2026-10-16,San Pedro Sula,2026-10-16T07:03:49.809451Z,Medida mal escrita por el súper,1
+2026-10-16,San Pedro Sula,2026-10-16T07:03:49.809451Z,Distinto entre ciudades,0
+2026-10-16,San Pedro Sula,2026-10-16T07:03:49.809451Z,Sin presentación,588
+2026-10-16,San Pedro Sula,2026-10-16T07:03:49.809451Z,Corregido en la web,19
+2026-10-16,Tegucigalpa,2026-10-16T07:06:25.326779Z,Peso o volumen imposible,21
+2026-10-16,Tegucigalpa,2026-10-16T07:06:25.326779Z,Precio por unidad: probable error,80
+2026-10-16,Tegucigalpa,2026-10-16T07:06:25.326779Z,Precio por unidad: revisar,82
+2026-10-16,Tegucigalpa,2026-10-16T07:06:25.326779Z,Medida mal escrita por el súper,2
+2026-10-16,Tegucigalpa,2026-10-16T07:06:25.326779Z,Distinto entre ciudades,14
+2026-10-16,Tegucigalpa,2026-10-16T07:06:25.326779Z,Sin presentación,671
+2026-10-16,Tegucigalpa,2026-10-16T07:06:25.326779Z,Corregido en la web,21
