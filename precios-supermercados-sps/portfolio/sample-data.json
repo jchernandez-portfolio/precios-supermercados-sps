@@ -1,7 +1,7 @@
 {
   "comparison_policy": "fail_closed_strong_identity_and_commercial_consistency",
   "currency": "HNL",
-  "published_at_utc": "2026-10-16T07:09:44Z",
+  "published_at_utc": "2026-10-16T12:00:00Z",
   "row_count": 10,
   "rows": [
     {
@@ -170,39 +170,6 @@
       "savings_vs_highest_pct": "15.40"
     },
     {
-      "best_price": "285.80",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "07610113025239",
-      "canonical_product_id": "prod_gtin_07610113025239",
-      "highest_price": "315.95",
-      "offers": [
-        {
-          "current_price": "315.95",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Bacardi",
-          "source_category": "Bebidas",
-          "source_name": "Ron Bacardí Spiced 700 Ml",
-          "source_presentation": "700 Ml",
-          "source_record_id": "la_colonia:6301",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "285.80",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "BACARDI",
-          "source_category": "Bebidas",
-          "source_name": "Ron Bacardi Spiced 700 Ml",
-          "source_presentation": null,
-          "source_record_id": "walmart:27279",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "30.15",
-      "savings_vs_highest_pct": "9.54"
-    },
-    {
       "best_price": "130.00",
       "best_supermarket_id": "walmart",
       "canonical_gtin": "00099176231813",
@@ -333,6 +300,39 @@
       ],
       "savings_vs_highest": "22.85",
       "savings_vs_highest_pct": "5.15"
+    },
+    {
+      "best_price": "150.00",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "07501008041703",
+      "canonical_product_id": "prod_gtin_07501008041703",
+      "highest_price": "169.40",
+      "offers": [
+        {
+          "current_price": "169.40",
+          "is_best_price": false,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Kelloggs",
+          "source_category": "Alimentos",
+          "source_name": "Cereal Kelloggs Komplete Pasas 420 Gr",
+          "source_presentation": "420 Gr",
+          "source_record_id": "la_colonia:2935",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "150.00",
+          "is_best_price": true,
+          "location_id": "walmart_sps",
+          "source_brand": "KELLOGGS",
+          "source_category": "Alimentos",
+          "source_name": "Cereal Komplete con pasas kelloggs - 420 g",
+          "source_presentation": null,
+          "source_record_id": "walmart:22678",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "19.40",
+      "savings_vs_highest_pct": "11.45"
     }
   ],
   "schema": "precios-sps-safe-portfolio-sample/v1",
@@ -347,8 +347,8 @@
     }
   ],
   "selection_rule": "highest_absolute_savings_within_safe_common_comparable_universe",
-  "source_as_of": "2026-10-16T07:03:27.595618Z",
+  "source_as_of": "2026-10-16T11:52:14.377149Z",
   "source_head_sha": "53ef2c46b0ff58042f98b84a6e1d6546c1a4b0f3",
   "source_schema": "rpi-consumer-mart/v2",
-  "source_workflow_run_id": 38864758648
+  "source_workflow_run_id": 38896597185
 }
