@@ -1,41 +1,74 @@
 {
   "comparison_policy": "fail_closed_strong_identity_and_commercial_consistency",
   "currency": "HNL",
-  "published_at_utc": "2026-10-18T20:55:28Z",
+  "published_at_utc": "2026-10-19T11:59:07Z",
   "row_count": 10,
   "rows": [
     {
-      "best_price": "242.05",
-      "best_supermarket_id": "la_colonia",
-      "canonical_gtin": "07804320706009",
-      "canonical_product_id": "prod_gtin_07804320706009",
-      "highest_price": "285.00",
+      "best_price": "400.00",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "00099176231837",
+      "canonical_product_id": "prod_gtin_00099176231837",
+      "highest_price": "487.95",
       "offers": [
         {
-          "current_price": "242.05",
-          "is_best_price": true,
+          "current_price": "487.95",
+          "is_best_price": false,
           "location_id": "la_colonia_sps",
-          "source_brand": "Frontera",
-          "source_category": "Bebidas",
-          "source_name": "Vino Tinto Frontera Merlot 750 Ml",
-          "source_presentation": "750 Ml",
-          "source_record_id": "la_colonia:6992",
+          "source_brand": "Suavitel",
+          "source_category": "Limpieza",
+          "source_name": "Suavizante de Telas Suavitel Complete Fresca Primavera 5 L",
+          "source_presentation": "5 L",
+          "source_record_id": "la_colonia:3869",
           "supermarket_id": "la_colonia"
         },
         {
-          "current_price": "285.00",
-          "is_best_price": false,
+          "current_price": "400.00",
+          "is_best_price": true,
           "location_id": "walmart_sps",
-          "source_brand": "FRONTERA",
-          "source_category": "Bebidas",
-          "source_name": "Vino Tinto Frontera Merlot- 750 Ml",
+          "source_brand": "SUAVITEL",
+          "source_category": "Limpieza",
+          "source_name": "Suavizante de Telas Suavitel Complete Fresca Primavera - 5 L",
           "source_presentation": null,
-          "source_record_id": "walmart:20170",
+          "source_record_id": "walmart:23047",
           "supermarket_id": "walmart"
         }
       ],
-      "savings_vs_highest": "42.95",
-      "savings_vs_highest_pct": "15.07"
+      "savings_vs_highest": "87.95",
+      "savings_vs_highest_pct": "18.02"
+    },
+    {
+      "best_price": "130.00",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "00099176231813",
+      "canonical_product_id": "prod_gtin_00099176231813",
+      "highest_price": "196.95",
+      "offers": [
+        {
+          "current_price": "196.95",
+          "is_best_price": false,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Suavitel",
+          "source_category": "Limpieza",
+          "source_name": "Suavizante de Telas Suavitel Complete Fresca Primavera 1.9 L",
+          "source_presentation": "1.9 L",
+          "source_record_id": "la_colonia:3868",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "130.00",
+          "is_best_price": true,
+          "location_id": "walmart_sps",
+          "source_brand": "SUAVITEL",
+          "source_category": "Limpieza",
+          "source_name": "Suavizante de Telas Suavitel Complete Fresca Primavera -1.9 L",
+          "source_presentation": null,
+          "source_record_id": "walmart:23045",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "66.95",
+      "savings_vs_highest_pct": "33.99"
     },
     {
       "best_price": "200.00",
@@ -104,6 +137,72 @@
       "savings_vs_highest_pct": "11.14"
     },
     {
+      "best_price": "226.70",
+      "best_supermarket_id": "la_colonia",
+      "canonical_gtin": "07500435155847",
+      "canonical_product_id": "prod_gtin_07500435155847",
+      "highest_price": "260.00",
+      "offers": [
+        {
+          "current_price": "226.70",
+          "is_best_price": true,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Pantene",
+          "source_category": "Cuidado personal",
+          "source_name": "Shampoo Pantene Pro-V Bambu Nutre Y Crece 400 Ml",
+          "source_presentation": "400 Ml",
+          "source_record_id": "la_colonia:2543",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "260.00",
+          "is_best_price": false,
+          "location_id": "walmart_sps",
+          "source_brand": "PANTENE",
+          "source_category": "Cuidado personal",
+          "source_name": "Shampoo Pantene Pro-V Bambú Nutre Crece - 400 ml",
+          "source_presentation": null,
+          "source_record_id": "walmart:19217",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "33.30",
+      "savings_vs_highest_pct": "12.81"
+    },
+    {
+      "best_price": "226.70",
+      "best_supermarket_id": "la_colonia",
+      "canonical_gtin": "07500435155922",
+      "canonical_product_id": "prod_gtin_07500435155922",
+      "highest_price": "260.00",
+      "offers": [
+        {
+          "current_price": "226.70",
+          "is_best_price": true,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Pantene",
+          "source_category": "Cuidado personal",
+          "source_name": "Acondicionador Pantene Pro-V Bambu Nutre Y Crece 400 Ml",
+          "source_presentation": "400 Ml",
+          "source_record_id": "la_colonia:1962",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "260.00",
+          "is_best_price": false,
+          "location_id": "walmart_sps",
+          "source_brand": "PANTENE",
+          "source_category": "Cuidado personal",
+          "source_name": "Acondicionador Pantene Pro-V Bambú Nutre & Crece -400 ml",
+          "source_presentation": null,
+          "source_record_id": "walmart:19221",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "33.30",
+      "savings_vs_highest_pct": "12.81"
+    },
+    {
       "best_price": "170.00",
       "best_supermarket_id": "walmart",
       "canonical_gtin": "07421001641338",
@@ -135,72 +234,6 @@
       ],
       "savings_vs_highest": "30.95",
       "savings_vs_highest_pct": "15.40"
-    },
-    {
-      "best_price": "130.00",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "00099176231813",
-      "canonical_product_id": "prod_gtin_00099176231813",
-      "highest_price": "157.56",
-      "offers": [
-        {
-          "current_price": "157.56",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Suavitel",
-          "source_category": "Limpieza",
-          "source_name": "Suavizante de Telas Suavitel Complete Fresca Primavera 1.9 L",
-          "source_presentation": "1.9 L",
-          "source_record_id": "la_colonia:3868",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "130.00",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "SUAVITEL",
-          "source_category": "Limpieza",
-          "source_name": "Suavizante de Telas Suavitel Complete Fresca Primavera -1.9 L",
-          "source_presentation": null,
-          "source_record_id": "walmart:23045",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "27.56",
-      "savings_vs_highest_pct": "17.49"
-    },
-    {
-      "best_price": "100.50",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "07500435183697",
-      "canonical_product_id": "prod_gtin_07500435183697",
-      "highest_price": "125.90",
-      "offers": [
-        {
-          "current_price": "125.90",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Old Spice",
-          "source_category": "Cuidado personal",
-          "source_name": "Desodorante Barra Old Spice Mar Profundo 85 Gr",
-          "source_presentation": "85 Gr",
-          "source_record_id": "la_colonia:2122",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "100.50",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "OLD SPICE",
-          "source_category": "Cuidado personal",
-          "source_name": "Barra Desodorante Old Spice Mar Profundo - 85 g",
-          "source_presentation": null,
-          "source_record_id": "walmart:21717",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "25.40",
-      "savings_vs_highest_pct": "20.17"
     },
     {
       "best_price": "420.95",
@@ -236,70 +269,37 @@
       "savings_vs_highest_pct": "5.15"
     },
     {
-      "best_price": "226.70",
+      "best_price": "268.95",
       "best_supermarket_id": "la_colonia",
-      "canonical_gtin": "07500435155847",
-      "canonical_product_id": "prod_gtin_07500435155847",
-      "highest_price": "246.00",
+      "canonical_gtin": "07804320706009",
+      "canonical_product_id": "prod_gtin_07804320706009",
+      "highest_price": "285.00",
       "offers": [
         {
-          "current_price": "226.70",
+          "current_price": "268.95",
           "is_best_price": true,
           "location_id": "la_colonia_sps",
-          "source_brand": "Pantene",
-          "source_category": "Cuidado personal",
-          "source_name": "Shampoo Pantene Pro-V Bambu Nutre Y Crece 400 Ml",
-          "source_presentation": "400 Ml",
-          "source_record_id": "la_colonia:2543",
+          "source_brand": "Frontera",
+          "source_category": "Bebidas",
+          "source_name": "Vino Tinto Frontera Merlot 750 Ml",
+          "source_presentation": "750 Ml",
+          "source_record_id": "la_colonia:6992",
           "supermarket_id": "la_colonia"
         },
         {
-          "current_price": "246.00",
+          "current_price": "285.00",
           "is_best_price": false,
           "location_id": "walmart_sps",
-          "source_brand": "PANTENE",
-          "source_category": "Cuidado personal",
-          "source_name": "Shampoo Pantene Pro-V Bambú Nutre Crece - 400 ml",
+          "source_brand": "FRONTERA",
+          "source_category": "Bebidas",
+          "source_name": "Vino Tinto Frontera Merlot- 750 Ml",
           "source_presentation": null,
-          "source_record_id": "walmart:19217",
+          "source_record_id": "walmart:20170",
           "supermarket_id": "walmart"
         }
       ],
-      "savings_vs_highest": "19.30",
-      "savings_vs_highest_pct": "7.85"
-    },
-    {
-      "best_price": "110.39",
-      "best_supermarket_id": "la_colonia",
-      "canonical_gtin": "07441001607370",
-      "canonical_product_id": "prod_gtin_07441001607370",
-      "highest_price": "126.50",
-      "offers": [
-        {
-          "current_price": "110.39",
-          "is_best_price": true,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Dos Pinos",
-          "source_category": "Alimentos",
-          "source_name": "Queso Crema Dos Pinos Original 350 Gr",
-          "source_presentation": "350 Gr",
-          "source_record_id": "la_colonia:1193",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "126.50",
-          "is_best_price": false,
-          "location_id": "walmart_sps",
-          "source_brand": "DOS PINOS",
-          "source_category": "Alimentos",
-          "source_name": "Queso crema Dos Pinos original - 350 g",
-          "source_presentation": null,
-          "source_record_id": "walmart:18791",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "16.11",
-      "savings_vs_highest_pct": "12.74"
+      "savings_vs_highest": "16.05",
+      "savings_vs_highest_pct": "5.63"
     },
     {
       "best_price": "90.60",
@@ -347,8 +347,8 @@
     }
   ],
   "selection_rule": "highest_absolute_savings_within_safe_common_comparable_universe",
-  "source_as_of": "2026-10-18T20:49:09.497693Z",
+  "source_as_of": "2026-10-19T11:52:30.951796Z",
   "source_head_sha": "53ef2c46b0ff58042f98b84a6e1d6546c1a4b0f3",
   "source_schema": "rpi-consumer-mart/v2",
-  "source_workflow_run_id": 39165015775
+  "source_workflow_run_id": 39247751501
 }
