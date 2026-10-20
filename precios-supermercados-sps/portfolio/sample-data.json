@@ -1,7 +1,7 @@
 {
   "comparison_policy": "fail_closed_strong_identity_and_commercial_consistency",
   "currency": "HNL",
-  "published_at_utc": "2026-10-19T11:59:07Z",
+  "published_at_utc": "2026-10-20T11:57:38Z",
   "row_count": 10,
   "rows": [
     {
@@ -236,6 +236,39 @@
       "savings_vs_highest_pct": "15.40"
     },
     {
+      "best_price": "53.00",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "07421000811640",
+      "canonical_product_id": "prod_gtin_07421000811640",
+      "highest_price": "79.15",
+      "offers": [
+        {
+          "current_price": "79.15",
+          "is_best_price": false,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Sula",
+          "source_category": "Bebidas",
+          "source_name": "Jugo Sula Ponche De Frutas 1.89 Lt",
+          "source_presentation": "1.89 Lt",
+          "source_record_id": "la_colonia:740",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "53.00",
+          "is_best_price": true,
+          "location_id": "walmart_sps",
+          "source_brand": "SULA",
+          "source_category": "Bebidas",
+          "source_name": "Jugo de Frutas Sula Ponche De Frutas - 1.89 L",
+          "source_presentation": null,
+          "source_record_id": "walmart:31798",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "26.15",
+      "savings_vs_highest_pct": "33.04"
+    },
+    {
       "best_price": "420.95",
       "best_supermarket_id": "la_colonia",
       "canonical_gtin": "04022025811030",
@@ -269,70 +302,37 @@
       "savings_vs_highest_pct": "5.15"
     },
     {
-      "best_price": "268.95",
+      "best_price": "97.52",
       "best_supermarket_id": "la_colonia",
-      "canonical_gtin": "07804320706009",
-      "canonical_product_id": "prod_gtin_07804320706009",
-      "highest_price": "285.00",
+      "canonical_gtin": "00750894621217",
+      "canonical_product_id": "prod_gtin_00750894621217",
+      "highest_price": "115.00",
       "offers": [
         {
-          "current_price": "268.95",
+          "current_price": "97.52",
           "is_best_price": true,
           "location_id": "la_colonia_sps",
-          "source_brand": "Frontera",
-          "source_category": "Bebidas",
-          "source_name": "Vino Tinto Frontera Merlot 750 Ml",
-          "source_presentation": "750 Ml",
-          "source_record_id": "la_colonia:6992",
+          "source_brand": "Mazola",
+          "source_category": "Alimentos",
+          "source_name": "Aceite De Canola Mazola 946 Ml",
+          "source_presentation": "946 Ml",
+          "source_record_id": "la_colonia:4441",
           "supermarket_id": "la_colonia"
         },
         {
-          "current_price": "285.00",
+          "current_price": "115.00",
           "is_best_price": false,
           "location_id": "walmart_sps",
-          "source_brand": "FRONTERA",
-          "source_category": "Bebidas",
-          "source_name": "Vino Tinto Frontera Merlot- 750 Ml",
+          "source_brand": "MAZOLA",
+          "source_category": "Alimentos",
+          "source_name": "Aceite Mazola canola - 946 ml",
           "source_presentation": null,
-          "source_record_id": "walmart:20170",
+          "source_record_id": "walmart:28321",
           "supermarket_id": "walmart"
         }
       ],
-      "savings_vs_highest": "16.05",
-      "savings_vs_highest_pct": "5.63"
-    },
-    {
-      "best_price": "90.60",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "07411000204818",
-      "canonical_product_id": "prod_gtin_07411000204818",
-      "highest_price": "105.00",
-      "offers": [
-        {
-          "current_price": "105.00",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "McCormick",
-          "source_category": "Alimentos",
-          "source_name": "Mayonesa Mccormick 800 Gr",
-          "source_presentation": "800 Gr",
-          "source_record_id": "la_colonia:2299",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "90.60",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "MCCORMICK",
-          "source_category": "Alimentos",
-          "source_name": "Mayonesa McCormick  - 800 g",
-          "source_presentation": null,
-          "source_record_id": "walmart:23499",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "14.40",
-      "savings_vs_highest_pct": "13.71"
+      "savings_vs_highest": "17.48",
+      "savings_vs_highest_pct": "15.20"
     }
   ],
   "schema": "precios-sps-safe-portfolio-sample/v1",
@@ -347,8 +347,8 @@
     }
   ],
   "selection_rule": "highest_absolute_savings_within_safe_common_comparable_universe",
-  "source_as_of": "2026-10-19T11:52:30.951796Z",
+  "source_as_of": "2026-10-20T11:52:38.483447Z",
   "source_head_sha": "53ef2c46b0ff58042f98b84a6e1d6546c1a4b0f3",
   "source_schema": "rpi-consumer-mart/v2",
-  "source_workflow_run_id": 39247751501
+  "source_workflow_run_id": 39418058237
 }
