@@ -1,7 +1,7 @@
 {
   "comparison_policy": "fail_closed_strong_identity_and_commercial_consistency",
   "currency": "HNL",
-  "published_at_utc": "2026-10-23T11:54:07Z",
+  "published_at_utc": "2026-10-23T19:00:59Z",
   "row_count": 10,
   "rows": [
     {
@@ -302,37 +302,37 @@
       "savings_vs_highest_pct": "7.34"
     },
     {
-      "best_price": "53.00",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "07421000811640",
-      "canonical_product_id": "prod_gtin_07421000811640",
-      "highest_price": "79.15",
+      "best_price": "420.95",
+      "best_supermarket_id": "la_colonia",
+      "canonical_gtin": "04022025811030",
+      "canonical_product_id": "prod_gtin_04022025811030",
+      "highest_price": "443.80",
       "offers": [
         {
-          "current_price": "79.15",
-          "is_best_price": false,
+          "current_price": "420.95",
+          "is_best_price": true,
           "location_id": "la_colonia_sps",
-          "source_brand": "Sula",
+          "source_brand": "Blue Nun",
           "source_category": "Bebidas",
-          "source_name": "Jugo Sula Ponche De Frutas 1.89 Lt",
-          "source_presentation": "1.89 Lt",
-          "source_record_id": "la_colonia:740",
+          "source_name": "Vino Tinto Blue Nun Merlot 750 Ml",
+          "source_presentation": "750 Ml",
+          "source_record_id": "la_colonia:6857",
           "supermarket_id": "la_colonia"
         },
         {
-          "current_price": "53.00",
-          "is_best_price": true,
+          "current_price": "443.80",
+          "is_best_price": false,
           "location_id": "walmart_sps",
-          "source_brand": "SULA",
+          "source_brand": "BLUE NUN",
           "source_category": "Bebidas",
-          "source_name": "Jugo de Frutas Sula Ponche De Frutas - 1.89 L",
+          "source_name": "Vino Blue Nun Tinto Merlot - 750 ml",
           "source_presentation": null,
-          "source_record_id": "walmart:31798",
+          "source_record_id": "walmart:28213",
           "supermarket_id": "walmart"
         }
       ],
-      "savings_vs_highest": "26.15",
-      "savings_vs_highest_pct": "33.04"
+      "savings_vs_highest": "22.85",
+      "savings_vs_highest_pct": "5.15"
     }
   ],
   "schema": "precios-sps-safe-portfolio-sample/v1",
@@ -347,8 +347,8 @@
     }
   ],
   "selection_rule": "highest_absolute_savings_within_safe_common_comparable_universe",
-  "source_as_of": "2026-10-23T11:48:04.854420Z",
+  "source_as_of": "2026-10-23T18:55:24.255797Z",
   "source_head_sha": "53ef2c46b0ff58042f98b84a6e1d6546c1a4b0f3",
   "source_schema": "rpi-consumer-mart/v2",
-  "source_workflow_run_id": 39948590366
+  "source_workflow_run_id": 40007227912
 }
