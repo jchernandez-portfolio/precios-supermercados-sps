@@ -1,33 +1,52 @@
 # Errores de datos en Súper Compras
 
-Actualizado automáticamente el 2026-10-16 a partir del catálogo publicado (San Pedro Sula: 2026-10-16T07:03:49.809451Z; Tegucigalpa: 2026-10-16T07:06:25.326779Z).
+Actualizado automáticamente el 2026-10-24 a partir del catálogo publicado (San Pedro Sula: 2026-10-24T20:57:28.608185Z; Tegucigalpa: 2026-10-24T21:00:42.612085Z).
 
 - [`errores_detectados.csv`](errores_detectados.csv): todo lo que la revisión automática encuentra hoy, una fila por producto y supermercado, con enlace al producto.
 - [`errores_confirmados.csv`](errores_confirmados.csv): errores revisados a mano, de dónde vienen (súper o Súper Compras) y su estado.
 - [`historial.csv`](historial.csv): cuántos errores había en cada publicación.
+- [`frescura.csv`](frescura.csv): última captura aceptada de cada supermercado, día a día.
+
+## Captura diaria
+
+⚠️ 2 sucursal(es) sin captura aceptada hoy; la web muestra la fecha de esos precios.
+
+| Ciudad | Supermercado | Sucursal | Última captura (UTC) | Horas | Estado |
+|---|---|---|---|---:|---|
+| San Pedro Sula | La Colonia | la_colonia_sps | 2026-10-24 17:39 | 3 | Al día |
+| San Pedro Sula | Colonial | colonial_sps | 2026-10-22 11:26 | 57 | Atrasado |
+| San Pedro Sula | Walmart | walmart_sps | 2026-10-24 11:25 | 9 | Al día |
+| San Pedro Sula | PriceSmart | pricesmart_sps | 2026-10-24 11:18 | 9 | Al día |
+| San Pedro Sula | Los Andes | comisariato_los_andes_sps | 2026-10-21 11:18 | 81 | Atrasado |
+| Tegucigalpa | La Colonia | la_colonia_tgu | 2026-10-24 17:49 | 3 | Al día |
+| Tegucigalpa | Walmart | walmart_tgu_ffaa | 2026-10-24 11:32 | 9 | Al día |
+| Tegucigalpa | Walmart | walmart_tgu_el_sauce | 2026-10-24 11:40 | 9 | Al día |
+| Tegucigalpa | PriceSmart | pricesmart_tgu | 2026-10-24 11:18 | 9 | Al día |
+| Tegucigalpa | Paiz | paiz_tgu_multiplaza | 2026-10-24 11:22 | 9 | Al día |
+| Tegucigalpa | Paiz | paiz_tgu_proceres | 2026-10-24 11:26 | 9 | Al día |
 
 ## San Pedro Sula
 
 | Problema | Colonial | La Colonia | Los Andes | PriceSmart | Walmart | Total |
 |---|---:|---:|---:|---:|---:|---:|
-| Peso o volumen imposible | 0 | 0 | 0 | 8 | 6 | 14 |
-| Precio por unidad: probable error | 5 | 6 | 8 | 0 | 20 | 39 |
-| Precio por unidad: revisar | 22 | 25 | 15 | 6 | 30 | 98 |
+| Peso o volumen imposible | 0 | 0 | 0 | 9 | 7 | 16 |
+| Precio por unidad: probable error | 7 | 6 | 8 | 7 | 26 | 54 |
+| Precio por unidad: revisar | 25 | 26 | 16 | 3 | 34 | 104 |
 | Medida mal escrita por el súper | 0 | 0 | 0 | 0 | 1 | 1 |
-| Sin presentación | 83 | 44 | 109 | 20 | 332 | 588 |
-| Corregido en la web | 5 | 5 | 1 | 2 | 6 | 19 |
+| Sin presentación | 94 | 47 | 109 | 19 | 344 | 613 |
+| Corregido en la web | 7 | 5 | 1 | 5 | 5 | 23 |
 
 ## Tegucigalpa
 
 | Problema | La Colonia | Paiz | PriceSmart | Walmart | Total |
 |---|---:|---:|---:|---:|---:|
-| Peso o volumen imposible | 0 | 2 | 7 | 12 | 21 |
-| Precio por unidad: probable error | 10 | 39 | 0 | 31 | 80 |
-| Precio por unidad: revisar | 22 | 22 | 4 | 34 | 82 |
+| Peso o volumen imposible | 0 | 2 | 9 | 12 | 23 |
+| Precio por unidad: probable error | 14 | 44 | 7 | 37 | 102 |
+| Precio por unidad: revisar | 22 | 22 | 3 | 35 | 82 |
 | Medida mal escrita por el súper | 0 | 0 | 0 | 2 | 2 |
-| Distinto entre ciudades | 12 | 0 | 0 | 2 | 14 |
-| Sin presentación | 27 | 36 | 22 | 586 | 671 |
-| Corregido en la web | 6 | 6 | 3 | 6 | 21 |
+| Distinto entre ciudades | 10 | 0 | 0 | 0 | 10 |
+| Sin presentación | 27 | 36 | 22 | 600 | 685 |
+| Corregido en la web | 6 | 6 | 2 | 6 | 20 |
 
 ## Qué significa cada problema
 

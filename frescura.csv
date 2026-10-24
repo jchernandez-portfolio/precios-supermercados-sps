@@ -1,0 +1,12 @@
+fecha,ciudad,supermercado,sucursal,ultima_captura,horas_de_atraso,estado
+2026-10-24,San Pedro Sula,La Colonia,la_colonia_sps,2026-10-24T17:39:24Z,3,Al día
+2026-10-24,San Pedro Sula,Colonial,colonial_sps,2026-10-22T11:26:53Z,57,Atrasado
+2026-10-24,San Pedro Sula,Walmart,walmart_sps,2026-10-24T11:25:41Z,9,Al día
+2026-10-24,San Pedro Sula,PriceSmart,pricesmart_sps,2026-10-24T11:18:15Z,9,Al día
+2026-10-24,San Pedro Sula,Los Andes,comisariato_los_andes_sps,2026-10-21T11:18:55.568550Z,81,Atrasado
+2026-10-24,Tegucigalpa,La Colonia,la_colonia_tgu,2026-10-24T17:49:46Z,3,Al día
+2026-10-24,Tegucigalpa,Walmart,walmart_tgu_ffaa,2026-10-24T11:32:59Z,9,Al día
+2026-10-24,Tegucigalpa,Walmart,walmart_tgu_el_sauce,2026-10-24T11:40:45Z,9,Al día
+2026-10-24,Tegucigalpa,PriceSmart,pricesmart_tgu,2026-10-24T11:18:42Z,9,Al día
+2026-10-24,Tegucigalpa,Paiz,paiz_tgu_multiplaza,2026-10-24T11:22:31Z,9,Al día
+2026-10-24,Tegucigalpa,Paiz,paiz_tgu_proceres,2026-10-24T11:26:28Z,9,Al día
