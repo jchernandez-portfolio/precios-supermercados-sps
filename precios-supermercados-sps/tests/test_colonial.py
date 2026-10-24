@@ -90,7 +90,7 @@ def test_unclosed_product_grid_is_rejected():
         parse_cards(raw[:grid_end])
 
 
-@pytest.mark.parametrize("mutation", ["missing", "duplicate", "identity_swap", "price", "total", "wrong_variant"])
+@pytest.mark.parametrize("mutation", ["missing", "duplicate", "sitemap_drift_too_large", "price", "total", "wrong_variant"])
 def test_incomplete_or_inconsistent_catalog_rejected(mutation):
     rows, cards, members = sample()
     total = 2
@@ -98,8 +98,8 @@ def test_incomplete_or_inconsistent_catalog_rejected(mutation):
         cards.pop()
     elif mutation == "duplicate":
         rows[1] = copy.deepcopy(rows[0])
-    elif mutation == "identity_swap":
-        members.pop(); members.add(ORIGIN + "/products/other")
+    elif mutation == "sitemap_drift_too_large":
+        members.update(f"{ORIGIN}/products/old-{i}" for i in range(60))
     elif mutation == "price":
         cards[0]["current_price"] = "0.00"
     elif mutation == "total":
@@ -154,3 +154,11 @@ def test_cards_markup_2026_09_30_still_fail_closed(mutation):
         return
     with pytest.raises(ColonialError, match="card_shape_invalid"):
         parse_cards(raw.encode())
+
+
+def test_sitemap_lagging_behind_new_products_is_tolerated():
+    """El sitemap de Shopify llega atrasado (2026-10-24: faltaban 30 productos nuevos)."""
+    rows, cards, members = sample()
+    members.pop()
+    members.add(ORIGIN + "/products/producto-retirado")
+    assert len(reconcile(rows, cards, members, 2)) == len(rows)

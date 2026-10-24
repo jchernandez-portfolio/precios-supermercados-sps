@@ -317,6 +317,21 @@ def apply_commercial_recheck(rows: list[dict], cards: list[dict], handle: str,
     return new_rows, new_cards
 
 
+def sitemap_drift_limit(expected: int) -> int:
+    """Productos que el sitemap de Shopify puede ir atrasado (altas o bajas del día).
+
+    El sitemap se regenera con retraso: el 2026-10-24 faltaban 30 productos nuevos
+    (navideños) de 9,124. Las fuentes de autoridad son ``products.json`` y las
+    tarjetas HTML, que sí deben coincidir exactamente; el sitemap sólo confirma.
+    """
+    return max(50, expected // 100)
+
+
+def sitemap_drift(handles: set[str], membership: set[str]) -> int:
+    expected_handles = {url.removeprefix(ORIGIN + "/products/") for url in membership}
+    return len(handles ^ expected_handles)
+
+
 def reconcile(rows: list[dict], cards: list[dict], membership: set[str], expected: int) -> list[dict]:
     by_variant = {row["item_id"]: row for row in rows}
     by_handle = {}
@@ -326,11 +341,12 @@ def reconcile(rows: list[dict], cards: list[dict], membership: set[str], expecte
     card_handles = {row["handle"] for row in cards}
     if len(by_variant) != len(rows) or len({c["item_id"] for c in cards}) != len(cards):
         raise ColonialError("duplicate_identity")
-    expected_handles = {url.removeprefix(ORIGIN + "/products/") for url in membership}
     if len({row["product_id"] for row in rows}) != expected or len(handles) != expected:
         raise ColonialError("catalog_count_mismatch")
-    if handles != expected_handles or handles != card_handles or len(cards) != expected:
+    if handles != card_handles or len(cards) != expected:
         raise ColonialError("catalog_membership_mismatch")
+    if sitemap_drift(handles, membership) > sitemap_drift_limit(expected):
+        raise ColonialError("sitemap_membership_drift_too_large")
     for card in cards:
         row = by_variant.get(card["item_id"])
         if row is None or row["handle"] != card["handle"]:

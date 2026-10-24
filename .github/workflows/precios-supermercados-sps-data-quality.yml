@@ -6,10 +6,17 @@ name: Precios SPS - Auditoría de calidad de datos
 #   errores_detectados.csv    todo lo que la revisión automática encuentra hoy
 #   errores_confirmados.csv   copia del registro manual docs/calidad/errores-confirmados.csv
 #   historial.csv             cuántos errores había en cada publicación
+#   frescura.csv              última captura aceptada de cada súper, día a día
 # Sólo lee datos públicos ya publicados; no consulta Turso ni supermercados y no
 # ejecuta contenido de las ramas de datos.
 
+# GitHub no encadena más de 3 workflows con workflow_run: la cadena diaria
+# (operador → homologación → publicación → sincronización) ya usa 4, así que tras
+# los cortes automáticos esta auditoría no se disparaba (sin datos del 16 al 24-oct).
+# El horario la corre después de cada ventana de captura; si nada cambió, no hay commit.
 on:
+  schedule:
+    - cron: "40 13,19,23 * * *" # 07:40, 13:40 y 17:40 Honduras
   workflow_run:
     workflows:
       - "Precios SPS - Sincronizar datos estáticos del portafolio"
@@ -29,6 +36,7 @@ jobs:
     if: >-
       ${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' &&
           (github.event_name == 'workflow_dispatch' ||
+           github.event_name == 'schedule' ||
            (github.event.workflow_run.conclusion == 'success' &&
             github.event.workflow_run.head_branch == 'main')) }}
     runs-on: ubuntu-latest
@@ -71,15 +79,15 @@ jobs:
         run: |
           set -euo pipefail
           repository="$GITHUB_WORKSPACE/calidad"
-          for name in README.md errores_detectados.csv errores_confirmados.csv historial.csv; do
+          for name in README.md errores_detectados.csv errores_confirmados.csv historial.csv frescura.csv; do
             if [ -L "$repository/$name" ]; then echo "calidad_symlink_boundary_invalid:$name" >&2; exit 1; fi
           done
           cp /tmp/calidad/resumen.md "$repository/README.md"
-          cp /tmp/calidad/errores_detectados.csv /tmp/calidad/historial.csv "$repository/"
+          cp /tmp/calidad/errores_detectados.csv /tmp/calidad/historial.csv /tmp/calidad/frescura.csv "$repository/"
           cp source/precios-supermercados-sps/docs/calidad/errores-confirmados.csv "$repository/errores_confirmados.csv"
           git -C "$repository" config user.name "github-actions[bot]"
           git -C "$repository" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git -C "$repository" add -A -- README.md errores_detectados.csv errores_confirmados.csv historial.csv
+          git -C "$repository" add -A -- README.md errores_detectados.csv errores_confirmados.csv historial.csv frescura.csv
           if git -C "$repository" diff --cached --quiet; then
             echo "calidad_already_current=true"
             exit 0

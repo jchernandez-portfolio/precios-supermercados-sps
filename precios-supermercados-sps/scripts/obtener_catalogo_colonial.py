@@ -17,7 +17,8 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from precios_supermercados.scrapers.colonial import (  # noqa: E402
     MAX_COMMERCIAL_RECHECKS, ORIGIN, SECTION, ColonialError, apply_commercial_recheck,
-    commercial_disagreements, parse_cards, parse_product_detail, parse_products, reconcile, sitemap_urls,
+    commercial_disagreements, parse_cards, parse_product_detail, parse_products, reconcile, sitemap_drift,
+    sitemap_drift_limit, sitemap_urls,
 )
 
 
@@ -158,7 +159,9 @@ def collect(get) -> dict:
         if membership & members:
             raise ColonialError("sitemap_overlap")
         membership.update(members)
-    if len(membership) != total:
+    # El sitemap llega atrasado (productos nuevos del día): se tolera un desfase
+    # pequeño; products.json y las tarjetas HTML sí deben cuadrar exactamente.
+    if abs(len(membership) - total) > sitemap_drift_limit(total):
         raise ColonialError("sitemap_collection_count_mismatch")
     rows = []
     for page in range(1, preflight["json_pages"] + 1):
@@ -187,6 +190,7 @@ def collect(get) -> dict:
             "skus_extracted": len(products), "skus_with_price": len(products),
             "membership_sha256": hashlib.sha256("\n".join(sorted(membership)).encode()).hexdigest(),
             "membership_count": len(membership), "html_cards_count": len(cards),
+            "sitemap_drift": sitemap_drift({card["handle"] for card in cards}, membership),
             "availability_counts": dict(Counter(p["availability"] for p in products)),
             "preflight": preflight, "commercial_recheck": recheck, "products": products}
 

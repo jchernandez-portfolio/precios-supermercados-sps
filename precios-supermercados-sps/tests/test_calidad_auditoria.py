@@ -67,3 +67,18 @@ def test_confirmed_registry_is_a_valid_table() -> None:
     assert body and all(len(row) == len(header) for row in body)
     assert {row[7] for row in body} <= {"Pendiente", "Corregido", "Sin cambio", "Oculto en la web", "Corregido en la web"}
     assert {row[6] for row in body} <= {"Súper", "Súper Compras", "Revisión"}
+
+
+def test_freshness_rows_report_late_supermarkets() -> None:
+    script = f"""
+import {{ freshnessRows, summaryMarkdown }} from '{SCRIPT.as_uri()}';
+const city = {{ name: 'San Pedro Sula', slug: 'san-pedro-sula', as_of: 'x', catalog: {{ manifest: {{ source_freshness: [
+  {{ supermarket_id: 'colonial', location_id: 'colonial_sps', status: 'STALE', last_successful_at: '2026-10-22T11:26:53Z', data_age_hours: 57 }},
+  {{ supermarket_id: 'walmart', location_id: 'walmart_sps', status: 'FRESH', last_successful_at: '2026-10-24T11:25:41Z', data_age_hours: 9 }},
+] }} }} }};
+const rows = freshnessRows([city], '2026-10-24');
+console.log(JSON.stringify({{ rows: rows.map(r => [r.supermercado, r.estado, r.horas_de_atraso]), md: summaryMarkdown([], [city], '2026-10-24', rows) }}));
+"""
+    result = json.loads(_node(script))
+    assert result["rows"] == [["Colonial", "Atrasado", 57], ["Walmart", "Al día", 9]]
+    assert "1 sucursal(es) sin captura aceptada hoy" in result["md"]

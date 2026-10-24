@@ -82,7 +82,7 @@ base.EXPECTED_PERMISSIONS[base.PRODUCT_IMAGES_SYNC_WORKFLOW] = {
 base.EXPECTED_TRIGGERS[base.PRODUCT_IMAGES_SYNC_WORKFLOW] = {"workflow_run"}
 base.DATA_QUALITY_WORKFLOW = "precios-supermercados-sps-data-quality.yml"
 base.EXPECTED_PERMISSIONS[base.DATA_QUALITY_WORKFLOW] = {"contents": "write"}
-base.EXPECTED_TRIGGERS[base.DATA_QUALITY_WORKFLOW] = {"workflow_run", "workflow_dispatch"}
+base.EXPECTED_TRIGGERS[base.DATA_QUALITY_WORKFLOW] = {"schedule", "workflow_run", "workflow_dispatch"}
 DATA_QUALITY_CHECKOUTS = [
     {"ref": "main", "path": "source", "persist-credentials": "false"},
     {"ref": "portfolio-data", "path": "data", "fetch-depth": "1",
