@@ -2,16 +2,18 @@
 
 GitHub `main`, GitHub Actions, los artifacts productivos, Turso y la rama `portfolio-data` son la fuente de verdad técnica. Este archivo contiene únicamente el estado **vigente**; los estados anteriores se conservan como snapshots (el más reciente: [`PROJECT_STATE_HISTORY_2026-10-09.md`](PROJECT_STATE_HISTORY_2026-10-09.md)).
 
-## Checkpoint vigente — 2026-10-09
+## Checkpoint vigente — 2026-10-24
 
 | Tema | Estado |
 | --- | --- |
-| Producto | Compra Inteligente B2C en **dos ciudades** (San Pedro Sula y Tegucigalpa) con pestañas **Análisis** y **Compra Inteligente**, Business Mart B2B para Power BI. Homologación v2.7 (medidas estandarizadas), árbol maestro de categorías v1.1, producto maestro con vínculos GTIN, decisiones revisadas y regla A por atributos (`engine_auto`). |
-| Operación diaria | **Activa.** Cortes aceptados todos los días desde el 2026-10-01 salvo el 05-oct (Paiz falló sus 3 intentos y entonces se bloqueaba todo). Última publicación: 2026-10-09 (run `37949953697`). |
-| Disparo | **05:17 Honduras** desde el Worker de Cloudflare `precios-sps-daily-trigger` (`17 11 * * *` UTC, secreto `GITHUB_DISPATCH_TOKEN`, token fine-grained que vence el 2027-10-10). Respaldo: el operador arranca el corte a las 08:17 si no existe. |
-| Persistencia | **Parcial**: se guardan y publican las cadenas aceptadas aunque otra falle; la fallida queda STALE y el operador la reintenta (08:17/12:17, máx. 3 intentos). |
-| Especificaciones PriceSmart | Semanal (sábado 10:37). Primera corrida real 2026-10-09: 584/600 fichas, guardadas en Turso; la homologación diaria ya las usa para completar marca/presentación. |
-| Repositorio | `jchernandez-portfolio/precios-supermercados-sps` (migración del monorepo completada; secrets `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN`). |
+| Producto | **Súper Compras** (`super-compras/`, versión `20261024-1`): web app PWA en San Pedro Sula y Tegucigalpa con búsqueda, detalle por súper, Mi compra y aviso de precios atrasados. Reemplaza a Compra Inteligente (`b2c/`, sin enlaces desde el portafolio). Business Mart B2B para Power BI sin cambios. |
+| Catálogo publicado | 2026-10-24: 33,672 productos visibles en SPS (41,210 ofertas fuente, 4,573 comparables) y 33,705 en TGU. 390 particiones en SPS; carga inicial 47,971 B / 8,967 B gzip, 2 requests. |
+| Homologación | Contenido neto GS1 en todo el catálogo (#37, #38), precio por libra para peso variable en Walmart, Paiz, La Colonia, Colonial y Los Andes (#34, #35, #39), corrección de patrones seguros y red de seguridad para datos absurdos (#41, #42). |
+| Operación diaria | Activa. Disparo 05:17 Honduras (Worker `precios-sps-daily-trigger`, token que vence el 2027-10-10), respaldo 08:17, reintentos por cadena 08:17/12:17 (máx. 3), persistencia parcial. Colonial y Los Andes reforzados en #43 (ver incidente abajo). |
+| Calidad | Auditoría 3 veces al día (07:40, 13:40, 17:40) + tras cada sincronización; rama `calidad-datos` con `README.md`, `errores_detectados.csv`, `errores_confirmados.csv`, `historial.csv` y `frescura.csv`. 34 errores confirmados en `docs/calidad/errores-confirmados.csv`. |
+| Fotos | Rama `product-images`, WebP 400 px; ~7,600 productos con foto (cobertura parcial). Próximo paso: dos tamaños (320/800 px) en almacenamiento de imágenes dedicado. |
+| Portafolio | Tarjeta y detalle de Súper Compras con cifras en vivo y página del caso en `Portafolio/precios-supermercados-sps/portfolio/caso/`. |
+| Repositorio | `jchernandez-portfolio/precios-supermercados-sps` (secrets `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN`). Pruebas: 3,141 pasan, 21 omitidas (2026-10-24). |
 
 ## Incidente 2026-10-15 a 10-24 — Colonial y Los Andes sin captura algunos días (resuelto en #43)
 
