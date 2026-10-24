@@ -97,11 +97,23 @@ def validate_snapshot_bytes(raw: bytes) -> dict[str, Any]:
     reported = data.get("catalog_products_reported")
     if type(reported) is not int or reported <= 0:
         raise SnapshotError("los_andes_catalog_count_invalid")
+    # Productos apartados por precio contradictorio (máx. 0.5 % del catálogo): no
+    # entran hoy al snapshot, pero cuentan para que el catálogo quede completo.
+    quarantine = data.get("price_quarantine") or {"count": 0, "limit": 0, "products": []}
+    quarantined = quarantine.get("count")
+    if (
+        type(quarantined) is not int
+        or quarantined < 0
+        or quarantined > max(10, reported // 200)
+        or not isinstance(quarantine.get("products"), list)
+        or len(quarantine["products"]) != quarantined
+    ):
+        raise SnapshotError("los_andes_price_quarantine_invalid")
     if (
         data.get("unique_products_extracted") != reported
         or data.get("membership_count") != reported
         or data.get("skus_extracted") != len(rows)
-        or len(rows) != reported
+        or len(rows) + quarantined != reported
         or data.get("skus_with_price") != len(rows)
     ):
         raise SnapshotError("los_andes_count_mismatch")

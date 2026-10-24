@@ -248,3 +248,24 @@ def test_verify_rejects_fewer_open_products_than_snapshot(monkeypatch) -> None:
             run_id="run-1",
             raw=raw,
         )
+
+
+def _with_quarantine(count: int, reported: int) -> bytes:
+    data = json.loads(snapshot_bytes())
+    data["catalog_products_reported"] = data["unique_products_extracted"] = data["membership_count"] = reported
+    data["price_quarantine"] = {"count": count, "limit": max(10, reported // 200),
+                                "products": [{"source_key": f"0001-9{i}", "reason": "new_price_price_mismatch",
+                                              "source_new_price": 10, "source_price": 9} for i in range(count)]}
+    return json.dumps(data).encode()
+
+
+def test_los_andes_snapshot_accepts_quarantined_price_conflicts() -> None:
+    """Un producto con precio contradictorio queda fuera sin tumbar la cadena (2026-10-22)."""
+    data = persistence.validate_snapshot_bytes(_with_quarantine(1, 3))
+    assert data["price_quarantine"]["count"] == 1
+
+
+@pytest.mark.parametrize("count,reported", [(1, 4), (11, 13)])
+def test_los_andes_snapshot_rejects_inconsistent_or_excessive_quarantine(count, reported) -> None:
+    with pytest.raises(persistence.SnapshotError, match="count_mismatch|price_quarantine_invalid"):
+        persistence.validate_snapshot_bytes(_with_quarantine(count, reported))

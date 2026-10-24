@@ -3,8 +3,8 @@
 import {
   Catalog, RETAILER_COLORS, rowKey, RETAILER_INITIALS, RETAILER_NAMES, loadCart, loadCities, loadCitySlug, money,
   photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, storeLabel,
-} from "./data.js?v=20261016-2";
-import { productIllustration } from "./illustration.js?v=20261016-2";
+} from "./data.js?v=20261024-1";
+import { productIllustration } from "./illustration.js?v=20261024-1";
 
 // Foto real si existe; si no hay o falla al cargar, la ilustración de siempre.
 function productVisual(product, { size = 118, decorative = true } = {}) {
@@ -146,11 +146,21 @@ function toast(text) {
   toastTimer = setTimeout(() => box.classList.remove("visible"), 1800);
 }
 
+function shortDate(value) {
+  return new Date(value).toLocaleDateString("es-HN", { day: "numeric", month: "short" });
+}
+
+// "Precios de hoy" sólo si todos los súper se capturaron hoy; si no, se dice cuáles
+// vienen de un día anterior (Colonial y Los Andes quedaron atrás 2026-10-22 a 24).
 function freshnessText() {
   const asOf = state.catalog?.asOf;
   if (!asOf) return "";
   const date = new Date(asOf);
-  return `Precios de hoy · actualizados ${date.toLocaleString("es-HN", { weekday: "long", hour: "numeric", minute: "2-digit" })}`;
+  const when = date.toLocaleString("es-HN", { weekday: "long", hour: "numeric", minute: "2-digit" });
+  const stale = state.catalog.staleRetailers();
+  if (!stale.length) return `Precios de hoy · actualizados ${when}`;
+  const names = stale.map((item) => `${RETAILER_NAMES[item.id] || item.id} del ${shortDate(item.since)}`);
+  return `Actualizado ${when} · ${names.join(", ")}`;
 }
 
 // ------------------------------------------------------------------ shared pieces
@@ -379,12 +389,14 @@ function viewProduct(id, container) {
         const onSale = offer.is_promotion === true || (regular && regular > Number(offer.current_price));
         const label = storeLabel(offer, offers);
         const unitPrice = offerUnitPrice(product, offer);
+        const staleSince = catalog.staleSince(offer);
         return h("div", { class: `offer${index === 0 && offers.length > 1 ? " best" : ""}` },
           h("span", { class: "store-badge", style: { background: RETAILER_COLORS[offer.supermarket_id] } }, RETAILER_INITIALS[offer.supermarket_id] || "?"),
           h("div", { class: "offer-main" },
             h("div", {}, h("strong", {}, label),
               index === 0 && offers.length > 1 ? h("span", { class: "badge-best" }, "MÁS BARATO") : null),
-            unitPrice ? h("span", { class: "muted small" }, `${money(unitPrice.amount)} por ${unitPrice.per}`) : null),
+            unitPrice ? h("span", { class: "muted small" }, `${money(unitPrice.amount)} por ${unitPrice.per}`) : null,
+            staleSince ? h("span", { class: "stale" }, `Precio del ${shortDate(staleSince)} · puede haber cambiado`) : null),
           h("div", { class: "offer-price" },
             h("strong", {}, money(offer.current_price)),
             onSale && regular > Number(offer.current_price) ? h("span", { class: "sale" }, "Oferta · antes ", h("del", {}, money(regular))) : onSale ? h("span", { class: "sale" }, "Oferta") : null),
@@ -393,7 +405,9 @@ function viewProduct(id, container) {
             onclick: () => addToCart(product.id, offer.location_id, label),
           }, icon("plus", 18)));
       }),
-      h("p", { class: "muted small" }, "Precios en línea de hoy; pueden variar en tienda. Usa + para elegir en qué súper comprarlo."),
+      h("p", { class: "muted small" }, offers.some((offer) => catalog.staleSince(offer))
+        ? "Precios en línea; los marcados con fecha no se pudieron actualizar hoy. Pueden variar en tienda."
+        : "Precios en línea de hoy; pueden variar en tienda. Usa + para elegir en qué súper comprarlo."),
       h("button", {
         type: "button", class: "primary wide",
         onclick: () => addToCart(product.id, offers.length > 1 && cheapest ? cheapest.location_id : null, offers.length > 1 ? cheapestLabel : ""),

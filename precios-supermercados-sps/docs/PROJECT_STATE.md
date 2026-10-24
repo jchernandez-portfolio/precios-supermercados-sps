@@ -13,6 +13,13 @@ GitHub `main`, GitHub Actions, los artifacts productivos, Turso y la rama `portf
 | Especificaciones PriceSmart | Semanal (sábado 10:37). Primera corrida real 2026-10-09: 584/600 fichas, guardadas en Turso; la homologación diaria ya las usa para completar marca/presentación. |
 | Repositorio | `jchernandez-portfolio/precios-supermercados-sps` (migración del monorepo completada; secrets `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN`). |
 
+## Incidente 2026-10-15 a 10-24 — Colonial y Los Andes sin captura algunos días (resuelto en #43)
+
+- **Colonial** falló 6 de 10 días con `sitemap_collection_count_mismatch`: el sitemap de Shopify llega atrasado respecto al catálogo (el 24-oct faltaban 30 productos nuevos de 9,124). El sitemap pasa a ser confirmación con desfase máximo de 1 % (`sitemap_drift_limit`); `products.json` y las tarjetas HTML siguen exigiendo coincidencia exacta. La evidencia guarda `sitemap_drift`.
+- **Los Andes** quedó STALE del 22 al 24-oct por `new_price_price_mismatch` en un solo producto. Las contradicciones de precio de un producto (`PRICE_CONFLICT_REASONS`) ahora lo apartan del snapshot del día con evidencia en `price_quarantine`; más de 0.5 % del catálogo (`price_quarantine_limit`) sigue fallando cerrado. El validador de Turso acepta `len(rows) + cuarentena == catálogo`.
+- **Web**: el encabezado y el detalle muestran la fecha del precio de cada súper atrasado (`manifest.source_freshness`) en vez de "Precios de hoy".
+- **Registro de errores**: la auditoría no corría tras los cortes automáticos (GitHub no encadena más de 3 `workflow_run`); ahora tiene horario (07:40, 13:40 y 17:40 Honduras) y publica `frescura.csv` en la rama `calidad-datos`.
+
 ## Incidente 2026-10-02 — La Colonia lista productos sin precio
 
 La corrida diaria "La Colonia - Actualización MVP" falló dos veces en `acquire (la_colonia)` con `SnapshotError: snapshot_sku_count_mismatch`: La Colonia publicó productos nuevos **sin precio y agotados** ("NO DISPONIBLE"), y la validación exigía precio en todo SKU. SPS y TGU: Dove 18658/18659 y Rexona 18660/18661 (~9.600 SKU por ciudad); TGU intento 1 además Dubois 18302. Como la persistencia exige las seis cadenas, ese día no se publicó nada.

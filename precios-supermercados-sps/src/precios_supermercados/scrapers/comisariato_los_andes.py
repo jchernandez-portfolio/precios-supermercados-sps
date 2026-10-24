@@ -220,7 +220,45 @@ def _availability(product: dict[str, Any]) -> tuple[str, Decimal | None]:
     return "unknown", signal
 
 
+# Contradicciones de precio de UN producto (newPrice ≠ price, descuento sin precio
+# regular...). Antes tumbaban la cadena completa (2026-10-22 a 10-24 Los Andes quedó
+# STALE por un producto): ahora ese producto sale sin precio y queda en evidencia,
+# con tope por corrida para que un cambio masivo del sitio siga fallando cerrado.
+PRICE_CONFLICT_REASONS = frozenset({
+    "new_price_price_mismatch",
+    "oldPrice_below_current",
+    "discount_without_regular_price_evidence",
+    "discount_amount_mismatch",
+})
+
+
+def price_quarantine_limit(total: int) -> int:
+    return max(10, total // 200)
+
+
 def _pricing(
+    product: dict[str, Any],
+) -> tuple[str | None, str | None, bool | None, dict[str, Any]]:
+    try:
+        return _strict_pricing(product)
+    except LosAndesError as exc:
+        reason = str(exc)
+        if reason not in PRICE_CONFLICT_REASONS:
+            raise
+        return None, None, None, {
+            "price_status": "quarantined_price_conflict",
+            "quarantine_reason": reason,
+            "source_new_price": product.get("newPrice"),
+            "source_price": product.get("price"),
+            "source_old_price": product.get("oldPrice"),
+            "source_list_price": product.get("listPrice"),
+            "source_discount": product.get("discount"),
+            "source_discount_two": product.get("discountTwo"),
+            "regular_price_evidence": [],
+        }
+
+
+def _strict_pricing(
     product: dict[str, Any],
 ) -> tuple[str | None, str | None, bool | None, dict[str, Any]]:
     current = _money(product.get("newPrice"), "new_price_invalid", allow_none=True)
@@ -502,6 +540,21 @@ def reconcile_capture(directory: str | Path) -> dict[str, Any]:
         "catalog_membership_incomplete",
     )
 
+    quarantined = sorted(
+        key for key, detail in all_details.items()
+        if detail.get("price_status") == "quarantined_price_conflict"
+    )
+    require(len(quarantined) <= price_quarantine_limit(total), "price_conflicts_above_quarantine_limit")
+    # Fuera del snapshot: hoy no tienen un precio confiable. Quedan en evidencia.
+    quarantine_evidence = [
+        {"source_key": key, "reason": all_details[key]["quarantine_reason"],
+         "source_new_price": all_details[key]["source_new_price"], "source_price": all_details[key]["source_price"]}
+        for key in quarantined
+    ]
+    all_rows = [row for row in all_rows if row["source_key"] not in set(quarantined)]
+    for key in quarantined:
+        del all_details[key]
+
     require(final_record.get("status") in {200, 201}, "final_recheck_failed")
     require(final_record.get("retries") == 0, "final_recheck_failed")
     final_url, final_body = build_catalog_request(0, PAGE_SIZE)
@@ -554,6 +607,8 @@ def reconcile_capture(directory: str | Path) -> dict[str, Any]:
         "products": all_rows,
         "source_details": all_details,
         "page_evidence": page_evidence,
+        "price_quarantine": {"count": len(quarantined), "limit": price_quarantine_limit(total),
+                             "products": quarantine_evidence},
         "request_count": request_count,
         "retry_count": retry_count,
     }

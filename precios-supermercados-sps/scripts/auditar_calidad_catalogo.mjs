@@ -176,14 +176,41 @@ export function previousFirstSeen(csvText, cities) {
   return map;
 }
 
-export function summaryMarkdown(rows, cities, today) {
+// Última captura aceptada de cada súper (manifest.source_freshness del catálogo).
+export function freshnessRows(cities, today) {
+  const out = [];
+  for (const city of cities) {
+    for (const item of city.catalog?.manifest?.source_freshness || []) {
+      out.push({
+        fecha: today, ciudad: city.name, supermercado: RETAILER_NAMES[item.supermarket_id] || item.supermarket_id,
+        sucursal: item.location_id, ultima_captura: item.last_successful_at || "",
+        horas_de_atraso: item.data_age_hours ?? "", estado: item.status === "FRESH" ? "Al día" : "Atrasado",
+      });
+    }
+  }
+  return out;
+}
+
+export function summaryMarkdown(rows, cities, today, freshness = []) {
   const lines = [
     "# Errores de datos en Súper Compras", "",
     `Actualizado automáticamente el ${today} a partir del catálogo publicado (${cities.map((c) => `${c.name}: ${c.as_of}`).join("; ")}).`, "",
     "- [`errores_detectados.csv`](errores_detectados.csv): todo lo que la revisión automática encuentra hoy, una fila por producto y supermercado, con enlace al producto.",
     "- [`errores_confirmados.csv`](errores_confirmados.csv): errores revisados a mano, de dónde vienen (súper o Súper Compras) y su estado.",
-    "- [`historial.csv`](historial.csv): cuántos errores había en cada publicación.", "",
+    "- [`historial.csv`](historial.csv): cuántos errores había en cada publicación.",
+    "- [`frescura.csv`](frescura.csv): última captura aceptada de cada supermercado, día a día.", "",
   ];
+  if (freshness.length) {
+    const late = freshness.filter((item) => item.estado !== "Al día");
+    lines.push("## Captura diaria", "", late.length
+      ? `⚠️ ${late.length} sucursal(es) sin captura aceptada hoy; la web muestra la fecha de esos precios.`
+      : "✅ Todos los supermercados se capturaron hoy.", "",
+    "| Ciudad | Supermercado | Sucursal | Última captura (UTC) | Horas | Estado |", "|---|---|---|---|---:|---|");
+    for (const item of freshness) {
+      lines.push(`| ${item.ciudad} | ${item.supermercado} | ${item.sucursal} | ${item.ultima_captura.replace("T", " ").slice(0, 16)} | ${item.horas_de_atraso} | ${item.estado} |`);
+    }
+    lines.push("");
+  }
   for (const city of cities) {
     const own = rows.filter((row) => row.ciudad === city.name);
     const retailers = [...new Set(own.map((row) => row.supermercado))].sort();
@@ -253,7 +280,11 @@ async function main(argv) {
   const rows = toRows(found, today, previousFirstSeen(read("errores_detectados.csv"), cities));
   mkdirSync(out, { recursive: true });
   writeFileSync(join(out, "errores_detectados.csv"), toCsv(rows));
-  writeFileSync(join(out, "resumen.md"), summaryMarkdown(rows, cities, today));
+  const freshness = freshnessRows(cities, today);
+  writeFileSync(join(out, "resumen.md"), summaryMarkdown(rows, cities, today, freshness));
+  const freshnessColumns = ["fecha", "ciudad", "supermercado", "sucursal", "ultima_captura", "horas_de_atraso", "estado"];
+  const pastFreshness = parseCsv(read("frescura.csv")).filter((row) => row.fecha !== today);
+  writeFileSync(join(out, "frescura.csv"), toCsv([...pastFreshness, ...freshness], freshnessColumns));
   const history = parseCsv(read("historial.csv")).filter((row) => row.fecha !== today);
   const historyColumns = ["fecha", "ciudad", "catalogo", "problema", "cantidad"];
   writeFileSync(join(out, "historial.csv"), toCsv([...history, ...historyRows(rows, cities, today)], historyColumns));

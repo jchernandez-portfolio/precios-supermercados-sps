@@ -161,16 +161,35 @@ def test_list_price_is_delivery_mode_not_a_monetary_signal():
         ({"code": ""}, "source_code_invalid"),
         ({"name": ""}, "source_name_invalid"),
         ({"newPrice": -1, "price": -1}, "new_price_invalid"),
-        ({"newPrice": 10, "price": 9}, "new_price_price_mismatch"),
-        ({"newPrice": 10, "price": 10, "oldPrice": 9}, "oldPrice_below_current"),
-        ({"discount": 5}, "discount_without_regular_price_evidence"),
-        ({"newPrice": 10, "price": 10, "oldPrice": 12, "discount": 1}, "discount_amount_mismatch"),
         ({"availibilityCount": -1}, "availability_signal_invalid"),
     ],
 )
 def test_ambiguous_or_invalid_source_signals_fail_closed(updates, reason):
     with pytest.raises(LosAndesError, match=reason):
         parse_products([source_product(**updates)])
+
+
+@pytest.mark.parametrize(
+    "updates,reason",
+    [
+        ({"newPrice": 10, "price": 9}, "new_price_price_mismatch"),
+        ({"newPrice": 10, "price": 10, "oldPrice": 9}, "oldPrice_below_current"),
+        ({"discount": 5}, "discount_without_regular_price_evidence"),
+        ({"newPrice": 10, "price": 10, "oldPrice": 12, "discount": 1}, "discount_amount_mismatch"),
+    ],
+)
+def test_one_product_price_conflict_is_quarantined_without_a_price(updates, reason):
+    """Un producto con precios contradictorios ya no tumba la cadena (2026-10-22 a 24)."""
+    rows, details = parse_products([source_product(**updates)])
+    row = rows[0]
+    assert row["current_price"] is None and row["reported_regular_price"] is None and row["is_promotion"] is None
+    detail = details[row["source_key"]]
+    assert detail["price_status"] == "quarantined_price_conflict" and detail["quarantine_reason"] == reason
+
+
+def test_price_quarantine_has_a_per_run_limit():
+    from precios_supermercados.scrapers.comisariato_los_andes import price_quarantine_limit
+    assert price_quarantine_limit(6277) == 31 and price_quarantine_limit(100) == 10
 
 
 def test_unpriced_product_does_not_invent_promotion_or_availability():
@@ -308,3 +327,87 @@ def test_capture_rejects_missing_same_run_store_evidence(tmp_path):
     )
     with pytest.raises(LosAndesError, match="store_evidence_missing"):
         reconcile_capture(tmp_path)
+
+
+def test_capture_quarantines_one_price_conflict_and_persists_the_rest(tmp_path):
+    """2026-10-22: un producto con newPrice ≠ price dejaba a Los Andes STALE tres días."""
+    products = [
+        source_product(code="0001-000000000000001", availibilityCount=3),
+        source_product(
+            code="0001-000000000000002",
+            availibilityCount=0,
+            name="Otro producto",
+            newPrice=12,
+            price=11,
+        ),
+    ]
+    payload = {
+        "currentPage": 1,
+        "data": products,
+        "itemPerPage": 2,
+        "totalItems": 2,
+        "totalPages": 1,
+    }
+    raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
+    response_name = "page-00000.json"
+    final_name = "final-recheck.json"
+    store_name = "store-evidence.json"
+    (tmp_path / response_name).write_bytes(raw)
+    (tmp_path / final_name).write_bytes(raw)
+    store_raw = json.dumps(store_payload(), ensure_ascii=False, separators=(",", ":")).encode()
+    (tmp_path / store_name).write_bytes(store_raw)
+
+    url, body = build_catalog_request(0, 100)
+    page_record = {
+        "skip": 0,
+        "take": 100,
+        "status": 201,
+        "retries": 0,
+        "url": url,
+        "request_body": body,
+        "response_file": response_name,
+        "response_sha256": hashlib.sha256(raw).hexdigest(),
+        "response_bytes": len(raw),
+        "observed_at_utc": "2026-09-04T01:30:00Z",
+    }
+    final_record = {
+        **page_record,
+        "response_file": final_name,
+        "observed_at_utc": "2026-09-04T01:30:02Z",
+    }
+    store_record = {
+        "status": 200,
+        "retries": 0,
+        "url": STORE_ENDPOINT,
+        "request_body": build_store_request(),
+        "response_file": store_name,
+        "response_sha256": hashlib.sha256(store_raw).hexdigest(),
+        "response_bytes": len(store_raw),
+        "observed_at_utc": "2026-09-04T01:29:59Z",
+    }
+    ledger = {
+        "closed": True,
+        "supermarket_id": "comisariato_los_andes",
+        "location_id": LOCATION_ID,
+        "store_id": 1,
+        "office_code": "00",
+        "location_two_code": "501",
+        "concurrency": 1,
+        "request_count": 3,
+        "retry_count": 0,
+        "store_evidence": store_record,
+        "final_total_items": 2,
+        "final_recheck": final_record,
+        "pages": [page_record],
+    }
+    (tmp_path / "ledger.json").write_text(json.dumps(ledger), encoding="utf-8")
+    snapshot = reconcile_capture(tmp_path)
+    assert snapshot["catalog_products_reported"] == 2 and snapshot["unique_products_extracted"] == 2
+    assert [row["source_key"] for row in snapshot["products"]] == ["0001-000000000000001"]
+    assert snapshot["skus_extracted"] == 1 and snapshot["skus_with_price"] == 1
+    assert snapshot["price_quarantine"]["count"] == 1
+    assert snapshot["price_quarantine"]["products"][0]["reason"] == "new_price_price_mismatch"
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import actualizar_mvp_turso_comisariato_los_andes as persistence
+    persistence.validate_snapshot_bytes(json.dumps(snapshot, ensure_ascii=False).encode())

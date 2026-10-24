@@ -465,3 +465,19 @@ console.log(JSON.stringify({ shown, offer: repairedUnitPrice(products.at(-6), '1
     ]
     assert result["offer"] == {"amount": "42.33", "per": "L"}
     assert result["name"] == "400 ml"
+
+
+def test_stale_retailers_come_from_source_freshness(tmp_path: Path) -> None:
+    """La web no dice "precios de hoy" de un súper que no se capturó hoy (Los Andes 2026-10-21)."""
+    script = """
+import { Catalog } from './data.js';
+const c = Object.create(Catalog.prototype);
+c.manifest = { source_freshness: [
+  { supermarket_id: 'la_colonia', location_id: 'la_colonia_sps', status: 'FRESH', last_successful_at: '2026-10-24T17:39:24Z' },
+  { supermarket_id: 'comisariato_los_andes', location_id: 'comisariato_los_andes_sps', status: 'STALE', last_successful_at: '2026-10-21T11:18:55Z' },
+] };
+console.log(JSON.stringify([c.staleRetailers().map((x) => x.id),
+  c.staleSince({ supermarket_id: 'comisariato_los_andes', location_id: 'comisariato_los_andes_sps' }),
+  c.staleSince({ supermarket_id: 'la_colonia', location_id: 'la_colonia_sps' })]));
+"""
+    assert json.loads(_node(script, tmp_path)) == [["comisariato_los_andes"], "2026-10-21T11:18:55Z", None]

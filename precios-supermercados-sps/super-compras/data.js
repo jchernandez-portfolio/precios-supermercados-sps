@@ -499,6 +499,18 @@ export class Catalog {
 
   get asOf() { return this.manifest?.as_of; }
 
+  // Súper cuya última captura aceptada no es del día (manifest.source_freshness).
+  staleRetailers() {
+    return (this.manifest?.source_freshness || [])
+      .filter((item) => item.status && item.status !== "FRESH" && item.last_successful_at)
+      .map((item) => ({ id: item.supermarket_id, location: item.location_id, since: item.last_successful_at }));
+  }
+
+  staleSince(offer) {
+    const found = this.staleRetailers().find((item) => item.location === offer.location_id || (!item.location && item.id === offer.supermarket_id));
+    return found ? found.since : null;
+  }
+
   departments() {
     const counts = new Map();
     for (const product of this.products) {
