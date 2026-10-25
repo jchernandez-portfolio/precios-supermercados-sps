@@ -33,7 +33,9 @@ Mientras dura la migración, el catálogo usa la foto v2 si existe y si no la v1
    - deja un artifact con las fotos nuevas, el `index.json` completo y `revision.html`.
 2. **Precios SPS - Publicar fotos de producto en R2** (`contents: read`, sólo las
    llaves del bucket) valida el artifact con `scripts/subir_fotos_r2.py` (rutas,
-   cabecera WebP, tamaño, índice) y sube las fotos; el índice va al final.
+   cabecera WebP, tamaño, índice), lista lo que ya hay en el bucket, sube en
+   paralelo sólo lo que falta (mismo nombre = mismo contenido, así una corrida
+   interrumpida se retoma) y al final el índice.
 3. La publicación del catálogo lee los dos índices y llena la columna `photo` de
    `search.json`: huella v2, versión v1 o 0.
 4. La app usa 320 px en tarjetas y deja que el navegador elija 320 u 800 px en el
@@ -64,6 +66,12 @@ Mientras dura la migración, el catálogo usa la foto v2 si existe y si no la v1
   catálogo completo se cubre en unos tres días; después sólo se procesa lo nuevo o
   lo que cambió); 1 s entre llamadas a los sitios y 0,15 s entre fotos. Se procesan
   primero las filas con más súper.
+- Tiempo: a los 250 minutos ya no se empiezan filas nuevas y se cierra el artifact
+  con lo hecho (el job tiene 300). La primera corrida (8 000 productos, 20 000
+  fotos medidas) tomó 3 h 47 min: 7 062 con foto (6 508 hd, 552 sd, 2 low), 316
+  sin foto aceptable.
+- Si la publicación en R2 se interrumpe, se relanza a mano el workflow de
+  publicación con el número de la corrida de fotos: sólo sube lo que falta.
 - Una fila con algún súper que no respondió ese día se pospone.
 - Productos sin foto en ningún súper siguen con ilustración.
 

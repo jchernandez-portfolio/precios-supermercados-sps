@@ -49,6 +49,8 @@ PUBLIC_BASE = "https://pub-0dcb2204775c484dbe6681e659eee236.r2.dev"
 R2_PREFIX = "fotos/v2/"
 INDEX_URL = f"{PUBLIC_BASE}/{R2_PREFIX}index.json"
 DEFAULT_MAX_PRODUCTS = 12000
+# El job tiene 300 min; a los 240 ya no se empiezan filas nuevas y se cierra el artifact.
+DEFAULT_TIME_BUDGET_MINUTES = 240
 REVIEW_LOWEST = 120
 REVIEW_SAMPLE = 80
 GENERIC_URL_OWNERS = 3
@@ -292,7 +294,15 @@ def _review_record(key: str, scored: Sequence[images.Scored], chosen: images.Sco
 
 def process(keys: Sequence[str], candidates: Mapping[str, Sequence[images.Candidate]], client,
             output_dir: Path, index: dict[str, dict[str, object]], *, log=print,
-            review: list[dict[str, object]] | None = None) -> Counter:
+            review: list[dict[str, object]] | None = None, deadline: float | None = None,
+            clock=time.monotonic) -> Counter:
+    """Descarga, puntúa y recorta las filas planeadas.
+
+    Se detiene limpiamente (y deja índice y artifact completos) cuando se agota el
+    presupuesto de descargas o cuando el reloj pasa ``deadline`` (time.monotonic):
+    la corrida de 8 000 productos tomó 3 h 47 min y el job tiene 5 h, así que lo
+    que no alcanza queda para la siguiente corrida en vez de perderlo todo.
+    """
     stats: Counter = Counter()
     generic = generic_urls(candidates)
     with tempfile.TemporaryDirectory(prefix="fotos-") as temporary:
@@ -303,6 +313,11 @@ def process(keys: Sequence[str], candidates: Mapping[str, Sequence[images.Candid
             if client.requests + 2 * len(candidates[key]) > client.max_requests:
                 log(f"presupuesto de descargas agotado tras {number - 1} filas; el resto sigue en la próxima corrida")
                 stats["filas_pospuestas"] = len(keys) - number + 1
+                break
+            if deadline is not None and clock() >= deadline:
+                log(f"tiempo agotado tras {number - 1} filas; el resto sigue en la próxima corrida")
+                stats["filas_pospuestas"] = len(keys) - number + 1
+                stats["tiempo_agotado"] = 1
                 break
             downloaded[key] = download_row(client, candidates[key], folder, count, generic)
             count += len(downloaded[key])
@@ -496,6 +511,7 @@ def _http_json(session, missing_ok: bool = False):
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    started = time.monotonic()
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--authorization", type=Path,
@@ -507,6 +523,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--api-delay", type=float, default=1.0)
     parser.add_argument("--image-delay", type=float, default=0.15)
     parser.add_argument("--max-image-requests", type=int, default=12000)
+    parser.add_argument("--time-budget-minutes", type=float, default=DEFAULT_TIME_BUDGET_MINUTES,
+                        help="minutos desde el arranque tras los cuales ya no se empiezan filas nuevas (0 = sin límite)")
     args = parser.parse_args(argv)
     authorization = load_authorization(
         args.authorization, api_delay=args.api_delay, image_delay=args.image_delay,
@@ -536,7 +554,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     downloader = sources.ImageSourceClient(requests.Session(), delay=args.image_delay,
                                            max_requests=args.max_image_requests)
     review: list[dict[str, object]] = []
-    stats = process(keys, candidates, downloader, args.output_dir, index, review=review)
+    deadline = started + args.time_budget_minutes * 60 if args.time_budget_minutes > 0 else None
+    stats = process(keys, candidates, downloader, args.output_dir, index, review=review, deadline=deadline)
     stats.update({f"error_{name}": 1 for name in api.errors})
     path = write_index(args.output_dir, index, stats)
     write_review(args.output_dir, review, args.public_base.rstrip("/"), stats)

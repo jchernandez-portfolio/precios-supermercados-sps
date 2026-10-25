@@ -5,6 +5,11 @@ name: Precios SPS - Publicar fotos de producto en R2
 # bucket: no consulta Turso ni supermercados, no escribe en el repositorio y no
 # ejecuta contenido del artifact. El script de main valida rutas, formato, tamaño
 # e índice antes de subir y sube el índice al final.
+#
+# Corre solo al terminar la corrida de fotos. También se puede lanzar a mano desde
+# main con el número de una corrida de fotos ya terminada (por ejemplo cuando la
+# publicación anterior se interrumpió): se comprueba con la API que esa corrida es
+# del workflow de fotos, de main y exitosa, y se usa el script de main.
 
 on:
   workflow_run:
@@ -12,6 +17,12 @@ on:
       - "Precios SPS - Fotos de producto"
     types:
       - completed
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Número de la corrida de 'Precios SPS - Fotos de producto' cuyo artifact se publica"
+        required: true
+        type: string
 
 permissions:
   actions: read
@@ -25,15 +36,33 @@ jobs:
   sync:
     if: >-
       ${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' &&
-          github.event.workflow_run.conclusion == 'success' &&
-          github.event.workflow_run.head_branch == 'main' }}
+          ((github.event_name == 'workflow_run' &&
+            github.event.workflow_run.conclusion == 'success' &&
+            github.event.workflow_run.head_branch == 'main') ||
+           (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 150
+    env:
+      SOURCE_RUN_ID: ${{ github.event.workflow_run.id || inputs.run_id }}
     steps:
+      - name: Comprobar la corrida indicada a mano (workflow de fotos, main, exitosa)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          case "$SOURCE_RUN_ID" in ''|*[!0-9]*) echo "run_id_invalid" >&2; exit 1 ;; esac
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN_ID}" \
+            --jq '[.name, .head_branch, .conclusion] | @tsv' > /tmp/run.tsv
+          IFS=$'\t' read -r name branch conclusion < /tmp/run.tsv
+          test "$name" = "Precios SPS - Fotos de producto" || { echo "run_not_photos:$name" >&2; exit 1; }
+          test "$branch" = "main" || { echo "run_not_main:$branch" >&2; exit 1; }
+          test "$conclusion" = "success" || { echo "run_not_success:$conclusion" >&2; exit 1; }
+
       - name: Descargar el script de subida de la misma revisión
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           path: source
           sparse-checkout: precios-supermercados-sps/scripts/subir_fotos_r2.py
           sparse-checkout-cone-mode: false
@@ -50,18 +79,17 @@ jobs:
       - name: Descargar exactamente el artifact de fotos ya generado
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v5.0.0
         with:
-          name: product-images-${{ github.event.workflow_run.id }}
+          name: product-images-${{ env.SOURCE_RUN_ID }}
           path: /tmp/precios-sps-product-images
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
 
       - name: Validar y subir a R2 (fotos primero, índice al final)
         env:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           set -euo pipefail
           python source/precios-supermercados-sps/scripts/subir_fotos_r2.py \

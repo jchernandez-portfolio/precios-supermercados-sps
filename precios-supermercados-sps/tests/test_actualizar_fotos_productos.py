@@ -164,6 +164,18 @@ def test_process_stops_cleanly_when_download_budget_runs_out(tmp_path: Path) -> 
     assert stats["filas_pospuestas"] == 2 and index == {}
 
 
+def test_process_stops_cleanly_when_time_runs_out(tmp_path: Path) -> None:
+    """Pasado el plazo no se empiezan filas nuevas; lo hecho queda en el índice y el resto se pospone."""
+    _, candidates = setup()
+    downloader = Downloader({})
+    index: dict = {}
+    ticks = iter([0.0, 999.0])
+    stats = fotos.process(["aa11", "bb22"], candidates, downloader, tmp_path, index, log=lambda _: None,
+                          deadline=100.0, clock=lambda: next(ticks))
+    assert stats["filas_pospuestas"] == 1 and stats["tiempo_agotado"] == 1
+    assert set(index) == {"aa11"}
+
+
 def test_secondary_photo_is_skipped_when_main_is_good(tmp_path: Path) -> None:
     _, candidates = setup()
     files = {fotos.sources.download_url("walmart", WM.format(1)): png(product()),

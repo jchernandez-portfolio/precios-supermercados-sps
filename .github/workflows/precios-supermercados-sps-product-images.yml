@@ -64,7 +64,8 @@ jobs:
             --max-products 12000 \
             --api-delay 1.0 \
             --image-delay 0.15 \
-            --max-image-requests 30000
+            --max-image-requests 30000 \
+            --time-budget-minutes 250
 
       - name: Guardar fotos nuevas e índice
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2

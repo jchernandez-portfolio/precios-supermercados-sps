@@ -78,12 +78,12 @@ base.EXPECTED_PERMISSIONS[base.PRODUCT_IMAGES_SYNC_WORKFLOW] = {
     "actions": "read",
     "contents": "read",
 }
-base.EXPECTED_TRIGGERS[base.PRODUCT_IMAGES_SYNC_WORKFLOW] = {"workflow_run"}
+base.EXPECTED_TRIGGERS[base.PRODUCT_IMAGES_SYNC_WORKFLOW] = {"workflow_run", "workflow_dispatch"}
 R2_SECRETS = {"R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"}
 base.ALLOWED_SECRET_REFERENCES[base.PRODUCT_IMAGES_SYNC_WORKFLOW] = set(R2_SECRETS)
 base.ALLOWED_VAR_REFERENCES[base.PRODUCT_IMAGES_SYNC_WORKFLOW] = {"R2_PUBLIC_BASE_URL"}
 PRODUCT_IMAGES_SYNC_CHECKOUT = {
-    "ref": "${{ github.event.workflow_run.head_sha }}",
+    "ref": "${{ github.event.workflow_run.head_sha || github.sha }}",
     "path": "source",
     "sparse-checkout": "precios-supermercados-sps/scripts/subir_fotos_r2.py",
     "sparse-checkout-cone-mode": "false",
@@ -588,16 +588,29 @@ def test_product_images_sync_uploads_validated_artifact_with_only_bucket_credent
     workflow = base.load_workflow(path)
     assert workflow["permissions"] == {"actions": "read", "contents": "read"}
     assert workflow["on"] == {
-        "workflow_run": {"workflows": ["Precios SPS - Fotos de producto"], "types": ["completed"]}
+        "workflow_run": {"workflows": ["Precios SPS - Fotos de producto"], "types": ["completed"]},
+        "workflow_dispatch": {"inputs": {"run_id": {
+            "description": "Número de la corrida de 'Precios SPS - Fotos de producto' cuyo artifact se publica",
+            "required": "true", "type": "string",
+        }}},
     }
     assert workflow["concurrency"] == {"group": "precios-sps-product-images-sync", "cancel-in-progress": "false"}
     sync = base.jobs(workflow)["sync"]
     assert set(base.jobs(workflow)) == {"sync"}
     assert "github.event.workflow_run.conclusion == 'success'" in sync["if"]
     assert "github.event.workflow_run.head_branch == 'main'" in sync["if"]
+    assert "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'" in sync["if"]
+    assert sync["env"] == {"SOURCE_RUN_ID": "${{ github.event.workflow_run.id || inputs.run_id }}"}
     raw = path.read_text(encoding="utf-8")
     assert base.secret_references(path) == R2_SECRETS
-    assert "product-images-${{ github.event.workflow_run.id }}" in raw
+    assert "product-images-${{ env.SOURCE_RUN_ID }}" in raw
+    assert "run-id: ${{ env.SOURCE_RUN_ID }}" in raw
+    # A mano: la corrida indicada se comprueba con la API antes de bajar nada.
+    check = next(step for step in base.steps(workflow) if "actions/runs/${SOURCE_RUN_ID}" in str(step.get("run", "")))
+    assert check["if"] == "${{ github.event_name == 'workflow_dispatch' }}"
+    assert check["env"] == {"GH_TOKEN": "${{ github.token }}"}
+    for expected in ('test "$name" = "Precios SPS - Fotos de producto"', 'test "$branch" = "main"', 'test "$conclusion" = "success"'):
+        assert expected in check["run"]
     assert "python -m pip install --disable-pip-version-check boto3==1.40.55" in raw
     assert "source/precios-supermercados-sps/scripts/subir_fotos_r2.py" in raw
     # Las llaves sólo existen en el paso que sube.
