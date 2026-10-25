@@ -41,6 +41,11 @@ from precios_supermercados import product_image_sources as sources  # noqa: E402
 from precios_supermercados import product_images as images  # noqa: E402
 
 PIPELINE_VERSION = 2
+# Versión de los criterios de puntuación. Cuando sube, las fotos ya elegidas con
+# puntaje bajo (< RESCORE_BELOW) se vuelven a evaluar una vez, sin tocar el resto.
+# 3 (2026-10-25): fondo no blanco descarta la foto en vez de restar puntos.
+CRITERIA_VERSION = 3
+RESCORE_BELOW = 70
 INDEX_SCHEMA = "super-compras-product-images/v2"
 REPOSITORY_RAW = "https://raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps"
 CATALOG_BASE = f"{REPOSITORY_RAW}/portfolio-data/precios-supermercados-sps/published/rpi/v3/"
@@ -226,10 +231,19 @@ def plan(rows: Sequence[CatalogRow], candidates: Mapping[str, Sequence[images.Ca
         row for row in rows
         if candidates.get(row.key)
         and not any(store in unavailable for store, _ in row.offers)
-        and (index.get(row.key) or {}).get("sig") != signature(candidates[row.key])
+        and ((index.get(row.key) or {}).get("sig") != signature(candidates[row.key])
+             or needs_rescore(index.get(row.key) or {}))
     ]
     pending.sort(key=lambda row: (-len({store for store, _ in row.offers}), row.key))
     return [row.key for row in pending[:max(0, max_products)]]
+
+
+def needs_rescore(item: Mapping[str, object]) -> bool:
+    """Foto elegida con puntaje bajo bajo criterios anteriores: se reevalúa una vez."""
+    try:
+        return "h" in item and int(item.get("s", 0)) < RESCORE_BELOW and int(item.get("c", 0)) < CRITERIA_VERSION  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return False
 
 
 # ---------------------------------------------------------------- proceso
@@ -343,7 +357,7 @@ def process(keys: Sequence[str], candidates: Mapping[str, Sequence[images.Candid
                 except images.ProductImageError:
                     chosen = None
             if chosen is None:
-                index[key] = {"sig": sig, "none": 1}
+                index[key] = {"sig": sig, "none": 1, "c": CRITERIA_VERSION}
                 stats["sin_foto"] += 1
                 if review is not None:
                     review.append(_review_record(key, scored, None, None))
@@ -357,7 +371,7 @@ def process(keys: Sequence[str], candidates: Mapping[str, Sequence[images.Candid
                 stats[f"bytes_{size}"] += len(rendered[size])
             quality = chosen.metrics.quality
             index[key] = {"sig": sig, "h": digest, "sm": chosen.candidate.supermarket_id, "s": chosen.score,
-                          "q": quality, "px": chosen.metrics.product_pixels}
+                          "q": quality, "px": chosen.metrics.product_pixels, "c": CRITERIA_VERSION}
             stats["con_foto"] += 1
             stats[f"calidad_{quality}"] += 1
             stats[f"elegida_{chosen.candidate.supermarket_id}"] += 1

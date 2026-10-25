@@ -63,10 +63,29 @@ def test_off_white_background_is_recognized_after_white_balance() -> None:
 def test_small_blurry_cropped_and_dark_background_photos_lose_points() -> None:
     small = scored("walmart", product(size=250, box=(80, 30, 170, 220)))
     assert "pequeña" in small.flags and small.score < 60
-    dark = scored("walmart", product(background=(40, 40, 40)))
-    assert "fondo no blanco" in dark.flags and dark.score < 60
     cropped = scored("walmart", product(box=(-50, -50, 1050, 1050)))
-    assert "recortada" in cropped.flags
+    assert cropped.score == 0 and cropped.flags == ("fondo no blanco",)
+    one_side = scored("walmart", product(box=(-50, 150, 670, 850)))
+    assert one_side.score > 0 and {"fondo no blanco"} <= set(one_side.flags) and one_side.metrics.touch == 1
+
+
+def test_non_white_backgrounds_are_rejected_not_just_penalized() -> None:
+    """Producto sobre una mesa, fondo oscuro o ilustración con regla → 0 puntos.
+
+    En la primera corrida pasaban con 55 puntos justos: el "producto" medido era el
+    cuadro entero. Un fondo casi blanco (balance de blancos) sigue siendo válido.
+    """
+    table = Image.new("RGB", (1000, 1000), (120, 80, 50))
+    draw = ImageDraw.Draw(table)
+    draw.rectangle((0, 600, 1000, 1000), fill=(90, 60, 30))
+    draw.rounded_rectangle((380, 250, 620, 700), radius=30, fill=(200, 30, 40))
+    ruler = product()  # ilustración: camiseta amarilla hasta dos bordes con el producto encima
+    ImageDraw.Draw(ruler).rectangle((0, 0, 1000, 700), fill=(250, 230, 90))
+    for image in (table, product(background=(40, 40, 40)), ruler):
+        scene = scored("walmart", image)
+        assert scene.score == 0 and scene.flags == ("fondo no blanco",)
+        assert pi.choose([scene]) is None
+    assert scored("walmart", product(background=(244, 241, 234))).score >= 85
 
 
 def test_secondary_photo_is_penalized() -> None:
