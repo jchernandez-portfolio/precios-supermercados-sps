@@ -8,7 +8,7 @@ Aprobado por el responsable del proyecto (octubre 2026). Registro:
 | Pieza | Lugar |
 | --- | --- |
 | Fotos v2 (800 y 320 px) | Cloudflare R2, bucket público `super-compras-fotos`, `fotos/v2/<tamaño>/<id[:2]>/<id>-<huella>.webp` |
-| Índice v2 | `fotos/v2/index.json` en el mismo bucket |
+| Índice v2 | `fotos/v2/index.json` en el mismo bucket (`items[id]`: `sig`, `h` huella, `sm` súper, `s` puntaje, `q` nivel, `px` píxeles útiles, `c` versión de criterios; o `none`) |
 | Revisión a ojo de la última corrida | `fotos/v2/revision/latest.html` (y una por corrida) |
 | Dirección pública | `https://pub-0dcb2204775c484dbe6681e659eee236.r2.dev` (variable `R2_PUBLIC_BASE_URL`) |
 | Fotos v1 (400 px, en retiro) | rama `product-images` |
@@ -51,6 +51,11 @@ Mientras dura la migración, el catálogo usa la foto v2 si existe y si no la v1
   agrandada sale marcada como `agrandada` y pierde contra una nítida.
 - **Nivel** de cada foto elegida en el índice: `hd` (el producto tiene al menos
   560 px útiles: 800 px nítido), `sd` (≥ 260 px) o `low`.
+- **Fondo blanco obligatorio** (criterios v3, 2026-10-25). Una foto con fondo que
+  no es blanco tras el balance de blancos (producto sobre una mesa, foto de ambiente,
+  fondo oscuro, ilustración con regla) se descarta: no se distingue el producto del
+  entorno. En la primera corrida pasaban con 55 puntos justos (2 % de las elegidas);
+  las ya publicadas con menos de 70 puntos se reevalúan una vez (campo `c` del índice).
 - Puntaje: fondo blanco 25, píxeles útiles del producto 35, nitidez 10, encuadre 15,
   código de barras 5, foto principal 10; foto secundaria −20. Mínimo 55.
 - Elección: primero el nivel de detalle, después el puntaje; en empates (≤ 6

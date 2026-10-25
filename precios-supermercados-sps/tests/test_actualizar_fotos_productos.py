@@ -114,6 +114,12 @@ def test_candidates_signature_and_plan() -> None:
     assert fotos.plan(rows, candidates, index, 10) == ["bb22"]
     assert fotos.plan(rows, candidates, {}, 1) == ["aa11"]
     assert fotos.plan(rows, candidates, {}, 10, unavailable={"walmart"}) == ["bb22"]
+    # Criterios nuevos: sólo se reevalúan las fotos elegidas con puntaje bajo bajo criterios viejos.
+    sig = fotos.signature(candidates["aa11"])
+    assert fotos.plan(rows, candidates, {"aa11": {"sig": sig, "h": "0123456789", "s": 58}}, 10) == ["aa11", "bb22"]
+    assert fotos.plan(rows, candidates, {"aa11": {"sig": sig, "h": "0123456789", "s": 92}}, 10) == ["bb22"]
+    assert fotos.plan(rows, candidates, {"aa11": {"sig": sig, "h": "0123456789", "s": 58, "c": fotos.CRITERIA_VERSION}}, 10) == ["bb22"]
+    assert fotos.plan(rows, candidates, {"aa11": {"sig": sig, "none": 1}}, 10) == ["bb22"]
 
 
 def test_generic_urls_need_three_products() -> None:
@@ -139,7 +145,7 @@ def test_process_writes_normalized_photo_and_index(tmp_path: Path) -> None:
     entry = index["aa11"]
     assert entry["sm"] == "colonial" and len(entry["h"]) == 10 and entry["q"] in {"hd", "sd", "low"}
     assert "v" not in entry and entry["px"] > 0
-    assert index["bb22"] == {"sig": fotos.signature(candidates["bb22"]), "none": 1}
+    assert index["bb22"] == {"sig": fotos.signature(candidates["bb22"]), "none": 1, "c": fotos.CRITERIA_VERSION}
     for size in (800, 320):
         output = Image.open(tmp_path / str(size) / "aa" / f"aa11-{entry['h']}.webp")
         assert output.format == "WEBP" and output.size == (size, size)

@@ -35,6 +35,10 @@ from PIL import Image, ImageFilter, ImageOps
 
 RETAILER_PRIORITY = ("colonial", "la_colonia", "walmart", "paiz", "comisariato_los_andes", "pricesmart")
 MIN_SCORE = 55
+# Borde blanco por debajo de esto (o por debajo de 0.85 tocando dos lados): escena,
+# fondo oscuro o ilustración, se descarta. En la primera corrida pasaban con 55 puntos
+# justos; eran el 2 % de las fotos elegidas.
+SCENE_BORDER_WHITE = 0.6
 NEAR_TIE_POINTS = 6
 OUTPUT_SIZES = (800, 320)
 OUTPUT_SIZE = OUTPUT_SIZES[0]
@@ -319,12 +323,18 @@ def score(candidate: Candidate, metrics: Metrics | None, *, duplicate: bool = Fa
         return 0, ("vacía",)
     if duplicate:
         return 0, ("genérica",)
+    # Fondo que no es blanco (tras balance de blancos): producto en una mesa, foto de
+    # ambiente, fondo oscuro o ilustración con regla que llega a los bordes. No se
+    # distingue el producto del entorno y el tamaño medido sería el del cuadro entero.
+    # Mejor la ilustración. Un producto que toca un solo lado sigue valiendo, con menos puntos.
+    if metrics.border_white < SCENE_BORDER_WHITE or (metrics.border_white < 0.85 and metrics.touch >= 2):
+        return 0, ("fondo no blanco",)
     flags: list[str] = []
+    if metrics.border_white < 0.85:
+        flags.append("fondo no blanco")
     short = min(metrics.width, metrics.height)
     if short < MIN_SHORT_SIDE:
         flags.append("pequeña")
-    if metrics.border_white < 0.85:
-        flags.append("fondo no blanco")
     if metrics.touch >= 2:
         flags.append("recortada")
     if metrics.effective < 0.6:
