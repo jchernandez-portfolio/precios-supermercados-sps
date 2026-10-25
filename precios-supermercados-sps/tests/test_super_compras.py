@@ -126,8 +126,15 @@ def test_app_shell_is_static_safe_and_installable() -> None:
         assert (APP_DIR / icon["src"]).is_file()
     assert (APP_DIR / "icons" / "icon-180.png").is_file()
     shell = (APP_DIR / "sw.js").read_text(encoding="utf-8")
-    for asset in re.findall(r'"([^"]+\.(?:js|css|png|svg|webmanifest|html))(?:\?[^"]*)?"', shell):
+    for asset in re.findall(r'"([^"]+\.(?:js|css|png|svg|webmanifest|html|woff2))(?:\?[^"]*)?"', shell):
         assert (APP_DIR / asset).is_file(), asset
+    # Sin terceros: la tipografía se sirve desde el sitio (SIL OFL) y la CSP no abre fonts.googleapis.
+    assert "fonts.googleapis.com" not in html and "fonts.gstatic.com" not in html
+    assert "font-src 'self'" in html and "style-src 'self';" in html
+    styles = (APP_DIR / "styles.css").read_text(encoding="utf-8")
+    for weight in (400, 500, 600, 700, 800):
+        assert f'url("fonts/figtree-{weight}.woff2")' in styles and (APP_DIR / "fonts" / f"figtree-{weight}.woff2").is_file()
+    assert (APP_DIR / "fonts" / "LICENSE-Figtree.txt").is_file()
 
 
 def test_app_never_injects_html_or_reads_private_sources() -> None:
