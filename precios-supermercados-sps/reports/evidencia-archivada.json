@@ -1,0 +1,55 @@
+{
+  "schema": "precios-sps-evidencia-archivada/v1",
+  "release": "evidencia-capturas-2026-09",
+  "release_url": "https://github.com/jchernandez-portfolio/precios-supermercados-sps/releases/tag/evidencia-capturas-2026-09",
+  "files": [
+    {
+      "path": "reports/walmart/2026-08-31-full/raw-capture.tar.gz",
+      "asset": "walmart__2026-08-31-full__raw-capture.tar.gz",
+      "bytes": 50517915,
+      "sha256": "704bee833cc1cf6d3d3f35e00910a50c3da761264a4f0af0072004d821330ed7"
+    },
+    {
+      "path": "reports/paiz/2026-09-04-full/raw-paiz-multiplaza.tar.gz",
+      "asset": "paiz__2026-09-04-full__raw-paiz-multiplaza.tar.gz",
+      "bytes": 9674951,
+      "sha256": "08526b28186b7afa2cc2fd3e10ca3ac8ff56517fb07fc993f1b5158e55d4d6b2"
+    },
+    {
+      "path": "reports/paiz/2026-09-04-full/raw-paiz-proceres.tar.gz",
+      "asset": "paiz__2026-09-04-full__raw-paiz-proceres.tar.gz",
+      "bytes": 9363352,
+      "sha256": "8d1c6a65cc5c24ec2a46abc40453f689e2dd6c6c90e3700aa6ecc2dcef5b9b98"
+    },
+    {
+      "path": "reports/paiz/2026-09-04-full/snapshot-paiz-multiplaza.json",
+      "asset": "paiz__2026-09-04-full__snapshot-paiz-multiplaza.json",
+      "bytes": 7328907,
+      "sha256": "38aa251354ffd15213d9df62451fe2618d6446d09e2b24c0b8d69b2b2b5d5fb1"
+    },
+    {
+      "path": "reports/paiz/2026-09-04-full/snapshot-paiz-proceres.json",
+      "asset": "paiz__2026-09-04-full__snapshot-paiz-proceres.json",
+      "bytes": 7082814,
+      "sha256": "a61da4475b74a46cc2c623e4cf07b2d88de6179e8582e913dd4383cf0a9276e4"
+    },
+    {
+      "path": "reports/colonial/2026-08-30/raw-capture.tar.gz",
+      "asset": "colonial__2026-08-30__raw-capture.tar.gz",
+      "bytes": 3658919,
+      "sha256": "544392a2e0d504a8bab5012a92ee51355f23ad30558033002a3fb34aaefed44d"
+    },
+    {
+      "path": "reports/pricesmart/2026-09-01-full/raw-capture.tar.gz",
+      "asset": "pricesmart__2026-09-01-full__raw-capture.tar.gz",
+      "bytes": 1769114,
+      "sha256": "4613c634f584cc3ba157504f5b40cbb04aa94c7c14e65984672babe9e27d1b05"
+    },
+    {
+      "path": "reports/walmart/2026-08-31-probe/raw-capture.tar.gz",
+      "asset": "walmart__2026-08-31-probe__raw-capture.tar.gz",
+      "bytes": 1065026,
+      "sha256": "1fc3100ff3fb96ec7647696a35d68ee479557dbd0439b4d51dfd5427e00907a4"
+    }
+  ]
+}

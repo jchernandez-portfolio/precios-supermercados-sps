@@ -1,0 +1,71 @@
+name: Precios SPS - Archivar evidencia de capturas
+
+# Mueve las capturas crudas grandes (tar.gz y snapshots de reports/) a un
+# GitHub Release para que el repositorio pese poco. Lee la lista, los tamaños y
+# los SHA-256 esperados de reports/evidencia-archivada.json, comprueba cada archivo
+# antes de subirlo y publica el release con esa misma lista. Se corre a mano una
+# vez por lote; después un PR quita los archivos del árbol y las pruebas los
+# descargan del release (tests/_evidencia.py) verificando el SHA-256.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: precios-sps-archive-evidence
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    if: ${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: precios-supermercados-sps
+    steps:
+      - name: Descargar revisión inmutable
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Comprobar los archivos contra el índice
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, pathlib, shutil
+          doc = json.loads(pathlib.Path("reports/evidencia-archivada.json").read_text(encoding="utf-8"))
+          assert doc["schema"] == "precios-sps-evidencia-archivada/v1"
+          out = pathlib.Path("/tmp/evidencia"); out.mkdir(exist_ok=True)
+          for item in doc["files"]:
+              path = pathlib.Path(item["path"])
+              assert path.is_file() and not path.is_symlink(), item["path"]
+              data = path.read_bytes()
+              assert len(data) == item["bytes"], f"tamaño distinto: {item['path']}"
+              assert hashlib.sha256(data).hexdigest() == item["sha256"], f"sha256 distinto: {item['path']}"
+              shutil.copyfile(path, out / item["asset"])
+          shutil.copyfile("reports/evidencia-archivada.json", out / "evidencia-archivada.json")
+          print(json.dumps({"release": doc["release"], "files": len(doc["files"])}))
+          PY
+
+      - name: Crear el release y subir los archivos
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag="$(python3 -c "import json; print(json.load(open('reports/evidencia-archivada.json'))['release'])")"
+          case "$tag" in evidencia-*) ;; *) echo "release_tag_invalid" >&2; exit 1 ;; esac
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --title "Evidencia de capturas ($tag)" --notes-file - <<'MD'
+          Capturas crudas (tar.gz) y snapshots grandes que antes vivían en `reports/` del
+          repositorio. Son la evidencia reproducible de las primeras capturas completas de
+          cada supermercado; las pruebas las descargan de aquí y comprueban su SHA-256
+          (`reports/evidencia-archivada.json`). No contienen credenciales ni datos privados.
+          MD
+          fi
+          gh release upload "$tag" --clobber /tmp/evidencia/*
+          gh release view "$tag" --json assets --jq '.assets[] | "\(.name) \(.size)"'

@@ -6,7 +6,6 @@ import sys
 import tarfile
 from datetime import datetime, timezone
 from pathlib import Path
-
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,6 +14,9 @@ from obtener_catalogo_colonial import Download, collect
 from actualizar_mvp_sqlite_la_colonia import validate_snapshot_bytes
 from precios_supermercados.scrapers.colonial import ean_source, gtin_from_sku
 
+from _evidencia import asegurar  # noqa: E402
+
+asegurar("reports/colonial/2026-08-30/raw-capture.tar.gz")
 
 def test_full_source_capture_reproduces_accepted_catalog_offline(tmp_path, monkeypatch):
     evidence = ROOT / "reports" / "colonial" / "2026-08-30"

@@ -5,7 +5,6 @@ import importlib.util
 import json
 import tarfile
 from pathlib import Path
-
 import pytest
 
 from precios_supermercados.scrapers.pricesmart import (
@@ -15,15 +14,16 @@ from precios_supermercados.scrapers.pricesmart import (
     reconcile_capture,
 )
 
+from _evidencia import asegurar  # noqa: E402
+
+asegurar("reports/pricesmart/2026-09-01-full/raw-capture.tar.gz")
 
 ROOT = Path(__file__).resolve().parents[1]
 REPORT = ROOT / "reports/pricesmart/2026-09-01-full"
 FIXTURES = Path(__file__).parent / "fixtures/pricesmart"
 
-
 def fixture(club="6603"):
     return json.loads((FIXTURES / f"documents_{club}.json").read_text())
-
 
 def extract_capture(tmp_path):
     with tarfile.open(REPORT / "raw-capture.tar.gz", "r:gz") as archive:
@@ -31,7 +31,6 @@ def extract_capture(tmp_path):
         assert all(member.isfile() and not Path(member.name).is_absolute() and ".." not in Path(member.name).parts for member in members)
         archive.extractall(tmp_path, filter="data")
     return tmp_path / "live"
-
 
 def test_fixtures_are_source_exact_and_cover_commercial_shapes(tmp_path):
     live = extract_capture(tmp_path)
@@ -62,7 +61,6 @@ def test_fixtures_are_source_exact_and_cover_commercial_shapes(tmp_path):
         }
         assert by_sku["317825"]["current_price"] is None
 
-
 @pytest.mark.parametrize("kind", ["partial_promo", "saving", "available_unpriced", "mismatch", "club"])
 def test_parser_fails_closed_on_semantic_corruption(kind):
     documents = copy.deepcopy(fixture()["documents"])
@@ -82,7 +80,6 @@ def test_parser_fails_closed_on_semantic_corruption(kind):
         promo["variants"][0]["price_HN_6603"] = [1]
     with pytest.raises(PriceSmartError):
         parse_documents(documents, "6604" if kind == "club" else "6603")
-
 
 def test_full_raw_hashes_pagination_snapshots_and_budget(tmp_path):
     live = extract_capture(tmp_path)
@@ -110,13 +107,11 @@ def test_full_raw_hashes_pagination_snapshots_and_budget(tmp_path):
     assert result["elapsed_seconds"] < 1800 and result["excluded_club"] == "6604"
     assert manifest["tls_preflight"]["http_posts_observed"] == 0
 
-
 def test_published_evidence_is_exactly_reproducible():
     spec = importlib.util.spec_from_file_location("pricesmart_report_verify", REPORT / "verify.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     assert module.reproduce() == json.loads((REPORT / "evidence.json").read_text())
-
 
 def test_full_reconciliation_rejects_one_changed_raw_byte(tmp_path):
     live = extract_capture(tmp_path)
