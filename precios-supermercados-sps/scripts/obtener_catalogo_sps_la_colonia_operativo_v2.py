@@ -24,10 +24,11 @@ import json
 import math
 import sys
 import time
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 import obtener_catalogo_sps_la_colonia_operativo as operational
 from precios_supermercados.enums import AvailabilityStatus
@@ -37,7 +38,6 @@ from precios_supermercados.scrapers.base import (
     ExtractionMetrics,
     ExtractionResult,
 )
-
 
 BaseExtractor = operational.core.LaColoniaExtractor
 BASE_AVAILABILITY = la_colonia._availability

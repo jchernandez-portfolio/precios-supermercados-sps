@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parents[1]
 REPORT = ROOT / "reports/pricesmart/2026-09-02-complete"
 sys.path[:0] = [str(ROOT / "src"), str(ROOT / "scripts")]

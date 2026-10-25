@@ -17,8 +17,9 @@ intento.
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -89,7 +90,7 @@ class SharedSegmentCookieTracker(bound.RegionContextTracker):
     """Autoriza cookie-jar compartido sólo tras transición observable de segmento."""
 
     shared_fallback_used = False
-    current_instance: "SharedSegmentCookieTracker | None" = None
+    current_instance: SharedSegmentCookieTracker | None = None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

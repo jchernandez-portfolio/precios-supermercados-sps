@@ -15,8 +15,8 @@ Además de los niveles, la comparación produce:
 """
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Mapping, Sequence
 
 from .standardize import StandardizedRecord, stem
 from .taxonomy import departments_compatible
@@ -72,7 +72,7 @@ class ComparisonSettings:
         cls,
         section: Mapping[str, object],
         implicit_defaults: Mapping[str, frozenset[str]] | None = None,
-    ) -> "ComparisonSettings":
+    ) -> ComparisonSettings:
         size = section.get("size") or {}
         assert isinstance(size, Mapping)
         return cls(

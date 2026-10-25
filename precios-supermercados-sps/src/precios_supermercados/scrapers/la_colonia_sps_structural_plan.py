@@ -41,7 +41,6 @@ from precios_supermercados.scrapers.la_colonia_sps_facet_wire import (
     prepare_sps_facet_wire_request,
 )
 
-
 SPS_STRUCTURAL_PLAN_SCHEMA_VERSION = "1"
 _SPS_STRUCTURAL_PLAN_DOMAIN = b"precios-sps/la-colonia-sps-structural-plan/v1\0"
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")

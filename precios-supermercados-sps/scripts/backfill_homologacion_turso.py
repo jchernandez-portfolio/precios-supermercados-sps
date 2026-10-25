@@ -26,12 +26,15 @@ import argparse
 import json
 import os
 import sys
+from collections.abc import Iterable
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+
+from datetime import UTC
 
 from actualizar_mvp_sqlite_la_colonia import SnapshotError  # noqa: E402
 from actualizar_mvp_turso_la_colonia import (  # noqa: E402
@@ -41,11 +44,28 @@ from actualizar_mvp_turso_la_colonia import (  # noqa: E402
     _stmt,
     _validate_table_names,
 )
+from precios_supermercados.matching.attribute_links import engine_attribute_links  # noqa: E402
+from precios_supermercados.pricesmart_specs_persistence import (  # noqa: E402
+    PROFILE_ATTRIBUTES_SQL,
+)
+from precios_supermercados.pricesmart_specs_persistence import (
+    TABLE_NAME as PRICESMART_SPECS_TABLE,
+)
+from precios_supermercados.product_homologation_persistence import (  # noqa: E402
+    LEGACY_PROFILE_COLUMNS,
+    NORMALIZATION_VERSION,
+    PROFILE_COLUMNS,
+    TABLE_NAME,
+    ProductHomologationPersistenceError,
+    ProductHomologationRow,
+    apply_source_spec_attributes,
+    build_homologation_rows,
+    records_from_product_rows,
+)
 from precios_supermercados.product_identity_decisions import (  # noqa: E402
     ProductIdentityDecisionError,
     load_reviewed_decisions,
 )
-from precios_supermercados.matching.attribute_links import engine_attribute_links  # noqa: E402
 from precios_supermercados.product_master import (  # noqa: E402
     DEFAULT_POLICY_PATH,
     MasterPolicy,
@@ -55,21 +75,6 @@ from precios_supermercados.product_master import (  # noqa: E402
     profile_state_digest,
     reviewed_decision_links,
     sync_product_master,
-)
-from precios_supermercados.product_homologation_persistence import (  # noqa: E402
-    NORMALIZATION_VERSION,
-    LEGACY_PROFILE_COLUMNS,
-    PROFILE_COLUMNS,
-    TABLE_NAME,
-    ProductHomologationPersistenceError,
-    ProductHomologationRow,
-    apply_source_spec_attributes,
-    build_homologation_rows,
-    records_from_product_rows,
-)
-from precios_supermercados.pricesmart_specs_persistence import (  # noqa: E402
-    PROFILE_ATTRIBUTES_SQL,
-    TABLE_NAME as PRICESMART_SPECS_TABLE,
 )
 
 STAGE_TABLE = "product_homologation_profiles_stage"
@@ -198,9 +203,9 @@ INDEX_STEPS = (
 
 
 def _utc_now() -> str:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _query(url: str, token: str, sql: str, args: tuple[object, ...] = ()) -> list[list[object]]:

@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 
 from precios_supermercados.scrapers.la_colonia_catalog_coverage import (
-    PartitionSpec,
     CanonicalCatalogEvidence,
+    PartitionSpec,
     build_traversal_evidence,
     evaluate_canonical_catalog_coverage,
     evaluate_catalog_coverage,

@@ -22,9 +22,10 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Any, Iterable, Protocol
+from datetime import UTC, datetime, timedelta
+from typing import Any, Protocol
 
 TABLE_NAME = "pricesmart_product_specs"
 VERIFIED_INDEX = "idx_pricesmart_product_specs_verified"
@@ -133,11 +134,11 @@ def _require(condition: object, reason: str) -> None:
 
 def _utc(value: object, reason: str) -> datetime:
     _require(isinstance(value, str) and _UTC_RE.fullmatch(value), reason)
-    return datetime.strptime(str(value), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    return datetime.strptime(str(value), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
 
 
 def _utc_text(value: datetime) -> str:
-    return value.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return value.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _chunks(values: list[Any], size: int = CHUNK_SIZE) -> Iterable[list[Any]]:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -93,8 +93,8 @@ def _payload(request: StructuralEdgeExecutionRequest, *, with_location: bool) ->
         raw_response_sha256=hashlib.sha256(raw).hexdigest(),
         response_status=200,
         response_body_bytes=len(raw),
-        physical_started_at_utc=datetime(2026, 8, 24, 2, 5, 0, tzinfo=timezone.utc),
-        response_completed_at_utc=datetime(2026, 8, 24, 2, 5, 0, 100_000, tzinfo=timezone.utc),
+        physical_started_at_utc=datetime(2026, 8, 24, 2, 5, 0, tzinfo=UTC),
+        response_completed_at_utc=datetime(2026, 8, 24, 2, 5, 0, 100_000, tzinfo=UTC),
         github_repository="jchernandez-portfolio/precios-supermercados-sps",
         github_repository_id="1282475205",
         github_ref="refs/heads/main",
@@ -203,8 +203,8 @@ def test_request_legacy_rechaza_receipt_contextual_no_solicitado() -> None:
 def test_receipt_v2_no_permite_binding_source_con_otro_fingerprint() -> None:
     request = _request()
     kwargs = _payload(request, with_location=True).canonical_dict()
-    kwargs["physical_started_at_utc"] = datetime(2026, 8, 24, 2, 5, 0, tzinfo=timezone.utc)
-    kwargs["response_completed_at_utc"] = datetime(2026, 8, 24, 2, 5, 0, 100_000, tzinfo=timezone.utc)
+    kwargs["physical_started_at_utc"] = datetime(2026, 8, 24, 2, 5, 0, tzinfo=UTC)
+    kwargs["response_completed_at_utc"] = datetime(2026, 8, 24, 2, 5, 0, 100_000, tzinfo=UTC)
     kwargs["context_value_path"] = ()
     kwargs["binding_source_key"] = "request:regionid:sha256:" + "0" * 64
     with pytest.raises(Exception, match="structural_receipt_binding_context_fingerprint_mismatch"):

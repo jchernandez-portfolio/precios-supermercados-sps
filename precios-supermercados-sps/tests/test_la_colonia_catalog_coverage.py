@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any
 
 import pytest
@@ -27,7 +27,7 @@ from precios_supermercados.scrapers.la_colonia_runner import (
 
 NAME_ASC = "OrderByNameASC"
 RELEASE_DESC = "OrderByReleaseDateDESC"
-FIXED_TIME = datetime(2026, 8, 5, 18, 0, tzinfo=timezone.utc)
+FIXED_TIME = datetime(2026, 8, 5, 18, 0, tzinfo=UTC)
 
 
 def keys(start: int, count: int, *, prefix: str = "P") -> list[str]:

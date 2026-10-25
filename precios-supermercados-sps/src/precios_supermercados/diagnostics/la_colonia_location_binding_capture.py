@@ -21,17 +21,12 @@ from __future__ import annotations
 import json
 import re
 import time
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
-from precios_supermercados.location_binding_radiography import (
-    ContextStage,
-    LocationBindingReport,
-    analyze_location_binding,
-    report_dict,
-)
 from precios_supermercados.diagnostics.la_colonia_sps_context_diagnostic import (
     DiagnosticBudget,
     DiagnosticSafetyError,
@@ -50,7 +45,12 @@ from precios_supermercados.diagnostics.location_binding_dom_controls import (
     resolve_exact_city_control,
     verify_structural_city_selection,
 )
-
+from precios_supermercados.location_binding_radiography import (
+    ContextStage,
+    LocationBindingReport,
+    analyze_location_binding,
+    report_dict,
+)
 
 TARGET_URL = "https://www.lacolonia.com/"
 TARGET_CITY = "San Pedro Sula"

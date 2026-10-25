@@ -9,9 +9,9 @@ de la autorización live para poder probar el contrato completamente offline.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
-
+from typing import Any
 
 # La evidencia HTML de La Colonia confirma botones de ciudad dentro de
 # ``.cont-btn-ciudad`` con estado ``selected`` / ``noselected``. Esa estructura se

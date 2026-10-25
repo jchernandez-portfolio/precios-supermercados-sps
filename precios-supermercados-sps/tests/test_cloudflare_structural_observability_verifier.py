@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any
 
 import pytest
@@ -38,7 +38,7 @@ TRACE_ID = "trace-structural-verifier-001"
 CUSTOM_SPAN_ID = "custom-structural-verifier-001"
 VERSION_ID = "cf-version-structural-001"
 INVOCATION_ID = "invocation-structural-verifier-001"
-START = datetime(2026, 8, 21, 20, 30, 0, tzinfo=timezone.utc)
+START = datetime(2026, 8, 21, 20, 30, 0, tzinfo=UTC)
 START_MS = int(START.timestamp() * 1000)
 
 
@@ -81,8 +81,8 @@ def _observation(kind: str = "root_total") -> CryptographicallyVerifiedStructura
         raw_response_sha256=hashlib.sha256(raw).hexdigest(),
         response_status=200,
         response_body_bytes=len(raw),
-        physical_started_at_utc=datetime(2026, 8, 21, 20, 30, 0, 100_000, tzinfo=timezone.utc),
-        response_completed_at_utc=datetime(2026, 8, 21, 20, 30, 0, 900_000, tzinfo=timezone.utc),
+        physical_started_at_utc=datetime(2026, 8, 21, 20, 30, 0, 100_000, tzinfo=UTC),
+        response_completed_at_utc=datetime(2026, 8, 21, 20, 30, 0, 900_000, tzinfo=UTC),
         github_repository="jchernandez-portfolio/precios-supermercados-sps",
         github_repository_id="1282475205",
         github_ref="refs/heads/main",

@@ -21,7 +21,6 @@ from precios_supermercados.tabular_persistence import (
 )
 from precios_supermercados.tabular_store import TabularBatch
 
-
 SPREADSHEET_ID = "1AbCdEfGhIjKlMnOpQrStUvWxYz_0123456789"
 
 

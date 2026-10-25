@@ -14,7 +14,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 OVERRIDE_SCHEMA = "precios-sps-historical-branch-overrides-1"
 ALLOWED_CATEGORIES = {
     "MERGED_OR_SUBSUMED",

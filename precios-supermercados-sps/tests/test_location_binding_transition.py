@@ -12,7 +12,6 @@ from precios_supermercados.location_binding_transition import (
 )
 from precios_supermercados.locations import LocationConfig, LocationGranularity
 
-
 CITY_KEY = "localStorage:regionid:sha256:" + "a" * 64
 STORE_KEY = "request_variable:storeid:sha256:" + "b" * 64
 

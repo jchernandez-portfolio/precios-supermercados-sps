@@ -7,3 +7,4 @@ google-cloud-bigquery==3.44.0
 requests==2.34.2
 numpy==2.3.3
 Pillow==11.3.0
+ruff==0.14.5

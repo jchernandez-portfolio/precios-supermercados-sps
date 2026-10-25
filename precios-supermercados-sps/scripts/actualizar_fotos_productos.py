@@ -28,10 +28,10 @@ import sys
 import tempfile
 import time
 from collections import Counter
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable, Iterable, Mapping, Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -364,7 +364,7 @@ def write_index(output_dir: Path, index: Mapping[str, Mapping[str, object]], sta
     document = {
         "schema": INDEX_SCHEMA,
         "pipeline": PIPELINE_VERSION,
-        "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "updated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "with_photo": sum(1 for value in index.values() if value.get("h") and not value.get("none")),
         "quality": dict(Counter(str(value.get("q")) for value in index.values() if value.get("h"))),
         "last_run": dict(stats),
@@ -515,6 +515,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(f"autorización: {authorization['authorization_id']}")
 
     import requests
+
     from exportar_modelo_analitico import TursoBackend
 
     public = requests.Session()

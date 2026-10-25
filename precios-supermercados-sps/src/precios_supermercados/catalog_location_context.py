@@ -14,9 +14,10 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Mapping, NoReturn
+from typing import NoReturn
 from urllib.parse import parse_qsl, quote, urlsplit
 
 from precios_supermercados.la_colonia_edge_request import ValidatedLaColoniaEdgeRequest
@@ -28,7 +29,6 @@ from precios_supermercados.scrapers.la_colonia_sps_facet_context import (
 from precios_supermercados.sps_context_bound_discovery import (
     VerifiedSpsStructuralContext,
 )
-
 
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 _REGION_KEY = re.compile(r"[^a-z0-9]")

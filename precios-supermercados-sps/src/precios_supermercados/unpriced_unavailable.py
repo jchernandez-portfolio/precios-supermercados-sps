@@ -15,8 +15,9 @@ validadores de snapshot y la persistencia Turso.
 """
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from decimal import Decimal
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from typing import Any
 
 # 2 % del catálogo de SKU (con precio + sin precio agotados). Configurable aquí;
 # por encima de este umbral la ausencia de precios deja de ser plausible como

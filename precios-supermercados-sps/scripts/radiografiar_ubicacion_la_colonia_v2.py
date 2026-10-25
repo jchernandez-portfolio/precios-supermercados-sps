@@ -25,7 +25,6 @@ from precios_supermercados.diagnostics.location_binding_dom_controls import (
     open_location_selector,
 )
 
-
 TARGET_URL = "https://www.lacolonia.com/"
 TARGET_CITY = "San Pedro Sula"
 OTHER_CITY = "Tegucigalpa"

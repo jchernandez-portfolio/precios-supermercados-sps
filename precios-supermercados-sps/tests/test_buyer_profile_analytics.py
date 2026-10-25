@@ -3,7 +3,12 @@ from __future__ import annotations
 import pytest
 
 from precios_supermercados.buyer_profile_analytics import BuyerProfile, analyze_buyer_profile
-from precios_supermercados.price_analytics import ComparisonScope, CurrentPriceObservation, PriceAnalyticsError, analyze_current_prices
+from precios_supermercados.price_analytics import (
+    ComparisonScope,
+    CurrentPriceObservation,
+    PriceAnalyticsError,
+    analyze_current_prices,
+)
 from precios_supermercados.product_homologation import SourceProductRecord, homologate_products
 
 

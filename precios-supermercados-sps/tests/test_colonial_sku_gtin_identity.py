@@ -6,9 +6,10 @@ GTIN y además una marca claramente contradictoria lo invalida.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 import yaml
-from pathlib import Path
 
 from precios_supermercados.gtin_policy import SKU_DERIVED_GTIN_SUPERMARKETS
 from precios_supermercados.product_homologation import SourceProductRecord

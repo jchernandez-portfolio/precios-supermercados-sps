@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import math
 from collections import Counter
+from collections.abc import Iterable, Mapping, Sequence
 from difflib import SequenceMatcher
-from typing import Iterable, Mapping, Sequence
 
 
 def jaro(left: str, right: str) -> float:

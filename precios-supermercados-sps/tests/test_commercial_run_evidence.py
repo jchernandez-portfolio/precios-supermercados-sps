@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -27,8 +27,7 @@ from precios_supermercados.identifiers import (
 from precios_supermercados.models import NormalizedOffer, ValidatedOffer
 from precios_supermercados.tabular_records import QualityEventRecord
 
-
-BASE = datetime(2026, 8, 22, 20, 0, tzinfo=timezone.utc)
+BASE = datetime(2026, 8, 22, 20, 0, tzinfo=UTC)
 AUTHORITY_EVIDENCE_ID = "verified-authority-evidence-001"
 
 

@@ -110,7 +110,7 @@ def test_route_allows_only_pricesmart_documents_and_scripts():
         assert route.result == expected, url
 
 
-def _browser_or_skip() -> "capture.BrowserTransport":
+def _browser_or_skip() -> capture.BrowserTransport:
     pytest.importorskip("playwright.sync_api")
     try:
         return capture.BrowserTransport()

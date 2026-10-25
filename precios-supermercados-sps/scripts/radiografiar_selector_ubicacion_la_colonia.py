@@ -22,7 +22,6 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from playwright.sync_api import Page, sync_playwright
 
-
 TARGET_URL = "https://www.lacolonia.com/"
 TARGET_CITY = "San Pedro Sula"
 OTHER_CITY = "Tegucigalpa"

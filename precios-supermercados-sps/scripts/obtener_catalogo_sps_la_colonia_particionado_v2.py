@@ -16,10 +16,11 @@ import math
 import re
 import sys
 import time
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -177,7 +178,7 @@ def _run_partitioned_catalog(*, page_size: int, delay_seconds: float) -> dict[st
         "partitions_completed": 0,
         "partition_quantity_sum": 0,
     }
-    run_id = f"sps_frontier_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
+    run_id = f"sps_frontier_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
     unique_products: set[str] = set()
     unique_skus: set[tuple[str, str]] = set()
     all_products: list[dict[str, Any]] = []

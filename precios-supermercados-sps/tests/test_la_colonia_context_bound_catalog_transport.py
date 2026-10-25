@@ -5,10 +5,10 @@ import hashlib
 import importlib.util
 import json
 import sys
-from datetime import datetime, timezone
+from collections.abc import Mapping
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from types import ModuleType
-from typing import Mapping
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -44,7 +44,6 @@ from precios_supermercados.structural_discovery_manifest import (
     build_verified_structural_discovery,
 )
 from precios_supermercados.structural_receipt_crypto import VerifiedStructuralReceipt
-
 
 TESTS = Path(__file__).parent
 
@@ -188,7 +187,7 @@ class _ContextSigningTransport:
             separators=(",", ":"),
         ).encode("utf-8")
         ordinal = len(self.calls)
-        started = datetime(2026, 8, 24, 16, 0, ordinal, tzinfo=timezone.utc)
+        started = datetime(2026, 8, 24, 16, 0, ordinal, tzinfo=UTC)
         completed = datetime(
             2026,
             8,
@@ -197,7 +196,7 @@ class _ContextSigningTransport:
             0,
             ordinal,
             100_000,
-            tzinfo=timezone.utc,
+            tzinfo=UTC,
         )
         base = EdgeReceiptPayload(
             run_id=context["runId"],

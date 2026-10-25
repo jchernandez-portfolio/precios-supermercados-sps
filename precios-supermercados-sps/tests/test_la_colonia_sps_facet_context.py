@@ -28,7 +28,6 @@ from precios_supermercados.scrapers.la_colonia_sps_facet_context import (
     prepare_sps_facet_execution,
 )
 
-
 GRAPHQL_URL = f"https://{FACET_CONTEXT_HOST}{FACET_CONTEXT_PATH}"
 
 

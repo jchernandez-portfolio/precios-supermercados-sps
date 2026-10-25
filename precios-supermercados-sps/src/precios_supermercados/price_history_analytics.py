@@ -5,10 +5,10 @@ la capa de comparación. Este módulo no inventa periodos ni interpola precios.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Iterable
+from datetime import UTC, datetime, timedelta
+from decimal import ROUND_HALF_UP, Decimal
 
 
 class PriceHistoryAnalyticsError(ValueError):
@@ -208,7 +208,7 @@ def summarize_price_windows(
 
     if as_of_utc.tzinfo is None or as_of_utc.utcoffset() is None:
         raise PriceHistoryAnalyticsError("history_as_of_not_timezone_aware")
-    as_of = as_of_utc.astimezone(timezone.utc)
+    as_of = as_of_utc.astimezone(UTC)
     if not windows or any(type(value) is not int or value <= 0 for value in windows):
         raise PriceHistoryAnalyticsError("history_windows_invalid")
     if len(set(windows)) != len(windows):

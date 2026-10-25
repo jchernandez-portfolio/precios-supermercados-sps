@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-import json
 import importlib.util
+import json
 from collections import defaultdict
-from datetime import datetime, timezone
-from typing import Any, Mapping
+from collections.abc import Mapping
+from datetime import UTC, datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -17,10 +18,6 @@ from precios_supermercados.scrapers.la_colonia import (
     LaColoniaExtractor,
     decode_search_variables,
 )
-from precios_supermercados.scrapers.la_colonia_graphql import (
-    MAX_CATALOG_PAGE_SIZE,
-    build_product_search_url,
-)
 from precios_supermercados.scrapers.la_colonia_catalog_coverage import (
     CanonicalCatalogEvidence,
     build_traversal_evidence,
@@ -28,6 +25,10 @@ from precios_supermercados.scrapers.la_colonia_catalog_coverage import (
 )
 from precios_supermercados.scrapers.la_colonia_catalog_partitions import (
     build_structural_discovery_report,
+)
+from precios_supermercados.scrapers.la_colonia_graphql import (
+    MAX_CATALOG_PAGE_SIZE,
+    build_product_search_url,
 )
 from precios_supermercados.scrapers.la_colonia_runner import (
     AcceptanceProfile,
@@ -37,7 +38,7 @@ from precios_supermercados.scrapers.la_colonia_runner import (
     _continuity_error,
 )
 
-FIXED_TIME = datetime(2026, 8, 5, 15, 0, tzinfo=timezone.utc)
+FIXED_TIME = datetime(2026, 8, 5, 15, 0, tzinfo=UTC)
 
 
 class StepClock:

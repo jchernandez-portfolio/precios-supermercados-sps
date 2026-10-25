@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -27,7 +27,7 @@ from precios_supermercados.scrapers.la_colonia import (
 )
 
 FIXTURES = Path(__file__).parent / "fixtures" / "la_colonia"
-FIXED_TIME = datetime(2026, 8, 5, 4, 30, tzinfo=timezone.utc)
+FIXED_TIME = datetime(2026, 8, 5, 4, 30, tzinfo=UTC)
 
 
 def load_fixture(name: str):

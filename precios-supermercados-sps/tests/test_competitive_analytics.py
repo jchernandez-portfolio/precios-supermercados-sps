@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 
 from precios_supermercados.analytics_quality import (
@@ -18,8 +18,7 @@ from precios_supermercados.price_analytics import (
 )
 from precios_supermercados.product_homologation import SourceProductRecord, homologate_products
 
-
-AS_OF = datetime(2026, 9, 8, 12, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 9, 8, 12, tzinfo=UTC)
 SCOPE = ComparisonScope((("a", "a_sps"), ("b", "b_sps")))
 
 

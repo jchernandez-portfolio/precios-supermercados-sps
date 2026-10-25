@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Mapping
 from urllib.parse import parse_qsl, urlencode, urlsplit
 
 from precios_supermercados.edge_provenance import canonical_json_bytes

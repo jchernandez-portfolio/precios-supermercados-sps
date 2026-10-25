@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -24,10 +24,9 @@ from precios_supermercados.offer_normalization import (
 )
 from precios_supermercados.scrapers.la_colonia import LaColoniaExtractor
 
-
 FIXTURES = Path(__file__).parent / "fixtures" / "la_colonia"
-OBSERVED_AT = datetime(2026, 8, 22, 20, 0, tzinfo=timezone.utc)
-VALIDATED_AT = datetime(2026, 8, 22, 20, 1, tzinfo=timezone.utc)
+OBSERVED_AT = datetime(2026, 8, 22, 20, 0, tzinfo=UTC)
+VALIDATED_AT = datetime(2026, 8, 22, 20, 1, tzinfo=UTC)
 
 
 def _raw_products():

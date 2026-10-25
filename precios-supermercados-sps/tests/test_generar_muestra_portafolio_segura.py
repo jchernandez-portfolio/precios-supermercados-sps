@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "generar_muestra_portafolio_segura.py"
 SPEC = importlib.util.spec_from_file_location("generar_muestra_portafolio_segura", SCRIPT)

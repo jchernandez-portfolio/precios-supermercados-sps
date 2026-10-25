@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "b2c" / "app.js"
 CATALOG = ROOT / "b2c" / "catalog.js"

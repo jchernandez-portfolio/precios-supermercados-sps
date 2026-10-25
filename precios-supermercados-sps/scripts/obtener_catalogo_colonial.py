@@ -9,16 +9,26 @@ import math
 import sys
 import time
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from precios_supermercados.scrapers.colonial import (  # noqa: E402
-    MAX_COMMERCIAL_RECHECKS, ORIGIN, SECTION, ColonialError, apply_commercial_recheck,
-    commercial_disagreements, parse_cards, parse_product_detail, parse_products, reconcile, sitemap_drift,
-    sitemap_drift_limit, sitemap_urls,
+    MAX_COMMERCIAL_RECHECKS,
+    ORIGIN,
+    SECTION,
+    ColonialError,
+    apply_commercial_recheck,
+    commercial_disagreements,
+    parse_cards,
+    parse_product_detail,
+    parse_products,
+    reconcile,
+    sitemap_drift,
+    sitemap_drift_limit,
+    sitemap_urls,
 )
 
 
@@ -61,11 +71,11 @@ class Download:
                 raise ColonialError("offline_cache_miss:" + url)
             for attempt in range(2):
                 time.sleep(max(0, 1 - (time.monotonic() - self.last)))
-                if datetime.now(timezone.utc) >= self.until or time.monotonic() >= self.deadline:
+                if datetime.now(UTC) >= self.until or time.monotonic() >= self.deadline:
                     raise ColonialError("authorization_or_deadline_expired")
                 if self.metrics["total_requests"] >= self.max_requests:
                     raise ColonialError("request_budget_exhausted")
-                row = {"url": url, "observed_at": datetime.now(timezone.utc).isoformat(), "reused": False}
+                row = {"url": url, "observed_at": datetime.now(UTC).isoformat(), "reused": False}
                 self.metrics["total_requests"] += 1
                 self.records.append(row)
                 self.save()
@@ -185,7 +195,7 @@ def collect(get) -> dict:
             "city": "San Pedro Sula", "currency": "HNL", "catalog_complete": True,
             "validation_passed": True, "location_verified_same_run": True,
             "scope": "public_ecommerce_sps_not_physical_branch_inventory",
-            "observed_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "observed_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "catalog_products_reported": total, "unique_products_extracted": total,
             "skus_extracted": len(products), "skus_with_price": len(products),
             "membership_sha256": hashlib.sha256("\n".join(sorted(membership)).encode()).hexdigest(),
@@ -205,7 +215,7 @@ def main() -> None:
     parser.add_argument("--deadline-seconds", type=int, default=1200)
     args = parser.parse_args()
     until = datetime.fromisoformat((args.authorized_until or "1970-01-01T00:00:00Z").replace("Z", "+00:00"))
-    if until.tzinfo is None or (not args.offline and until <= datetime.now(timezone.utc)) or not 1 <= args.max_requests <= 450 or not 1 <= args.deadline_seconds <= 1200:
+    if until.tzinfo is None or (not args.offline and until <= datetime.now(UTC)) or not 1 <= args.max_requests <= 450 or not 1 <= args.deadline_seconds <= 1200:
         parser.error("Autorización/presupuesto inválido")
     downloader = Download(args.output, until, args.reuse_cache, args.max_requests, args.deadline_seconds)
     downloader.offline = args.offline

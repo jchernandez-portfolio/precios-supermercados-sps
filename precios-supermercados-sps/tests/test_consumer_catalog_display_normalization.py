@@ -4,7 +4,6 @@ import importlib.util
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "exportar_consumer_catalog.py"
 SPEC = importlib.util.spec_from_file_location("exportar_consumer_catalog_display_test", SCRIPT)

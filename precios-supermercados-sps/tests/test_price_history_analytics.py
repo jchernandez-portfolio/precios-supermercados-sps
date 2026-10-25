@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from decimal import Decimal
 
 import pytest
@@ -18,7 +18,7 @@ def observation(day: int, price: int, *, location: str = "walmart_sps") -> Histo
         canonical_product_id="prod_gtin_07590002040003",
         supermarket_id="walmart",
         location_id=location,
-        observed_at_utc=datetime(2026, 9, day, 12, tzinfo=timezone.utc),
+        observed_at_utc=datetime(2026, 9, day, 12, tzinfo=UTC),
         price_minor=price,
     )
 
@@ -74,19 +74,19 @@ def test_history_requires_timezone_aware_timestamp() -> None:
 
 
 def test_windows_require_a_real_baseline_and_never_shorten_silently() -> None:
-    as_of = datetime(2026, 9, 10, 12, tzinfo=timezone.utc)
+    as_of = datetime(2026, 9, 10, 12, tzinfo=UTC)
     rows = (
         HistoricalPriceObservation(
             "prod_gtin_07590002040003", "walmart", "walmart_sps",
-            datetime(2026, 8, 1, 12, tzinfo=timezone.utc), 10000,
+            datetime(2026, 8, 1, 12, tzinfo=UTC), 10000,
         ),
         HistoricalPriceObservation(
             "prod_gtin_07590002040003", "walmart", "walmart_sps",
-            datetime(2026, 9, 5, 12, tzinfo=timezone.utc), 9000,
+            datetime(2026, 9, 5, 12, tzinfo=UTC), 9000,
         ),
         HistoricalPriceObservation(
             "prod_gtin_07590002040003", "walmart", "walmart_sps",
-            datetime(2026, 9, 9, 12, tzinfo=timezone.utc), 9500,
+            datetime(2026, 9, 9, 12, tzinfo=UTC), 9500,
         ),
     )
 
@@ -107,7 +107,7 @@ def test_windows_require_a_real_baseline_and_never_shorten_silently() -> None:
 
 
 def test_windows_reject_invalid_configuration_and_future_observations() -> None:
-    as_of = datetime(2026, 9, 2, 12, tzinfo=timezone.utc)
+    as_of = datetime(2026, 9, 2, 12, tzinfo=UTC)
     with pytest.raises(PriceHistoryAnalyticsError, match="history_windows_duplicate"):
         summarize_price_windows((observation(1, 10000),), as_of_utc=as_of, windows=(7, 7))
     with pytest.raises(PriceHistoryAnalyticsError, match="history_observation_after_as_of"):

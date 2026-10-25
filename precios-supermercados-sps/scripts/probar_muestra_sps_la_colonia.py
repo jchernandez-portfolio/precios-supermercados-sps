@@ -13,9 +13,10 @@ import argparse
 import json
 import sys
 import time
-from datetime import datetime, timezone
+from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,11 +33,11 @@ from precios_supermercados.diagnostics.location_binding_dom_controls import (  #
     resolve_exact_city_control,
     verify_structural_city_selection,
 )
+from precios_supermercados.scrapers.base import StructureChangedError  # noqa: E402
 from precios_supermercados.scrapers.la_colonia import (  # noqa: E402
     CATALOG_URL,
     LaColoniaExtractor,
 )
-from precios_supermercados.scrapers.base import StructureChangedError  # noqa: E402
 
 TARGET_HOME = "https://www.lacolonia.com/"
 TARGET_HOST = "www.lacolonia.com"
@@ -88,7 +89,7 @@ class MvpSampleError(RuntimeError):
 
 
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _product_search_payload(value: Any) -> bool:
@@ -275,7 +276,7 @@ def build_sample_artifact(
         "location_id": MVP_LOCATION_ID,
         "city": TARGET_CITY,
         "location_verified_same_run": True,
-        "observed_at_utc": observed_at_utc.astimezone(timezone.utc)
+        "observed_at_utc": observed_at_utc.astimezone(UTC)
         .isoformat(timespec="seconds")
         .replace("+00:00", "Z"),
         "sample_size_requested": sample_size,
@@ -332,7 +333,7 @@ def build_failure_artifact(
         "supermarket_id": "la_colonia",
         "location_id": MVP_LOCATION_ID,
         "city": TARGET_CITY,
-        "observed_at_utc": observed_at.astimezone(timezone.utc)
+        "observed_at_utc": observed_at.astimezone(UTC)
         .isoformat(timespec="seconds")
         .replace("+00:00", "Z"),
         **safe_diagnostic,

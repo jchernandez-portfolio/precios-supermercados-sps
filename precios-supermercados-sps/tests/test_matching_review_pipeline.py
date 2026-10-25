@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from _matching_fixtures import build_records
 from precios_supermercados.matching.config import (
     DEFAULT_CONFIG_PATH,
     DEFAULT_DECISIONS_PATH,
@@ -35,8 +36,6 @@ from precios_supermercados.matching.review import (
 )
 from precios_supermercados.matching.taxonomy import load_source_taxonomy
 from precios_supermercados.product_identity_decisions import load_reviewed_decisions
-
-from _matching_fixtures import build_records
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "homologacion_motor_shadow.py"

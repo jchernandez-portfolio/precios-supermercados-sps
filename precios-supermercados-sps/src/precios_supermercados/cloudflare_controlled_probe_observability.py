@@ -15,7 +15,7 @@ import hashlib
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import NoReturn, Protocol
 
 from precios_supermercados.cloudflare_controlled_probe_verifier import (
@@ -128,7 +128,7 @@ def _safe_integer(
 def _utc(value: datetime, code: str) -> datetime:
     if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
         _fail(code)
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)
 
 
 def _iso_timestamp(value: object, code: str) -> datetime:
@@ -145,13 +145,13 @@ def _iso_timestamp(value: object, code: str) -> datetime:
 def _epoch_ms(value: object, code: str) -> datetime:
     milliseconds = _safe_integer(value, code, minimum=1)
     try:
-        return datetime.fromtimestamp(milliseconds / 1000, tz=timezone.utc)
+        return datetime.fromtimestamp(milliseconds / 1000, tz=UTC)
     except (OverflowError, OSError, ValueError) as exc:
         raise ControlledProbeObservabilityError(code) from exc
 
 
 def _timestamp(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    return value.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
 def _filter(key: str, value: str) -> dict[str, object]:

@@ -3,7 +3,6 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github/workflows/precios-supermercados-sps-bigquery-first-load.yml"
 BOOTSTRAP = ROOT / "precios-supermercados-sps/scripts/preparar_bigquery_gcp.sh"

@@ -4,7 +4,7 @@ import base64
 import hashlib
 import json
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -66,8 +66,8 @@ def _observation(kind: str, private_key: Ed25519PrivateKey):
         raw_response_sha256=hashlib.sha256(raw).hexdigest(),
         response_status=200,
         response_body_bytes=len(raw),
-        physical_started_at_utc=datetime(2026, 8, 21, 20, 20, 0, 100_000, tzinfo=timezone.utc),
-        response_completed_at_utc=datetime(2026, 8, 21, 20, 20, 0, 300_000, tzinfo=timezone.utc),
+        physical_started_at_utc=datetime(2026, 8, 21, 20, 20, 0, 100_000, tzinfo=UTC),
+        response_completed_at_utc=datetime(2026, 8, 21, 20, 20, 0, 300_000, tzinfo=UTC),
         github_repository="jchernandez-portfolio/precios-supermercados-sps",
         github_repository_id="1282475205",
         github_ref="refs/heads/main",
@@ -125,10 +125,10 @@ def _trace(observation, **overrides: object) -> CloudflareStructuralTraceEvidenc
         "fetch_method": "GET",
         "fetch_status": 200,
         "fetch_response_body_size": payload.response_body_bytes,
-        "custom_started_at_utc": datetime(2026, 8, 21, 20, 20, 0, 90_000, tzinfo=timezone.utc),
-        "custom_completed_at_utc": datetime(2026, 8, 21, 20, 20, 0, 310_000, tzinfo=timezone.utc),
-        "fetch_started_at_utc": datetime(2026, 8, 21, 20, 20, 0, 110_000, tzinfo=timezone.utc),
-        "fetch_completed_at_utc": datetime(2026, 8, 21, 20, 20, 0, 290_000, tzinfo=timezone.utc),
+        "custom_started_at_utc": datetime(2026, 8, 21, 20, 20, 0, 90_000, tzinfo=UTC),
+        "custom_completed_at_utc": datetime(2026, 8, 21, 20, 20, 0, 310_000, tzinfo=UTC),
+        "fetch_started_at_utc": datetime(2026, 8, 21, 20, 20, 0, 110_000, tzinfo=UTC),
+        "fetch_completed_at_utc": datetime(2026, 8, 21, 20, 20, 0, 290_000, tzinfo=UTC),
     }
     values.update(overrides)
     return CloudflareStructuralTraceEvidence(**values)  # type: ignore[arg-type]
@@ -219,10 +219,10 @@ def test_evidencia_fuera_de_ventana_temporal_falla() -> None:
     observation = _observation("root_total", key)
     trace = _trace(
         observation,
-        custom_started_at_utc=datetime(2026, 8, 21, 20, 19, 0, tzinfo=timezone.utc),
-        custom_completed_at_utc=datetime(2026, 8, 21, 20, 19, 1, tzinfo=timezone.utc),
-        fetch_started_at_utc=datetime(2026, 8, 21, 20, 19, 0, 100_000, tzinfo=timezone.utc),
-        fetch_completed_at_utc=datetime(2026, 8, 21, 20, 19, 0, 200_000, tzinfo=timezone.utc),
+        custom_started_at_utc=datetime(2026, 8, 21, 20, 19, 0, tzinfo=UTC),
+        custom_completed_at_utc=datetime(2026, 8, 21, 20, 19, 1, tzinfo=UTC),
+        fetch_started_at_utc=datetime(2026, 8, 21, 20, 19, 0, 100_000, tzinfo=UTC),
+        fetch_completed_at_utc=datetime(2026, 8, 21, 20, 19, 0, 200_000, tzinfo=UTC),
     )
     with pytest.raises(CloudflareStructuralTraceEvidenceError) as exc:
         reconcile_cloudflare_structural_trace(observation, [trace])

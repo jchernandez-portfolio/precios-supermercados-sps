@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from types import MappingProxyType
-from typing import Any, Mapping, TypeVar
+from typing import Any, TypeVar
 from urllib.parse import urlsplit
 
 from .enums import (

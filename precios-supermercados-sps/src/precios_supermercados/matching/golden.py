@@ -12,7 +12,7 @@ import csv
 import io
 import random
 from collections import Counter, defaultdict
-from typing import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 
 from .thresholds import prf, wilson_lower
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -40,8 +40,7 @@ from precios_supermercados.tabular_persistence import (
     validate_offer_location_for_persistence,
 )
 
-
-BASE_TIME = datetime(2026, 8, 22, 18, 0, tzinfo=timezone.utc)
+BASE_TIME = datetime(2026, 8, 22, 18, 0, tzinfo=UTC)
 
 
 def fixed_catalog(*, supermarket_id: str = "demo", name: str = "Demo"):

@@ -19,7 +19,6 @@ from precios_supermercados.scrapers.la_colonia_sps_facet_wire import (
     prepare_sps_facet_wire_request,
 )
 
-
 GRAPHQL_URL = "https://www.lacolonia.com/_v/segment/graphql/v1"
 RAW_REGION = "opaque-region-for-wire-test"
 

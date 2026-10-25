@@ -12,10 +12,11 @@ import math
 import re
 import threading
 import time
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any
 
 from .base import (
     BlockedResponseError,
@@ -158,7 +159,7 @@ class LaColoniaWindowDiagnosticRuntime:
             raise ValueError("El diagnóstico exige max_retries=0 para respetar 12 solicitudes")
         self.sleeper = sleeper
         self.monotonic = monotonic
-        self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.clock = clock or (lambda: datetime.now(UTC))
         self.max_duration_seconds = float(max_duration_seconds)
         self._run_lock = threading.Lock()
 
@@ -656,4 +657,4 @@ def _extend_unique(values: list[str], new_values: Sequence[str]) -> None:
 def _utc(value: datetime) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("clock debe devolver una fecha con zona horaria")
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)

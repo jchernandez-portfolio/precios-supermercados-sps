@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
@@ -36,7 +36,7 @@ from precios_supermercados.structural_provenance import (
 )
 from precios_supermercados.structural_receipt_crypto import VerifiedStructuralReceipt
 
-BASE = datetime(2026, 8, 21, 20, 30, 0, tzinfo=timezone.utc)
+BASE = datetime(2026, 8, 21, 20, 30, 0, tzinfo=UTC)
 AUTH = "authorization-structural-manifest"
 RUN = "32527000000:1"
 RELEASE = "release-structural-manifest-001"

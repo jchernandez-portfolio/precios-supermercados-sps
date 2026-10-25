@@ -3,7 +3,6 @@ import json
 import socket
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 REPORT = ROOT / "reports" / "pricesmart" / "2026-08-31-graphql-schema-probe"
 

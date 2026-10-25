@@ -12,7 +12,7 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass, field
-from typing import Mapping, NoReturn
+from typing import NoReturn
 from urllib.parse import parse_qsl, urlsplit
 
 from precios_supermercados.scrapers.la_colonia_sps_facet_context import (

@@ -11,9 +11,10 @@ No autentica, no hace red y no concede autoridad para nuevas escrituras Sheets.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any
 
 from .storage_contract import LEGACY_SHEETS_MANAGED_TABLE_SPECS
 from .tabular_persistence import TableSpec

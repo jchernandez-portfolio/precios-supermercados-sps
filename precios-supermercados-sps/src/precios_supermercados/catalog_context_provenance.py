@@ -9,12 +9,12 @@ v3 nunca contiene el ``regionId`` raw: sólo binding, evidencia y fingerprints.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import fields
 from datetime import datetime
-from typing import Mapping, NoReturn
+from typing import NoReturn
 
 from precios_supermercados.edge_provenance import EdgeReceiptPayload, canonical_json_bytes
-
 
 CATALOG_CONTEXT_RECEIPT_SCHEMA_VERSION = "3"
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")

@@ -17,18 +17,18 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from difflib import SequenceMatcher
 from functools import lru_cache
-from typing import Iterable
 
+from . import master_taxonomy
 from .gtin_policy import (
     SKU_DERIVED_GTIN_SUPERMARKETS,
     restricted_circulation_reason,
     restricted_gtin_master_partition,
 )
-from . import master_taxonomy
 from .identifiers import generate_gtin_product_id
 from .product_homologation import (
     ExactGtinGroup,
@@ -562,7 +562,7 @@ class BrandLexicon(frozenset):
         aliases: dict[str, str] | None = None,
         squashed: dict[str, str] | None = None,
         generic: Iterable[str] = (),
-    ) -> "BrandLexicon":
+    ) -> BrandLexicon:
         instance = super().__new__(cls, values)
         instance.aliases = dict(aliases or {})
         instance.squashed = dict(squashed or {})

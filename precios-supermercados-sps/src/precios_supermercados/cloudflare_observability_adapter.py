@@ -12,7 +12,7 @@ con valores distintos. Nunca usa la salida MCP como evidencia productiva.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import NoReturn
 
 from precios_supermercados.cloudflare_trace_evidence import (
@@ -108,13 +108,13 @@ def _safe_integer(
 def _utc(value: object, code: str) -> datetime:
     if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
         _fail(code)
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)
 
 
 def _epoch_ms(value: object, code: str) -> datetime:
     milliseconds = _safe_integer(value, code, minimum=1)
     try:
-        return datetime.fromtimestamp(milliseconds / 1000, tz=timezone.utc)
+        return datetime.fromtimestamp(milliseconds / 1000, tz=UTC)
     except (OverflowError, OSError, ValueError) as exc:
         raise CloudflareObservabilityAdapterError(code) from exc
 
@@ -400,7 +400,7 @@ def _build_trace_evidence(
     custom_event: Mapping[str, object],
     fetch_event: Mapping[str, object],
 ) -> CloudflareOriginTraceEvidence:
-    custom_metadata = _metadata(custom_event, prefix="custom")
+    _metadata(custom_event, prefix="custom")  # valida la forma aunque la identidad salga de _standard_span_identity
     fetch_metadata = _metadata(fetch_event, prefix="fetch")
     custom_trace_id, custom_span_id, custom_invocation, service, version = _standard_span_identity(
         custom_event,

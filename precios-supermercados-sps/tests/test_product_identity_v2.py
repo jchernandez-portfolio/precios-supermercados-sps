@@ -7,17 +7,17 @@ import pytest
 from precios_supermercados.product_homologation import SourceProductRecord
 from precios_supermercados.product_identity_v2 import (
     IDENTITY_NORMALIZATION_VERSION,
-    audit_identity_quality,
     assign_taxonomy_v2,
-    canonicalize_brand_key,
-    canonical_presentation_fields,
-    canonical_egg_size,
+    audit_identity_quality,
+    build_brand_lexicon,
     candidate_presentations_compatible,
+    canonical_egg_size,
+    canonical_presentation_fields,
+    canonicalize_brand_key,
     homologate_products_v2,
     profile_product_v2,
     resolve_brand,
     resolve_presentation_v2,
-    build_brand_lexicon,
     source_brand_role,
 )
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -39,9 +39,8 @@ from precios_supermercados.tabular_persistence import (
 from precios_supermercados.tabular_rehydration import rehydrate_commercial_snapshot
 from precios_supermercados.tabular_store import InMemoryTabularStore
 
-
 FIXTURES = Path(__file__).parent / "fixtures" / "la_colonia"
-BASE_TIME = datetime(2026, 8, 26, 12, 0, tzinfo=timezone.utc)
+BASE_TIME = datetime(2026, 8, 26, 12, 0, tzinfo=UTC)
 SUPERMARKET_ID = "la_colonia"
 LOCATION_ID = "la_colonia_sps"
 

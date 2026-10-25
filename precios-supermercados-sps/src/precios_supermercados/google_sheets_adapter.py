@@ -12,9 +12,10 @@ concede por sí solo autorización para nuevas escrituras Sheets.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Mapping, Protocol, Sequence
+from typing import Any, Protocol
 
 from .google_sheets_plan import (
     AtomicWorkbookPlan,

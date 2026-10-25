@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from obtener_catalogo_colonial import Download, collect
@@ -29,7 +29,7 @@ def main() -> None:
     if not 1 <= args.deadline_seconds <= MAX_DEADLINE_SECONDS:
         raise SystemExit("deadline_invalid")
 
-    deadline_utc = datetime.now(timezone.utc) + timedelta(seconds=args.deadline_seconds)
+    deadline_utc = datetime.now(UTC) + timedelta(seconds=args.deadline_seconds)
     downloader = Download(args.output, deadline_utc, [], args.max_requests, args.deadline_seconds)
     try:
         snapshot = collect(downloader.get)

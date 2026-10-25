@@ -1,6 +1,6 @@
-from copy import deepcopy
-from datetime import datetime, timezone
 import json
+from copy import deepcopy
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
@@ -12,7 +12,7 @@ from precios_supermercados.scrapers.la_colonia_graphql import (
 )
 
 FIXTURE = Path(__file__).parent / "fixtures" / "la_colonia" / "product_search_page.json"
-FIXED_TIME = datetime(2026, 8, 5, 4, 30, tzinfo=timezone.utc)
+FIXED_TIME = datetime(2026, 8, 5, 4, 30, tzinfo=UTC)
 
 
 def decoded_variables(url: str):

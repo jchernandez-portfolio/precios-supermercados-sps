@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import precios_supermercados.diagnostics.la_colonia_location_binding_capture as capture
 
-
 CONSUMED_AUTHORIZATION_IDS = frozenset(
     {
         "LC-location-binding-336",

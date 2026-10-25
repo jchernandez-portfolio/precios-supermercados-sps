@@ -15,7 +15,6 @@ from precios_supermercados.diagnostics.location_binding_dom_controls import (
     resolve_exact_city_control,
 )
 
-
 HTML = b'''<!doctype html>
 <html><body>
   <button class="btn-modal-selector" onclick="openLocation()">Selecciona tu tienda</button>

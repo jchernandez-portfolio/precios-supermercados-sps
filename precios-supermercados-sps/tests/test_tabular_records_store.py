@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
@@ -24,8 +24,7 @@ from precios_supermercados.tabular_store import (
     TabularStoreError,
 )
 
-
-START = datetime(2026, 8, 22, 18, 0, tzinfo=timezone.utc)
+START = datetime(2026, 8, 22, 18, 0, tzinfo=UTC)
 END = START + timedelta(minutes=3)
 
 

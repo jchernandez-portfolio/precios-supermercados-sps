@@ -39,10 +39,11 @@ import time
 import urllib.error
 import urllib.request
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 for _path in (ROOT / "scripts", ROOT / "src"):
@@ -120,13 +121,13 @@ class AbortRun(RuntimeError):
 
 
 def utc_text(value: datetime) -> str:
-    return value.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return value.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def parse_utc(value: object, reason: str) -> datetime:
     if not isinstance(value, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", value):
         raise CaptureError(reason)
-    return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
 
 
 # ---------------------------------------------------------------------------
@@ -636,7 +637,7 @@ def run_capture(
     transport: Transport,
     raw_directory: Path | None = None,
     checkpoint: Path | None = None,
-    now: Callable[[], datetime] = lambda: datetime.now(timezone.utc).replace(microsecond=0),
+    now: Callable[[], datetime] = lambda: datetime.now(UTC).replace(microsecond=0),
     sleep: Callable[[float], None] = time.sleep,
     monotonic: Callable[[], float] = time.monotonic,
 ) -> dict[str, Any]:
@@ -777,7 +778,7 @@ def main() -> int:
         raise SystemExit("max_failure_rate_invalid")
     if not 1 <= args.stale_days <= 365:
         raise SystemExit("stale_days_invalid")
-    now = datetime.now(timezone.utc).replace(microsecond=0)
+    now = datetime.now(UTC).replace(microsecond=0)
     authorization = load_authorization(
         args.authorization, now=now, delay=args.delay_seconds, max_requests=args.max_requests,
     )

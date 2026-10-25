@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-
 import json
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
@@ -23,10 +22,9 @@ from precios_supermercados.rpi_data_marts import (
     build_rpi_data_marts,
 )
 
-
-AS_OF = datetime(2026, 9, 8, 12, tzinfo=timezone.utc)
-A_CURRENT_AT = datetime(2026, 9, 1, 12, tzinfo=timezone.utc)
-B_CURRENT_AT = datetime(2026, 9, 2, 12, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 9, 8, 12, tzinfo=UTC)
+A_CURRENT_AT = datetime(2026, 9, 1, 12, tzinfo=UTC)
+B_CURRENT_AT = datetime(2026, 9, 2, 12, tzinfo=UTC)
 
 
 def inputs(*, stale: bool = False):
@@ -84,11 +82,11 @@ def inputs(*, stale: bool = False):
         MartCommercialState("b:2", 2200, None, False, "in_stock", B_CURRENT_AT),
     )
     history = (
-        MartHistoricalState("a:1", 2400, None, False, datetime(2026, 5, 1, 12, tzinfo=timezone.utc)),
-        MartHistoricalState("a:1", 2200, None, False, datetime(2026, 8, 20, 12, tzinfo=timezone.utc)),
+        MartHistoricalState("a:1", 2400, None, False, datetime(2026, 5, 1, 12, tzinfo=UTC)),
+        MartHistoricalState("a:1", 2200, None, False, datetime(2026, 8, 20, 12, tzinfo=UTC)),
         MartHistoricalState("a:1", 2000, 2500, True, A_CURRENT_AT),
-        MartHistoricalState("b:2", 2100, None, False, datetime(2026, 5, 1, 12, tzinfo=timezone.utc)),
-        MartHistoricalState("b:2", 2150, None, False, datetime(2026, 8, 20, 12, tzinfo=timezone.utc)),
+        MartHistoricalState("b:2", 2100, None, False, datetime(2026, 5, 1, 12, tzinfo=UTC)),
+        MartHistoricalState("b:2", 2150, None, False, datetime(2026, 8, 20, 12, tzinfo=UTC)),
         MartHistoricalState("b:2", 2200, None, False, B_CURRENT_AT),
     )
     return analytics, competition, descriptors, states, freshness, history

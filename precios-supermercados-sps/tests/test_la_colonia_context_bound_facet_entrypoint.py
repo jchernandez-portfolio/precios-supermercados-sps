@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from types import MappingProxyType, SimpleNamespace
 
 import pytest
@@ -30,7 +30,7 @@ from precios_supermercados.scrapers.la_colonia_sps_structural_plan import (
 )
 
 RAW_REGION = "opaque-region-context-bound-entrypoint-test"
-FIXED_TIME = datetime(2026, 8, 24, 18, 50, tzinfo=timezone.utc)
+FIXED_TIME = datetime(2026, 8, 24, 18, 50, tzinfo=UTC)
 SHA = "a" * 40
 RUN_ID = "32765000000"
 

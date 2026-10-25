@@ -22,8 +22,8 @@ from __future__ import annotations
 import random
 import zlib
 from collections import defaultdict
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Iterable, Mapping, Sequence
 
 from .comparison import pair_key
 from .standardize import StandardizedRecord, size_bucket
@@ -45,7 +45,7 @@ class BlockingSettings:
     min_similarity: float = 0.15
 
     @classmethod
-    def from_config(cls, section: Mapping[str, object]) -> "BlockingSettings":
+    def from_config(cls, section: Mapping[str, object]) -> BlockingSettings:
         minhash = section.get("minhash") or {}
         assert isinstance(minhash, Mapping)
         return cls(

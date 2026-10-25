@@ -13,7 +13,7 @@ import random
 import sqlite3
 import sys
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -37,10 +37,12 @@ from generar_mvp_sqlite_la_colonia import HISTORY_INDEX_NAME, HISTORY_INDEX_SQL,
 from precios_supermercados.price_analytics import ComparisonScope, CurrentPriceObservation  # noqa: E402
 from precios_supermercados.product_homologation_persistence import (  # noqa: E402
     NORMALIZATION_VERSION,
+)
+from precios_supermercados.product_homologation_persistence import (
     SCHEMA_SQL as PROFILE_SCHEMA_SQL,
 )
 
-AS_OF = datetime(2026, 9, 20, 12, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 9, 20, 12, tzinfo=UTC)
 CONTEXTS = (
     ("la_colonia", "la_colonia_sps", "San Pedro Sula"),
     ("la_colonia", "la_colonia_tgu", "Tegucigalpa"),
@@ -231,7 +233,7 @@ def legacy_fetch_visible_offers(backend, scope, *, page_size: int = 2000):
 
 def legacy_fetch_historical_points(backend, scope, *, as_of_utc, page_size: int = 5000):
     predicate, scope_args = core._scope_predicate(scope)
-    as_of_text = as_of_utc.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    as_of_text = as_of_utc.astimezone(UTC).isoformat().replace("+00:00", "Z")
     cursor_product, cursor_location, cursor_observed = -1, "", ""
     grouped = defaultdict(list)
     seen = set()
@@ -702,7 +704,7 @@ def test_cardinality_guards_follow_their_loads_and_still_fail_closed(tmp_path: P
     con = sqlite3.connect(db, isolation_level=None)
     try:
         with pytest.raises(sqlite3.IntegrityError):
-            for name, sql, args in _mutation_steps(3, sku_count=4):
+            for _name, sql, args in _mutation_steps(3, sku_count=4):
                 con.execute(sql, args)
         assert con.in_transaction is False
     finally:

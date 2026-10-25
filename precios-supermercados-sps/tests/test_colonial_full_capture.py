@@ -4,17 +4,17 @@ import hashlib
 import json
 import sys
 import tarfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
+
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from obtener_catalogo_colonial import Download, collect
-from actualizar_mvp_sqlite_la_colonia import validate_snapshot_bytes
-from precios_supermercados.scrapers.colonial import ean_source, gtin_from_sku
-
 from _evidencia import asegurar  # noqa: E402
+from actualizar_mvp_sqlite_la_colonia import validate_snapshot_bytes
+from obtener_catalogo_colonial import Download, collect
+from precios_supermercados.scrapers.colonial import ean_source, gtin_from_sku
 
 asegurar("reports/colonial/2026-08-30/raw-capture.tar.gz")
 
@@ -27,7 +27,7 @@ def test_full_source_capture_reproduces_accepted_catalog_offline(tmp_path, monke
     with tarfile.open(evidence / "raw-capture.tar.gz") as archive:
         archive.extractall(cache, filter="data")
     monkeypatch.setattr("requests.Session.get", lambda *a, **k: pytest.fail("unexpected live request"))
-    downloader = Download(tmp_path / "reparsed", datetime(1970, 1, 1, tzinfo=timezone.utc), [cache], 1, 1)
+    downloader = Download(tmp_path / "reparsed", datetime(1970, 1, 1, tzinfo=UTC), [cache], 1, 1)
     downloader.offline = True
     try:
         rebuilt = collect(downloader.get)

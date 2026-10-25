@@ -4,7 +4,7 @@ import importlib.util
 import json
 import sys
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from types import ModuleType
@@ -174,7 +174,7 @@ def test_producto_promovido_no_emite_pending_location_binding() -> None:
     normalized = normalize_raw_product(result.products[0], currency="HNL")
     validated = validate_normalized_offer(
         normalized,
-        validated_at_utc=datetime(2026, 8, 24, 18, 0, tzinfo=timezone.utc),
+        validated_at_utc=datetime(2026, 8, 24, 18, 0, tzinfo=UTC),
     )
 
     assert normalized.location_id == "la_colonia_sps"

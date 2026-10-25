@@ -1,5 +1,6 @@
 """PriceSmart HN: parse and reconcile a complete club-bound Bloomreach capture."""
 from __future__ import annotations
+
 import hashlib
 import json
 import re
@@ -7,6 +8,7 @@ from collections import Counter
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+
 ENDPOINT = "https://www.pricesmart.com/api/br_discovery/getProductsByKeyword"
 CATEGORY_URL = "https://www.pricesmart.com/es-hn/categoria/Alimentos-G10D03/G10D03"
 CATEGORY_ID = "G10D03"

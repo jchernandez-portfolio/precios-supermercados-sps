@@ -16,10 +16,10 @@ from __future__ import annotations
 
 import math
 from collections import Counter
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Iterable, Mapping, Sequence
 
-from .comparison import FIELDS, FIELD_NAMES, ComparisonVector
+from .comparison import FIELD_NAMES, FIELDS, ComparisonVector
 
 MODEL_SCHEMA = "precios-sps-fellegi-sunter-model/v1"
 
@@ -113,7 +113,7 @@ class FellegiSunterModel:
             raise FellegiSunterError("em_requires_initial_m_u")
         prior = min(max(self.prior, 1e-6), 0.5)
         used = 0
-        for used in range(1, iterations + 1):
+        for _used in range(1, iterations + 1):
             m_counts = [[0.0] * len(levels) for _, levels in FIELDS]
             u_counts = [[0.0] * len(levels) for _, levels in FIELDS]
             expected_matches = 0.0
@@ -222,7 +222,7 @@ class FellegiSunterModel:
         }
 
     @classmethod
-    def from_json(cls, payload: Mapping[str, object]) -> "FellegiSunterModel":
+    def from_json(cls, payload: Mapping[str, object]) -> FellegiSunterModel:
         if payload.get("schema") != MODEL_SCHEMA:
             raise FellegiSunterError("model_schema_invalid")
         fields = payload.get("fields")

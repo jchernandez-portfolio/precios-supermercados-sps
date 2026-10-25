@@ -4,7 +4,7 @@ import base64
 import hashlib
 import json
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
@@ -66,8 +66,8 @@ def _page(*, role: str = "primary", traversal_id: str = "traversal-primary-001",
         raw_response_sha256=hashlib.sha256(raw).hexdigest(),
         response_status=200,
         response_body_bytes=len(raw),
-        physical_started_at_utc=datetime(2026, 8, 21, 19, 0, 0, 100_000, tzinfo=timezone.utc),
-        response_completed_at_utc=datetime(2026, 8, 21, 19, 0, 0, 900_000, tzinfo=timezone.utc),
+        physical_started_at_utc=datetime(2026, 8, 21, 19, 0, 0, 100_000, tzinfo=UTC),
+        response_completed_at_utc=datetime(2026, 8, 21, 19, 0, 0, 900_000, tzinfo=UTC),
         github_repository="jchernandez-portfolio/precios-supermercados-sps",
         github_repository_id="1282475205",
         github_ref="refs/heads/main",
@@ -130,10 +130,10 @@ def _trace(page: CryptographicallyVerifiedEdgeCatalogPage, **overrides: object) 
         "fetch_method": "GET",
         "fetch_status": 200,
         "fetch_response_body_size": payload.response_body_bytes,
-        "custom_started_at_utc": datetime(2026, 8, 21, 18, 59, 59, 900_000, tzinfo=timezone.utc),
-        "custom_completed_at_utc": datetime(2026, 8, 21, 19, 0, 1, 100_000, tzinfo=timezone.utc),
-        "fetch_started_at_utc": datetime(2026, 8, 21, 19, 0, 0, 150_000, tzinfo=timezone.utc),
-        "fetch_completed_at_utc": datetime(2026, 8, 21, 19, 0, 0, 500_000, tzinfo=timezone.utc),
+        "custom_started_at_utc": datetime(2026, 8, 21, 18, 59, 59, 900_000, tzinfo=UTC),
+        "custom_completed_at_utc": datetime(2026, 8, 21, 19, 0, 1, 100_000, tzinfo=UTC),
+        "fetch_started_at_utc": datetime(2026, 8, 21, 19, 0, 0, 150_000, tzinfo=UTC),
+        "fetch_completed_at_utc": datetime(2026, 8, 21, 19, 0, 0, 500_000, tzinfo=UTC),
     }
     values.update(overrides)
     return CloudflareOriginTraceEvidence(**values)  # type: ignore[arg-type]
@@ -188,7 +188,7 @@ def test_candidato_de_otro_request_no_cuenta_como_match() -> None:
         ({"fetch_response_body_size": 1}, "trace_fetch_body_size_mismatch"),
         ({"script_version_id": "cf-version-wrong"}, "trace_script_version_mismatch"),
         (
-            {"fetch_started_at_utc": datetime(2026, 8, 21, 18, 59, 40, tzinfo=timezone.utc)},
+            {"fetch_started_at_utc": datetime(2026, 8, 21, 18, 59, 40, tzinfo=UTC)},
             "fetch_span_outside_custom_span",
         ),
     ],
@@ -209,10 +209,10 @@ def test_tiempo_de_fetch_fuera_de_ventana_del_receipt_falla() -> None:
     page = _page()
     evidence = _trace(
         page,
-        custom_started_at_utc=datetime(2026, 8, 21, 19, 0, 15, tzinfo=timezone.utc),
-        custom_completed_at_utc=datetime(2026, 8, 21, 19, 0, 17, tzinfo=timezone.utc),
-        fetch_started_at_utc=datetime(2026, 8, 21, 19, 0, 15, 100_000, tzinfo=timezone.utc),
-        fetch_completed_at_utc=datetime(2026, 8, 21, 19, 0, 15, 500_000, tzinfo=timezone.utc),
+        custom_started_at_utc=datetime(2026, 8, 21, 19, 0, 15, tzinfo=UTC),
+        custom_completed_at_utc=datetime(2026, 8, 21, 19, 0, 17, tzinfo=UTC),
+        fetch_started_at_utc=datetime(2026, 8, 21, 19, 0, 15, 100_000, tzinfo=UTC),
+        fetch_completed_at_utc=datetime(2026, 8, 21, 19, 0, 15, 500_000, tzinfo=UTC),
     )
     with pytest.raises(CloudflareTraceEvidenceError) as captured:
         reconcile_cloudflare_origin_trace(page, [evidence])

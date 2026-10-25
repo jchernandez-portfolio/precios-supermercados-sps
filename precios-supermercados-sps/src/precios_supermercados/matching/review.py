@@ -13,10 +13,10 @@ import csv
 import hashlib
 import io
 import json
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
 
 from ..product_identity_decisions import (
     DECISION_SCHEMA,
@@ -319,7 +319,7 @@ def import_review_rows(
     now_utc: str | None = None,
     allow_offline_fingerprints: bool = False,
 ) -> ImportResult:
-    now = now_utc or datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    now = now_utc or datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
     decisions: list[ReviewedIdentityDecision] = []
     errors: list[dict[str, str]] = []
     skipped = 0

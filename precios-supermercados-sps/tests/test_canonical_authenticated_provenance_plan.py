@@ -4,7 +4,7 @@ import base64
 import hashlib
 import inspect
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
@@ -47,7 +47,7 @@ RUN = "32532000000:1"
 AUTH = "authorization-canonical-plan-001"
 RELEASE = "release-canonical-plan-001"
 KEY_ID = "cloudflare-ed25519-v1"
-BASE = datetime(2026, 8, 21, 23, 0, 0, tzinfo=timezone.utc)
+BASE = datetime(2026, 8, 21, 23, 0, 0, tzinfo=UTC)
 
 
 def _signature(seed: int) -> str:

@@ -139,7 +139,7 @@ class ScrapeRunRecord:
         quality_event_count: int,
         apply_result: ApplyRunResult,
         run_evidence_id: str | None = None,
-    ) -> "ScrapeRunRecord":
+    ) -> ScrapeRunRecord:
         if not isinstance(apply_result, ApplyRunResult):
             raise TabularPersistenceError("apply_result debe ser ApplyRunResult")
         record = cls(
@@ -238,7 +238,7 @@ class QualityEventRecord:
         observed_at_utc: datetime,
         sequence: int,
         offer_id: str | None = None,
-    ) -> "QualityEventRecord":
+    ) -> QualityEventRecord:
         sequence = _non_negative_int(sequence, "sequence")
         try:
             normalized_category = (

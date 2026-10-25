@@ -1,10 +1,11 @@
 """Build deterministic B2B and B2C marts from one safe analytical result."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Any, Iterable
+from datetime import UTC, datetime
+from decimal import ROUND_HALF_UP, Decimal
+from typing import Any
 
 from .analytics_quality import FreshnessAssessment, MarketWindowStatus
 from .competitive_analytics import CompetitiveAnalyticsResult
@@ -57,7 +58,7 @@ class MartCommercialState:
             raise RpiDataMartError("mart_offer_not_buyable")
         if self.observed_at_utc.tzinfo is None or self.observed_at_utc.utcoffset() is None:
             raise RpiDataMartError("mart_observed_at_not_timezone_aware")
-        object.__setattr__(self, "observed_at_utc", self.observed_at_utc.astimezone(timezone.utc))
+        object.__setattr__(self, "observed_at_utc", self.observed_at_utc.astimezone(UTC))
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,7 +83,7 @@ class MartHistoricalState:
             raise RpiDataMartError("mart_history_promotion_invalid")
         if self.observed_at_utc.tzinfo is None or self.observed_at_utc.utcoffset() is None:
             raise RpiDataMartError("mart_history_observed_at_not_timezone_aware")
-        object.__setattr__(self, "observed_at_utc", self.observed_at_utc.astimezone(timezone.utc))
+        object.__setattr__(self, "observed_at_utc", self.observed_at_utc.astimezone(UTC))
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,7 +130,7 @@ def _change_pct(current_minor: int, previous_minor: int) -> str:
 
 
 def _iso(value: datetime | None) -> str | None:
-    return None if value is None else value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    return None if value is None else value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _unique_by_id(values: Iterable[Any], field: str, error: str) -> dict[str, Any]:
@@ -326,7 +327,7 @@ def build_rpi_data_marts(
     consumer_products: list[dict[str, Any]] = []
     category_names: set[str] = set()
     brand_names: set[str] = set()
-    as_of_utc = freshness_values[0].as_of_utc if freshness_values else datetime.now(timezone.utc)
+    as_of_utc = freshness_values[0].as_of_utc if freshness_values else datetime.now(UTC)
     for product in analytics.products:
         product_dimensions.append(
             {

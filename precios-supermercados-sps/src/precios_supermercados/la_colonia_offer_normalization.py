@@ -11,11 +11,11 @@ el puente falla cerrado y exige revisión en vez de reutilizar una corrección v
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Mapping, Sequence
 
 from .la_colonia_product_normalization import (
     ProductNormalizationError,

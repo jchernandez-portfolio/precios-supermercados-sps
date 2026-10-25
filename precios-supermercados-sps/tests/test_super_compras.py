@@ -12,7 +12,6 @@ import pytest
 
 from test_exportar_consumer_catalog import MODULE, build_db, export
 
-
 ROOT = Path(__file__).resolve().parents[1]
 APP_DIR = ROOT / "super-compras"
 

@@ -9,7 +9,7 @@ sigue estando en el recibo Ed25519 y en la reconciliación estricta existente.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
 from precios_supermercados.cloudflare_controlled_probe_observability import (
@@ -94,7 +94,7 @@ def _timestamp(value: object, code: str) -> datetime:
         raise ControlledProbeObservabilityError(code) from exc
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         _fail(code)
-    return parsed.astimezone(timezone.utc)
+    return parsed.astimezone(UTC)
 
 
 def _account_id(value: object) -> str:
@@ -122,8 +122,8 @@ def _window(from_utc: datetime, to_utc: datetime) -> tuple[int, int]:
         or to_utc.tzinfo is None
     ):
         _fail("probe_query_window_invalid")
-    start = from_utc.astimezone(timezone.utc)
-    end = to_utc.astimezone(timezone.utc)
+    start = from_utc.astimezone(UTC)
+    end = to_utc.astimezone(UTC)
     if end <= start or end - start > MAX_QUERY_WINDOW:
         _fail("probe_query_window_invalid")
     return int(start.timestamp() * 1000), int(end.timestamp() * 1000)

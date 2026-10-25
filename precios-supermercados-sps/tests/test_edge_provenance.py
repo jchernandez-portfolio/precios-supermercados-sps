@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
@@ -16,13 +16,12 @@ from precios_supermercados.edge_provenance import (
     validate_edge_provenance_structure,
 )
 
-
 COMMIT = "a" * 40
 REQUEST_DIGEST = "b" * 64
 REQUEST_SHA = "c" * 64
 RESPONSE_SHA = "d" * 64
 CODE_SHA = "e" * 64
-T0 = datetime(2026, 8, 21, 15, 0, tzinfo=timezone.utc)
+T0 = datetime(2026, 8, 21, 15, 0, tzinfo=UTC)
 SIGNATURE = base64.urlsafe_b64encode(b"offline-edge-signature").decode("ascii").rstrip("=")
 
 
@@ -455,5 +454,5 @@ def test_non_utc_input_is_normalized_not_rejected() -> None:
         response_completed_at_utc=payload.response_completed_at_utc.astimezone(offset),
     )
 
-    assert localized.physical_started_at_utc.tzinfo == timezone.utc
-    assert localized.response_completed_at_utc.tzinfo == timezone.utc
+    assert localized.physical_started_at_utc.tzinfo == UTC
+    assert localized.response_completed_at_utc.tzinfo == UTC

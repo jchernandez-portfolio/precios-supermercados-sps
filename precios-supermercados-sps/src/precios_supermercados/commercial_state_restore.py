@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from .commercial_pricing import CommercialPricingError, evaluate_real_price_reduction
@@ -32,7 +32,6 @@ from .enums import RunStatus
 from .tabular_persistence import FACT_SCRAPE_RUNS, TabularPersistenceError
 from .tabular_records import ScrapeRunRecord
 from .tabular_rehydration import RehydratedCommercialSnapshot
-
 
 _RESTORED_TERMINAL_RUN_SENTINEL = "durable-terminal-run-requires-reconciliation"
 _BOUND_EVIDENCE_RE = re.compile(r"^crev1_[0-9a-f]{64}$")
@@ -95,7 +94,7 @@ def _utc(row: Mapping[str, Any], field: str) -> datetime:
         parsed = datetime.fromisoformat(value[:-1] + "+00:00")
     except ValueError as exc:
         raise CommercialStateRestoreError(f"durable_run_{field}_invalid") from exc
-    if parsed.tzinfo is None or parsed.utcoffset() != timezone.utc.utcoffset(parsed):
+    if parsed.tzinfo is None or parsed.utcoffset() != UTC.utcoffset(parsed):
         raise CommercialStateRestoreError(f"durable_run_{field}_invalid")
     return parsed
 

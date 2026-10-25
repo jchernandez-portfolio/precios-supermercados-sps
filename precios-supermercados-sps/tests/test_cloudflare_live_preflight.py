@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
@@ -39,8 +39,8 @@ def _record(*, role: str, traversal_id: str, order_by: str, suffix: str) -> Prov
         custom_span_id=f"custom-{suffix}",
         fetch_span_id=f"fetch-{suffix}",
         raw_response_sha256=("7" if role == "primary" else "8") * 64,
-        physical_started_at_utc=datetime(2026, 8, 21, 20, 0, 0, tzinfo=timezone.utc),
-        response_completed_at_utc=datetime(2026, 8, 21, 20, 0, 1, tzinfo=timezone.utc),
+        physical_started_at_utc=datetime(2026, 8, 21, 20, 0, 0, tzinfo=UTC),
+        response_completed_at_utc=datetime(2026, 8, 21, 20, 0, 1, tzinfo=UTC),
     )
 
 
@@ -95,7 +95,7 @@ def _deployment() -> CloudflareDeploymentEvidence:
         observability_query_roundtrip_succeeded=True,
         egress_allowlist_enforced=True,
         allowed_origin_host="www.lacolonia.com",
-        observed_at_utc=datetime(2026, 8, 21, 20, 5, tzinfo=timezone.utc),
+        observed_at_utc=datetime(2026, 8, 21, 20, 5, tzinfo=UTC),
     )
 
 

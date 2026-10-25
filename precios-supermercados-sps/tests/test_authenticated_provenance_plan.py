@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 import pytest
 
@@ -26,7 +26,7 @@ COMMIT = "a" * 40
 CODE_SHA = "d" * 64
 KEY_ID = "cloudflare-ed25519-v1"
 RELEASE = "release-authenticated-plan-001"
-NOW = datetime(2026, 8, 21, 21, 0, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 8, 21, 21, 0, 0, tzinfo=UTC)
 
 
 def _structure(*, total: int = 51):

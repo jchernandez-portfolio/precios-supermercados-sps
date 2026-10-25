@@ -9,8 +9,9 @@ prueba por sí sola independencia física/productiva, por lo que
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping, NoReturn
+from typing import Any, NoReturn
 
 from precios_supermercados.edge_catalog_page import ValidatedEdgeCatalogPage
 from precios_supermercados.edge_provenance import canonical_json_bytes

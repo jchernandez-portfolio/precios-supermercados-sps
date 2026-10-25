@@ -10,10 +10,10 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, Mapping
 
 from .gtin_policy import restricted_gtin_shared_master_ok
 from .product_homologation import ProductProfile, fold_text
@@ -22,7 +22,6 @@ from .product_identity_v2 import (
     explain_candidate,
     one_sided_variant_conflicts,
 )
-
 
 DECISION_SCHEMA = "precios-sps-product-identity-decisions/v1"
 IDENTITY_POLICY_VERSION = "precios-sps-product-identity-policy/v1"
@@ -163,7 +162,7 @@ class ReviewedIdentityDecision:
             raise ProductIdentityDecisionError("decision_policy_version_invalid")
 
     @classmethod
-    def from_mapping(cls, value: Mapping[str, object]) -> "ReviewedIdentityDecision":
+    def from_mapping(cls, value: Mapping[str, object]) -> ReviewedIdentityDecision:
         expected = {
             "candidate_id",
             "left_source_record_id",

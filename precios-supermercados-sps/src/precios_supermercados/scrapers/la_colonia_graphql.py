@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 from urllib.parse import urlencode
 
 GRAPHQL_ENDPOINT = "https://www.lacolonia.com/_v/segment/graphql/v1"

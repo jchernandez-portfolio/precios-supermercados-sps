@@ -6,20 +6,13 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from precios_supermercados.scrapers.la_colonia_runner import (  # noqa: E402
-    AcceptanceProfile,
-    AcceptanceThresholds,
-    CatalogRunResult,
-    CrawlConfig,
-    LaColoniaCatalogRunner,
-)
 from precios_supermercados.scrapers.la_colonia_catalog_coverage import (  # noqa: E402
     CanonicalCatalogEvidence,
     build_traversal_evidence,
@@ -27,6 +20,13 @@ from precios_supermercados.scrapers.la_colonia_catalog_coverage import (  # noqa
 )
 from precios_supermercados.scrapers.la_colonia_catalog_partitions import (  # noqa: E402
     build_structural_discovery_report,
+)
+from precios_supermercados.scrapers.la_colonia_runner import (  # noqa: E402
+    AcceptanceProfile,
+    AcceptanceThresholds,
+    CatalogRunResult,
+    CrawlConfig,
+    LaColoniaCatalogRunner,
 )
 
 SAFE_PAGE_SIZES = (10, 20, 30, 50)
@@ -159,7 +159,7 @@ def _run_once(
     suffix: str = "",
     canonical_evidence: CanonicalCatalogEvidence | None = None,
 ) -> CatalogRunResult:
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     run_id = (
         canonical_evidence.run_id
         if canonical_evidence is not None

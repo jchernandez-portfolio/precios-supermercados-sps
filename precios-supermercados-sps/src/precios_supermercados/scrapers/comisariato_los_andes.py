@@ -10,7 +10,7 @@ import json
 import math
 import re
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -567,7 +567,7 @@ def reconcile_capture(directory: str | Path) -> dict[str, Any]:
 
     all_rows.sort(key=lambda row: row["source_key"])
     observed_at = (
-        max(observed).astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+        max(observed).astimezone(UTC).isoformat().replace("+00:00", "Z")
     )
     availability_counts = dict(
         sorted(Counter(row["availability"] for row in all_rows).items())

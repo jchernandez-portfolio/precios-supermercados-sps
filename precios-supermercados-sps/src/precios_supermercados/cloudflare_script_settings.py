@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from types import MappingProxyType
-from typing import Mapping, NoReturn
+from typing import NoReturn
 
 from precios_supermercados.edge_provenance import canonical_json_bytes
 

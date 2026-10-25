@@ -7,6 +7,7 @@ import socket
 import sys
 import tarfile
 from pathlib import Path
+
 import pytest
 import requests
 
@@ -16,7 +17,6 @@ ROOT = Path(__file__).resolve().parents[1]
 REPORT = ROOT / "reports/walmart/2026-08-31-full"
 sys.path.insert(0, str(ROOT / "scripts"))
 import actualizar_mvp_sqlite_la_colonia as local
-
 from _evidencia import asegurar  # noqa: E402
 
 asegurar("reports/walmart/2026-08-31-full/raw-capture.tar.gz")

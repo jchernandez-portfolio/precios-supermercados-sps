@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 import pytest
 
@@ -15,8 +15,7 @@ from precios_supermercados.shopping_analytics import (
     optimize_split_basket,
 )
 
-
-OBSERVED = datetime(2026, 9, 8, 11, tzinfo=timezone.utc)
+OBSERVED = datetime(2026, 9, 8, 11, tzinfo=UTC)
 
 
 def offer(

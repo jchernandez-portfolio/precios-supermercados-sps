@@ -9,7 +9,6 @@ from precios_supermercados.location_binding_transition import (
 )
 from precios_supermercados.locations import LA_COLONIA_SPS, LocationGranularity
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EVIDENCE = (
     REPO_ROOT

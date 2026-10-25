@@ -11,14 +11,13 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Iterable, Sequence
 
 import exportar_consumer_catalog as base
 from exportar_modelo_analitico import ExportError, SQLiteBackend, TursoBackend
-
 
 TGU_SCOPE = (
     ("la_colonia", "la_colonia_tgu"),
@@ -278,7 +277,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.freshness_hours <= 0:
         raise ExportError("consumer_catalog_tgu_freshness_hours_invalid")
     as_of = (
-        datetime.now(timezone.utc)
+        datetime.now(UTC)
         if args.as_of_utc is None
         else base._parse_utc(args.as_of_utc, "consumer_catalog_tgu_as_of_invalid")
     )

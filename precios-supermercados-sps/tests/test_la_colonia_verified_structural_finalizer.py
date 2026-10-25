@@ -3,7 +3,8 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-from datetime import datetime, timedelta, timezone
+from collections.abc import Mapping
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 
 import pytest
@@ -51,7 +52,7 @@ SERVICE = "precios-sps-provenance"
 VERSION_ID = "cf-version-finalizer-001"
 RUN = "32531000000:1"
 AUTH = "authorization-finalizer-001"
-BASE = datetime(2026, 8, 21, 22, 30, 0, tzinfo=timezone.utc)
+BASE = datetime(2026, 8, 21, 22, 30, 0, tzinfo=UTC)
 
 
 def _b64url(value: bytes) -> str:

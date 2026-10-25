@@ -12,13 +12,14 @@ import ipaddress
 import json
 import math
 import re
+import secrets
 import threading
 import time
-import secrets
-from types import MappingProxyType
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any, Callable, Mapping
+from types import MappingProxyType
+from typing import Any
 
 MINIMUM_PHYSICAL_START_DELAY_SECONDS = 1.5
 REQUEST_SCHEMA_VERSION = "1"

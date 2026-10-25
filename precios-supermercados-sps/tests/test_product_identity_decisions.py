@@ -23,7 +23,6 @@ from precios_supermercados.product_identity_v2 import (
     homologate_products_v2,
 )
 
-
 ROOT = Path(__file__).resolve().parents[1]
 GOLDEN = ROOT / "tests" / "fixtures" / "homologation" / "golden-pairs-v1.jsonl"
 REGISTRY = ROOT / "config" / "homologation" / "reviewed-decisions-v1.json"

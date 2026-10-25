@@ -5,16 +5,16 @@ import importlib.util
 import json
 import tarfile
 from pathlib import Path
+
 import pytest
 
+from _evidencia import asegurar  # noqa: E402
 from precios_supermercados.scrapers.pricesmart import (
     CLUBS,
     PriceSmartError,
     parse_documents,
     reconcile_capture,
 )
-
-from _evidencia import asegurar  # noqa: E402
 
 asegurar("reports/pricesmart/2026-09-01-full/raw-capture.tar.gz")
 

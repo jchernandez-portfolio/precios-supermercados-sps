@@ -7,7 +7,7 @@ from precios_supermercados.edge_gateway_client import (
     EdgeGatewayClient,
     EdgeGatewayClientError,
 )
-from test_edge_gateway_client import FakeTransport, RUN_ID, SHA
+from test_edge_gateway_client import RUN_ID, SHA, FakeTransport
 
 
 def authorization() -> EdgeAuthorizationRequest:

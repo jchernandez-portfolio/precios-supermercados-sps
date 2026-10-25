@@ -29,7 +29,6 @@ from precios_supermercados.structural_discovery_manifest import (
 from precios_supermercados.structural_provenance import SignedStructuralReceipt
 from precios_supermercados.structural_receipt_crypto import VerifiedStructuralReceipt
 
-
 TESTS = Path(__file__).parent
 
 

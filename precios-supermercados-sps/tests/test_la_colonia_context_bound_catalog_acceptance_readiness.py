@@ -14,7 +14,6 @@ from precios_supermercados.scrapers.la_colonia_context_bound_catalog_finalizer i
     ContextBoundCatalogProvenanceRun,
 )
 
-
 RUN = "32610000000:1"
 AUTH = "authorization-context-readiness"
 COMMIT = "a" * 40

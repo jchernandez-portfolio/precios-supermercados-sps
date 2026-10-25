@@ -16,10 +16,10 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Iterable, Mapping
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any, Iterable, Mapping
-
+from typing import Any
 
 OUTPUT_COLUMNS = (
     "supermarket_id",

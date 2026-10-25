@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -47,7 +47,7 @@ from precios_supermercados.structural_provenance import (
 )
 from precios_supermercados.structural_receipt_crypto import Ed25519StructuralReceiptVerifier
 
-FIXED_TIME = datetime(2026, 8, 21, 22, 30, tzinfo=timezone.utc)
+FIXED_TIME = datetime(2026, 8, 21, 22, 30, tzinfo=UTC)
 GRAPHQL_URL = "https://www.lacolonia.com/_v/segment/graphql/v1"
 RAW_REGION = "opaque-region-for-verified-facet-transport-test"
 
@@ -166,12 +166,12 @@ class _SigningTransport:
             response_body_bytes=len(raw_body),
             physical_started_at_utc=datetime(
                 2026, 8, 21, 22, 30, request.request_kind == "category_tree" and 2 or 0,
-                tzinfo=timezone.utc,
+                tzinfo=UTC,
             ),
             response_completed_at_utc=datetime(
                 2026, 8, 21, 22, 30, request.request_kind == "category_tree" and 2 or 0,
                 100_000,
-                tzinfo=timezone.utc,
+                tzinfo=UTC,
             ),
             github_repository="jchernandez-portfolio/precios-supermercados-sps",
             github_repository_id="1282475205",

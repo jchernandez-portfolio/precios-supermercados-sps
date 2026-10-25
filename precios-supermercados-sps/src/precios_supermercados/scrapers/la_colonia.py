@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 import math
 import re
-from datetime import datetime, timezone
+from collections.abc import Callable, Mapping, Sequence
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 from precios_supermercados.enums import AvailabilityStatus, LocationStatus
@@ -73,7 +74,7 @@ class LaColoniaExtractor:
             forbidden_path_prefixes=FORBIDDEN_PATH_PREFIXES,
             user_agent=USER_AGENT,
         )
-        self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.clock = clock or (lambda: datetime.now(UTC))
 
     def build_page_url(
         self,
@@ -141,7 +142,7 @@ class LaColoniaExtractor:
         observed_at = self.clock()
         if observed_at.tzinfo is None or observed_at.utcoffset() is None:
             raise ValueError("clock debe devolver una fecha con zona horaria")
-        observed_at = observed_at.astimezone(timezone.utc)
+        observed_at = observed_at.astimezone(UTC)
 
         raw_products: list[RawProduct] = []
         seen_keys: set[tuple[str, str]] = set()

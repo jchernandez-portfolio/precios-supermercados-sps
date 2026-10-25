@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -26,7 +26,7 @@ from precios_supermercados.scrapers.la_colonia_window_diagnostic_runtime import 
     write_diagnostic_artifacts,
 )
 
-FIXED_TIME = datetime(2026, 8, 5, 20, 0, tzinfo=timezone.utc)
+FIXED_TIME = datetime(2026, 8, 5, 20, 0, tzinfo=UTC)
 
 
 class StepClock:

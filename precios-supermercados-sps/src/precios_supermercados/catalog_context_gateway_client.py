@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Mapping
-from dataclasses import dataclass, field as dataclass_field
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from typing import NoReturn, TypeAlias
 
 from precios_supermercados.catalog_context_provenance import (
     CatalogContextProvenanceError,
-    ContextBoundEdgeReceiptPayload,
     context_bound_edge_receipt_payload_from_mapping,
 )
 from precios_supermercados.catalog_location_context import CatalogEdgeLocationContext
@@ -43,7 +43,6 @@ from precios_supermercados.la_colonia_edge_request import (
     LA_COLONIA_PATH,
     ValidatedLaColoniaEdgeRequest,
 )
-
 
 CATALOG_CONTEXT_EXECUTE_PATH = "/v1/catalog-execute"
 

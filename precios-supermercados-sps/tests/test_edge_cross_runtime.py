@@ -3,13 +3,12 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 import pytest
 
 from precios_supermercados.edge_provenance import _iso_z
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CLI = PROJECT_ROOT / "edge" / "cloudflare" / "test" / "canonical-time-cli.mjs"
@@ -24,9 +23,9 @@ def _node() -> str:
 @pytest.mark.parametrize(
     "value",
     [
-        datetime(2026, 8, 21, 16, 0, 0, tzinfo=timezone.utc),
-        datetime(2026, 8, 21, 16, 0, 0, 123_000, tzinfo=timezone.utc),
-        datetime(2026, 8, 21, 16, 0, 59, 999_000, tzinfo=timezone.utc),
+        datetime(2026, 8, 21, 16, 0, 0, tzinfo=UTC),
+        datetime(2026, 8, 21, 16, 0, 0, 123_000, tzinfo=UTC),
+        datetime(2026, 8, 21, 16, 0, 59, 999_000, tzinfo=UTC),
     ],
 )
 def test_edge_timestamp_matches_python_and_javascript(value: datetime) -> None:

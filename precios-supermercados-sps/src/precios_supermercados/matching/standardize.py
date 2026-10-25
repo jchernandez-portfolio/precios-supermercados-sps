@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import math
 import re
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
-from typing import Iterable, Mapping, Sequence
 
 from ..product_homologation import ProductProfile, fold_text
 from ..product_identity_v2 import build_brand_lexicon, canonicalize_brand_key, profile_product_v2

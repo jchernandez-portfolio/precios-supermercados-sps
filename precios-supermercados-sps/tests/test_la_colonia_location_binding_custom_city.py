@@ -8,7 +8,6 @@ import pytest
 
 import precios_supermercados.diagnostics.la_colonia_location_binding_capture as capture
 
-
 SYNTHETIC_AUTH = "LC-location-binding-777"
 
 

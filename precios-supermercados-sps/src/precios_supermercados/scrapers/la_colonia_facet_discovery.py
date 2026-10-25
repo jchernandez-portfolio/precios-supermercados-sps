@@ -8,8 +8,9 @@ lógicas predeterminadas del plan ``catalog_categories_v1``.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from .la_colonia_catalog_coverage import PartitionSpec
 from .la_colonia_catalog_partitions import (

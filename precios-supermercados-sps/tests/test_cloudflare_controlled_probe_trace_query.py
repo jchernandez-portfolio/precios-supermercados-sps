@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
@@ -12,7 +12,7 @@ from precios_supermercados.cloudflare_controlled_probe_observability import (
 )
 
 TRACE_ID = "trace-controlled-001"
-START = datetime(2026, 8, 22, 4, 30, 39, tzinfo=timezone.utc)
+START = datetime(2026, 8, 22, 4, 30, 39, tzinfo=UTC)
 
 
 def _summary_response(*, trace_id: str = TRACE_ID):

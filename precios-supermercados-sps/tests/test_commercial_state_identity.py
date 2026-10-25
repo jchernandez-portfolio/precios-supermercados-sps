@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -25,8 +25,7 @@ from precios_supermercados.identifiers import (
 )
 from precios_supermercados.models import NormalizedOffer, ValidatedOffer
 
-
-T0 = datetime(2026, 8, 20, 12, 0, tzinfo=timezone.utc)
+T0 = datetime(2026, 8, 20, 12, 0, tzinfo=UTC)
 
 
 def _validated(

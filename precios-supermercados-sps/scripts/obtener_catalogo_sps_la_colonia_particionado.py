@@ -15,9 +15,10 @@ import json
 import math
 import sys
 import time
-from datetime import datetime, timezone
+from collections.abc import Mapping
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 from urllib.parse import urlencode
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -155,7 +156,7 @@ def _run_partitioned_catalog(*, page_size: int, delay_seconds: float) -> dict[st
         "partitions_detected": 0,
         "partitions_completed": 0,
     }
-    run_id = f"sps_partitioned_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
+    run_id = f"sps_partitioned_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
     unique_products: set[str] = set()
     unique_skus: set[tuple[str, str]] = set()
     all_products: list[dict[str, Any]] = []

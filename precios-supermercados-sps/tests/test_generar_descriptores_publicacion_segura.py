@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parents[1]
 EXPORTER_PATH = ROOT / "scripts" / "exportar_modelo_analitico.py"
 DESCRIPTOR_PATH = ROOT / "scripts" / "generar_descriptores_publicacion_segura.py"

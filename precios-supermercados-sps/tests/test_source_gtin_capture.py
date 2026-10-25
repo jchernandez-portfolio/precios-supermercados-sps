@@ -29,6 +29,8 @@ from precios_supermercados.scrapers.colonial import (
 )
 from precios_supermercados.scrapers.comisariato_los_andes import (
     ean_provenance as comisariato_ean_provenance,
+)
+from precios_supermercados.scrapers.comisariato_los_andes import (
     parse_catalog_page,
 )
 from precios_supermercados.scrapers.pricesmart import parse_documents

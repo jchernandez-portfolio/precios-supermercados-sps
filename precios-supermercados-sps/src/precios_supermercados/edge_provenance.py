@@ -14,9 +14,10 @@ import binascii
 import hashlib
 import json
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Iterable, Literal
+from datetime import UTC, datetime
+from typing import Literal
 
 EDGE_PROVENANCE_SCHEMA_VERSION = "2"
 _RECEIPT_DOMAIN = b"precios-sps/edge-receipt/v2\0"
@@ -76,11 +77,11 @@ def _non_negative_int(value: object, label: str) -> int:
 def _utc(value: datetime, label: str) -> datetime:
     if not isinstance(value, datetime) or value.tzinfo is None:
         raise ValueError(f"{label} debe tener zona horaria")
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)
 
 
 def _iso_z(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _provider(value: object, label: str) -> str:

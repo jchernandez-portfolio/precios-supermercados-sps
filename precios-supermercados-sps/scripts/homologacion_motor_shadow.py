@@ -25,9 +25,9 @@ import os
 import sys
 import time
 from collections import defaultdict
-from datetime import datetime, timezone
+from collections.abc import Callable, Iterable, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable, Iterable, Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -52,7 +52,6 @@ from precios_supermercados.matching.pipeline import (  # noqa: E402
     MatchingEngine,
     model_report,
     pair_candidate_id,
-    retailer_pair,
     summarize_metrics,
 )
 from precios_supermercados.matching.policy import load_policy_gate  # noqa: E402
@@ -72,7 +71,7 @@ DEFAULT_REVIEW_LIMIT = 20000
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _write_json(path: Path, payload: object) -> None:
@@ -332,7 +331,6 @@ def load_turso_records(url: str, token: str) -> list[MatchRecord]:
     """Lee ``products`` + contextos (``price_history``/``locations``) de Turso."""
 
     from backfill_homologacion_turso import _fetch_products, _query  # noqa: PLC0415
-
     from precios_supermercados.product_homologation import fold_text  # noqa: PLC0415
 
     products = _fetch_products(url, token)

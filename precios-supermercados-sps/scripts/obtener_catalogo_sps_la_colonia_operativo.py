@@ -15,9 +15,10 @@ import json
 import math
 import sys
 import time
-from datetime import datetime, timezone
+from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -421,7 +422,7 @@ def _run_catalog(*, page_size: int, delay_seconds: float) -> dict[str, Any]:
         "recovery_duplicate_skus_ignored": 0,
         "partition_products_recovered": 0,
     }
-    run_id = f"sps_operational_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
+    run_id = f"sps_operational_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
     unique_products: set[str] = set()
     unique_skus: set[tuple[str, str]] = set()
     all_products: list[dict[str, Any]] = []

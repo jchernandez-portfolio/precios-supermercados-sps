@@ -5,7 +5,7 @@ import json
 import shutil
 import subprocess
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -23,7 +23,6 @@ from precios_supermercados.edge_receipt_crypto import (
     Ed25519ReceiptVerifier,
     EdgeReceiptCryptoError,
 )
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CLI = PROJECT_ROOT / "edge" / "cloudflare" / "test" / "receipt-sign-cli.mjs"
@@ -61,8 +60,8 @@ def _payload(**overrides: object) -> EdgeReceiptPayload:
         "raw_response_sha256": "c" * 64,
         "response_status": 200,
         "response_body_bytes": 1234,
-        "physical_started_at_utc": datetime(2026, 8, 21, 18, 30, 0, 123_000, tzinfo=timezone.utc),
-        "response_completed_at_utc": datetime(2026, 8, 21, 18, 30, 0, 456_000, tzinfo=timezone.utc),
+        "physical_started_at_utc": datetime(2026, 8, 21, 18, 30, 0, 123_000, tzinfo=UTC),
+        "response_completed_at_utc": datetime(2026, 8, 21, 18, 30, 0, 456_000, tzinfo=UTC),
         "github_repository": "jchernandez-portfolio/precios-supermercados-sps",
         "github_repository_id": "1282475205",
         "github_ref": "refs/heads/main",

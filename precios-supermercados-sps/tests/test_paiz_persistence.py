@@ -4,11 +4,13 @@ import json
 import sqlite3
 import sys
 from pathlib import Path
+
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
+from _evidencia import asegurar  # noqa: E402
 from actualizar_mvp_turso_paiz import _normalised_json, validate_snapshot_bytes  # noqa: E402
 from generar_mvp_sqlite_la_colonia import create_schema  # noqa: E402
 from migrar_mvp_paiz import (  # noqa: E402
@@ -16,8 +18,6 @@ from migrar_mvp_paiz import (  # noqa: E402
     migrate_sqlite,
     schema_ready_sql,
 )
-
-from _evidencia import asegurar  # noqa: E402
 
 asegurar("reports/paiz/2026-09-04-full/snapshot-paiz-multiplaza.json", "reports/paiz/2026-09-04-full/snapshot-paiz-proceres.json")
 

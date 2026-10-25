@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "scripts" / "ensamblar_adquisicion_diaria.py"
 SPEC = importlib.util.spec_from_file_location("ensamblar_adquisicion_diaria", MODULE_PATH)

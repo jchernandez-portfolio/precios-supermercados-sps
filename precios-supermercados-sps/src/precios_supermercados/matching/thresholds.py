@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import math
 from collections import defaultdict
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Iterable, Mapping, Sequence
 
 BANDS = ("auto_match", "review", "non_match")
 AUTO_DISABLED = 1.01  # probabilidad inalcanzable: el segmento no tiene auto-match

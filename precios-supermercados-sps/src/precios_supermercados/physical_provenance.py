@@ -12,9 +12,10 @@ import base64
 import hashlib
 import json
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Iterable, Literal
+from datetime import UTC, datetime
+from typing import Literal
 
 PROVENANCE_SCHEMA_VERSION = "1"
 _RECEIPT_DOMAIN = b"precios-sps/physical-receipt/v1\0"
@@ -41,14 +42,14 @@ def _exact_sha256(value: object, label: str) -> str:
 def _utc(value: datetime, label: str) -> datetime:
     if not isinstance(value, datetime) or value.tzinfo is None:
         raise ValueError(f"{label} debe tener zona horaria")
-    normalized = value.astimezone(timezone.utc)
-    if normalized.utcoffset() != timezone.utc.utcoffset(normalized):
+    normalized = value.astimezone(UTC)
+    if normalized.utcoffset() != UTC.utcoffset(normalized):
         raise ValueError(f"{label} debe normalizar a UTC")
     return normalized
 
 
 def _iso_z(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _signature_bytes(value: str) -> bytes:
@@ -64,7 +65,7 @@ def _signature_bytes(value: str) -> bytes:
 
 # `binascii` se importa después para mantener agrupadas las dependencias estándar
 # usadas únicamente por el validador estricto de base64.
-import binascii
+import binascii  # noqa: E402
 
 
 @dataclass(frozen=True, slots=True)

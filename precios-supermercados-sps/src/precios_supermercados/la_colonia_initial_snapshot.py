@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from .bigquery_adapter import (
     BigQueryAdapter,
@@ -80,7 +81,7 @@ def _utc(value: Any) -> datetime:
         raise InitialSnapshotError("snapshot_observed_at_invalid") from exc
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise InitialSnapshotError("snapshot_observed_at_invalid")
-    return parsed.astimezone(timezone.utc)
+    return parsed.astimezone(UTC)
 
 
 def _require(condition: bool, code: str) -> None:

@@ -118,15 +118,22 @@ Ramas de datos: `portfolio-data` (catálogo público), `product-images` (fotos),
 5. Los datos públicos no contienen secretos, datos crudos ni colas privadas.
 6. Solo se usan datos públicos; no se usan APIs privadas.
 
-## Pruebas
+## Estándar de código y pruebas
 
-Desde la raíz del repositorio:
+Todo cambio entra por PR y debe pasar el workflow de pruebas, que corre en este orden:
 
 ```bash
 python -m pip check
 python -m compileall precios-supermercados-sps/src precios-supermercados-sps/scripts
-PYTHONPATH=precios-supermercados-sps/src pytest -q precios-supermercados-sps/tests
+python -m ruff check precios-supermercados-sps          # Python: reglas en pyproject.toml
+npx --yes @biomejs/biome@2.3.5 lint                      # JavaScript: reglas en biome.json (desde precios-supermercados-sps/)
+PRECIOS_SPS_EVIDENCIA=descargar PYTHONPATH=precios-supermercados-sps/src pytest -q precios-supermercados-sps/tests
 ```
+
+- La versión de la app se pone con `scripts/versionar_super_compras.py` (el despliegue a
+  Pages la sella sola con fecha + commit).
+- Cada PR fusionado se anota en [`CHANGELOG.md`](CHANGELOG.md).
+- Las capturas crudas grandes viven en un Release ([`reports/EVIDENCIA.md`](reports/EVIDENCIA.md)).
 
 ## Documentación
 
