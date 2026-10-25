@@ -85,8 +85,9 @@ def test_load_catalogs_merges_every_published_city() -> None:
         if url.endswith("manifest.json"):
             return {"files": [{"path": "catalog/p0.json"}]}
         if "tegucigalpa" in url:
-            return {"rows": [{"row_id": "canonical-aa11", "offers": [{"source_product_id": "paiz:9"}]},
-                             {"row_id": "source-dd44", "offers": [{"source_product_id": "paiz:10"}]}]}
+            return {"rows": [{"row_id": "canonical-aa11", "offers": [{"source_product_id": "paiz:9@paiz_tgu_proceres"},
+                                                                      {"source_product_id": "paiz:9@paiz_tgu_multiplaza"}]},
+                             {"row_id": "source-dd44", "offers": [{"source_product_id": "paiz:10@paiz_tgu_proceres"}]}]}
         return catalog_document()
 
     rows = {row.key: row.offers for row in fotos.load_catalogs(fetch, "https://x.test/")}
