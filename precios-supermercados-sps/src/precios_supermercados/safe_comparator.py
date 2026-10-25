@@ -6,9 +6,9 @@ suficientemente demostrada. En particular, marca + presentación nunca bastan.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from itertools import combinations
-from typing import Iterable
 
 from .product_homologation import (
     HomologationResult,

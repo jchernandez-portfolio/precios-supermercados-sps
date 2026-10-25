@@ -13,7 +13,6 @@ from precios_supermercados.la_colonia_edge_request import (
 )
 from precios_supermercados.scrapers.la_colonia_graphql import build_product_search_url
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CLI = PROJECT_ROOT / "edge" / "cloudflare" / "test" / "fixture-cli.mjs"
 

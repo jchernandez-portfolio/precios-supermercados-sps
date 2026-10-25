@@ -11,10 +11,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from types import MappingProxyType
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from .bigquery_contract import (
     BIGQUERY_TABLE_BY_NAME,

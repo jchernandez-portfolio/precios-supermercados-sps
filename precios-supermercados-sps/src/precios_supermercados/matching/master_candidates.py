@@ -26,8 +26,8 @@ import copy
 import hashlib
 import math
 from collections import Counter, defaultdict
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Callable, Iterable, Mapping, Sequence
 
 from ..product_master import GoldenRecord
 from .comparison import ComparisonSettings, compare, name_similarity
@@ -89,7 +89,7 @@ class MasterCandidateSettings:
 
 
 def review_id(product_key: str, master_product_id: str) -> str:
-    return "mr_" + hashlib.sha256(f"{product_key}|{master_product_id}".encode("utf-8")).hexdigest()[:16]
+    return "mr_" + hashlib.sha256(f"{product_key}|{master_product_id}".encode()).hexdigest()[:16]
 
 
 def _size_from_golden(record: GoldenRecord) -> SizeInfo | None:
@@ -322,7 +322,8 @@ def generate_master_candidates(
         state_of[record.source_record_id] = (state, own)
         scored: list[tuple[str, dict[str, object]]] = []
 
-        def blocked(master_id: str, supermarket: str = record.supermarket_id, key: str = product_key) -> bool:
+        def blocked(master_id: str, supermarket: str = record.supermarket_id, key: str = product_key,
+                    own: str | None = own) -> bool:
             # Mismo maestro, rechazo humano o cadena ya presente en el maestro
             # (≤ 1 vínculo activo por cadena): nunca ocupan un cupo de candidato.
             if master_id == own:
@@ -532,9 +533,9 @@ def standardize_records(
 
     standardizer = Standardizer(
         records,  # type: ignore[arg-type]
-        vocabulary=getattr(config, "variant_vocabulary"),
+        vocabulary=config.variant_vocabulary,
         taxonomy=taxonomy,  # type: ignore[arg-type]
-        synonyms=getattr(config, "token_synonyms"),
+        synonyms=config.token_synonyms,
     )
     standardized = standardizer.run()
     tfidf = TfidfModel(item.core_text for item in standardized)

@@ -11,9 +11,10 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from types import MappingProxyType
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from .la_colonia_graphql import ALLOWED_ORDER_BY, MAX_CATALOG_PAGE_SIZE
 

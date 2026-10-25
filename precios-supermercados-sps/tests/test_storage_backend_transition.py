@@ -12,7 +12,6 @@ from precios_supermercados.storage_contract import (
     ACTIVE_STORAGE_TABLE_NAMES,
 )
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SHEETS_WORKFLOW = (
     REPO_ROOT

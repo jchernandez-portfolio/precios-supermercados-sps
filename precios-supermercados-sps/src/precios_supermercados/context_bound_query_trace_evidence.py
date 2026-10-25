@@ -16,7 +16,7 @@ import json
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import NoReturn
 from urllib.parse import parse_qsl, urlsplit
 
@@ -85,11 +85,11 @@ def _sha256(value: object, code: str) -> str:
 def _utc(value: object, code: str) -> datetime:
     if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
         _fail(code)
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)
 
 
 def _iso_z(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    return value.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
 def _hash_text(value: str) -> str:
@@ -411,8 +411,8 @@ def reconcile_context_bound_query_trace(
     if trace.script_version_id != payload.collector_release_id:
         _fail("query_trace_script_version_mismatch")
 
-    physical_start = payload.physical_started_at_utc.astimezone(timezone.utc)
-    response_end = payload.response_completed_at_utc.astimezone(timezone.utc)
+    physical_start = payload.physical_started_at_utc.astimezone(UTC)
+    response_end = payload.response_completed_at_utc.astimezone(UTC)
     if trace.fetch_started_at_utc < physical_start - clock_skew:
         _fail("query_trace_fetch_started_too_early")
     if trace.fetch_started_at_utc > response_end + clock_skew:

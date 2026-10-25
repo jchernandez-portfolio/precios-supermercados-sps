@@ -13,12 +13,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
-from collections.abc import Mapping
-from typing import Iterable
 
 from .enums import ChangeType, RunStatus
 from .identifiers import (
@@ -629,7 +628,7 @@ def _require_single_open_period(
 
 def _comparable(value: object) -> object:
     if hasattr(value, "value"):
-        value = getattr(value, "value")
+        value = value.value
     if isinstance(value, Decimal):
         return value.normalize()
     if isinstance(value, str):

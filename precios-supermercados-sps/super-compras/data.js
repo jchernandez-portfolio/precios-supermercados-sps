@@ -561,7 +561,7 @@ export class Catalog {
 
   search({ query = "", category = "", retailer = "", promoOnly = false, sort = "price", limit = 60 } = {}) {
     const terms = fold(query).split(" ").filter(Boolean);
-    let results = this.products.filter((product) => {
+    const results = this.products.filter((product) => {
       if (category && product.category !== category) return false;
       if (retailer && !product.retailers.includes(retailer)) return false;
       if (promoOnly && !product.promo) return false;

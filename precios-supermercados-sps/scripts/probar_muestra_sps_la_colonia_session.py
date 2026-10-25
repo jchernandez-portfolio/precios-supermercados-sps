@@ -10,8 +10,9 @@ GraphQL permitido. Los valores raw de cookies nunca se conservan ni se escriben.
 from __future__ import annotations
 
 import sys
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -63,7 +64,7 @@ class SharedBrowserSessionTracker(resilient.SharedSegmentCookieTracker):
     """Acepta el cookie jar compartido si cambia segmento o sesión VTEX."""
 
     shared_fallback_used = False
-    current_instance: "SharedBrowserSessionTracker | None" = None
+    current_instance: SharedBrowserSessionTracker | None = None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

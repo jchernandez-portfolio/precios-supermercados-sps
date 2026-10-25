@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -17,9 +17,8 @@ from precios_supermercados.la_colonia_offer_normalization import (
 from precios_supermercados.models import RawProduct, ValidatedOffer
 from precios_supermercados.scrapers.la_colonia import LaColoniaExtractor
 
-
 FIXTURES = Path(__file__).parent / "fixtures" / "la_colonia"
-BASE_TIME = datetime(2026, 8, 26, 12, 0, tzinfo=timezone.utc)
+BASE_TIME = datetime(2026, 8, 26, 12, 0, tzinfo=UTC)
 
 
 def _payload() -> dict[str, object]:

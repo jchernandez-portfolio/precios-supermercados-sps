@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
@@ -16,8 +16,7 @@ from precios_supermercados.analytics_quality import (
     select_last_known_good,
 )
 
-
-AS_OF = datetime(2026, 9, 8, 12, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 9, 8, 12, tzinfo=UTC)
 
 
 def run(run_id: str, hours_old: int, status: QualityStatus) -> QualityRun:

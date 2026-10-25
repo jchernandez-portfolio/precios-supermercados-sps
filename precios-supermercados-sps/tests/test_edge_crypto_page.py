@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -87,8 +87,8 @@ def _fixture() -> tuple[
         raw_response_sha256=hashlib.sha256(raw).hexdigest(),
         response_status=200,
         response_body_bytes=len(raw),
-        physical_started_at_utc=datetime(2026, 8, 21, 18, 50, 0, 123_000, tzinfo=timezone.utc),
-        response_completed_at_utc=datetime(2026, 8, 21, 18, 50, 0, 456_000, tzinfo=timezone.utc),
+        physical_started_at_utc=datetime(2026, 8, 21, 18, 50, 0, 123_000, tzinfo=UTC),
+        response_completed_at_utc=datetime(2026, 8, 21, 18, 50, 0, 456_000, tzinfo=UTC),
         github_repository="jchernandez-portfolio/precios-supermercados-sps",
         github_repository_id="1282475205",
         github_ref="refs/heads/main",

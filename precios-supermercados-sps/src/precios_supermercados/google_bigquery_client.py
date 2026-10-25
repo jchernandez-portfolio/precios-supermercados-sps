@@ -16,9 +16,10 @@ from __future__ import annotations
 import hashlib
 import re
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from collections.abc import Mapping
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from typing import Any, Mapping
+from typing import Any
 
 from google.api_core.exceptions import (
     Conflict,
@@ -31,7 +32,6 @@ from google.cloud import bigquery
 
 from .bigquery_adapter import BigQueryAdapterError, BigQueryReplayConflict
 from .bigquery_contract import BIGQUERY_TABLE_BY_NAME, BigQueryTableSpec
-
 
 _DATASET_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,1023}$")
 _MAX_ATOMIC_JOB_ATTEMPTS = 4
@@ -245,7 +245,7 @@ class GoogleCloudBigQueryClient:
 
     @staticmethod
     def _atomic_job_id(dataset_id: str, run_id: str, attempt: int = 0) -> str:
-        raw = f"{dataset_id}\x00{run_id}".encode("utf-8")
+        raw = f"{dataset_id}\x00{run_id}".encode()
         digest = hashlib.sha256(raw).hexdigest()
         return f"precios_sps_atomic_{digest}_{attempt}"
 
@@ -352,7 +352,7 @@ class GoogleCloudBigQueryClient:
                 staging_ref = f"{self._dataset_ref(dataset_id)}.{staging_name}"
                 self._client.delete_table(staging_ref, not_found_ok=True)
                 staging = bigquery.Table(staging_ref, schema=self._schema(spec))
-                staging.expires = datetime.now(timezone.utc) + timedelta(hours=2)
+                staging.expires = datetime.now(UTC) + timedelta(hours=2)
                 self._client.create_table(staging)
                 job_config = bigquery.LoadJobConfig(
                     schema=self._schema(spec),

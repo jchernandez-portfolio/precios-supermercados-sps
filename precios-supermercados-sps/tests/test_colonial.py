@@ -7,7 +7,13 @@ from pathlib import Path
 import pytest
 
 from precios_supermercados.scrapers.colonial import (
-    ORIGIN, ColonialError, parse_cards, parse_products, price, reconcile, sitemap_urls,
+    ORIGIN,
+    ColonialError,
+    parse_cards,
+    parse_products,
+    price,
+    reconcile,
+    sitemap_urls,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures" / "colonial"

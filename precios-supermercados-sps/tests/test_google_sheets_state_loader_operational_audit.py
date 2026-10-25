@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 LOADER = ROOT / "src" / "precios_supermercados" / "google_sheets_state_loader.py"
 

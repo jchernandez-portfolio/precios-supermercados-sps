@@ -15,7 +15,6 @@ from precios_supermercados.catalog_context_provenance import (
 )
 from precios_supermercados.edge_provenance import SignedEdgeReceipt
 
-
 TESTS = Path(__file__).parent
 
 

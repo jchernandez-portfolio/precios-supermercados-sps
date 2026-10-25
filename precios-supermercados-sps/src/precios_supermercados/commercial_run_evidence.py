@@ -31,7 +31,6 @@ from .models import ValidatedOffer
 from .tabular_persistence import FACT_SCRAPE_RUNS
 from .tabular_records import QualityEventRecord
 
-
 _BINDING_SCHEMA = "commercial-run-evidence-1"
 _BINDING_PREFIX = "crev1_"
 _MAX_AUTHORITY_EVIDENCE_ID = 512

@@ -6,7 +6,6 @@ from types import SimpleNamespace
 
 import pytest
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = PROJECT_ROOT / "scripts" / "probar_muestra_sps_la_colonia_bound.py"
 SPEC = importlib.util.spec_from_file_location("probar_muestra_sps_la_colonia_bound", SCRIPT)

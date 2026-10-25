@@ -16,13 +16,14 @@ import binascii
 import hashlib
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Mapping, NoReturn
+from datetime import UTC, datetime
+from typing import NoReturn
 
 from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives.serialization import load_der_public_key
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from cryptography.hazmat.primitives.serialization import load_der_public_key
 
 from precios_supermercados.edge_provenance import canonical_json_bytes
 
@@ -176,9 +177,9 @@ def _utc_timestamp(value: object, code: str) -> datetime:
         parsed = datetime.fromisoformat(text[:-1] + "+00:00")
     except ValueError as exc:
         raise ControlledProbeVerificationError(code) from exc
-    if parsed.tzinfo is None or parsed.utcoffset() != timezone.utc.utcoffset(parsed):
+    if parsed.tzinfo is None or parsed.utcoffset() != UTC.utcoffset(parsed):
         _fail(code)
-    return parsed.astimezone(timezone.utc)
+    return parsed.astimezone(UTC)
 
 
 def _public_key(value: object) -> Ed25519PublicKey:

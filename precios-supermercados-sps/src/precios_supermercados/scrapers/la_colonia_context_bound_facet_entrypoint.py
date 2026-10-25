@@ -20,7 +20,7 @@ import re
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import MappingProxyType
 from typing import NoReturn
 
@@ -177,7 +177,7 @@ def _derived_id(run: FacetEdgeRunContext, plan: SpsStructuralFacetPlan, kind: st
     material = (
         f"precios-sps/facet-entrypoint/v1\0{run.edge_authorization_id}\0{run.run_id}"
         f"\0{run.approved_commit_sha}\0{plan.digest}\0{kind}\0{purpose}"
-    ).encode("utf-8")
+    ).encode()
     return f"facet-{purpose}-{hashlib.sha256(material).hexdigest()[:40]}"
 
 
@@ -330,7 +330,7 @@ def run_context_bound_facet_entrypoint(
         _fail("facet_structural_public_key_missing")
     if not callable(sleeper):
         _fail("facet_sleeper_invalid")
-    runtime_clock = clock or (lambda: datetime.now(timezone.utc))
+    runtime_clock = clock or (lambda: datetime.now(UTC))
     if not callable(runtime_clock):
         _fail("facet_clock_invalid")
 

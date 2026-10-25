@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -44,7 +44,7 @@ CODE_SHA = "d" * 64
 KEY_ID = "cloudflare-ed25519-catalog-v1"
 RELEASE = "release-catalog-edge-001"
 TOTAL = 51
-NOW = datetime(2026, 8, 21, 23, 0, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 8, 21, 23, 0, 0, tzinfo=UTC)
 
 
 def _b64url(value: bytes) -> str:
@@ -238,11 +238,11 @@ class _SigningTransport:
             response_body_bytes=len(raw_body),
             physical_started_at_utc=datetime(
                 2026, 8, 21, 23, 0, call_number,
-                tzinfo=timezone.utc,
+                tzinfo=UTC,
             ),
             response_completed_at_utc=datetime(
                 2026, 8, 21, 23, 0, call_number, 100_000,
-                tzinfo=timezone.utc,
+                tzinfo=UTC,
             ),
             github_repository="jchernandez-portfolio/precios-supermercados-sps",
             github_repository_id="1282475205",

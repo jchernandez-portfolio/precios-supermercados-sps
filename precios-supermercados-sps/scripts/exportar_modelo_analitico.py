@@ -17,10 +17,11 @@ import json
 import os
 import sqlite3
 import sys
+from collections.abc import Iterable, Sequence
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable, Protocol, Sequence
+from typing import Protocol
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -158,7 +159,7 @@ def _scope_predicate(scope: ComparisonScope) -> tuple[str, tuple[object, ...]]:
 
 def scope_contexts(scope: object) -> tuple[tuple[str, str], ...]:
     """Contextos ``(supermarket_id, location_id)`` únicos en el orden del scope."""
-    return tuple(dict.fromkeys((str(s), str(l)) for s, l in getattr(scope, "locations")))
+    return tuple(dict.fromkeys((str(s), str(l)) for s, l in scope.locations))
 
 
 CURRENT_PAGE_SIZE = 2000
@@ -328,7 +329,7 @@ def export_dataset(
 
     manifest: dict[str, object] = {
         "schema": "precios-sps-publication-manifest/v1",
-        "generated_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "generated_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "source_backend": backend.kind,
         "comparison_policy": publication.comparison_policy,
         "scope": [dict(item) for item in publication.scope],

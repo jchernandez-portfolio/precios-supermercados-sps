@@ -20,7 +20,7 @@ test exige que ambas coincidan.
 """
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from .identifiers import canonicalize_gtin
 

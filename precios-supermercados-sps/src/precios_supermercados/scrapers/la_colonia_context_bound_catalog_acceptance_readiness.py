@@ -29,7 +29,6 @@ from precios_supermercados.scrapers.la_colonia_context_bound_catalog_finalizer i
 )
 from precios_supermercados.sps_context_bound_discovery import VerifiedSpsStructuralContext
 
-
 _TRUST_GATE = "trusted_collector_provenance_unavailable"
 _AUTHORITY_BLOCKER = "production_authority_not_established"
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")

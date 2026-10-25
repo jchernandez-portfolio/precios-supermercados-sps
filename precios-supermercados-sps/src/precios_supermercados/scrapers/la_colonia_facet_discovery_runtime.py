@@ -8,9 +8,10 @@ mismo.
 from __future__ import annotations
 
 import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Callable, Mapping
+from datetime import UTC, datetime
+from typing import Any
 
 from .la_colonia_facet_discovery import (
     FACET_DISCOVERY_CONCURRENCY,
@@ -141,7 +142,7 @@ class FacetDiscoveryRuntime:
             raise ValueError("max_requests debe estar entre 1 y 2")
         self.transport = transport
         self.sleeper = sleeper
-        self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.clock = clock or (lambda: datetime.now(UTC))
         self.max_retries = max_retries
         self.max_requests = max_requests
 
@@ -364,4 +365,4 @@ def _extend_unique(values: list[str], additions: Any) -> None:
 def _utc(value: datetime) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("clock debe devolver una fecha con zona horaria")
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)

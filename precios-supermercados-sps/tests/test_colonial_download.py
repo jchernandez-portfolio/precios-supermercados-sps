@@ -1,5 +1,5 @@
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -18,7 +18,7 @@ def downloader(tmp_path, monkeypatch, statuses, budget=5):
         return SimpleNamespace(status_code=statuses.pop(0), content=b'{"products":[]}')
     monkeypatch.setattr("requests.Session.get", lambda self, *a, **kw: get(*a, **kw))
     monkeypatch.setattr("obtener_catalogo_colonial.time.sleep", lambda seconds: None)
-    obj = Download(tmp_path / "capture", datetime.now(timezone.utc) + timedelta(minutes=1), [], budget, 60)
+    obj = Download(tmp_path / "capture", datetime.now(UTC) + timedelta(minutes=1), [], budget, 60)
     return obj, calls
 
 
@@ -59,7 +59,7 @@ def test_expired_authorization_or_wrong_origin_does_not_fetch(tmp_path, monkeypa
     obj, calls = downloader(tmp_path, monkeypatch, [200])
     with pytest.raises(ColonialError, match="origin"):
         obj.get("https://example.com/x")
-    obj.until = datetime.now(timezone.utc) - timedelta(seconds=1)
+    obj.until = datetime.now(UTC) - timedelta(seconds=1)
     with pytest.raises(ColonialError, match="expired"):
         obj.get(ORIGIN + "/x")
     assert calls == []

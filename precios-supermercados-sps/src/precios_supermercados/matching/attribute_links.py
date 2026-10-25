@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter, defaultdict
-from typing import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 
 from ..product_master import MasterLink, MemberProfile, gtin_master_id
 from .comparison import ComparisonSettings, compare
@@ -99,7 +99,7 @@ def engine_attribute_links(
                 source_record_id=member.key,
                 supermarket_id=member.supermarket_id,
                 city="ALL",
-                source_name=str(getattr(record, "source_name")),
+                source_name=str(record.source_name),
                 source_brand=getattr(record, "source_brand", None),
                 source_presentation=getattr(record, "source_presentation", None),
                 source_category=getattr(record, "source_category", None),

@@ -22,10 +22,11 @@ import hashlib
 import json
 import re
 from collections import Counter, defaultdict
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Callable, Iterable, Mapping, Protocol, Sequence
+from typing import Protocol
 
 import yaml
 
@@ -137,7 +138,7 @@ class MasterPolicy:
         )
 
     @classmethod
-    def from_mapping(cls, raw: Mapping[str, object]) -> "MasterPolicy":
+    def from_mapping(cls, raw: Mapping[str, object]) -> MasterPolicy:
         section = raw.get("product_master")
         if section is None:
             # Sin sección explícita: sólo vínculos GTIN (reproduce la identidad vigente).
@@ -199,7 +200,7 @@ def gtin_master_id(gtin: str) -> str:
     canonical = canonicalize_gtin(gtin)
     if canonical is None:
         raise ProductMasterError("master_gtin_invalid")
-    return "mp_" + hashlib.sha256(f"gtin:{canonical}".encode("utf-8")).hexdigest()[:20]
+    return "mp_" + hashlib.sha256(f"gtin:{canonical}".encode()).hexdigest()[:20]
 
 
 def seeded_master_id(kind: str, seed: str) -> str:
@@ -207,7 +208,7 @@ def seeded_master_id(kind: str, seed: str) -> str:
 
     if kind not in {"verified", "manual", "engine"} or not seed.strip():
         raise ProductMasterError("master_seed_invalid")
-    return "mp_" + hashlib.sha256(f"{kind}:{seed}".encode("utf-8")).hexdigest()[:20]
+    return "mp_" + hashlib.sha256(f"{kind}:{seed}".encode()).hexdigest()[:20]
 
 
 def is_master_id(value: object) -> bool:
@@ -267,24 +268,24 @@ class MemberProfile:
         return source_product_key(self.supermarket_id, self.product_id)
 
     @classmethod
-    def from_profile_row(cls, row: object, source_name: str) -> "MemberProfile":
+    def from_profile_row(cls, row: object, source_name: str) -> MemberProfile:
         """Adapta ``ProductHomologationRow`` (o un objeto con los mismos campos)."""
 
         return cls(
-            product_id=int(getattr(row, "product_id")),
-            supermarket_id=str(getattr(row, "supermarket_id")),
+            product_id=int(row.product_id),
+            supermarket_id=str(row.supermarket_id),
             source_name=source_name,
-            canonical_gtin=getattr(row, "canonical_gtin"),
-            comparison_status=str(getattr(row, "comparison_status")),
-            normalized_brand=getattr(row, "normalized_brand"),
+            canonical_gtin=row.canonical_gtin,
+            comparison_status=str(row.comparison_status),
+            normalized_brand=row.normalized_brand,
             brand_resolution_source=str(getattr(row, "brand_resolution_source", "missing")),
-            product_type=getattr(row, "product_type"),
-            taxonomy_rule_id=getattr(row, "taxonomy_rule_id"),
-            category=getattr(row, "category"),
-            presentation_dimension=getattr(row, "presentation_dimension"),
-            presentation_total_base=getattr(row, "presentation_total_base"),
-            presentation_pack_count=getattr(row, "presentation_pack_count"),
-            presentation_status=str(getattr(row, "presentation_status")),
+            product_type=row.product_type,
+            taxonomy_rule_id=row.taxonomy_rule_id,
+            category=row.category,
+            presentation_dimension=row.presentation_dimension,
+            presentation_total_base=row.presentation_total_base,
+            presentation_pack_count=row.presentation_pack_count,
+            presentation_status=str(row.presentation_status),
         )
 
 
@@ -294,7 +295,7 @@ def member_profiles(
 ) -> tuple[MemberProfile, ...]:
     result = []
     for row in rows:
-        product_id = int(getattr(row, "product_id"))
+        product_id = int(row.product_id)
         name = names_by_product_id.get(product_id)
         if name is None:
             raise ProductMasterError("master_member_source_name_missing")
@@ -1751,7 +1752,7 @@ def sync_product_master(
         **scope_counts,
     }
     if reads_before is not None:
-        result["rows_read"] = int(getattr(store, "rows_read")) - int(reads_before)
+        result["rows_read"] = int(store.rows_read) - int(reads_before)
     return result
 
 
@@ -1859,17 +1860,17 @@ def reviewed_decision_links(
     approved = [
         decision
         for decision in decisions
-        if getattr(decision, "status") == "approved" and getattr(decision, "relation") in IDENTITY_RELATIONS
+        if decision.status == "approved" and decision.relation in IDENTITY_RELATIONS
     ]
     if not approved or not policy.method_active("reviewed_decision"):
         return (), {}
     lexicon = build_brand_lexicon(record for _, record in records)  # type: ignore[misc]
-    by_source = {getattr(record, "source_record_id"): (product_id, record) for product_id, record in records}
+    by_source = {record.source_record_id: (product_id, record) for product_id, record in records}
     links: dict[int, MasterLink] = {}
     conflicted: set[int] = set()
-    for decision in sorted(approved, key=lambda item: getattr(item, "candidate_id")):
-        left = by_source.get(getattr(decision, "left_source_record_id"))
-        right = by_source.get(getattr(decision, "right_source_record_id"))
+    for decision in sorted(approved, key=lambda item: item.candidate_id):
+        left = by_source.get(decision.left_source_record_id)
+        right = by_source.get(decision.right_source_record_id)
         if left is None or right is None:
             diagnostics["reviewed_decision_source_missing"] += 1
             continue
@@ -1887,17 +1888,17 @@ def reviewed_decision_links(
         for product_id, record in (left, right):
             link = MasterLink(
                 product_id=int(product_id),
-                supermarket_id=str(getattr(record, "supermarket_id")),
+                supermarket_id=str(record.supermarket_id),
                 master_product_id=master_id,
                 link_method="reviewed_decision",
-                decided_by="human:" + str(getattr(decision, "reviewed_by")).strip(),
+                decided_by="human:" + str(decision.reviewed_by).strip(),
                 evidence={
-                    "candidate_id": getattr(decision, "candidate_id"),
+                    "candidate_id": decision.candidate_id,
                     "relation": assessment.relation,
                     "evidence_codes": sorted(assessment.evidence_codes),
                     "decision_master_product_id": assessment.master_product_id,
                     "primary_gtin": primary_gtin,
-                    "reviewed_at_utc": getattr(decision, "reviewed_at_utc"),
+                    "reviewed_at_utc": decision.reviewed_at_utc,
                 },
             )
             previous = links.get(link.product_id)

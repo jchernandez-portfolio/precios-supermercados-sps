@@ -27,9 +27,10 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Mapping, Sequence
+from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
 from precios_supermercados.la_colonia_edge_structural_request import (

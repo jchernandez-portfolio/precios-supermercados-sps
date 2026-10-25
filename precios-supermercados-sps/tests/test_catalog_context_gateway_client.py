@@ -25,7 +25,6 @@ from precios_supermercados.edge_gateway_client import (
 )
 from precios_supermercados.edge_provenance import canonical_json_bytes
 
-
 TESTS = Path(__file__).parent
 
 

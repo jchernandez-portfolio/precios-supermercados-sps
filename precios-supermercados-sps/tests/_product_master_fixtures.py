@@ -20,6 +20,8 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from generar_mvp_sqlite_la_colonia import HISTORY_INDEX_SQL, create_schema  # noqa: E402
 from precios_supermercados.product_homologation_persistence import (  # noqa: E402
     SCHEMA_SQL as PROFILE_SCHEMA_SQL,
+)
+from precios_supermercados.product_homologation_persistence import (
     build_homologation_rows,
     persist_sqlite_rows,
     records_from_product_rows,

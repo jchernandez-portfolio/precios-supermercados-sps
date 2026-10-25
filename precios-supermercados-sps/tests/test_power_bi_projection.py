@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -29,8 +29,7 @@ from precios_supermercados.power_bi_projection import (
 )
 from precios_supermercados.tabular_rehydration import RehydratedCommercialSnapshot
 
-
-BASE = datetime(2026, 8, 22, 12, 0, tzinfo=timezone.utc)
+BASE = datetime(2026, 8, 22, 12, 0, tzinfo=UTC)
 
 
 def validated(

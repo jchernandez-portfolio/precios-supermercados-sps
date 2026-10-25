@@ -14,8 +14,8 @@ import copy
 import hashlib
 import random
 from collections import Counter, defaultdict
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Iterable, Mapping, Sequence
 
 from ..product_identity_decisions import candidate_id
 from .blocking import BlockingSettings, CandidateSet, generate_candidates

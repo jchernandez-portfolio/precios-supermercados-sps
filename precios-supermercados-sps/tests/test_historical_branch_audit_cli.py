@@ -5,7 +5,6 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "precios-supermercados-sps" / "scripts" / "auditar_ramas_historicas.py"
 

@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-import precios_supermercados.live_safety as live_safety
 import precios_supermercados.diagnostics.la_colonia_sps_context_diagnostic as sps_diag
+import precios_supermercados.live_safety as live_safety
 from precios_supermercados.live_safety import (
     ClosedBudget,
     ImmutableLiveRequest,

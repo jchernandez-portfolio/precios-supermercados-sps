@@ -28,10 +28,10 @@ import json
 import re
 import unicodedata
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
-from typing import Iterable
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TREE_PATH = PROJECT_ROOT / "config" / "homologation" / "master-category-tree-v1.json"
@@ -77,7 +77,7 @@ class Node:
     def depth(self) -> int:
         return sum(value is not None for value in (self.department, self.category, self.subcategory, self.product_type))
 
-    def contains(self, other: "Node") -> bool:
+    def contains(self, other: Node) -> bool:
         """``other`` está dentro de este nodo (mismo camino hasta su profundidad)."""
         for mine, theirs in ((self.department, other.department), (self.category, other.category),
                              (self.subcategory, other.subcategory)):

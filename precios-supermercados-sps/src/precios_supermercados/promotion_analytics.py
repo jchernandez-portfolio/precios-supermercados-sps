@@ -1,11 +1,11 @@
 """Promotion intelligence that keeps source claims separate from price history."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from decimal import Decimal, ROUND_HALF_UP
+from datetime import UTC, datetime
+from decimal import ROUND_HALF_UP, Decimal
 from enum import StrEnum
-from typing import Iterable
 
 from .price_history_analytics import HistoricalPriceObservation, summarize_price_windows
 
@@ -42,7 +42,7 @@ class PromotionPriceObservation:
                 raise PromotionAnalyticsError(f"{name}_missing")
         if self.observed_at_utc.tzinfo is None or self.observed_at_utc.utcoffset() is None:
             raise PromotionAnalyticsError("promotion_timestamp_not_timezone_aware")
-        object.__setattr__(self, "observed_at_utc", self.observed_at_utc.astimezone(timezone.utc))
+        object.__setattr__(self, "observed_at_utc", self.observed_at_utc.astimezone(UTC))
         if type(self.current_price_minor) is not int or self.current_price_minor <= 0:
             raise PromotionAnalyticsError("promotion_current_price_invalid")
         if not isinstance(self.source_reports_promotion, bool):
@@ -114,7 +114,7 @@ def analyze_promotions(
 
     if as_of_utc.tzinfo is None or as_of_utc.utcoffset() is None:
         raise PromotionAnalyticsError("promotion_as_of_not_timezone_aware")
-    as_of = as_of_utc.astimezone(timezone.utc)
+    as_of = as_of_utc.astimezone(UTC)
     if (
         not isinstance(near_minimum_threshold_pct, Decimal)
         or not near_minimum_threshold_pct.is_finite()

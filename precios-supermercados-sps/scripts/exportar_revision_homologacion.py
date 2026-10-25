@@ -12,10 +12,10 @@ import json
 import os
 import sys
 import time
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -28,16 +28,6 @@ from precios_supermercados.product_homologation import (  # noqa: E402
     SourceProductRecord,
     homologate_products,
 )
-from precios_supermercados.product_identity_v2 import (  # noqa: E402
-    IDENTITY_NORMALIZATION_VERSION,
-    audit_identity_quality,
-    canonicalize_brand_key,
-    canonical_presentation_fields,
-    canonical_egg_size,
-    explain_candidate,
-    homologate_products_v2,
-    source_brand_role,
-)
 from precios_supermercados.product_identity_decisions import (  # noqa: E402
     IDENTITY_POLICY_VERSION,
     ReviewedIdentityDecision,
@@ -47,6 +37,16 @@ from precios_supermercados.product_identity_decisions import (  # noqa: E402
     index_reviewed_decisions,
     load_reviewed_decisions,
     profile_evidence_fingerprint,
+)
+from precios_supermercados.product_identity_v2 import (  # noqa: E402
+    IDENTITY_NORMALIZATION_VERSION,
+    audit_identity_quality,
+    canonical_egg_size,
+    canonical_presentation_fields,
+    canonicalize_brand_key,
+    explain_candidate,
+    homologate_products_v2,
+    source_brand_role,
 )
 
 SCHEMA = "precios-sps-homologation-review/v3"
@@ -364,7 +364,7 @@ def main() -> int:
     products = _fetch_products(url, token)
     if len(products) != before["products"]:
         raise SystemExit("homologation_review_source_changed_during_read")
-    generated = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    generated = datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
     document = export_review(
         products,
         args.output,

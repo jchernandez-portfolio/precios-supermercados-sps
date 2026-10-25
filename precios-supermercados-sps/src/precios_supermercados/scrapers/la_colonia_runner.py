@@ -10,10 +10,11 @@ import hashlib
 import json
 import math
 import time
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any
 
 from precios_supermercados.models import RawProduct
 from precios_supermercados.unpriced_unavailable import unpriced_unavailable_limit
@@ -231,7 +232,7 @@ class CatalogRunResult:
 
         sample_hashes = [
             hashlib.sha256(
-                f"{product.source_key_type.value}:{product.source_key}".encode("utf-8")
+                f"{product.source_key_type.value}:{product.source_key}".encode()
             ).hexdigest()[:16]
             for product in self.products[:5]
         ]
@@ -263,7 +264,7 @@ class LaColoniaCatalogRunner:
         self.extractor = extractor or LaColoniaExtractor()
         self.sleeper = sleeper
         self.monotonic = monotonic
-        self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.clock = clock or (lambda: datetime.now(UTC))
 
     def run(
         self,
@@ -919,4 +920,4 @@ def _append_unique(values: list[str], value: str) -> None:
 def _utc(value: datetime) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("clock debe devolver una fecha con zona horaria")
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)

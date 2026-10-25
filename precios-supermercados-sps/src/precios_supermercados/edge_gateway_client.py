@@ -13,7 +13,8 @@ import binascii
 import hashlib
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass, field as dataclass_field, fields
+from dataclasses import dataclass, fields
+from dataclasses import field as dataclass_field
 from datetime import datetime
 from typing import NoReturn, Protocol, TypeAlias
 

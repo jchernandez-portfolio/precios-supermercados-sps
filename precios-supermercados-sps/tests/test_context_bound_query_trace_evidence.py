@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from types import SimpleNamespace
 from urllib.parse import quote
 
@@ -37,7 +37,7 @@ WIRE_KEY = "regionId"
 FETCH_URL = f"{BASE_URL}&{WIRE_KEY}={quote(RAW_REGION, safe='-._~')}"
 RUN_ID = "32770000000:1"
 SHA = "a" * 40
-START = datetime(2026, 8, 24, 19, 30, 0, tzinfo=timezone.utc)
+START = datetime(2026, 8, 24, 19, 30, 0, tzinfo=UTC)
 END = START + timedelta(milliseconds=800)
 BODY_SIZE = 1234
 CONTEXT_FP = fingerprint_context_value(RAW_REGION)

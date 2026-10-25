@@ -36,9 +36,9 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections import Counter, defaultdict
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from typing import Callable, Iterable, Mapping, Sequence
 
 from .comparison import ComparisonSettings, compare
 from .config import DEFAULT_CONFIG_PATH, DEFAULT_TAXONOMY_PATH, load_engine_config

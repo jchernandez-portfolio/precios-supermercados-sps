@@ -12,7 +12,7 @@ import sqlite3
 import sys
 from contextlib import contextmanager
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -30,7 +30,7 @@ import exportar_consumer_catalog_tgu as tgu  # noqa: E402
 import exportar_modelo_analitico as modelo  # noqa: E402
 import importar_decisiones_maestro as importer  # noqa: E402
 
-AS_OF = datetime(2026, 9, 20, 12, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 9, 20, 12, tzinfo=UTC)
 POLICY = pm.load_master_policy(ROOT / "config/homologation/identity-policy-v1.yaml")
 
 

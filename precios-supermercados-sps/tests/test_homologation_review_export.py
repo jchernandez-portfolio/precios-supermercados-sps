@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+import sys
 from decimal import Decimal
 from pathlib import Path
-import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from scripts.exportar_revision_homologacion import SCHEMA, build_review_queue
+
 from precios_supermercados.product_homologation import SourceProductRecord, homologate_products
 from precios_supermercados.product_identity_v2 import homologate_products_v2
-from scripts.exportar_revision_homologacion import SCHEMA, build_review_queue
 
 
 def product(record_id: str, supermarket: str, name: str, **kwargs: object) -> SourceProductRecord:

@@ -15,8 +15,9 @@ import base64
 import json
 import sys
 import time
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 from urllib.parse import parse_qsl, unquote, urlencode, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]

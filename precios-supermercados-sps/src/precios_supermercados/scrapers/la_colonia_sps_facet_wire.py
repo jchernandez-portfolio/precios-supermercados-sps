@@ -20,8 +20,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from types import MappingProxyType
-from typing import Mapping
 from urllib.parse import parse_qsl, quote, urlsplit
 
 from precios_supermercados.scrapers.la_colonia_sps_facet_context import (

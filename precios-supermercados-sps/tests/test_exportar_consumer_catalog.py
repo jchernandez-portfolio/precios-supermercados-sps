@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-import importlib.util
 import gzip
+import importlib.util
 import json
 import math
 import sqlite3
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
-
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "exportar_consumer_catalog.py"
 SPEC = importlib.util.spec_from_file_location("exportar_consumer_catalog", SCRIPT)
@@ -18,7 +17,7 @@ assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
-AS_OF = datetime(2026, 9, 9, 12, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 9, 9, 12, tzinfo=UTC)
 SCOPE = MODULE.parse_scope(tuple(f"{supermarket}={location}" for supermarket, location in MODULE.EXPECTED_SCOPE))
 
 

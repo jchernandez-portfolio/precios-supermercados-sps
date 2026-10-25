@@ -5,7 +5,6 @@ import json
 import sqlite3
 from pathlib import Path
 
-
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "exportar_modelo_analitico.py"
 SPEC = importlib.util.spec_from_file_location("exportar_modelo_analitico", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None

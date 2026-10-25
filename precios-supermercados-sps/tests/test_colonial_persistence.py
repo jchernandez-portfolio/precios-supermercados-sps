@@ -10,7 +10,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import actualizar_mvp_sqlite_la_colonia as local
 import actualizar_mvp_turso_la_colonia as remote
-from test_actualizar_mvp_turso_la_colonia import product, snapshot as la_colonia_snapshot
+from test_actualizar_mvp_turso_la_colonia import product
+from test_actualizar_mvp_turso_la_colonia import snapshot as la_colonia_snapshot
 
 
 def snapshot(hour=1, rows=None):

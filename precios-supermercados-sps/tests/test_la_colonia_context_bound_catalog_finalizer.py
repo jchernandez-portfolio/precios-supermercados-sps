@@ -21,7 +21,6 @@ from precios_supermercados.scrapers.la_colonia_sps_facet_context import (
     RequestContextPlacement,
 )
 
-
 RUN = "32600000000:1"
 PLAN_DIGEST = "1" * 64
 DISCOVERY_DIGEST = "2" * 64

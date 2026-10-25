@@ -30,9 +30,9 @@ import requests
 from precios_supermercados.cloudflare_edge_http_transport import CloudflareEdgeHttpTransport
 from precios_supermercados.diagnostics.la_colonia_sps_context_diagnostic import (
     ACTIVE_AUTHORIZATION_IDS,
+    TARGET_URL,
     DiagnosticBudget,
     LogicalRequestCounter,
-    TARGET_URL,
     launch_compatible_chromium,
     sanitize_error,
     validate_live_authorization,

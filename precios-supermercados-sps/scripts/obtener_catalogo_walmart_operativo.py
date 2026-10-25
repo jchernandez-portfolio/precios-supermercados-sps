@@ -11,7 +11,7 @@ import time
 import urllib.error
 import urllib.request
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlsplit
 
@@ -35,7 +35,7 @@ CATEGORY2_PARTITIONS = {"articulos-para-el-hogar", "ropa-y-zapateria"}
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def region_id(seller: str) -> str:

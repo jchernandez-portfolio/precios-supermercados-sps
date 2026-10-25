@@ -10,8 +10,9 @@ import hashlib
 import json
 import math
 import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from .la_colonia_catalog_coverage import PartitionSpec, StructuralDiscoveryReport
 from .la_colonia_graphql import MAX_CATALOG_PAGE_SIZE

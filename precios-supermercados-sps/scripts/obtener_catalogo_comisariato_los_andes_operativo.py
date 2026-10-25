@@ -15,9 +15,10 @@ import shutil
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from precios_supermercados.scrapers.comisariato_los_andes import (
     LOCATION_ID,
@@ -45,7 +46,7 @@ class LiveCaptureError(RuntimeError):
 
 
 def _now_z() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _write_json(path: Path, value: object) -> None:

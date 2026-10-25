@@ -3,8 +3,8 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Mapping
 
 import pytest
 
@@ -21,7 +21,6 @@ from precios_supermercados.edge_gateway_client import (
 from precios_supermercados.edge_provenance import canonical_json_bytes
 from precios_supermercados.la_colonia_edge_request import validate_la_colonia_edge_request
 from precios_supermercados.scrapers.la_colonia_graphql import build_product_search_url
-
 
 SHA = "a" * 40
 RUN_ID = "32512282466:1"

@@ -14,9 +14,10 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import NoReturn, Sequence
+from datetime import UTC, datetime
+from typing import NoReturn
 
 from precios_supermercados.cloudflare_trace_evidence import (
     CloudflareTraceEvidenceError,
@@ -79,11 +80,11 @@ def _index(value: object, code: str) -> int:
 def _utc(value: object, code: str) -> datetime:
     if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
         _fail(code)
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)
 
 
 def _iso_z(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    return value.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
 @dataclass(frozen=True, slots=True, order=True)

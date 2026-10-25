@@ -22,7 +22,6 @@ from precios_supermercados.diagnostics.la_colonia_sps_context_diagnostic import 
     classify_facet,
     classify_graphql,
     compare_storage,
-    structural_fields,
     find_unique_dom_target,
     parse_network_request,
     run_offline_fixture,
@@ -31,10 +30,10 @@ from precios_supermercados.diagnostics.la_colonia_sps_context_diagnostic import 
     sanitize_url,
     store_option_plan,
     store_selector_plan,
+    structural_fields,
     summarize_response,
     validate_live_authorization,
 )
-
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures"
 DOM_FIXTURE = FIXTURE_ROOT / "la_colonia_sps_context_diagnostic.html"

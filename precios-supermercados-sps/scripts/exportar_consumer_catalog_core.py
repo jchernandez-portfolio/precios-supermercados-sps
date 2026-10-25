@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exporta el catálogo público B2C SPS v3 desde estado aceptado, sin escrituras."""
 from __future__ import annotations
+
 import argparse
 import gzip
 import hashlib
@@ -9,17 +10,24 @@ import re
 import sys
 import unicodedata
 from collections import defaultdict
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Iterable, Sequence
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 from exportar_modelo_analitico import (  # noqa: E402
-    ExportError, QueryBackend, SQLiteBackend, TursoBackend, _scope_predicate,
-    fetch_current_rows_by_location, parse_scope, scope_contexts,
+    ExportError,
+    QueryBackend,
+    SQLiteBackend,
+    TursoBackend,
+    _scope_predicate,
+    fetch_current_rows_by_location,
+    parse_scope,
+    scope_contexts,
 )
 from exportar_rpi_marts import _parse_utc, fetch_freshness  # noqa: E402
 from generar_mvp_sqlite_la_colonia import HISTORY_INDEX_NAME  # noqa: E402
@@ -35,9 +43,12 @@ from precios_supermercados.product_homologation_persistence import (  # noqa: E4
 )
 from precios_supermercados.product_master import (  # noqa: E402
     DEFAULT_POLICY_PATH as MASTER_POLICY_PATH,
+)
+from precios_supermercados.product_master import (
     curated_link_overrides,
     load_master_policy,
 )
+
 SCHEMA, MANIFEST_SCHEMA = "rpi-consumer-catalog/v3", "rpi-consumer-catalog-manifest/v3"
 FACETS_SCHEMA, INDEX_SCHEMA = "rpi-consumer-facets/v3", "rpi-consumer-index/v3"
 PARTITION_SCHEMA = "rpi-consumer-catalog-partition/v3"
@@ -402,7 +413,7 @@ def fetch_historical_points(
     as_of_utc: datetime,
 ) -> dict[tuple[str, str], tuple[HistoricalPoint, ...]]:
     """Lee periodos con precio mediante keyset pagination, sin queries por producto."""
-    as_of_text = as_of_utc.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    as_of_text = as_of_utc.astimezone(UTC).isoformat().replace("+00:00", "Z")
     grouped: dict[tuple[str, str], list[HistoricalPoint]] = defaultdict(list)
     seen: set[tuple[int, str, str]] = set()
     if _history_index_available(backend):
@@ -507,7 +518,7 @@ def _identity_groups(offers: Iterable[VisibleOffer]) -> list[tuple[str, list[Vis
         else:
             individual.append(offer)
     groups: list[tuple[str, list[VisibleOffer]]] = []
-    for canonical_id, grouped in candidates.items():
+    for grouped in candidates.values():
         retailers = [offer.supermarket_id for offer in grouped]
         if len(grouped) >= 2 and len(retailers) == len(set(retailers)):
             groups.append(("comparable", grouped))
@@ -578,7 +589,7 @@ def _representative(group: Sequence[VisibleOffer]) -> VisibleOffer:
             offer.supermarket_id,
         ),
     )[0]
-def _public_assignment(group: Sequence[VisibleOffer]) -> "master_taxonomy.Assignment":
+def _public_assignment(group: Sequence[VisibleOffer]) -> master_taxonomy.Assignment:
     """Nodo del árbol maestro v1 de un grupo (comparte el más específico)."""
     assignments = [
         master_taxonomy.assign_offer(
@@ -602,7 +613,7 @@ def _public_taxonomy(group: Sequence[VisibleOffer]) -> tuple[str | None, str | N
     return master_taxonomy.public_fields(chosen.node)
 
 
-def _unit_price(offer: VisibleOffer, node: "master_taxonomy.Node | None") -> dict[str, str] | None:
+def _unit_price(offer: VisibleOffer, node: master_taxonomy.Node | None) -> dict[str, str] | None:
     """Precio unitario público con la referencia fija de la subcategoría."""
     return consumer_catalog_display.unit_price(
         price=_money(offer.current_price_minor),
@@ -862,7 +873,7 @@ def build_consumer_analysis(
     recent_lows.sort(key=lambda value: (_money_minor(value["current_price"]) or 0, str(value["product_name"])))
     return {
         "schema": ANALYSIS_SCHEMA,
-        "as_of": as_of_utc.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "as_of": as_of_utc.astimezone(UTC).isoformat().replace("+00:00", "Z"),
         "location": {"city": "San Pedro Sula", "country_code": "HN"},
         "summary": {
             "visible_products": len(rows),
@@ -1025,8 +1036,8 @@ def export_consumer_catalog(
     manifest = {
         "schema": MANIFEST_SCHEMA,
         "catalog_schema": SCHEMA,
-        "generated_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-        "as_of": as_of_utc.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "generated_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "as_of": as_of_utc.astimezone(UTC).isoformat().replace("+00:00", "Z"),
         "source_backend": backend.kind,
         "location": {"city": "San Pedro Sula", "country_code": "HN"},
         "scope": [
@@ -1093,7 +1104,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser().parse_args(argv)
     if args.freshness_hours <= 0:
         raise ExportError("consumer_catalog_freshness_hours_invalid")
-    as_of = datetime.now(timezone.utc) if args.as_of_utc is None else _parse_utc(args.as_of_utc, "consumer_catalog_as_of_invalid")
+    as_of = datetime.now(UTC) if args.as_of_utc is None else _parse_utc(args.as_of_utc, "consumer_catalog_as_of_invalid")
     scope = parse_scope(args.scope)
     if args.sqlite is not None:
         if not args.sqlite.is_file():

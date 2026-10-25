@@ -1,8 +1,8 @@
 """Walmart persistence uses the real SQL and existing offline Hrana transport."""
 import base64
 import copy
-import hashlib
 import gzip
+import hashlib
 import json
 import sqlite3
 import sys
@@ -14,8 +14,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import actualizar_mvp_sqlite_la_colonia as local
 import actualizar_mvp_turso_la_colonia as remote
 import migrar_mvp_walmart as migration
-from test_actualizar_mvp_turso_la_colonia import product, snapshot as lc_snapshot
-from test_colonial_persistence import database, dump, apply, snapshot as colonial_snapshot
+from test_actualizar_mvp_turso_la_colonia import product
+from test_actualizar_mvp_turso_la_colonia import snapshot as lc_snapshot
+from test_colonial_persistence import apply, database, dump
+from test_colonial_persistence import snapshot as colonial_snapshot
 
 
 def walmart_snapshot(hour=1, rows=None, location="walmart_sps"):

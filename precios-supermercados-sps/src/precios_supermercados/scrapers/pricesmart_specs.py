@@ -33,10 +33,11 @@ import hashlib
 import json
 import re
 import unicodedata
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from html.parser import HTMLParser
-from typing import Any, Iterator
+from typing import Any
 
 from ..identifiers import canonicalize_gtin
 
@@ -294,19 +295,19 @@ _HEADING_TAGS = frozenset({"h1", "h2", "h3", "h4", "h5", "h6"})
 class Node:
     tag: str
     attrs: dict[str, str]
-    parent: "Node | None" = None
-    children: list["Node | str"] = field(default_factory=list)
+    parent: Node | None = None
+    children: list[Node | str] = field(default_factory=list)
 
-    def elements(self) -> list["Node"]:
+    def elements(self) -> list[Node]:
         return [child for child in self.children if isinstance(child, Node)]
 
-    def iter(self) -> Iterator["Node"]:
+    def iter(self) -> Iterator[Node]:
         yield self
         for child in self.children:
             if isinstance(child, Node):
                 yield from child.iter()
 
-    def leaves(self) -> list[tuple["Node", str]]:
+    def leaves(self) -> list[tuple[Node, str]]:
         """Textos hoja visibles en orden de documento (sin scripts/estilos)."""
 
         result: list[tuple[Node, str]] = []
@@ -573,7 +574,7 @@ def _split_inline_label(text: str) -> tuple[str, str] | None:
     for label in _LABEL_PREFIXES:
         if folded.startswith(label) and len(folded) > len(label):
             rest_folded = folded[len(label):]
-            if not rest_folded[:1] in {":", " "}:
+            if rest_folded[:1] not in {":", " "}:
                 continue
             # Recortar sobre el texto original conservando acentos.
             words = len(label.split())

@@ -12,7 +12,6 @@ sys.path.insert(0, str(SCRIPTS))
 import preflight_mvp_turso_daily as daily  # noqa: E402
 from actualizar_mvp_sqlite_la_colonia import SnapshotError  # noqa: E402
 
-
 RELATIVE_LOCATIONS = {
     "sps/full-catalog.json": "la_colonia_sps",
     "tgu/full-catalog.json": "la_colonia_tgu",

@@ -24,13 +24,13 @@ from precios_supermercados.cloudflare_structural_observability_verifier import (
 from precios_supermercados.edge_structural_observation import (
     CryptographicallyVerifiedStructuralObservation,
 )
+from precios_supermercados.scrapers.la_colonia_verified_facet_transport import (
+    VerifiedFacetDiscoveryEdgeTransport,
+)
 from precios_supermercados.structural_discovery_manifest import (
     StructuralDiscoveryManifestError,
     VerifiedStructuralDiscovery,
     build_verified_structural_discovery,
-)
-from precios_supermercados.scrapers.la_colonia_verified_facet_transport import (
-    VerifiedFacetDiscoveryEdgeTransport,
 )
 
 _EXPECTED_KINDS = frozenset({"root_total", "category_tree"})

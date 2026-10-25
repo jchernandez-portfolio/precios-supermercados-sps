@@ -7,9 +7,9 @@ import pytest
 import yaml
 
 from precios_supermercados.gtin_policy import (
+    RESTRICTED_GTIN8_FIRST_DIGITS,
     RESTRICTED_GTIN13_PREFIX_RANGES,
     RESTRICTED_GTIN14_INDICATORS,
-    RESTRICTED_GTIN8_FIRST_DIGITS,
     RESTRICTED_GTIN_POLICY_VERSION,
     SHARED_PRODUCT_MASTERS,
     product_master_of,

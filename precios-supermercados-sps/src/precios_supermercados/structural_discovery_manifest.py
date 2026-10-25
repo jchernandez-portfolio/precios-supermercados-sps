@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import NoReturn
 
 from precios_supermercados.cloudflare_structural_trace_evidence import (
@@ -85,11 +85,11 @@ def _positive_int(value: object, code: str, *, maximum: int = 2**53 - 1) -> int:
 def _utc(value: object, code: str) -> datetime:
     if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
         _fail(code)
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)
 
 
 def _timestamp(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    return value.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
 @dataclass(frozen=True, slots=True)

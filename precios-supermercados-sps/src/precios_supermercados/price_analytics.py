@@ -6,9 +6,9 @@ fuera de ahorros, mejores precios y canastas comunes.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Iterable, Mapping
+from decimal import ROUND_HALF_UP, Decimal
 
 from .product_homologation import HomologationResult
 from .safe_comparator import COMPARABLE, SafeComparisonGroup, safe_group_decisions

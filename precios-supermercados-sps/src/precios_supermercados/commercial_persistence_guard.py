@@ -12,9 +12,9 @@ replay/auditoría. ``extraction_enabled`` sigue en ``False`` y no se genera trá
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Sequence
+from datetime import UTC, datetime
 
 from .commercial_persistence_batch import (
     PreparedCommercialPersistence,
@@ -70,13 +70,13 @@ LA_COLONIA_INITIAL_SNAPSHOT_LOCATION_ID = "la_colonia_sps"
 LA_COLONIA_INITIAL_SNAPSHOT_PRODUCTS = 9437
 LA_COLONIA_INITIAL_SNAPSHOT_OFFERS = 9439
 LA_COLONIA_INITIAL_SNAPSHOT_STARTED_AT_UTC = datetime(
-    2026, 8, 26, 2, 28, 59, tzinfo=timezone.utc
+    2026, 8, 26, 2, 28, 59, tzinfo=UTC
 )
 LA_COLONIA_INITIAL_SNAPSHOT_FINISHED_AT_UTC = datetime(
-    2026, 8, 26, 2, 41, 3, tzinfo=timezone.utc
+    2026, 8, 26, 2, 41, 3, tzinfo=UTC
 )
 LA_COLONIA_INITIAL_SNAPSHOT_APPROVED_AT_UTC = datetime(
-    2026, 8, 27, 4, 14, 1, tzinfo=timezone.utc
+    2026, 8, 27, 4, 14, 1, tzinfo=UTC
 )
 
 

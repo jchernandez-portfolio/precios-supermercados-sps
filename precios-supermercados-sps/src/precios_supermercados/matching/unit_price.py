@@ -6,7 +6,7 @@ ahorro "mismo producto" del comparador.
 """
 from __future__ import annotations
 
-from typing import Iterable, Mapping
+from collections.abc import Iterable, Mapping
 
 from .comparison import ComparisonVector
 from .standardize import StandardizedRecord

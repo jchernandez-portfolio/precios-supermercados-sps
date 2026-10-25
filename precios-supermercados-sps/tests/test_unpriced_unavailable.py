@@ -7,13 +7,14 @@ from __future__ import annotations
 
 import copy
 import hashlib
-from decimal import Decimal
 import json
 import sqlite3
 import sys
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
+
 from test_colonial_persistence import database  # noqa: F401  (fixture Hrana offline)
 
 ROOT = Path(__file__).resolve().parents[1]

@@ -8,10 +8,10 @@ auxiliar sólo para etiquetas de entrenamiento/evaluación y nunca entra al scor
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable, Iterator
 from dataclasses import asdict, dataclass, field
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Iterable, Iterator
 
 from ..product_homologation import SourceProductRecord
 
@@ -83,7 +83,7 @@ class MatchRecord:
         return payload
 
     @classmethod
-    def from_json(cls, payload: dict[str, object]) -> "MatchRecord":
+    def from_json(cls, payload: dict[str, object]) -> MatchRecord:
         if not isinstance(payload, dict):
             raise MatchRecordError("record_not_object")
         data = dict(payload)

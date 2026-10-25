@@ -20,10 +20,10 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from difflib import SequenceMatcher
-from typing import Iterable
 
 from .gtin_policy import restricted_gtin_shared_master_ok
 from .identifiers import canonicalize_gtin, generate_gtin_product_id

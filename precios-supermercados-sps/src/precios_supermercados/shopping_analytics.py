@@ -5,10 +5,10 @@ not model tax, delivery, service, shipping, membership, or checkout fees.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Iterable, Mapping
 
 from .analytics_quality import FreshnessStatus
 
@@ -74,7 +74,7 @@ class ConsumerOffer:
             raise ShoppingAnalyticsError("availability_invalid")
         if self.observed_at_utc.tzinfo is None or self.observed_at_utc.utcoffset() is None:
             raise ShoppingAnalyticsError("observed_at_not_timezone_aware")
-        object.__setattr__(self, "observed_at_utc", self.observed_at_utc.astimezone(timezone.utc))
+        object.__setattr__(self, "observed_at_utc", self.observed_at_utc.astimezone(UTC))
         try:
             freshness = FreshnessStatus(self.freshness_status)
         except (TypeError, ValueError) as exc:

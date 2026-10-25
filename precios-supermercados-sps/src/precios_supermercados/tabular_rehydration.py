@@ -12,11 +12,12 @@ todos los campos que participan en identidad, estado y fingerprint comercial.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from types import MappingProxyType
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from .commercial_state import CurrentCommercialOffer, OfferHistoryPeriod
 from .enums import ChangeType
@@ -117,7 +118,7 @@ def _utc(row: Mapping[str, Any], field: str, *, optional: bool = False) -> datet
         parsed = datetime.fromisoformat(value[:-1] + "+00:00")
     except ValueError as exc:
         raise TabularRehydrationError(f"durable_{field}_invalid") from exc
-    if parsed.tzinfo is None or parsed.utcoffset() != timezone.utc.utcoffset(parsed):
+    if parsed.tzinfo is None or parsed.utcoffset() != UTC.utcoffset(parsed):
         raise TabularRehydrationError(f"durable_{field}_invalid")
     return parsed
 

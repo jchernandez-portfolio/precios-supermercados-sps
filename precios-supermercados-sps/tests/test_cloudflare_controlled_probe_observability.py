@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 from cryptography.hazmat.primitives import serialization
@@ -93,14 +93,14 @@ def _artifact() -> tuple[dict[str, object], str]:
         "oidc_jti": "probe-jti-001",
         "oidc_subject": CONTROLLED_PROBE_SUBJECT,
         "physical_started_at_utc": datetime.fromtimestamp(
-            START_MS / 1000, tz=timezone.utc
+            START_MS / 1000, tz=UTC
         ).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
         "probe_id": PROBE_ID,
         "purpose": CONTROLLED_PROBE_PURPOSE,
         "raw_response_sha256": hashlib.sha256(raw_body).hexdigest(),
         "response_body_bytes": len(raw_body),
         "response_completed_at_utc": datetime.fromtimestamp(
-            (START_MS + 700) / 1000, tz=timezone.utc
+            (START_MS + 700) / 1000, tz=UTC
         ).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
         "response_status": 200,
         "schema_version": CONTROLLED_PROBE_SCHEMA_VERSION,
@@ -243,7 +243,7 @@ def _verified():
 
 
 def test_discovery_query_filtra_identidad_completa_de_sonda() -> None:
-    start = datetime.fromtimestamp((START_MS - 1_000) / 1000, tz=timezone.utc)
+    start = datetime.fromtimestamp((START_MS - 1_000) / 1000, tz=UTC)
     query = build_controlled_probe_trace_discovery_query(
         from_utc=start,
         to_utc=start + timedelta(minutes=1),

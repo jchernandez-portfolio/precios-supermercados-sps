@@ -16,9 +16,10 @@ import json
 import math
 import sys
 import time
-from datetime import datetime, timezone
+from collections.abc import Mapping
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -57,8 +58,8 @@ class FullCatalogError(RuntimeError):
 
 
 def _utc_text(value: datetime | None = None) -> str:
-    current = value or datetime.now(timezone.utc)
-    return current.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    current = value or datetime.now(UTC)
+    return current.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _safe_failure(reason: str, diagnostic: Mapping[str, Any]) -> dict[str, Any]:
@@ -189,7 +190,7 @@ def _run_catalog(
     total_reported: int | None = None
     total_pages: int | None = None
     staged_validation_passed = False
-    run_id = f"sps_full_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
+    run_id = f"sps_full_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
 
     with sync_playwright() as pw:
         browser, _ = launch_compatible_chromium(pw)

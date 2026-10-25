@@ -14,7 +14,6 @@ from precios_supermercados.automation.la_colonia_file_dispatcher import (
     request_marker,
 )
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COMMAND_WORKFLOW = (
     REPO_ROOT

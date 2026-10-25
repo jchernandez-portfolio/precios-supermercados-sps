@@ -4,7 +4,7 @@ import base64
 import hashlib
 import json
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 import pytest
 
@@ -83,8 +83,8 @@ def _platform_page(
         raw_response_sha256=hashlib.sha256(raw).hexdigest(),
         response_status=200,
         response_body_bytes=len(raw),
-        physical_started_at_utc=datetime(2026, 8, 21, 19, 45, page_number, 100_000, tzinfo=timezone.utc),
-        response_completed_at_utc=datetime(2026, 8, 21, 19, 45, page_number, 900_000, tzinfo=timezone.utc),
+        physical_started_at_utc=datetime(2026, 8, 21, 19, 45, page_number, 100_000, tzinfo=UTC),
+        response_completed_at_utc=datetime(2026, 8, 21, 19, 45, page_number, 900_000, tzinfo=UTC),
         github_repository="jchernandez-portfolio/precios-supermercados-sps",
         github_repository_id="1282475205",
         github_ref="refs/heads/main",
@@ -143,10 +143,10 @@ def _platform_page(
         fetch_method="GET",
         fetch_status=200,
         fetch_response_body_size=payload.response_body_bytes,
-        custom_started_at_utc=datetime(2026, 8, 21, 19, 45, page_number, 0, tzinfo=timezone.utc),
-        custom_completed_at_utc=datetime(2026, 8, 21, 19, 45, page_number + 1, 0, tzinfo=timezone.utc),
-        fetch_started_at_utc=datetime(2026, 8, 21, 19, 45, page_number, 150_000, tzinfo=timezone.utc),
-        fetch_completed_at_utc=datetime(2026, 8, 21, 19, 45, page_number, 500_000, tzinfo=timezone.utc),
+        custom_started_at_utc=datetime(2026, 8, 21, 19, 45, page_number, 0, tzinfo=UTC),
+        custom_completed_at_utc=datetime(2026, 8, 21, 19, 45, page_number + 1, 0, tzinfo=UTC),
+        fetch_started_at_utc=datetime(2026, 8, 21, 19, 45, page_number, 150_000, tzinfo=UTC),
+        fetch_completed_at_utc=datetime(2026, 8, 21, 19, 45, page_number, 500_000, tzinfo=UTC),
     )
     return reconcile_cloudflare_origin_trace(crypto_page, [trace])
 
@@ -282,7 +282,7 @@ def test_wrapper_platform_fabricado_se_revalida_y_falla() -> None:
         page=second.page,
         trace_evidence=pages[0].trace_evidence,
     )
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017 - cualquier rechazo del manifiesto vale
         build_edge_provenance_run_manifest(expected_pages=expected, reconciled_pages=[pages[0], forged])
 
 

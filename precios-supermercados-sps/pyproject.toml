@@ -1,0 +1,38 @@
+# Estándar de código del proyecto. Las pruebas corren con pytest; el linter es ruff
+# (python -m ruff check .) y para JavaScript se usa Biome (biome.json). Ambos corren
+# en el workflow de pruebas; un cambio que no pase no se fusiona.
+[project]
+name = "precios-supermercados-sps"
+version = "2026.10.25"
+description = "Súper Compras: captura, validación, homologación y publicación diaria de precios de supermercados de Honduras"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+src = ["src", "scripts", "tests"]
+extend-exclude = ["reports", "b2c", "edge", "powerbi"]
+
+[tool.ruff.lint]
+# E/W estilo, F errores, B bugs probables, UP sintaxis moderna, I orden de imports.
+select = ["E", "F", "W", "B", "UP", "I"]
+ignore = [
+  "E701", "E702",  # una línea con varias sentencias cortas se usa a propósito en validadores
+  "E741",          # nombres de una letra en expresiones matemáticas cortas
+  "B904",          # `raise ... from` no aporta en errores de validación fail-closed
+  "B905",          # zip sin strict= en iterables del mismo largo conocido
+  "E731",          # lambdas asignadas en fixtures
+  "UP040",         # alias de tipo con TypeAlias (compatibilidad de lectura)
+  "E501",          # líneas largas en literales de validación; el formato no se impone todavía
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Fixtures de pytest redefinen nombres a propósito; closures dentro de bucles se usan en la misma iteración.
+"tests/*" = ["F811", "B023", "E402", "F401"]  # F401: fixtures importadas de otros módulos de prueba
+# El exportador inyecta en sus globals los nombres del módulo core (_sync_core).
+"scripts/exportar_consumer_catalog.py" = ["F821"]
+"scripts/*" = ["E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["precios_supermercados"]

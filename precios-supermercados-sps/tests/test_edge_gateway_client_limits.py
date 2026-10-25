@@ -3,10 +3,10 @@ from __future__ import annotations
 import pytest
 
 from precios_supermercados.edge_gateway_client import (
-    EdgeAuthorizationRequest,
-    EdgeGatewayClientError,
     MAX_AUTHORIZATION_LIFETIME_MS,
     MAX_REQUESTS,
+    EdgeAuthorizationRequest,
+    EdgeGatewayClientError,
 )
 
 

@@ -16,7 +16,6 @@ from precios_supermercados.google_sheets_transport import (
     validate_spreadsheet_id,
 )
 
-
 SPREADSHEET_ID = "1AbCdEfGhIjKlMnOpQrStUvWxYz_0123456789"
 
 

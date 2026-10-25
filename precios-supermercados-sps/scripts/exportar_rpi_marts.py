@@ -8,9 +8,9 @@ import hashlib
 import json
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from collections.abc import Sequence
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -51,7 +51,7 @@ def _parse_utc(value: object, error: str) -> datetime:
         raise ExportError(error) from exc
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise ExportError(error)
-    return parsed.astimezone(timezone.utc)
+    return parsed.astimezone(UTC)
 
 
 def fetch_freshness(
@@ -386,7 +386,7 @@ def export_rpi_marts(
     }
     manifest = {
         "schema": "rpi-marts-manifest/v1",
-        "generated_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "generated_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "as_of": as_of_utc.isoformat().replace("+00:00", "Z"),
         "source_backend": backend.kind,
         "scope": [
@@ -422,7 +422,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.freshness_hours <= 0:
         raise ExportError("rpi_freshness_hours_invalid")
     as_of = (
-        datetime.now(timezone.utc)
+        datetime.now(UTC)
         if args.as_of_utc is None
         else _parse_utc(args.as_of_utc, "rpi_as_of_invalid")
     )

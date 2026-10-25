@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Mapping, Protocol, Sequence
+from typing import Any, Protocol
 
 from .bigquery_contract import (
-    BIGQUERY_TABLE_BY_NAME,
     BIGQUERY_TABLE_NAMES,
     BIGQUERY_TABLE_SPECS,
     INVENTARIO_HISTORICO,
@@ -17,7 +17,6 @@ from .bigquery_contract import (
     BigQueryTableSpec,
 )
 from .bigquery_persistence import BigQueryWritePlan
-
 
 _BOUND_EVIDENCE_PREFIX = "crev1_"
 _BOUND_EVIDENCE_HEX_LENGTH = 64

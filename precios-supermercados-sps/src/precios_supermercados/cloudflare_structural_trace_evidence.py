@@ -12,7 +12,7 @@ import hashlib
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import NoReturn
 
 from precios_supermercados.edge_provenance import canonical_json_bytes
@@ -73,7 +73,7 @@ def _sha256(value: object, code: str) -> str:
 def _utc(value: object, code: str) -> datetime:
     if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
         _fail(code)
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)
 
 
 def _int(value: object, code: str, *, minimum: int = 0, maximum: int = 2**53 - 1) -> int:
@@ -83,7 +83,7 @@ def _int(value: object, code: str, *, minimum: int = 0, maximum: int = 2**53 - 1
 
 
 def _timestamp(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    return value.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
 @dataclass(frozen=True, slots=True)
@@ -299,8 +299,8 @@ def reconcile_cloudflare_structural_trace(
     if evidence.script_version_id != payload.collector_release_id:
         _fail("trace_script_version_mismatch")
 
-    physical_start = payload.physical_started_at_utc.astimezone(timezone.utc)
-    response_end = payload.response_completed_at_utc.astimezone(timezone.utc)
+    physical_start = payload.physical_started_at_utc.astimezone(UTC)
+    response_end = payload.response_completed_at_utc.astimezone(UTC)
     if evidence.fetch_started_at_utc < physical_start - clock_skew:
         _fail("trace_fetch_started_too_early")
     if evidence.fetch_started_at_utc > response_end + clock_skew:

@@ -92,10 +92,9 @@ def test_import_same_creates_manual_link_and_marks_master_dirty(db: Path) -> Non
 
 
 def test_import_different_is_remembered_and_never_reproposed(db: Path) -> None:
-    from precios_supermercados.matching.master_candidates import generate_master_candidates
-    from precios_supermercados.matching.records import MatchRecord
-    from precios_supermercados.matching.master_candidates import standardize_records
     from precios_supermercados.matching.config import DEFAULT_CONFIG_PATH, DEFAULT_TAXONOMY_PATH, load_engine_config
+    from precios_supermercados.matching.master_candidates import generate_master_candidates, standardize_records
+    from precios_supermercados.matching.records import MatchRecord
     from precios_supermercados.matching.taxonomy import load_source_taxonomy
 
     con, store = _synced(db)

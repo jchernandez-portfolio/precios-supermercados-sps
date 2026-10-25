@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EDGE_ROOT = PROJECT_ROOT / "edge" / "cloudflare"
 PROBE_RUNBOOK = PROJECT_ROOT / "docs" / "cloudflare-controlled-probe-runbook.md"

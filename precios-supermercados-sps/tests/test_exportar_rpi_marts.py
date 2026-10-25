@@ -3,16 +3,15 @@ from __future__ import annotations
 import importlib.util
 import json
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
-
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "exportar_rpi_marts.py"
 SPEC = importlib.util.spec_from_file_location("exportar_rpi_marts", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
-AS_OF = datetime(2026, 9, 8, 12, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 9, 8, 12, tzinfo=UTC)
 
 
 def build_db(path: Path, *, stale_b: bool = False) -> None:

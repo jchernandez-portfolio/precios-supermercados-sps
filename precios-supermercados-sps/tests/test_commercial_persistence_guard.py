@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -33,8 +33,7 @@ from precios_supermercados.locations import (
     build_location_catalog,
 )
 
-
-BASE = datetime(2026, 8, 22, 20, 0, tzinfo=timezone.utc)
+BASE = datetime(2026, 8, 22, 20, 0, tzinfo=UTC)
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MONOREPO_ROOT = PROJECT_ROOT.parent
 RAW_PREPARER = "prepare_new_run_persistence"

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from decimal import Decimal
 
 import pytest
@@ -43,7 +43,7 @@ def build_offer(**overrides):
         "is_promotion": False,
         "availability": AvailabilityStatus.IN_STOCK,
         "location_status": LocationStatus.CONFIRMED,
-        "observed_at_utc": datetime(2026, 8, 5, 0, 0, tzinfo=timezone.utc),
+        "observed_at_utc": datetime(2026, 8, 5, 0, 0, tzinfo=UTC),
         "scrape_run_id": "run_20260805_000000",
         "extractor_version": "0.1.0",
         "schema_version": "1.0.0",
@@ -75,7 +75,7 @@ def test_creates_valid_models():
         source_key="SKU-001",
         source_name="Arroz Blanco Marca Demo 1 kg",
         product_url="https://example.com/productos/arroz",
-        observed_at_utc=datetime(2026, 8, 5, 0, 0, tzinfo=timezone.utc),
+        observed_at_utc=datetime(2026, 8, 5, 0, 0, tzinfo=UTC),
         scrape_run_id="run_20260805_000000",
         extractor_version="0.1.0",
         schema_version="1.0.0",
@@ -89,7 +89,7 @@ def test_creates_valid_models():
     validated = ValidatedOffer(
         offer=offer,
         state_hash=generate_state_hash(offer),
-        validated_at_utc=datetime(2026, 8, 5, 0, 1, tzinfo=timezone.utc),
+        validated_at_utc=datetime(2026, 8, 5, 0, 1, tzinfo=UTC),
     )
 
     assert raw.source_key_type is SourceKeyType.SKU
@@ -108,7 +108,7 @@ def test_missing_product_url_is_preserved_as_unknown_instead_of_invented() -> No
         source_key="SKU-001",
         source_name="Arroz Blanco Marca Demo 1 kg",
         product_url=None,
-        observed_at_utc=datetime(2026, 8, 5, 0, 0, tzinfo=timezone.utc),
+        observed_at_utc=datetime(2026, 8, 5, 0, 0, tzinfo=UTC),
         scrape_run_id="run_20260805_000000",
         extractor_version="0.1.0",
         schema_version="1.0.0",
@@ -183,7 +183,7 @@ def test_product_without_interpretable_presentation_is_preserved_for_review():
     validated = ValidatedOffer(
         offer=offer,
         state_hash=generate_state_hash(offer),
-        validated_at_utc=datetime(2026, 8, 5, 0, 1, tzinfo=timezone.utc),
+        validated_at_utc=datetime(2026, 8, 5, 0, 1, tzinfo=UTC),
     )
 
     assert offer.review_status is ReviewStatus.NEEDS_REVIEW
@@ -202,7 +202,7 @@ def test_product_without_brand_is_preserved_without_inventing_one():
     validated = ValidatedOffer(
         offer=offer,
         state_hash=generate_state_hash(offer),
-        validated_at_utc=datetime(2026, 8, 5, 0, 1, tzinfo=timezone.utc),
+        validated_at_utc=datetime(2026, 8, 5, 0, 1, tzinfo=UTC),
     )
 
     assert offer.normalized_brand is None

@@ -6,6 +6,7 @@ import random
 
 import pytest
 
+from _matching_fixtures import build_records
 from precios_supermercados.matching.blocking import (
     BlockingSettings,
     MinHasher,
@@ -13,7 +14,7 @@ from precios_supermercados.matching.blocking import (
     shingles,
 )
 from precios_supermercados.matching.clustering import Edge, cluster_id, constrained_clustering
-from precios_supermercados.matching.comparison import FIELDS, FIELD_NAMES, ComparisonVector
+from precios_supermercados.matching.comparison import FIELD_NAMES, FIELDS, ComparisonVector
 from precios_supermercados.matching.config import DEFAULT_TAXONOMY_PATH, load_engine_config
 from precios_supermercados.matching.fellegi_sunter import (
     FellegiSunterError,
@@ -29,8 +30,6 @@ from precios_supermercados.matching.thresholds import (
     choose_thresholds,
     wilson_lower,
 )
-
-from _matching_fixtures import build_records
 
 LEVEL_COUNT = [len(levels) for _, levels in FIELDS]
 

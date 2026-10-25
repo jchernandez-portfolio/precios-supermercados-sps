@@ -17,7 +17,6 @@ from precios_supermercados.scrapers.la_colonia_sps_structural_plan import (
     build_sps_structural_facet_plan,
 )
 
-
 GRAPHQL_URL = "https://www.lacolonia.com/_v/segment/graphql/v1"
 RAW_REGION = "opaque-region-for-structural-plan-test"
 

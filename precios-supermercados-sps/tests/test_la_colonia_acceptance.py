@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 from precios_supermercados.scrapers.la_colonia import LaColoniaExtractor
 
 FIXTURE = Path(__file__).parent / "fixtures" / "la_colonia" / "product_search_page.json"
-FIXED_TIME = datetime(2026, 8, 5, 14, 0, tzinfo=timezone.utc)
+FIXED_TIME = datetime(2026, 8, 5, 14, 0, tzinfo=UTC)
 
 
 def _base_product():

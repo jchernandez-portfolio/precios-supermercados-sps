@@ -17,19 +17,18 @@ from pathlib import Path
 
 from precios_supermercados.google_sheets_adapter import (
     GoogleSheetsAdapterError,
-    GoogleSheetsWorkbookAdapter,
+    GoogleSheetsWorkbookAdapter,  # noqa: F401 - la prueba del CLI retirado lo parchea
 )
 from precios_supermercados.google_sheets_bootstrap import (
     ALLOWED_BOOTSTRAP_MODES,
     MODE_CHECK,
     GoogleSheetsBootstrapError,
-    run_google_sheets_bootstrap,
+    run_google_sheets_bootstrap,  # noqa: F401 - la prueba del CLI retirado lo parchea
 )
 from precios_supermercados.google_sheets_transport import (
-    GoogleSheetsHttpTransport,
+    GoogleSheetsHttpTransport,  # noqa: F401 - la prueba del CLI retirado lo parchea
     GoogleSheetsTransportError,
 )
-
 
 SPREADSHEET_ID_ENV = "PRECIOS_SPS_GOOGLE_SPREADSHEET_ID"
 SERVICE_ACCOUNT_JSON_ENV = "PRECIOS_SPS_GOOGLE_SERVICE_ACCOUNT_JSON"

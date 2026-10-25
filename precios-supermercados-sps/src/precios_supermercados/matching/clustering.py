@@ -16,8 +16,8 @@ aristas más fuertes en lugar de fusionarse.
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Callable, Iterable, Mapping, Sequence
 
 PairStatus = Callable[[str, str], str]
 

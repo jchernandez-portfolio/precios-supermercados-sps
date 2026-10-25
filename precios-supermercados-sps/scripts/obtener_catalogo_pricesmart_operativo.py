@@ -11,7 +11,7 @@ import unicodedata
 import urllib.error
 import urllib.request
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from precios_supermercados.scrapers.pricesmart import (
@@ -63,7 +63,7 @@ ROOTS = (
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def category_url(key: str, name: str) -> str:

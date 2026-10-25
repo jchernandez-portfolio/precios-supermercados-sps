@@ -8,7 +8,7 @@ atributo relevante; los filtros de la API nunca se consideran autoridad.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import NoReturn
 
 from precios_supermercados.cloudflare_structural_trace_evidence import (
@@ -106,13 +106,13 @@ def _safe_integer(
 def _utc(value: object, code: str) -> datetime:
     if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
         _fail(code)
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)
 
 
 def _epoch_ms(value: object, code: str) -> datetime:
     milliseconds = _safe_integer(value, code, minimum=1)
     try:
-        return datetime.fromtimestamp(milliseconds / 1000, tz=timezone.utc)
+        return datetime.fromtimestamp(milliseconds / 1000, tz=UTC)
     except (OverflowError, OSError, ValueError) as exc:
         raise CloudflareStructuralObservabilityAdapterError(code) from exc
 

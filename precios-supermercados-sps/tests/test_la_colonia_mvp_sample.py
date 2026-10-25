@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import urlencode
@@ -10,7 +10,6 @@ from urllib.parse import urlencode
 import pytest
 
 from precios_supermercados.scrapers.la_colonia import LaColoniaExtractor
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = Path(__file__).parent / "fixtures" / "la_colonia"
@@ -20,7 +19,7 @@ assert SPEC is not None and SPEC.loader is not None
 module = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(module)
 
-FIXED_TIME = datetime(2026, 8, 24, 23, 0, tzinfo=timezone.utc)
+FIXED_TIME = datetime(2026, 8, 24, 23, 0, tzinfo=UTC)
 
 
 def _payload(*, total: int = 9291):

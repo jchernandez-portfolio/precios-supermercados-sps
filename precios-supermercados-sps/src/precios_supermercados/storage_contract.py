@@ -12,8 +12,8 @@ para que ese código no vuelva a importar por accidente el contrato activo.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from types import MappingProxyType
-from typing import Mapping
 
 from .bigquery_contract import BIGQUERY_TABLE_SPECS, BigQueryTableSpec
 from .tabular_persistence import (
@@ -25,10 +25,11 @@ from .tabular_persistence import (
     FACT_QUALITY_EVENTS,
     FACT_SCRAPE_RUNS,
     MAP_SOURCE_PRODUCTS,
-    TABLE_SPECS as LEGACY_TABLE_SPECS,
     TableSpec,
 )
-
+from .tabular_persistence import (
+    TABLE_SPECS as LEGACY_TABLE_SPECS,
+)
 
 ACTIVE_STORAGE_BACKEND = "bigquery"
 ACTIVE_STORAGE_TABLE_SPECS: Mapping[str, BigQueryTableSpec] = MappingProxyType(

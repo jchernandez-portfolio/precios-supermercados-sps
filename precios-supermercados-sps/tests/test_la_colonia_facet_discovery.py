@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 import json
 import socket
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 import pytest
 
@@ -41,7 +41,7 @@ from precios_supermercados.scrapers.la_colonia_facet_discovery_runtime import (
 )
 from precios_supermercados.scrapers.la_colonia_runner import LaColoniaCatalogRunner
 
-FIXED_TIME = datetime(2026, 8, 5, 19, 30, tzinfo=timezone.utc)
+FIXED_TIME = datetime(2026, 8, 5, 19, 30, tzinfo=UTC)
 
 
 def command(**updates):

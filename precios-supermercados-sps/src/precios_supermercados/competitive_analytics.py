@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from enum import StrEnum
 
 from .analytics_quality import MarketWindowAssessment, MarketWindowStatus
-from .price_analytics import AnalyticsResult, PERCENT
+from .price_analytics import PERCENT, AnalyticsResult
 
 
 class CompetitiveAnalyticsError(ValueError):

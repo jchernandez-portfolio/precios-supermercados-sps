@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from decimal import Decimal
 
 import pytest
@@ -28,8 +28,7 @@ from precios_supermercados.tabular_persistence import (
     source_product_mapping_row,
 )
 
-
-OBSERVED = datetime(2026, 8, 22, 20, 0, tzinfo=timezone.utc)
+OBSERVED = datetime(2026, 8, 22, 20, 0, tzinfo=UTC)
 
 
 def raw_product(

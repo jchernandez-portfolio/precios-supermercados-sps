@@ -37,10 +37,10 @@ import os
 import sqlite3
 import sys
 import unicodedata
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Mapping, Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -52,6 +52,7 @@ from precios_supermercados.product_master import (  # noqa: E402
     LINK_INSERT_SQL,
     LINK_TABLE,
     REJECTION_TABLE,
+    SCHEMA_OBJECTS,
     MasterLink,
     MasterStore,
     SQLiteMasterStore,
@@ -61,7 +62,6 @@ from precios_supermercados.product_master import (  # noqa: E402
     read_active_links_by_master,
     read_active_links_by_product,
     read_masters_by_id,
-    SCHEMA_OBJECTS,
 )
 
 SAME = frozenset({"mismo", "same", "same_product", "si", "sí", "yes", "igual"})
@@ -91,7 +91,7 @@ class Decision:
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def load_queue(path: Path) -> dict[str, tuple[str, str]]:

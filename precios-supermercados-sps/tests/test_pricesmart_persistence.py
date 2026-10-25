@@ -11,10 +11,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import actualizar_mvp_sqlite_la_colonia as local
 import actualizar_mvp_turso_la_colonia as remote
 import migrar_mvp_pricesmart as migration
-from test_actualizar_mvp_turso_la_colonia import product, snapshot as lc_snapshot
-from test_colonial_persistence import apply, database, dump, snapshot as colonial_snapshot
+from test_actualizar_mvp_turso_la_colonia import product
+from test_actualizar_mvp_turso_la_colonia import snapshot as lc_snapshot
+from test_colonial_persistence import apply, database, dump
+from test_colonial_persistence import snapshot as colonial_snapshot
 from test_walmart_persistence import walmart_snapshot
-
 
 ROOT = Path(__file__).resolve().parents[1]
 REPORT = ROOT / "reports/pricesmart/2026-09-01-full"
@@ -141,11 +142,11 @@ def pre_pricesmart_database(path):
     target["price_history"] = target["price_history"].replace(
         "supermarket_id IN ('walmart', 'pricesmart')", "supermarket_id = 'walmart'"
     )
-    for name, sql in target.items():
+    for _name, sql in target.items():
         if not sql.startswith("CREATE TABLE"):
             continue
         con.execute(sql)
-    for name, sql in target.items():
+    for _name, sql in target.items():
         if sql.startswith("CREATE TABLE"):
             continue
         con.execute(sql)

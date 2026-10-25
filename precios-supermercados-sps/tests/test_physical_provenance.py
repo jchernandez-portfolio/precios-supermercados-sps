@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
@@ -14,13 +14,12 @@ from precios_supermercados.physical_provenance import (
     validate_provenance_structure,
 )
 
-
 COMMIT = "a" * 40
 IMAGE = "sha256:" + "b" * 64
 REQUEST_DIGEST = "c" * 64
 REQUEST_SHA = "d" * 64
 RESPONSE_SHA = "e" * 64
-T0 = datetime(2026, 8, 21, 12, 0, tzinfo=timezone.utc)
+T0 = datetime(2026, 8, 21, 12, 0, tzinfo=UTC)
 SIGNATURE = base64.b64encode(b"offline-test-signature").decode("ascii")
 
 

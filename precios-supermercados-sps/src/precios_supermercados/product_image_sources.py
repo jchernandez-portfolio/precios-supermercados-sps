@@ -18,7 +18,8 @@ import json
 import re
 import time
 import unicodedata
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from precios_supermercados.scrapers import comisariato_los_andes as los_andes

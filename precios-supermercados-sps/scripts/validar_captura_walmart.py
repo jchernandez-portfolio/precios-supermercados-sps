@@ -6,8 +6,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from precios_supermercados.scrapers.walmart import reconcile_capture  # noqa: E402
 from actualizar_mvp_sqlite_la_colonia import validate_snapshot_bytes  # noqa: E402
+from precios_supermercados.scrapers.walmart import reconcile_capture  # noqa: E402
 
 
 def main():

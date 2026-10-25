@@ -7,7 +7,6 @@ from pathlib import Path
 
 import yaml
 
-
 BASE_PATH = Path(__file__).with_name("_workflow_security_audit_base.py")
 SPEC = importlib.util.spec_from_file_location("_workflow_security_audit_base", BASE_PATH)
 assert SPEC is not None and SPEC.loader is not None

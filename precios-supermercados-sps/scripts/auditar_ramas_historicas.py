@@ -42,7 +42,6 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any
 
-
 CATEGORIES = {
     "MERGED_OR_SUBSUMED",
     "CLOSED_SUPERSEDED",

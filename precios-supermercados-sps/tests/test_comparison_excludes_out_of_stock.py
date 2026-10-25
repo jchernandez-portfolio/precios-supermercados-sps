@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import sys
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -22,7 +22,7 @@ import exportar_consumer_catalog_tgu as tgu  # noqa: E402
 from precios_supermercados.price_analytics import CurrentPriceObservation  # noqa: E402
 from precios_supermercados.shopping_analytics import ConsumerOffer  # noqa: E402
 
-AS_OF = datetime(2026, 10, 2, 12, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 10, 2, 12, tzinfo=UTC)
 SPS_LOCATIONS = dict(core.EXPECTED_SCOPE)
 FRESH_SPS = {scope: "FRESH" for scope in core.EXPECTED_SCOPE}
 

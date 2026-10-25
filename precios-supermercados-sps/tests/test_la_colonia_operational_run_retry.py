@@ -4,7 +4,6 @@ import importlib.util
 import json
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "obtener_catalogo_sps_la_colonia_operativo_v2.py"
 SPEC = importlib.util.spec_from_file_location("obtener_catalogo_sps_la_colonia_operativo_v2", SCRIPT)

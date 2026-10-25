@@ -9,9 +9,10 @@ from __future__ import annotations
 
 import argparse
 import json
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from collections.abc import Sequence
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 PUBLICATION_SCHEMA = "precios-sps-publication/v1"
 DESCRIPTOR_SCHEMA = "precios-sps-safe-source-descriptors/v1"

@@ -7,8 +7,9 @@ la firma contra una clave pública productiva y nunca concede autoridad comercia
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping, NoReturn
+from typing import Any, NoReturn
 
 from precios_supermercados.edge_gateway_client import (
     EdgeExecutionRequest,

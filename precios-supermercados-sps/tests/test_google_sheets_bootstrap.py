@@ -16,7 +16,6 @@ from precios_supermercados.google_sheets_bootstrap import (
 )
 from precios_supermercados.storage_contract import LEGACY_SHEETS_MANAGED_TABLE_SPECS
 
-
 SPREADSHEET_ID = "1AbCdEfGhIjKlMnOpQrStUvWxYz_0123456789"
 
 

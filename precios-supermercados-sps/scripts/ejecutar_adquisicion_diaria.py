@@ -29,7 +29,6 @@ from actualizar_mvp_turso_comisariato_los_andes import (  # noqa: E402
 from actualizar_mvp_turso_paiz import validate_snapshot_bytes as validate_paiz  # noqa: E402
 from ensamblar_adquisicion_diaria import HANDOFF_FILE, HANDOFF_SCHEMA  # noqa: E402
 
-
 RETAILERS = (
     "la_colonia",
     "los_andes",

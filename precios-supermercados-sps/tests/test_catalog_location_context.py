@@ -27,7 +27,6 @@ from precios_supermercados.structural_discovery_manifest import (
     build_verified_structural_discovery,
 )
 
-
 TESTS = Path(__file__).parent
 
 

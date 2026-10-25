@@ -15,7 +15,7 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Literal, NoReturn
 
 STRUCTURAL_PROVENANCE_SCHEMA_VERSION = "1"
@@ -79,14 +79,14 @@ def _safe_int(value: object, code: str, *, minimum: int = 0, maximum: int = 2**5
 def _utc_ms(value: object, code: str) -> datetime:
     if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
         _fail(code)
-    normalized = value.astimezone(timezone.utc)
+    normalized = value.astimezone(UTC)
     if normalized.microsecond % 1000:
         _fail(code)
     return normalized
 
 
 def _iso_ms(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    return value.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def _canonical_b64url(value: object, code: str, *, maximum: int = 4096) -> tuple[str, bytes]:

@@ -27,8 +27,8 @@ empates, siempre la misma fuente para que la cuadrícula se vea pareja.
 from __future__ import annotations
 
 import io
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import Iterable, Sequence
 
 import numpy as np
 from PIL import Image, ImageFilter, ImageOps

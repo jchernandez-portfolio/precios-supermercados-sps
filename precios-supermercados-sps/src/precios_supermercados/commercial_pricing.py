@@ -7,10 +7,10 @@ sólo un valor reportado por la fuente. La referencia válida es el
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Sequence
 
 from .commercial_state import CurrentCommercialOffer, OfferHistoryPeriod
 from .identifiers import (

@@ -5,7 +5,7 @@ import json
 import shutil
 import subprocess
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -67,8 +67,8 @@ def _payload(**overrides: object) -> StructuralReceiptPayload:
         "raw_response_sha256": "d" * 64,
         "response_status": 200,
         "response_body_bytes": 123,
-        "physical_started_at_utc": datetime(2026, 8, 21, 20, 10, 0, 123_000, tzinfo=timezone.utc),
-        "response_completed_at_utc": datetime(2026, 8, 21, 20, 10, 0, 456_000, tzinfo=timezone.utc),
+        "physical_started_at_utc": datetime(2026, 8, 21, 20, 10, 0, 123_000, tzinfo=UTC),
+        "response_completed_at_utc": datetime(2026, 8, 21, 20, 10, 0, 456_000, tzinfo=UTC),
         "github_repository": "jchernandez-portfolio/precios-supermercados-sps",
         "github_repository_id": "1282475205",
         "github_ref": "refs/heads/main",
@@ -158,7 +158,7 @@ def test_receipt_rechaza_firma_no_ed25519_y_tiempos_no_milisegundo() -> None:
 
     with pytest.raises(StructuralProvenanceError) as timestamp:
         _payload(
-            physical_started_at_utc=datetime(2026, 8, 21, 20, 10, 0, 123_456, tzinfo=timezone.utc)
+            physical_started_at_utc=datetime(2026, 8, 21, 20, 10, 0, 123_456, tzinfo=UTC)
         )
     assert timestamp.value.code == "structural_receipt_physical_started_at_invalid"
 

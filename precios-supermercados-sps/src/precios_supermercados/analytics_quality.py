@@ -8,10 +8,10 @@ good observation.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
-from typing import Iterable
 
 
 class AnalyticsQualityError(ValueError):
@@ -38,7 +38,7 @@ class MarketWindowStatus(StrEnum):
 def _utc(value: datetime, field_name: str) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise AnalyticsQualityError(f"{field_name}_not_timezone_aware")
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)
 
 
 def _clean_reasons(values: Iterable[str], field_name: str) -> tuple[str, ...]:

@@ -17,6 +17,8 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
+from datetime import UTC, datetime, timezone  # noqa: E402
+
 import actualizar_mvp_turso_la_colonia as turso_updater  # noqa: E402
 import backfill_homologacion_turso as homologation  # noqa: E402
 import persistir_especificaciones_pricesmart_turso as persist_script  # noqa: E402
@@ -44,7 +46,6 @@ from precios_supermercados.scrapers.pricesmart_specs import (  # noqa: E402
     parse_product_page,
     spec_fingerprint,
 )
-from datetime import datetime, timezone  # noqa: E402
 
 FIXTURE = ROOT / "tests" / "fixtures" / "pricesmart_specs" / "SYNTHETIC-breadco-415586.html"
 
@@ -179,7 +180,7 @@ def test_rows_read_budget_reads_only_indexed_keys(executor: SqliteExecutor) -> N
 
 
 def test_state_reads_only_fresh_keys_and_tolerates_missing_table(executor: SqliteExecutor) -> None:
-    now = datetime(2026, 10, 10, 12, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 10, 10, 12, 0, tzinfo=UTC)
     state = read_state(executor, now=now)
     assert state["table_exists"] is False and state["fresh"] == {}
     apply_rows(executor, rows_from_artifact(artifact([
@@ -265,7 +266,7 @@ def test_turso_script_state_and_apply_end_to_end(tmp_path: Path, monkeypatch: py
     monkeypatch.setattr(persist_script, "_pipeline", fake.pipeline)
     monkeypatch.setattr(persist_script, "_run_batch", fake.run_batch)
     executor = persist_script.TursoExecutor("libsql://offline.example", "offline")
-    now = datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 10, 3, 12, 0, tzinfo=UTC)
 
     summary = persist_script.command_state(executor, tmp_path / "state.json", stale_days=28, now=now)
     assert summary["table_exists"] is False and summary["fresh_keys"] == 0

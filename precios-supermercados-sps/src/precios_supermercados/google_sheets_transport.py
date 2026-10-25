@@ -20,7 +20,6 @@ import requests
 from google.auth.transport.requests import AuthorizedSession
 from google.oauth2 import service_account
 
-
 SHEETS_API_ORIGIN = "https://sheets.googleapis.com"
 SHEETS_API_VERSION = "v4"
 SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets"
@@ -195,7 +194,7 @@ class GoogleSheetsHttpTransport:
         session_factory: Callable[[Any], SessionLike] = AuthorizedSession,
         connect_timeout_seconds: float = 5.0,
         read_timeout_seconds: float = 30.0,
-    ) -> "GoogleSheetsHttpTransport":
+    ) -> GoogleSheetsHttpTransport:
         session = build_authorized_session(
             raw_service_account_json,
             session_factory=session_factory,

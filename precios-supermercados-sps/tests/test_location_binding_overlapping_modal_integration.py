@@ -11,7 +11,6 @@ from precios_supermercados.diagnostics.location_binding_dom_controls import (
     CITY_CONTROL_READY_TIMEOUT_MS,
 )
 
-
 AUTH = "LC-location-binding-777"
 
 

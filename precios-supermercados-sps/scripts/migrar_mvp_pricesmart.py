@@ -1,12 +1,15 @@
 """One-time offline-safe schema migration for nullable PriceSmart out-of-stock offers."""
 from __future__ import annotations
+
 import argparse
 import hashlib
 import json
 import re
 import sqlite3
 from pathlib import Path
+
 from generar_mvp_sqlite_la_colonia import create_schema
+
 PRE_PRICESMART_FINGERPRINT = "f09ea1cf63f3de159c87872f842babcc42e5d14f8e2c33067782dd272c1a36f4"
 SCHEMA_QUERY = "SELECT name,sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY name"
 def _normalized(rows):

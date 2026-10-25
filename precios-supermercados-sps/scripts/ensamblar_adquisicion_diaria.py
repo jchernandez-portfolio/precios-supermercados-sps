@@ -20,7 +20,6 @@ import re
 import shutil
 from pathlib import Path
 
-
 HANDOFF_SCHEMA = "precios-sps-daily-acquisition-handoff/v1"
 HANDOFF_FILE = "acquisition-handoff.json"
 ARTIFACT_PREFIX = "daily-acquisition"
@@ -143,7 +142,7 @@ def assemble(root: Path, output: Path, *, run_id: str, allow_missing: bool = Fal
             raise AssemblyError("daily_acquisition_output_not_safe_directory")
         shutil.rmtree(output)
     output.mkdir(parents=True)
-    for retailer, (attempt, source) in selected.items():
+    for retailer, (_attempt, source) in selected.items():
         allowed = OWNED_TOP_LEVEL[retailer]
         actual = {
             child.name

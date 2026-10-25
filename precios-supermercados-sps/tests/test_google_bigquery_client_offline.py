@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -11,8 +11,7 @@ from precios_supermercados.bigquery_adapter import BigQueryAdapterError
 from precios_supermercados.bigquery_contract import BigQueryField, BigQueryTableSpec
 from precios_supermercados.google_bigquery_client import GoogleCloudBigQueryClient
 
-
-UTC = timezone.utc
+UTC = UTC
 
 
 def staging_spec() -> BigQueryTableSpec:

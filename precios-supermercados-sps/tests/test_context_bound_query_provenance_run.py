@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -25,7 +25,7 @@ RELEASE = "worker-release-query-run-001"
 CODE_SHA = "b" * 64
 SIGNING_KEY = "edge-signing-key-query-001"
 CONTEXT_FP = "c" * 64
-START = datetime(2026, 8, 24, 20, 0, tzinfo=timezone.utc)
+START = datetime(2026, 8, 24, 20, 0, tzinfo=UTC)
 
 
 def _expected(index: int, *, role: str, traversal: str, order: str) -> ExpectedProvenancePage:

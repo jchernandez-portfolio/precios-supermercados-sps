@@ -2,9 +2,9 @@
 import importlib.util
 import io
 import json
-from pathlib import Path
 import socket
 import tarfile
+from pathlib import Path
 
 import pytest
 

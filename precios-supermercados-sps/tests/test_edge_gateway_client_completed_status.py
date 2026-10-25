@@ -6,7 +6,7 @@ import pytest
 
 from precios_supermercados.edge_gateway_client import EdgeGatewayClient, EdgeGatewayClientError
 from precios_supermercados.edge_provenance import canonical_json_bytes
-from test_edge_gateway_client import FakeTransport, SIGNATURE, completed_response, execution
+from test_edge_gateway_client import SIGNATURE, FakeTransport, completed_response, execution
 
 
 def test_completed_no_acepta_status_distinto_de_200_aunque_envelope_sea_consistente() -> None:

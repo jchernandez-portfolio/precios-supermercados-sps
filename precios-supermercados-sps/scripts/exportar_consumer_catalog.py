@@ -12,22 +12,22 @@ import math
 import re
 import sys
 import unicodedata
+from collections.abc import Iterable, Sequence
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Iterable, Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import exportar_consumer_catalog_core as _core  # noqa: E402
+from precios_supermercados import master_taxonomy  # noqa: E402
 from precios_supermercados.consumer_catalog_display import (  # noqa: E402
     brand_from_prefix,
     canonical_brand,
     canonical_egg_size,
     canonical_presentation,
 )
-from precios_supermercados import master_taxonomy  # noqa: E402
 from precios_supermercados.matching import size_variants  # noqa: E402
 
 # Conserva la API histórica del script, incluidos helpers privados consumidos por

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -54,8 +54,7 @@ from precios_supermercados.storage_contract import (
 )
 from precios_supermercados.tabular_records import QualityEventRecord
 
-
-BASE = datetime(2026, 8, 26, 12, 0, tzinfo=timezone.utc)
+BASE = datetime(2026, 8, 26, 12, 0, tzinfo=UTC)
 EVIDENCE_ID = "crev1_" + "a" * 64
 
 

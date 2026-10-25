@@ -21,8 +21,8 @@ import json
 import os
 import re
 import sys
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
-from typing import Callable, Iterable, Mapping
 
 INDEX_SCHEMA = "super-compras-product-images/v2"
 PREFIX = "fotos/v2/"

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -15,8 +15,7 @@ from precios_supermercados.la_colonia_offer_normalization import (
 from precios_supermercados.models import RawProduct
 from precios_supermercados.offer_normalization import normalize_raw_product
 
-
-BASE_TIME = datetime(2026, 8, 26, 2, 40, 57, tzinfo=timezone.utc)
+BASE_TIME = datetime(2026, 8, 26, 2, 40, 57, tzinfo=UTC)
 
 
 def _raw(

@@ -6,8 +6,9 @@ import hashlib
 import json
 import re
 import unicodedata
+from collections.abc import Mapping
 from decimal import Decimal
-from typing import Any, Mapping
+from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from .enums import SourceKeyType

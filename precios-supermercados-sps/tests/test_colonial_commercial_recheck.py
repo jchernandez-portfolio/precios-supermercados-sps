@@ -16,8 +16,14 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from obtener_catalogo_colonial import html_page_url, recheck_commercial_disagreements  # noqa: E402
 from precios_supermercados.scrapers.colonial import (  # noqa: E402
-    MAX_COMMERCIAL_RECHECKS, ORIGIN, ColonialError, apply_commercial_recheck,
-    commercial_disagreements, parse_cards, parse_product_detail, reconcile,
+    MAX_COMMERCIAL_RECHECKS,
+    ORIGIN,
+    ColonialError,
+    apply_commercial_recheck,
+    commercial_disagreements,
+    parse_cards,
+    parse_product_detail,
+    reconcile,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures" / "colonial"

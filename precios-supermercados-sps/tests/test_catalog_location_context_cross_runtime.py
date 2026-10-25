@@ -16,7 +16,6 @@ from precios_supermercados.scrapers.la_colonia_sps_facet_context import (
     fingerprint_context_value,
 )
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = (
     PROJECT_ROOT

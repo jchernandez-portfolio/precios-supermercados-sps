@@ -29,9 +29,9 @@ import os
 import sys
 import time
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from collections.abc import Iterable, Mapping, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -57,9 +57,9 @@ from precios_supermercados.product_homologation import SourceProductRecord  # no
 from precios_supermercados.product_homologation_persistence import build_homologation_rows  # noqa: E402
 from precios_supermercados.product_master import (  # noqa: E402
     DEFAULT_POLICY_PATH,
+    LINK_TABLE,
     MASTER_BUILDER_VERSION,
     MASTER_TABLE,
-    LINK_TABLE,
     REJECTION_TABLE,
     GoldenRecord,
     MasterStore,
@@ -76,7 +76,7 @@ _CITY_CODES = {"san pedro sula": "SPS", "tegucigalpa": "TGU"}
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _write_json(path: Path, payload: object) -> None:
@@ -171,12 +171,12 @@ def completeness_report(
         brand = size = ptype = variant = 0
         for key in keys:
             profile = profiles_by_key[key]
-            brand += bool(getattr(profile, "normalized_brand"))
+            brand += bool(profile.normalized_brand)
             size += bool(
-                getattr(profile, "presentation_total_base")
-                and getattr(profile, "presentation_status") not in {"conflict", "ambiguous_multipack", "missing"}
+                profile.presentation_total_base
+                and profile.presentation_status not in {"conflict", "ambiguous_multipack", "missing"}
             )
-            ptype += bool(getattr(profile, "product_type"))
+            ptype += bool(profile.product_type)
             variant += bool(golden_variant_labels(names_by_key[key]))
         return {
             "rows": len(keys),
@@ -194,13 +194,13 @@ def completeness_report(
             for key in member_keys_by_master[master_id] & city_keys:
                 profile = profiles_by_key[key]
                 checks = {
-                    "brand": (not getattr(profile, "normalized_brand"), bool(record.brand)),
+                    "brand": (not profile.normalized_brand, bool(record.brand)),
                     "size": (
-                        not getattr(profile, "presentation_total_base")
-                        or getattr(profile, "presentation_status") in {"conflict", "ambiguous_multipack", "missing"},
+                        not profile.presentation_total_base
+                        or profile.presentation_status in {"conflict", "ambiguous_multipack", "missing"},
                         record.net_content_value is not None,
                     ),
-                    "product_type": (not getattr(profile, "product_type"), bool(record.product_type)),
+                    "product_type": (not profile.product_type, bool(record.product_type)),
                 }
                 for name, (missing, golden_has) in checks.items():
                     if missing:
@@ -296,7 +296,7 @@ def run_offline(
     all_rows: list[dict[str, object]] = []
     city_summaries: dict[str, object] = {}
     completeness: dict[str, object] = {}
-    status_by_key = {key: getattr(row, "comparison_status") for key, row in profiles_by_key.items()}
+    status_by_key = {key: row.comparison_status for key, row in profiles_by_key.items()}
     for city, city_records in sorted(by_city.items()):
         t0 = time.time()
         product_key_of = {record.source_record_id: key_of[f"{city}|{record.source_record_id}"] for record in city_records}

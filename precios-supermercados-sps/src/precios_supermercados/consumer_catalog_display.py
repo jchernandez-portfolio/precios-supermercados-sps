@@ -15,7 +15,6 @@ from pathlib import Path
 
 from .product_identity_v2 import display_quantity, normalize_thousands_separators
 
-
 _GENERIC_BRAND_KEYS = frozenset(
     {
         "rms",

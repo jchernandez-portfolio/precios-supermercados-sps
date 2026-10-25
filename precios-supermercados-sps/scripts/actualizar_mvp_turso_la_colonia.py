@@ -19,11 +19,11 @@ if str(ROOT / "src") not in sys.path:
     sys.path.append(str(ROOT / "src"))
 
 from actualizar_mvp_sqlite_la_colonia import (  # noqa: E402
-    LOCATIONS,
     COLONIAL_LOCATIONS,
+    LOCATIONS,
     PRICESMART_LOCATIONS,
-    WALMART_LOCATIONS,
     SUPERMARKET_ID,
+    WALMART_LOCATIONS,
     SnapshotError,
     _minor,
     validate_snapshot_bytes,

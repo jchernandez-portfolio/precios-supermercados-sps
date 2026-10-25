@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -12,8 +12,7 @@ from precios_supermercados.promotion_analytics import (
     analyze_promotions,
 )
 
-
-AS_OF = datetime(2026, 9, 10, 12, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 9, 10, 12, tzinfo=UTC)
 
 
 def row(days_old: int, price: int, promoted: bool, regular: int | None = None):

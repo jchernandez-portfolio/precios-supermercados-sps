@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
@@ -147,7 +147,7 @@ def _response(events: list[dict[str, object]], *, count: int | None = None) -> d
 
 
 def _window() -> tuple[datetime, datetime]:
-    start = datetime(2026, 8, 21, 20, 0, tzinfo=timezone.utc)
+    start = datetime(2026, 8, 21, 20, 0, tzinfo=UTC)
     return start, start + timedelta(minutes=5)
 
 

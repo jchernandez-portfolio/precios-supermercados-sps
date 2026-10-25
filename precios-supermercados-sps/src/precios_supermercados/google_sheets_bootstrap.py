@@ -8,9 +8,9 @@ completo antes del único batchUpdate atómico.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Mapping
 
 from .google_sheets_adapter import GoogleSheetsWorkbookAdapter
 from .locations import DEFAULT_LOCATION_CATALOG, LocationCatalog
@@ -21,7 +21,6 @@ from .tabular_persistence import (
     supermarket_config_rows,
 )
 from .tabular_store import TabularBatch
-
 
 MODE_CHECK = "check"
 MODE_APPLY_CONFIG = "apply-config"
