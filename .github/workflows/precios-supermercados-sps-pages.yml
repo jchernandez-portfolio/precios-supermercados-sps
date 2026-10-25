@@ -1,0 +1,72 @@
+name: Precios SPS - Publicar Súper Compras
+
+# Publica la web app en GitHub Pages de este repositorio cada vez que cambia
+# `super-compras/` en main. Copia la app tal cual (sin build), le pone una versión
+# única (fecha + commit) para renovar la caché y el service worker, y la empuja a
+# la rama huérfana `gh-pages` (un solo commit, siempre reemplazado). Sin secretos,
+# sin OIDC: sólo el token del workflow. Pages se sirve desde esa rama.
+#
+# Dirección: https://jchernandez-portfolio.github.io/precios-supermercados-sps/super-compras/
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "precios-supermercados-sps/super-compras/**"
+      - "precios-supermercados-sps/scripts/versionar_super_compras.py"
+      - ".github/workflows/precios-supermercados-sps-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: precios-sps-pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    if: ${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Descargar revisión inmutable
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Armar el sitio con versión única
+        env:
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/site
+          mkdir -p /tmp/site/super-compras
+          cp -R precios-supermercados-sps/super-compras/. /tmp/site/super-compras/
+          version="$(python3 precios-supermercados-sps/scripts/versionar_super_compras.py --stamp "$COMMIT" --app-dir /tmp/site/super-compras)"
+          python3 precios-supermercados-sps/scripts/versionar_super_compras.py --check --app-dir /tmp/site/super-compras
+          touch /tmp/site/.nojekyll
+          cat > /tmp/site/index.html <<'HTML'
+          <!doctype html><html lang="es"><head><meta charset="utf-8"><title>Súper Compras</title>
+          <meta http-equiv="refresh" content="0; url=super-compras/"><link rel="canonical" href="super-compras/">
+          </head><body><p>Súper Compras se abre en <a href="super-compras/">super-compras/</a>.</p>
+          <script>location.replace("super-compras/" + location.hash);</script></body></html>
+          HTML
+          cp /tmp/site/index.html /tmp/site/404.html
+          echo "publicada: $version"
+
+      - name: Reemplazar la rama gh-pages (un solo commit)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          cd /tmp/site
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "pages: Súper Compras desde ${COMMIT}"
+          git push -q --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:gh-pages

@@ -90,6 +90,9 @@ PRODUCT_IMAGES_SYNC_CHECKOUT = {
     "sparse-checkout-cone-mode": "false",
     "persist-credentials": "false",
 }
+base.PAGES_WORKFLOW = "precios-supermercados-sps-pages.yml"
+base.EXPECTED_PERMISSIONS[base.PAGES_WORKFLOW] = {"contents": "write"}
+base.EXPECTED_TRIGGERS[base.PAGES_WORKFLOW] = {"push", "workflow_dispatch"}
 base.DATA_QUALITY_WORKFLOW = "precios-supermercados-sps-data-quality.yml"
 base.EXPECTED_PERMISSIONS[base.DATA_QUALITY_WORKFLOW] = {"contents": "write"}
 base.EXPECTED_TRIGGERS[base.DATA_QUALITY_WORKFLOW] = {"schedule", "workflow_run", "workflow_dispatch"}
@@ -615,6 +618,30 @@ def test_product_images_sync_uploads_validated_artifact_with_only_bucket_credent
     others = [step for step in base.steps(workflow) if step is not upload]
     assert not any("secrets." in str(step) for step in others)
     for forbidden in ("TURSO", "pull_request", "id-token", "contents: write", "git push", "actions: write"):
+        assert forbidden not in raw, forbidden
+
+
+def test_pages_publishes_super_compras_from_main_with_only_the_workflow_token() -> None:
+    path = base.WORKFLOW_DIR / base.PAGES_WORKFLOW
+    workflow = base.load_workflow(path)
+    assert workflow["permissions"] == {"contents": "write"}
+    assert workflow["on"]["push"]["branches"] == ["main"]
+    assert set(workflow["on"]["push"]["paths"]) == {
+        "precios-supermercados-sps/super-compras/**",
+        "precios-supermercados-sps/scripts/versionar_super_compras.py",
+        ".github/workflows/precios-supermercados-sps-pages.yml",
+    }
+    assert workflow["concurrency"] == {"group": "precios-sps-pages", "cancel-in-progress": "true"}
+    publish = base.jobs(workflow)["publish"]
+    assert set(base.jobs(workflow)) == {"publish"}
+    assert "github.ref == 'refs/heads/main'" in publish["if"]
+    assert publish["timeout-minutes"] == "10"
+    raw = path.read_text(encoding="utf-8")
+    assert base.secret_references(path) == set()
+    assert "versionar_super_compras.py --stamp" in raw and "--check" in raw
+    assert "HEAD:gh-pages" in raw and "git push -q --force" in raw
+    for forbidden in ("TURSO", "pip install", "id-token", "pull_request", "vars.", "actions/deploy-pages",
+                      "schedule:", "R2_"):
         assert forbidden not in raw, forbidden
 
 
