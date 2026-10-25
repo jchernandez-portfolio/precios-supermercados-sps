@@ -1,6 +1,6 @@
 # Errores de datos en Súper Compras
 
-Actualizado automáticamente el 2026-10-25 a partir del catálogo publicado (San Pedro Sula: 2026-10-25T15:55:14.608579Z; Tegucigalpa: 2026-10-25T15:57:48.071991Z).
+Actualizado automáticamente el 2026-10-25 a partir del catálogo publicado (San Pedro Sula: 2026-10-25T20:59:50.858283Z; Tegucigalpa: 2026-10-25T21:03:12.848202Z).
 
 - [`errores_detectados.csv`](errores_detectados.csv): todo lo que la revisión automática encuentra hoy, una fila por producto y supermercado, con enlace al producto.
 - [`errores_confirmados.csv`](errores_confirmados.csv): errores revisados a mano, de dónde vienen (súper o Súper Compras) y su estado.
@@ -14,17 +14,17 @@ Actualizado automáticamente el 2026-10-25 a partir del catálogo publicado (San
 
 | Ciudad | Supermercado | Sucursal | Última captura (UTC) | Horas | Estado |
 |---|---|---|---|---:|---|
-| San Pedro Sula | La Colonia | la_colonia_sps | 2026-10-25 11:28 | 4 | Al día |
-| San Pedro Sula | Colonial | colonial_sps | 2026-10-25 11:26 | 4 | Al día |
-| San Pedro Sula | Walmart | walmart_sps | 2026-10-25 11:25 | 4 | Al día |
-| San Pedro Sula | PriceSmart | pricesmart_sps | 2026-10-25 11:18 | 4 | Al día |
-| San Pedro Sula | Los Andes | comisariato_los_andes_sps | 2026-10-21 11:18 | 100 | Atrasado |
-| Tegucigalpa | La Colonia | la_colonia_tgu | 2026-10-25 11:39 | 4 | Al día |
-| Tegucigalpa | Walmart | walmart_tgu_ffaa | 2026-10-25 11:32 | 4 | Al día |
-| Tegucigalpa | Walmart | walmart_tgu_el_sauce | 2026-10-25 11:40 | 4 | Al día |
-| Tegucigalpa | PriceSmart | pricesmart_tgu | 2026-10-25 11:18 | 4 | Al día |
-| Tegucigalpa | Paiz | paiz_tgu_multiplaza | 2026-10-25 11:22 | 4 | Al día |
-| Tegucigalpa | Paiz | paiz_tgu_proceres | 2026-10-25 11:26 | 4 | Al día |
+| San Pedro Sula | La Colonia | la_colonia_sps | 2026-10-25 11:28 | 9 | Al día |
+| San Pedro Sula | Colonial | colonial_sps | 2026-10-25 11:26 | 9 | Al día |
+| San Pedro Sula | Walmart | walmart_sps | 2026-10-25 11:25 | 9 | Al día |
+| San Pedro Sula | PriceSmart | pricesmart_sps | 2026-10-25 11:18 | 9 | Al día |
+| San Pedro Sula | Los Andes | comisariato_los_andes_sps | 2026-10-21 11:18 | 105 | Atrasado |
+| Tegucigalpa | La Colonia | la_colonia_tgu | 2026-10-25 11:39 | 9 | Al día |
+| Tegucigalpa | Walmart | walmart_tgu_ffaa | 2026-10-25 11:32 | 9 | Al día |
+| Tegucigalpa | Walmart | walmart_tgu_el_sauce | 2026-10-25 11:40 | 9 | Al día |
+| Tegucigalpa | PriceSmart | pricesmart_tgu | 2026-10-25 11:18 | 9 | Al día |
+| Tegucigalpa | Paiz | paiz_tgu_multiplaza | 2026-10-25 11:22 | 9 | Al día |
+| Tegucigalpa | Paiz | paiz_tgu_proceres | 2026-10-25 11:26 | 9 | Al día |
 
 ## Fotos de producto
 
