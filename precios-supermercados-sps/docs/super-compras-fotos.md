@@ -20,7 +20,7 @@ Mientras dura la migración, el catálogo usa la foto v2 si existe y si no la v1
 ## Flujo diario
 
 1. **Precios SPS - Fotos de producto** (`contents: read`, secretos de Turso de sólo
-   lectura, sin llaves de R2) corre a las 14:29 de Honduras o a mano.
+   lectura, sin llaves de R2) corre a las 02:29 y 14:29 de Honduras o a mano.
    `scripts/actualizar_fotos_productos.py`:
    - lee el catálogo publicado de **todas las ciudades** (`cities.json`) y une las
      filas del mismo producto;
@@ -60,8 +60,10 @@ Mientras dura la migración, el catálogo usa la foto v2 si existe y si no la v1
 
 ## Límites
 
-- Hasta 8 000 productos y 20 000 descargas por corrida; 1 s entre llamadas a los
-  sitios y 0,15 s entre fotos. Se procesan primero las filas con más súper.
+- Hasta 12 000 productos y 30 000 descargas por corrida (dos corridas al día: el
+  catálogo completo se cubre en unos tres días; después sólo se procesa lo nuevo o
+  lo que cambió); 1 s entre llamadas a los sitios y 0,15 s entre fotos. Se procesan
+  primero las filas con más súper.
 - Una fila con algún súper que no respondió ese día se pospone.
 - Productos sin foto en ningún súper siguen con ilustración.
 
@@ -71,6 +73,12 @@ Cada corrida publica `fotos/v2/revision/latest.html`: las 120 fotos elegidas con
 menor puntaje, una muestra de 80 y productos sin foto aceptable, con los datos de
 cada candidata (súper, puntaje, nivel, píxeles útiles, factor de detalle, tamaño y
 enlace a la foto original).
+
+## Informe
+
+La auditoría de calidad (tres veces al día) publica en la rama `calidad-datos` la
+cobertura de fotos por ciudad y supermercado (`fotos.csv` y sección "Fotos de
+producto" del README) con los niveles hd/sd/low leídos del índice del bucket.
 
 ## Retiro
 

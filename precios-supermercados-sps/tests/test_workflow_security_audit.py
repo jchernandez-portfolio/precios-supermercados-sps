@@ -559,7 +559,7 @@ def test_product_images_weekly_is_authorized_bounded_and_read_only() -> None:
     workflow = base.load_workflow(path)
     assert workflow["permissions"] == {"contents": "read"}
     assert set(workflow["on"]) == {"schedule", "workflow_dispatch"}
-    assert workflow["on"]["schedule"] == [{"cron": "29 20 * * *"}]
+    assert workflow["on"]["schedule"] == [{"cron": "29 8,20 * * *"}]
     assert workflow["concurrency"] == {"group": "precios-sps-product-images", "cancel-in-progress": "false"}
     job = base.jobs(workflow)["photos"]
     assert set(base.jobs(workflow)) == {"photos"}
@@ -568,12 +568,12 @@ def test_product_images_weekly_is_authorized_bounded_and_read_only() -> None:
         "&& github.ref == 'refs/heads/main' }}"
     )
     assert "permissions" not in job and "environment" not in job
-    assert job["timeout-minutes"] == "240"
+    assert job["timeout-minutes"] == "300"
     raw = path.read_text(encoding="utf-8")
     assert "scripts/actualizar_fotos_productos.py" in raw
     assert "--authorization .automation/product-images-capture-authorization.json" in raw
-    assert "--max-products 8000" in raw and "--api-delay 1.0" in raw
-    assert "--image-delay 0.15" in raw and "--max-image-requests 20000" in raw
+    assert "--max-products 12000" in raw and "--api-delay 1.0" in raw
+    assert "--image-delay 0.15" in raw and "--max-image-requests 30000" in raw
     assert "requests==2.34.2 numpy==2.3.3 Pillow==11.3.0" in raw
     assert "actions/upload-artifact@" in raw and "product-images-${{ github.run_id }}" in raw
     assert "43 7 * * *" not in raw and "23 10 * * 0" not in raw and "37 16 * * 6" not in raw
@@ -585,8 +585,8 @@ def test_product_images_weekly_is_authorized_bounded_and_read_only() -> None:
     assert authorization["schema"] == "precios-sps-product-images-authorization/v1"
     assert authorization["live_read_only_authorized"] is True
     assert authorization["approved_by"] == "project_owner"
-    assert authorization["max_products_per_run"] >= 8000
-    assert authorization["max_image_requests_per_run"] >= 20000
+    assert authorization["max_products_per_run"] >= 12000
+    assert authorization["max_image_requests_per_run"] >= 30000
     assert authorization["publication_target"] == "r2:super-compras-fotos"
     assert authorization["min_api_delay_seconds"] <= 1.0
     assert authorization["concurrency"] == 1

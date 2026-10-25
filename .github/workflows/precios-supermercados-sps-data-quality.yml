@@ -7,6 +7,7 @@ name: Precios SPS - Auditoría de calidad de datos
 #   errores_confirmados.csv   copia del registro manual docs/calidad/errores-confirmados.csv
 #   historial.csv             cuántos errores había en cada publicación
 #   frescura.csv              última captura aceptada de cada súper, día a día
+#   fotos.csv                 cobertura de fotos por ciudad y súper, día a día
 # Sólo lee datos públicos ya publicados; no consulta Turso ni supermercados y no
 # ejecuta contenido de las ramas de datos.
 
@@ -65,13 +66,22 @@ jobs:
           path: calidad
           fetch-depth: 1
 
+      - name: Leer índice público de fotos v2 (opcional)
+        run: |
+          set -uo pipefail
+          # Bucket público R2 de fotos; si falla, el informe sale sin niveles hd/sd/low.
+          curl --fail --silent --show-error --location --max-time 60 \
+            --output /tmp/fotos-index.json \
+            https://pub-0dcb2204775c484dbe6681e659eee236.r2.dev/fotos/v2/index.json \
+            || rm -f /tmp/fotos-index.json
+
       - name: Auditar catálogo
         run: |
           set -euo pipefail
           node --version
           rm -rf /tmp/calidad
           node source/precios-supermercados-sps/scripts/auditar_calidad_catalogo.mjs \
-            --data data --previous calidad --out /tmp/calidad
+            --data data --previous calidad --out /tmp/calidad --photos-index /tmp/fotos-index.json
 
       - name: Publicar en un solo commit y push
         env:
@@ -79,15 +89,15 @@ jobs:
         run: |
           set -euo pipefail
           repository="$GITHUB_WORKSPACE/calidad"
-          for name in README.md errores_detectados.csv errores_confirmados.csv historial.csv frescura.csv; do
+          for name in README.md errores_detectados.csv errores_confirmados.csv historial.csv frescura.csv fotos.csv; do
             if [ -L "$repository/$name" ]; then echo "calidad_symlink_boundary_invalid:$name" >&2; exit 1; fi
           done
           cp /tmp/calidad/resumen.md "$repository/README.md"
-          cp /tmp/calidad/errores_detectados.csv /tmp/calidad/historial.csv /tmp/calidad/frescura.csv "$repository/"
+          cp /tmp/calidad/errores_detectados.csv /tmp/calidad/historial.csv /tmp/calidad/frescura.csv /tmp/calidad/fotos.csv "$repository/"
           cp source/precios-supermercados-sps/docs/calidad/errores-confirmados.csv "$repository/errores_confirmados.csv"
           git -C "$repository" config user.name "github-actions[bot]"
           git -C "$repository" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git -C "$repository" add -A -- README.md errores_detectados.csv errores_confirmados.csv historial.csv frescura.csv
+          git -C "$repository" add -A -- README.md errores_detectados.csv errores_confirmados.csv historial.csv frescura.csv fotos.csv
           if git -C "$repository" diff --cached --quiet; then
             echo "calidad_already_current=true"
             exit 0

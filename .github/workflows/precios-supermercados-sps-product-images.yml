@@ -1,7 +1,7 @@
 name: Precios SPS - Fotos de producto
 
-# Corrida diaria incremental de fotos para Súper Compras (ambas ciudades, 800 y
-# 320 px). Autorizada por el responsable del proyecto en
+# Dos corridas diarias incrementales de fotos para Súper Compras (ambas ciudades,
+# 800 y 320 px) hasta cubrir todo el catálogo; después sólo procesan lo nuevo. Autorizada por el responsable del proyecto en
 # precios-supermercados-sps/.automation/product-images-capture-authorization.json.
 # Lee el catálogo público ya publicado, resuelve llaves exactas en Turso (sólo
 # lectura), pide las direcciones de foto a los endpoints públicos de cada súper y
@@ -10,7 +10,7 @@ name: Precios SPS - Fotos de producto
 
 on:
   schedule:
-    - cron: "29 20 * * *" # 14:29 America/Tegucigalpa, después del corte y sus reintentos
+    - cron: "29 8,20 * * *" # 02:29 y 14:29 America/Tegucigalpa, lejos del corte y sus reintentos
   workflow_dispatch:
 
 permissions:
@@ -24,12 +24,13 @@ jobs:
   photos:
     if: ${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 300
     defaults:
       run:
         working-directory: precios-supermercados-sps
     env:
       PYTHONPATH: ${{ github.workspace }}/precios-supermercados-sps/src
+      PYTHONUNBUFFERED: "1" # el avance se ve en el log mientras corre (dura horas)
 
     steps:
       - name: Descargar revisión inmutable
@@ -60,10 +61,10 @@ jobs:
           python scripts/actualizar_fotos_productos.py \
             --authorization .automation/product-images-capture-authorization.json \
             --output-dir run-artifacts/product-images \
-            --max-products 8000 \
+            --max-products 12000 \
             --api-delay 1.0 \
             --image-delay 0.15 \
-            --max-image-requests 20000
+            --max-image-requests 30000
 
       - name: Guardar fotos nuevas e índice
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
