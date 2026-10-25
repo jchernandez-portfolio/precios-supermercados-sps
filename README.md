@@ -1,6 +1,6 @@
 # Errores de datos en Súper Compras
 
-Actualizado automáticamente el 2026-10-24 a partir del catálogo publicado (San Pedro Sula: 2026-10-24T20:57:28.608185Z; Tegucigalpa: 2026-10-24T21:00:42.612085Z).
+Actualizado automáticamente el 2026-10-25 a partir del catálogo publicado (San Pedro Sula: 2026-10-24T20:57:28.608185Z; Tegucigalpa: 2026-10-24T21:00:42.612085Z).
 
 - [`errores_detectados.csv`](errores_detectados.csv): todo lo que la revisión automática encuentra hoy, una fila por producto y supermercado, con enlace al producto.
 - [`errores_confirmados.csv`](errores_confirmados.csv): errores revisados a mano, de dónde vienen (súper o Súper Compras) y su estado.
