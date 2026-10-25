@@ -297,6 +297,7 @@ async function loadCities(base) {
   for (const city of index.cities) {
     const catalog = new Catalog(base + city.manifest);
     await catalog.load();
+    await catalog.loadIndex();
     cities.push({ name: city.name, slug: city.slug, as_of: catalog.asOf, catalog, products: catalog.products });
   }
   return cities;
