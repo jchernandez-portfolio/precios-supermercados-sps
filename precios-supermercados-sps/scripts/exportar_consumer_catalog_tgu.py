@@ -269,7 +269,7 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--require-products", action="store_true")
     # Fotos de Súper Compras: mismo índice que SPS (la fila pública tiene la misma
     # clave cuando el producto es el mismo); opcional y sin efecto si falta.
-    result.add_argument("--images-index", type=Path)
+    result.add_argument("--images-index", type=Path, action="append", default=[])
     return result
 
 

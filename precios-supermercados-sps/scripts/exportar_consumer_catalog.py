@@ -438,24 +438,46 @@ SEARCH_COLUMNS = (
     "partition", "best_price", "unit_amount", "unit_per", "retailers", "promo",
     "other_presentations", "comparability", "photo",
 )
-# id = hash del row_id sin prefijo; comparabilidad en una letra; photo = versión
-# de la foto en la rama ``product-images`` (0 = sin foto, la app dibuja la ilustración).
+# id = hash del row_id sin prefijo; comparabilidad en una letra; photo = foto del
+# producto: huella de 10 caracteres de la versión 2 (R2, 800 y 320 px), número de
+# versión de la rama ``product-images`` (v1, 400 px) o 0 (la app dibuja la ilustración).
 PHOTO_INDEX_SCHEMA = "super-compras-product-images/v1"
-_PHOTO_VERSIONS: dict[str, int] = {}
+PHOTO_INDEX_SCHEMA_V2 = "super-compras-product-images/v2"
+_PHOTO_VERSIONS: dict[str, int | str] = {}
 _COMPARABILITY_CODES = {"comparable": "c", "single_source": "s", "individual": "i"}
 
 
-def load_photo_versions(path: Path | None) -> dict[str, int]:
-    """Lee ``index.json`` de fotos; si falta o no cuadra, el catálogo sale sin fotos."""
+_PHOTO_HASH = re.compile(r"[0-9a-f]{10}")
+
+
+def load_photo_versions(path: Path | None | Sequence[Path | None]) -> dict[str, int | str]:
+    """Lee los ``index.json`` de fotos; si falta o no cuadra, el catálogo sale sin fotos.
+
+    Acepta varios índices: el último gana. Así la versión 2 (R2) reemplaza a la 1
+    producto por producto mientras dura la migración.
+    """
+    if isinstance(path, (list, tuple)):
+        merged: dict[str, int | str] = {}
+        for item in path:
+            merged.update(load_photo_versions(item))
+        return merged
     if path is None or not path.is_file():
         return {}
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
-    items = document.get("items") if isinstance(document, dict) and document.get("schema") == PHOTO_INDEX_SCHEMA else None
+    schema = document.get("schema") if isinstance(document, dict) else None
+    items = document.get("items") if schema in {PHOTO_INDEX_SCHEMA, PHOTO_INDEX_SCHEMA_V2} else None
     if not isinstance(items, dict):
         return {}
+    if schema == PHOTO_INDEX_SCHEMA_V2:
+        return {
+            str(key): value["h"]
+            for key, value in items.items()
+            if isinstance(value, dict) and not value.get("none") and isinstance(value.get("h"), str)
+            and _PHOTO_HASH.fullmatch(value["h"])
+        }
     return {
         str(key): value["v"]
         for key, value in items.items()
@@ -542,15 +564,15 @@ def attach_search_index(output_directory: Path, manifest: dict[str, object]) -> 
 def main(argv: Sequence[str] | None = None) -> int:
     # ``--images-index`` es opcional y propio de este envoltorio: el núcleo no lo ve.
     arguments = list(sys.argv[1:] if argv is None else argv)
-    images_index = None
-    if "--images-index" in arguments:
+    images_indexes: list[Path] = []
+    while "--images-index" in arguments:
         position = arguments.index("--images-index")
         if position + 1 >= len(arguments):
             raise SystemExit("--images-index requiere una ruta")
-        images_index = Path(arguments[position + 1])
+        images_indexes.append(Path(arguments[position + 1]))
         del arguments[position:position + 2]
     _PHOTO_VERSIONS.clear()
-    _PHOTO_VERSIONS.update(load_photo_versions(images_index))
+    _PHOTO_VERSIONS.update(load_photo_versions(images_indexes))
     argv = arguments
     _sync_core()
     previous_export = _core.export_consumer_catalog

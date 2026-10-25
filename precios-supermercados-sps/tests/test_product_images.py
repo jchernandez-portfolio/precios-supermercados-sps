@@ -134,15 +134,16 @@ def test_normalize_outputs_square_white_webp_with_product_centered() -> None:
     assert array[:10].min() >= 245 and array[:, :10].min() >= 245
     content = np.argwhere(array.min(axis=2) < 200)
     (y0, x0), (y1, x1) = content.min(axis=0), content.max(axis=0)
-    assert abs((x0 + x1) / 2 - 200) < 8 and abs((y0 + y1) / 2 - 200) < 8
-    assert max(x1 - x0, y1 - y0) == pytest.approx(pi.OUTPUT_SIZE * pi.OUTPUT_FILL, abs=6)
-    assert len(output) < 40_000
+    half = pi.OUTPUT_SIZE / 2
+    assert abs((x0 + x1) / 2 - half) < 12 and abs((y0 + y1) / 2 - half) < 12
+    assert max(x1 - x0, y1 - y0) == pytest.approx(pi.OUTPUT_SIZE * pi.OUTPUT_FILL, abs=12)
+    assert len(output) < 120_000
 
 
 def test_normalize_with_crop_removes_edge_strip() -> None:
     image = product(box=(250, 150, 590, 850), strip=(880, 250, 970, 760))
     item = scored("walmart", image)
-    result = np.asarray(Image.open(io.BytesIO(pi.normalize(image, item.metrics.main_bbox))).convert("RGB")).astype(int)
+    result = np.asarray(Image.open(io.BytesIO(pi.normalize(image, item.metrics.bbox))).convert("RGB")).astype(int)
     orange = (result[:, :, 0] > 230) & (result[:, :, 1] > 140) & (result[:, :, 1] < 200) & (result[:, :, 2] < 60)
     assert orange.sum() < 20
 
@@ -165,3 +166,87 @@ def test_load_image_rejects_garbage_and_flattens_transparency() -> None:
     rgba = Image.new("RGBA", (50, 50), (0, 0, 0, 0))
     loaded = pi.load_image(png(rgba))
     assert loaded.mode == "RGB" and loaded.getpixel((0, 0)) == (255, 255, 255)
+
+
+def clear_bottle(size: int = 1000, top: int = 120) -> Image.Image:
+    """Botella transparente: tapa azul, plástico casi blanco y etiqueta con puntos (caso Agua Zen)."""
+    image = Image.new("RGB", (size, size), (255, 255, 255))
+    draw = ImageDraw.Draw(image)
+    s = size / 1000
+    shift = top - 120
+    draw.rounded_rectangle((470 * s, (120 + shift) * s, 530 * s, (190 + shift) * s), radius=8 * s, fill=(30, 110, 210))
+    draw.rectangle((455 * s, (190 + shift) * s, 545 * s, (230 + shift) * s), outline=(225, 228, 232),
+                   width=max(1, int(3 * s)), fill=(250, 251, 252))
+    draw.rounded_rectangle((400 * s, (230 + shift) * s, 600 * s, (880 + shift) * s), radius=40 * s,
+                           outline=(222, 226, 230), width=max(1, int(4 * s)), fill=(249, 250, 251))
+    rng = np.random.default_rng(1)
+    for _ in range(500):
+        x, y, r = rng.uniform(410, 590) * s, (rng.uniform(440, 690) + shift) * s, rng.uniform(2, 6) * s
+        color = tuple(int(v) for v in rng.choice([[40, 160, 200], [120, 60, 160], [20, 40, 150]]))
+        draw.ellipse((x - r, y - r, x + r, y + r), fill=color)
+    return image
+
+
+def jpeg(image: Image.Image, quality: int = 88) -> bytes:
+    buffer = io.BytesIO()
+    image.save(buffer, format="JPEG", quality=quality)
+    return buffer.getvalue()
+
+
+def measured(image: Image.Image) -> pi.Metrics:
+    data = jpeg(image)
+    return pi.measure(pi.load_image(data), len(data))
+
+
+def blue_pixels(webp: bytes) -> int:
+    array = np.asarray(Image.open(io.BytesIO(webp)).convert("RGB")).astype(int)
+    return int(((array[:, :, 2] > 170) & (array[:, :, 0] < 90) & (array[:, :, 1] > 70) & (array[:, :, 1] < 150)).sum())
+
+
+def test_clear_bottle_keeps_cap_and_whole_body() -> None:
+    """Antes la tapa se tomaba por franja y se recortaba: sólo quedaba la etiqueta."""
+    image = clear_bottle()
+    metrics = measured(image)
+    x0, y0, x1, y1 = metrics.bbox
+    assert y0 < 0.13 and y1 > 0.86, metrics.bbox
+    assert metrics.strip_extra == 0.0 and metrics.main_bbox is None
+    rendered = pi.render(image, metrics.bbox)
+    assert blue_pixels(rendered[800]) > 1500
+    # El plástico casi blanco del interior se conserva (no se pinta de blanco).
+    array = np.asarray(Image.open(io.BytesIO(rendered[800])).convert("RGB")).astype(int)
+    outline = (array.min(axis=2) < 236) & (array.min(axis=2) > 180) & (array.max(axis=2) - array.min(axis=2) < 20)
+    assert outline.sum() > 800
+
+
+def test_cap_touching_the_top_is_never_cropped() -> None:
+    metrics = measured(clear_bottle(top=4))
+    assert metrics.bbox[1] < 0.02
+    assert blue_pixels(pi.render(clear_bottle(top=4), metrics.bbox)[800]) > 1500
+
+
+def test_upscaled_photo_is_detected_and_loses_to_a_sharp_one() -> None:
+    sharp = clear_bottle()
+    upscaled = sharp.resize((330, 330), Image.Resampling.LANCZOS).resize((1000, 1000), Image.Resampling.BICUBIC)
+    sharp_metrics, upscaled_metrics = measured(sharp), measured(upscaled)
+    assert sharp_metrics.effective == 1.0 and sharp_metrics.quality == "hd"
+    assert upscaled_metrics.effective <= 0.5 and upscaled_metrics.quality != "hd"
+    candidates = [
+        pi.Candidate("colonial", 0, "https://cdn.shopify.com/a.jpg", True),
+        pi.Candidate("la_colonia", 0, "https://lacolonia.vteximg.com.br/a.jpg", True),
+    ]
+    scored_items = []
+    for candidate, metrics in zip(candidates, (upscaled_metrics, sharp_metrics)):
+        value, flags = pi.score(candidate, metrics)
+        scored_items.append(pi.Scored(candidate, metrics, value, flags))
+    assert "agrandada" in scored_items[0].flags
+    # Colonial gana los empates, pero no con una foto agrandada contra una nítida.
+    assert pi.choose(scored_items).candidate.supermarket_id == "la_colonia"
+
+
+def test_render_outputs_both_sizes_as_small_webp() -> None:
+    rendered = pi.render(product())
+    assert set(rendered) == {800, 320}
+    for size, data in rendered.items():
+        image = Image.open(io.BytesIO(data))
+        assert image.format == "WEBP" and image.size == (size, size)
+    assert len(rendered[800]) < 120_000 and len(rendered[320]) < 40_000

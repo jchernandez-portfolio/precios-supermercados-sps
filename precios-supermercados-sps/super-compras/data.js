@@ -417,14 +417,37 @@ async function sha256Hex(buffer) {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-// Fotos normalizadas (WebP 400×400, fondo blanco) en la rama pública product-images.
+// Fotos v2: WebP de 800 y 320 px en el bucket público de Cloudflare R2. El nombre
+// lleva la huella del contenido (nunca cambia: caché de un año).
+export const PHOTO_BASE_V2 = "https://pub-0dcb2204775c484dbe6681e659eee236.r2.dev/fotos/v2/";
+// Fotos v1 (WebP 400 px) en la rama product-images, mientras termina la migración.
 export const PHOTO_BASE = "https://raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/product-images/img/";
+export const PHOTO_SIZES = [320, 800];
 
-export function photoUrl(product) {
+// photo: huella v2 ("a1b2c3d4e5"), número de versión v1 o 0 (sin foto).
+export function photoUrl(product, size = 320) {
   const id = String(product?.id ?? "");
-  const version = Number(product?.photo) || 0;
-  if (!version || !/^[0-9a-z_-]{3,}$/.test(id)) return null;
+  if (!/^[0-9a-z_-]{3,}$/.test(id)) return null;
+  const photo = product?.photo;
+  if (typeof photo === "string" && /^[0-9a-f]{10}$/.test(photo)) {
+    const side = PHOTO_SIZES.includes(size) ? size : 320;
+    return `${PHOTO_BASE_V2}${side}/${id.slice(0, 2)}/${id}-${photo}.webp`;
+  }
+  const version = Number(photo) || 0;
+  if (!version) return null;
   return `${PHOTO_BASE}${id.slice(0, 2)}/${id}.webp?v=${version}`;
+}
+
+// srcset con los dos tamaños (sólo v2); null si la foto es v1 o no hay.
+export function photoSrcset(product) {
+  if (typeof product?.photo !== "string") return null;
+  const urls = PHOTO_SIZES.map((size) => photoUrl(product, size));
+  return urls.every(Boolean) ? urls.map((url, index) => `${url} ${PHOTO_SIZES[index]}w`).join(", ") : null;
+}
+
+function photoValue(value) {
+  if (typeof value === "string" && /^[0-9a-f]{10}$/.test(value)) return value;
+  return Number(value) || 0;
 }
 
 // id público = row_id sin su prefijo ("source-…", "canonical-…").
@@ -474,7 +497,7 @@ export class Catalog {
         retailers: (row[column.retailers] || []).map((index) => search.retailers[index]),
         promo: row[column.promo] === 1, other_count: row[column.other_presentations] || 0,
         comparability: row[column.comparability],
-        photo: column.photo === undefined ? 0 : Number(row[column.photo]) || 0,
+        photo: column.photo === undefined ? 0 : photoValue(row[column.photo]),
       };
       product.text = fold([product.brand, product.product_name, product.presentation, product.product_type].join(" "));
       return product;

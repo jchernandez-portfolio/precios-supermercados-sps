@@ -77,9 +77,19 @@ base.ALLOWED_SECRET_REFERENCES[base.PRODUCT_IMAGES_WORKFLOW] = {
 }
 base.EXPECTED_PERMISSIONS[base.PRODUCT_IMAGES_SYNC_WORKFLOW] = {
     "actions": "read",
-    "contents": "write",
+    "contents": "read",
 }
 base.EXPECTED_TRIGGERS[base.PRODUCT_IMAGES_SYNC_WORKFLOW] = {"workflow_run"}
+R2_SECRETS = {"R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"}
+base.ALLOWED_SECRET_REFERENCES[base.PRODUCT_IMAGES_SYNC_WORKFLOW] = set(R2_SECRETS)
+base.ALLOWED_VAR_REFERENCES[base.PRODUCT_IMAGES_SYNC_WORKFLOW] = {"R2_PUBLIC_BASE_URL"}
+PRODUCT_IMAGES_SYNC_CHECKOUT = {
+    "ref": "${{ github.event.workflow_run.head_sha }}",
+    "path": "source",
+    "sparse-checkout": "precios-supermercados-sps/scripts/subir_fotos_r2.py",
+    "sparse-checkout-cone-mode": "false",
+    "persist-credentials": "false",
+}
 base.DATA_QUALITY_WORKFLOW = "precios-supermercados-sps-data-quality.yml"
 base.EXPECTED_PERMISSIONS[base.DATA_QUALITY_WORKFLOW] = {"contents": "write"}
 base.EXPECTED_TRIGGERS[base.DATA_QUALITY_WORKFLOW] = {"schedule", "workflow_run", "workflow_dispatch"}
@@ -111,12 +121,9 @@ def _checkout_identity_with_derived_workflows() -> None:
             }
             continue
         if path.name == base.PRODUCT_IMAGES_SYNC_WORKFLOW:
+            # Sólo el script de subida de la misma revisión, sin credenciales.
             assert len(checkout_steps) == 1
-            assert checkout_steps[0]["with"] == {
-                "ref": "product-images",
-                "path": "product-images",
-                "fetch-depth": "1",
-            }
+            assert checkout_steps[0]["with"] == PRODUCT_IMAGES_SYNC_CHECKOUT
             continue
         if path.name == base.DATA_QUALITY_WORKFLOW:
             # Código de main sin credenciales; ramas de datos sólo como archivos; sólo
@@ -552,7 +559,7 @@ def test_product_images_weekly_is_authorized_bounded_and_read_only() -> None:
     workflow = base.load_workflow(path)
     assert workflow["permissions"] == {"contents": "read"}
     assert set(workflow["on"]) == {"schedule", "workflow_dispatch"}
-    assert workflow["on"]["schedule"] == [{"cron": "29 17 * * 3"}]
+    assert workflow["on"]["schedule"] == [{"cron": "29 20 * * *"}]
     assert workflow["concurrency"] == {"group": "precios-sps-product-images", "cancel-in-progress": "false"}
     job = base.jobs(workflow)["photos"]
     assert set(base.jobs(workflow)) == {"photos"}
@@ -561,46 +568,53 @@ def test_product_images_weekly_is_authorized_bounded_and_read_only() -> None:
         "&& github.ref == 'refs/heads/main' }}"
     )
     assert "permissions" not in job and "environment" not in job
-    assert job["timeout-minutes"] == "180"
+    assert job["timeout-minutes"] == "240"
     raw = path.read_text(encoding="utf-8")
     assert "scripts/actualizar_fotos_productos.py" in raw
     assert "--authorization .automation/product-images-capture-authorization.json" in raw
-    assert "--max-products 4000" in raw and "--api-delay 1.0" in raw
-    assert "--image-delay 0.15" in raw and "--max-image-requests 12000" in raw
+    assert "--max-products 8000" in raw and "--api-delay 1.0" in raw
+    assert "--image-delay 0.15" in raw and "--max-image-requests 20000" in raw
     assert "requests==2.34.2 numpy==2.3.3 Pillow==11.3.0" in raw
     assert "actions/upload-artifact@" in raw and "product-images-${{ github.run_id }}" in raw
     assert "43 7 * * *" not in raw and "23 10 * * 0" not in raw and "37 16 * * 6" not in raw
     for forbidden in ("pull_request:", "pull_request_target:", "issue_comment:", "id-token",
-                      "contents: write", "actions: write", "vars.", "git push"):
+                      "contents: write", "actions: write", "vars.", "git push", "R2_"):
         assert forbidden not in raw, forbidden
 
     authorization = json.loads((base.REPO_ROOT / base.PRODUCT_IMAGES_AUTHORIZATION).read_text(encoding="utf-8"))
     assert authorization["schema"] == "precios-sps-product-images-authorization/v1"
     assert authorization["live_read_only_authorized"] is True
     assert authorization["approved_by"] == "project_owner"
-    assert authorization["max_products_per_run"] >= 4000
-    assert authorization["max_image_requests_per_run"] >= 12000
+    assert authorization["max_products_per_run"] >= 8000
+    assert authorization["max_image_requests_per_run"] >= 20000
+    assert authorization["publication_target"] == "r2:super-compras-fotos"
     assert authorization["min_api_delay_seconds"] <= 1.0
     assert authorization["concurrency"] == 1
 
 
-def test_product_images_sync_publishes_validated_artifact_without_secrets() -> None:
+def test_product_images_sync_uploads_validated_artifact_with_only_bucket_credentials() -> None:
     path = base.WORKFLOW_DIR / base.PRODUCT_IMAGES_SYNC_WORKFLOW
     workflow = base.load_workflow(path)
-    assert workflow["permissions"] == {"actions": "read", "contents": "write"}
+    assert workflow["permissions"] == {"actions": "read", "contents": "read"}
     assert workflow["on"] == {
-        "workflow_run": {"workflows": ["Precios SPS - Fotos de producto semanal"], "types": ["completed"]}
+        "workflow_run": {"workflows": ["Precios SPS - Fotos de producto"], "types": ["completed"]}
     }
     assert workflow["concurrency"] == {"group": "precios-sps-product-images-sync", "cancel-in-progress": "false"}
     sync = base.jobs(workflow)["sync"]
+    assert set(base.jobs(workflow)) == {"sync"}
     assert "github.event.workflow_run.conclusion == 'success'" in sync["if"]
     assert "github.event.workflow_run.head_branch == 'main'" in sync["if"]
     raw = path.read_text(encoding="utf-8")
-    assert base.secret_references(path) == set()
+    assert base.secret_references(path) == R2_SECRETS
     assert "product-images-${{ github.event.workflow_run.id }}" in raw
-    assert "product_images_path_invalid" in raw and "product_images_file_invalid" in raw
-    assert "git -C \"$repository\" push origin HEAD:product-images" in raw
-    for forbidden in ("TURSO", "pip install", "python scripts/", "pull_request", "id-token", "vars."):
+    assert "python -m pip install --disable-pip-version-check boto3==1.40.55" in raw
+    assert "source/precios-supermercados-sps/scripts/subir_fotos_r2.py" in raw
+    # Las llaves sólo existen en el paso que sube.
+    upload = next(step for step in base.steps(workflow) if "subir_fotos_r2.py" in str(step.get("run", "")))
+    assert set(upload["env"]) >= R2_SECRETS
+    others = [step for step in base.steps(workflow) if step is not upload]
+    assert not any("secrets." in str(step) for step in others)
+    for forbidden in ("TURSO", "pull_request", "id-token", "contents: write", "git push", "actions: write"):
         assert forbidden not in raw, forbidden
 
 
