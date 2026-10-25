@@ -326,7 +326,7 @@ console.log(JSON.stringify({
     assert "img-src 'self' data: https://raw.githubusercontent.com https://pub-0dcb2204775c484dbe6681e659eee236.r2.dev;" in html
     app = (APP_DIR / "app.js").read_text(encoding="utf-8")
     assert 'image.addEventListener("error", () => image.replaceWith(productIllustration(' in app
-    assert 'image.crossOrigin = "anonymous"' in app and 'image.loading = sizes ? "eager" : "lazy"' in app
+    assert "crossOrigin" not in app and 'image.loading = sizes ? "eager" : "lazy"' in app
     assert "mix-blend-mode: multiply" in (APP_DIR / "styles.css").read_text(encoding="utf-8")
 
 

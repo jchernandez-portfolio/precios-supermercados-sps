@@ -39,7 +39,9 @@ Mientras dura la migración, el catálogo usa la foto v2 si existe y si no la v1
 3. La publicación del catálogo lee los dos índices y llena la columna `photo` de
    `search.json`: huella v2, versión v1 o 0.
 4. La app usa 320 px en tarjetas y deja que el navegador elija 320 u 800 px en el
-   detalle (`srcset`); si no hay foto o falla, dibuja la ilustración.
+   detalle (`srcset`); si no hay foto o falla, dibuja la ilustración. Las fotos se
+   piden sin CORS (el bucket no lo envía); el navegador las guarda un año por
+   `Cache-Control` y el service worker guarda sólo las respuestas que puede leer.
 
 ## Criterios de calidad (versión 2, 2026-10-25)
 
