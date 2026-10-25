@@ -89,7 +89,9 @@ def parse_catalog_rows(document: Mapping[str, object]) -> list[CatalogRow]:
         for offer in row.get("offers") or ():
             if not isinstance(offer, Mapping):
                 continue
+            # SPS: "walmart:51"; Tegucigalpa agrega la sucursal: "la_colonia:24@la_colonia_tgu".
             supermarket, _, product = str(offer.get("source_product_id") or "").partition(":")
+            product = product.split("@", 1)[0]
             if supermarket and product.isdigit() and (supermarket, int(product)) not in offers:
                 offers.append((supermarket, int(product)))
         if offers:
