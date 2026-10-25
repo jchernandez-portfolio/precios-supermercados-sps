@@ -25,7 +25,7 @@ La app vive en [`super-compras/`](super-compras/) y se publica en el sitio del p
 - **Producto:** el mismo artículo en cada supermercado, con el más barato marcado y otras presentaciones para comparar.
 - **Mi compra:** la lista completa con su costo en cada supermercado y comprando cada cosa donde está más barata. Se guarda en el dispositivo.
 
-La app solo lee archivos estáticos ya publicados (`portfolio-data`, `product-images`). No consulta Turso ni sitios de supermercados desde el navegador, no pide cuenta ni datos personales y tiene una política de seguridad de contenido estricta. La carga inicial pesa ~48 KB (~9 KB gzip, 2 requests); el catálogo se baja por partes bajo demanda.
+La app solo lee archivos estáticos ya publicados (`portfolio-data`, `product-images`). No consulta Turso ni sitios de supermercados desde el navegador, no pide cuenta ni datos personales y tiene una política de seguridad de contenido estricta. La carga inicial pesa ~48 KB (~9 KB gzip, 2 requests) más la portada del catálogo (`home.json`, ~11 KB gzip); el índice de búsqueda (~1.4 MB gzip) baja en segundo plano y las fichas por partición bajo demanda.
 
 `b2c/` contiene la versión anterior ("Compra Inteligente") y ya no se enlaza desde el portafolio.
 

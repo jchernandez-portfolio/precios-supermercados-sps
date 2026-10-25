@@ -354,8 +354,8 @@ function repairCandidates(product, size, ratio) {
   return out;
 }
 
-export function hideImplausible(products) {
-  const medians = unitPriceMedians(products);
+export function hideImplausible(products, medians = null) {
+  medians = medians || unitPriceMedians(products);
   for (const product of products) {
     const size = parsedSize(product.presentation);
     if (size && (CAPACITY_DEPARTMENTS.has(fold(product.category)) || CAPACITY_TYPES.has(fold(product.product_type)))) {
@@ -475,36 +475,57 @@ export class Catalog {
     return JSON.parse(new TextDecoder().decode(buffer));
   }
 
+  // Carga el manifest y la portada (home.json: ofertas, más comparados, departamentos,
+  // ≈11 KB). El índice completo (≈1.4 MB) se pide aparte con loadIndex(); un catálogo
+  // viejo sin portada lo carga aquí mismo.
   async load() {
     const response = await fetch(this.manifestUrl, { cache: "no-cache" });
     if (!response.ok) throw new Error(`No se pudo cargar el catálogo (${response.status})`);
     this.manifest = await response.json();
     if (this.manifest.schema !== "rpi-consumer-catalog-manifest/v3") throw new Error("Versión de catálogo no compatible");
     this.files = new Map((this.manifest.files || []).map((item) => [item.path, item]));
-    const searchFile = this.manifest.search_file;
-    if (!searchFile || !this.files.has(searchFile)) throw new Error("El catálogo publicado todavía no trae índice de búsqueda");
-    const search = await this.fetchJson(searchFile);
-    if (search.schema !== "rpi-consumer-search/v1") throw new Error("Índice de búsqueda no compatible");
-    const column = Object.fromEntries(search.columns.map((name, index) => [name, index]));
-    this.retailers = search.retailers;
-    this.partitions = search.partitions;
-    this.products = search.rows.map((row) => {
-      const product = {
-        id: row[column.id], product_name: row[column.product_name], brand: row[column.brand],
-        presentation: row[column.presentation], category: row[column.category], product_type: row[column.product_type],
-        partition: search.partitions[row[column.partition]], best_price: row[column.best_price],
-        unit_amount: row[column.unit_amount], unit_per: row[column.unit_per],
-        retailers: (row[column.retailers] || []).map((index) => search.retailers[index]),
-        promo: row[column.promo] === 1, other_count: row[column.other_presentations] || 0,
-        comparability: row[column.comparability],
-        photo: column.photo === undefined ? 0 : photoValue(row[column.photo]),
-      };
-      product.text = fold([product.brand, product.product_name, product.presentation, product.product_type].join(" "));
-      return product;
-    });
+    if (!this.manifest.search_file || !this.files.has(this.manifest.search_file)) throw new Error("El catálogo publicado todavía no trae índice de búsqueda");
+    this.ready = false;
+    this.products = [];
+    this.byId = new Map();
+    const homeFile = this.manifest.home_file;
+    if (!homeFile || !this.files.has(homeFile)) {
+      await this.loadIndex();
+      return this;
+    }
+    const home = await this.fetchJson(homeFile);
+    if (home.schema !== "rpi-consumer-home/v1") throw new Error("Portada del catálogo no compatible");
+    this.retailers = home.retailers;
+    this.partitions = home.partitions;
+    this.rowCount = home.row_count;
+    this.homeDepartments = home.departments || [];
+    this.unitBasis = home.unit_basis || {};
+    this.unitMedians = new Map(Object.entries(home.unit_medians || {}));
+    const rows = this.materialize(home);
+    this.home = {
+      deals: (home.sections?.deals || []).map((id) => rows.get(id)).filter(Boolean),
+      compared: (home.sections?.compared || []).map((id) => rows.get(id)).filter(Boolean),
+    };
+    return this;
+  }
+
+  // Índice completo (search.json), una sola vez.
+  loadIndex() {
+    if (!this.indexPromise) {
+      this.indexPromise = this.readIndex().catch((error) => { this.indexPromise = null; throw error; });
+    }
+    return this.indexPromise;
+  }
+
+  async readIndex() {
+    const document = await this.fetchJson(this.manifest.search_file);
+    if (document.schema !== "rpi-consumer-search/v1") throw new Error("Índice de búsqueda no compatible");
+    this.retailers = document.retailers;
+    this.partitions = document.partitions;
+    const products = [...this.materialize(document, { finish: false }).values()];
     // Base de precio unitario más común por tipo (para tamaños leídos del nombre).
     const bases = new Map();
-    for (const product of this.products) {
+    for (const product of products) {
       if (!product.unit_per || !product.product_type) continue;
       const counts = bases.get(product.product_type) || new Map();
       counts.set(product.unit_per, (counts.get(product.unit_per) || 0) + 1);
@@ -514,13 +535,48 @@ export class Catalog {
       const counts = bases.get(type);
       return counts ? [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0] : null;
     };
-    for (const product of this.products) Object.assign(product, displayFields(product, basisOf(product.product_type)));
-    hideImplausible(this.products);
-    this.byId = new Map(this.products.map((product) => [product.id, product]));
+    for (const product of products) Object.assign(product, displayFields(product, basisOf(product.product_type)));
+    hideImplausible(products);
+    this.products = products;
+    this.rowCount = products.length;
+    this.byId = new Map(products.map((product) => [product.id, product]));
+    this.ready = true;
     return this;
   }
 
+  // Filas del índice (o de la portada) a productos. Con finish, aplica campos de
+  // muestra y esconde medidas imposibles con las medianas que trae la portada.
+  materialize(document, { finish = true } = {}) {
+    const column = Object.fromEntries(document.columns.map((name, index) => [name, index]));
+    const products = (document.rows || []).map((row) => {
+      const product = {
+        id: row[column.id], product_name: row[column.product_name], brand: row[column.brand],
+        presentation: row[column.presentation], category: row[column.category], product_type: row[column.product_type],
+        partition: document.partitions[row[column.partition]], best_price: row[column.best_price],
+        unit_amount: row[column.unit_amount], unit_per: row[column.unit_per],
+        retailers: (row[column.retailers] || []).map((index) => document.retailers[index]),
+        promo: row[column.promo] === 1, other_count: row[column.other_presentations] || 0,
+        comparability: row[column.comparability],
+        photo: column.photo === undefined ? 0 : photoValue(row[column.photo]),
+      };
+      product.text = fold([product.brand, product.product_name, product.presentation, product.product_type].join(" "));
+      return product;
+    });
+    if (finish) {
+      for (const product of products) Object.assign(product, displayFields(product, this.unitBasis?.[product.product_type] || null));
+      hideImplausible(products, this.unitMedians);
+    }
+    return new Map(products.map((product) => [product.id, product]));
+  }
+
+  // Un producto por id, esperando el índice si todavía no llegó.
+  async product(id) {
+    if (!this.ready) await this.loadIndex();
+    return this.byId.get(id) || null;
+  }
+
   get asOf() { return this.manifest?.as_of; }
+  get productCount() { return this.ready ? this.products.length : (this.rowCount || 0); }
 
   // Súper cuya última captura aceptada no es del día (manifest.source_freshness).
   staleRetailers() {
@@ -535,6 +591,7 @@ export class Catalog {
   }
 
   departments() {
+    if (!this.ready) return this.homeDepartments || [];
     const counts = new Map();
     for (const product of this.products) {
       if (!product.category) continue;

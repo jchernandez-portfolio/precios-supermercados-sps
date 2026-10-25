@@ -59,6 +59,40 @@ def test_search_row_carries_best_offer_retailers_promo_and_points_to_partition(t
     assert row["product_name"] == "Leche entera Sula 1 L"
 
 
+def test_catalog_also_publishes_a_home_page_for_the_first_paint(tmp_path: Path) -> None:
+    """La app pinta Inicio con home.json (ofertas, más comparados, departamentos) sin bajar el índice."""
+    database = tmp_path / "source.sqlite"
+    output = tmp_path / "public"
+    build_db(database)
+    manifest = export(database, output)
+    on_disk = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+    listed = {item["path"]: item for item in on_disk["files"]}
+    search = _search(output)
+    rows_by_id = {row[0]: row for row in search["rows"]}
+
+    assert on_disk["home_file"] == manifest["home_file"] == "home.json"
+    assert listed["home.json"]["sha256"] == hashlib.sha256((output / "home.json").read_bytes()).hexdigest()
+    home = json.loads((output / "home.json").read_text(encoding="utf-8"))
+    column = {name: index for index, name in enumerate(home["columns"])}
+    assert home["schema"] == MODULE.HOME_SCHEMA == "rpi-consumer-home/v1"
+    assert home["columns"] == search["columns"] and home["row_count"] == search["row_count"]
+    assert home["partitions"] == search["partitions"] and home["retailers"] == search["retailers"]
+    ids = [row[0] for row in home["rows"]]
+    assert ids == home["sections"]["deals"] + home["sections"]["compared"]
+    assert all(rows_by_id[item] == row for item, row in zip(ids, home["rows"]))
+    assert home["sections"]["deals"] and all(rows_by_id[item][column["promo"]] == 1 for item in home["sections"]["deals"])
+    assert all(len(rows_by_id[item][column["retailers"]]) >= 3 for item in home["sections"]["compared"])
+    assert not set(home["sections"]["deals"]) & set(home["sections"]["compared"])
+    counted: dict[str, int] = {}
+    for row in search["rows"]:
+        if row[column["category"]]:
+            counted[row[column["category"]]] = counted.get(row[column["category"]], 0) + 1
+    assert {item["name"]: item["count"] for item in home["departments"]} == counted
+    assert [item["count"] for item in home["departments"]] == sorted(counted.values(), reverse=True)
+    assert set(home["unit_basis"]) <= {row[column["product_type"]] for row in search["rows"]}
+    assert isinstance(home["unit_medians"], dict)
+
+
 def test_search_index_rejects_row_count_mismatch(tmp_path: Path) -> None:
     database = tmp_path / "source.sqlite"
     output = tmp_path / "public"
@@ -194,6 +228,54 @@ console.log(JSON.stringify(out));
     assert result["alts"] == ["b"]  # descarta el precio por unidad imposible (1100 Lt)
     assert result["money"].startswith("L ") and result["money"].endswith("1,234.50")
     assert result["key"] == "abc-def"
+
+
+def test_catalog_paints_home_first_and_loads_the_index_once_in_the_background(tmp_path: Path) -> None:
+    """Inicio sale de home.json; buscar, Mi compra y un enlace a producto esperan el índice."""
+    script = """
+import { Catalog } from './data.js';
+const columns = ['id','product_name','brand','presentation','category','product_type','partition','best_price','unit_amount','unit_per','retailers','promo','other_presentations','comparability','photo'];
+const row = (id, name, type, price, promo, stores) => [id, name, 'Marca', '1 L', 'Alimentos', type, 0, price, price, 'L', stores, promo, 0, 'c', 0];
+const rows = [row('a1', 'Leche A', 'Leche', '30.00', 1, [0, 1, 2]), row('b2', 'Leche B', 'Leche', '28.00', 0, [0, 1, 2]), row('c3', 'Jugo C', 'Jugo', '20.00', 1, [0])];
+const base = { schema: 'rpi-consumer-search/v1', columns, retailers: ['walmart', 'la_colonia', 'colonial'], partitions: ['catalog/p.json'] };
+const files = {};
+files['search.json'] = { ...base, rows };
+files['home.json'] = { schema: 'rpi-consumer-home/v1', columns, retailers: base.retailers, partitions: base.partitions, row_count: 3,
+  departments: [{ name: 'Alimentos', count: 3 }], unit_basis: { Leche: 'L' }, unit_medians: {}, sections: { deals: ['a1'], compared: ['b2'] }, rows: [rows[0], rows[1]] };
+const sha = async (text) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map((b) => b.toString(16).padStart(2, '0')).join('');
+const listed = await Promise.all(Object.entries(files).map(async ([path, body]) => ({ path, sha256: await sha(JSON.stringify(body)) })));
+const manifest = { schema: 'rpi-consumer-catalog-manifest/v3', as_of: '2026-10-25T12:00:00Z', search_file: 'search.json', home_file: 'home.json', files: listed };
+const fetched = [];
+globalThis.fetch = async (url) => {
+  const relative = url.replace('https://x.test/', '');
+  fetched.push(relative);
+  const body = relative === 'manifest.json' ? manifest : files[relative];
+  if (!body) return { ok: false, status: 404 };
+  const bytes = new TextEncoder().encode(JSON.stringify(body));
+  return { ok: true, json: async () => body, arrayBuffer: async () => bytes.buffer };
+};
+const out = {};
+const c = await new Catalog('https://x.test/manifest.json').load();
+out.afterLoad = { ready: c.ready, fetched: [...fetched], deals: c.home.deals.map((p) => p.id), compared: c.home.compared.map((p) => p.id),
+  count: c.productCount, departments: c.departments(), searchable: c.products.length };
+fetched.length = 0;
+const [product] = await Promise.all([c.product('c3'), c.loadIndex(), c.loadIndex()]);
+out.index = { id: product?.id, fetched: [...fetched], ready: c.ready, ids: c.products.map((p) => p.id).sort(), found: c.search({ query: 'leche' }).total,
+  departments: c.departments(), count: c.productCount };
+fetched.length = 0;
+delete manifest.home_file;
+const legacy = await new Catalog('https://x.test/manifest.json').load();
+out.legacy = { ready: legacy.ready, fetched: [...fetched], count: legacy.productCount, home: legacy.home ?? null };
+console.log(JSON.stringify(out));
+"""
+    result = json.loads(_node(script, tmp_path))
+    assert result["afterLoad"] == {
+        "ready": False, "fetched": ["manifest.json", "home.json"], "deals": ["a1"], "compared": ["b2"],
+        "count": 3, "departments": [{"name": "Alimentos", "count": 3}], "searchable": 0,
+    }
+    assert result["index"] == {"id": "c3", "fetched": ["search.json"], "ready": True, "ids": ["a1", "b2", "c3"], "found": 2,
+                               "departments": [{"name": "Alimentos", "count": 3}], "count": 3}
+    assert result["legacy"] == {"ready": True, "fetched": ["manifest.json", "search.json"], "count": 3, "home": None}
 
 
 def test_illustration_kinds_follow_product_type(tmp_path: Path) -> None:

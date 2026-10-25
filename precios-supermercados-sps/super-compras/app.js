@@ -3,8 +3,8 @@
 import {
   Catalog, RETAILER_COLORS, rowKey, RETAILER_INITIALS, RETAILER_NAMES, loadCart, loadCities, loadCitySlug, money,
   photoSrcset, photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, storeLabel,
-} from "./data.js?v=20261025-2";
-import { productIllustration } from "./illustration.js?v=20261025-2";
+} from "./data.js?v=20261025-3";
+import { productIllustration } from "./illustration.js?v=20261025-3";
 
 // Foto real si existe; si no hay o falla al cargar, la ilustración de siempre.
 // Tarjetas y miniaturas usan 320 px; el detalle deja que el navegador elija 320 u
@@ -89,6 +89,7 @@ function icon(name, size = 22) {
 // ------------------------------------------------------------------ state
 const state = {
   catalog: null,
+  renderToken: 0,
   cities: [],
   city: null,
   cart: [],
@@ -239,8 +240,10 @@ function sectionHeader(title, link) {
 }
 
 // ------------------------------------------------------------------ views
-function viewHome() {
-  const catalog = state.catalog;
+// Portada: ofertas y más comparados vienen en home.json (misma selección que aquí);
+// un catálogo sin portada los calcula del índice completo.
+function homeSections(catalog) {
+  if (catalog.home) return { deals: catalog.home.deals.slice(0, 12), compared: catalog.home.compared.slice(0, 12) };
   const deals = catalog.products
     .filter((product) => product.promo && product.best_price)
     .sort((a, b) => b.retailers.length - a.retailers.length || b.other_count - a.other_count)
@@ -250,10 +253,32 @@ function viewHome() {
     .filter((product) => product.retailers.length >= 3 && !shown.has(product.id))
     .sort((a, b) => b.retailers.length - a.retailers.length || a.product_name.length - b.product_name.length)
     .slice(0, 12);
+  return { deals, compared };
+}
+
+function loadingPage(text) {
+  return h("div", { class: "page loading", "aria-busy": "true" }, h("div", { class: "spinner", "aria-hidden": "true" }), h("p", {}, text));
+}
+
+// Vistas que necesitan el índice completo: lo piden y se vuelven a pintar al llegar.
+function whenIndexed(catalog, text = "Cargando el catálogo…") {
+  const token = state.renderToken;
+  catalog.loadIndex().then(() => { if (state.renderToken === token && state.catalog === catalog) render(); })
+    .catch((error) => {
+      if (state.renderToken !== token) return;
+      fill(document.getElementById("main"), h("div", { class: "page empty" }, h("strong", {}, "No pudimos cargar el catálogo."), h("p", {}, error.message),
+        h("button", { type: "button", class: "primary", onclick: () => render() }, "Reintentar")));
+    });
+  return loadingPage(text);
+}
+
+function viewHome() {
+  const catalog = state.catalog;
+  const { deals, compared } = homeSections(catalog);
   return h("div", { class: "page" },
     h("section", { class: "hero" },
       h("h1", {}, `Compara precios de súper en ${cityName()}`),
-      h("p", { class: "muted" }, `${catalog.products.length.toLocaleString("es-HN")} productos en ${catalog.retailers.map((id) => RETAILER_NAMES[id]).join(", ")}.`),
+      h("p", { class: "muted" }, `${catalog.productCount.toLocaleString("es-HN")} productos en ${catalog.retailers.map((id) => RETAILER_NAMES[id]).join(", ")}.`),
       h("div", { class: "hero-search" }, searchForm("", { large: true })),
       h("p", { class: "fresh" }, icon("pin", 14), freshnessText())),
     h("section", {},
@@ -276,6 +301,7 @@ function viewHome() {
 
 function viewSearch(params, { offers = false } = {}) {
   const catalog = state.catalog;
+  if (!catalog.ready) return whenIndexed(catalog, "Cargando el catálogo para buscar…");
   const query = params.get("q") || "";
   const category = params.get("cat") || "";
   const retailer = params.get("super") || "";
@@ -356,7 +382,23 @@ function historyBlock(offer) {
 
 function viewProduct(id, container) {
   const catalog = state.catalog;
-  const product = catalog.byId.get(id);
+  if (catalog.ready) return renderProduct(catalog.byId.get(id), container);
+  // Enlace abierto antes de tener el índice: se espera a que llegue.
+  const token = state.renderToken;
+  fill(container, loadingPage("Abriendo el producto…"));
+  catalog.product(id).then((product) => {
+    if (state.renderToken !== token || state.catalog !== catalog) return;
+    const view = renderProduct(product, container);
+    if (view) fill(container, view);
+  }).catch((error) => {
+    if (state.renderToken !== token) return;
+    fill(container, h("div", { class: "page empty" }, h("strong", {}, "No pudimos abrir el producto."), h("p", {}, error.message), h("a", { href: "#/" }, "Volver al inicio")));
+  });
+  return null;
+}
+
+function renderProduct(product, container) {
+  const catalog = state.catalog;
   if (!product) return h("div", { class: "page empty" }, h("strong", {}, "Este producto ya no está en el catálogo de hoy."), h("a", { href: "#/" }, "Volver al inicio"));
   const page = h("div", { class: "page product" },
     h("div", { class: "product-top" },
@@ -420,6 +462,7 @@ function viewProduct(id, container) {
         onclick: () => addToCart(product.id, offers.length > 1 && cheapest ? cheapest.location_id : null, offers.length > 1 ? cheapestLabel : ""),
       }, offers.length > 1 ? `Agregar a Mi compra · ${cheapestLabel}` : "Agregar a Mi compra"));
 
+    if (!page.isConnected) return;
     const extra = page.querySelector(".product-extra");
     const priceHistory = historyBlock(cheapest);
     const others = (row.other_presentations || []).map((other) => {
@@ -455,6 +498,7 @@ function viewProduct(id, container) {
           h("span", { class: "alt-price" }, h("strong", {}, money(alt.best_price)),
             h("span", { class: Number(alt.unit_amount) < Number(product.unit_amount) ? "good small" : "muted small" }, `${money(alt.unit_amount)} / ${alt.unit_per}`)))))) : null);
   }).catch((error) => {
+    if (!page.isConnected) return;
     fill(page.querySelector(".offers"), h("h2", {}, "Dónde comprar"), h("p", {}, `No pudimos cargar los precios: ${error.message}`));
   });
   return null;
@@ -467,6 +511,7 @@ function liveOffers(row) {
 
 function viewCart(container) {
   const catalog = state.catalog;
+  if (!catalog.ready) return whenIndexed(catalog, "Cargando los precios de tu compra…");
   const lines = state.cart.map((line, index) => ({ ...line, index, product: catalog.byId.get(line.id) })).filter((line) => line.product);
   if (!lines.length) {
     return h("div", { class: "page empty" }, h("h1", {}, "Mi compra"), h("p", {}, "Todavía no agregaste productos."), h("a", { class: "primary", href: "#/buscar" }, "Buscar productos"));
@@ -567,6 +612,7 @@ function renderChrome() {
 function render() {
   const main = document.getElementById("main");
   if (!state.catalog) return;
+  state.renderToken += 1;
   const { path, params } = route();
   let view;
   if (path.startsWith("/p/")) view = viewProduct(decodeURIComponent(path.slice(3)), main);
@@ -585,17 +631,25 @@ function pickCity(cities, fallback) {
 
 async function loadCity(city) {
   const main = document.getElementById("main");
-  fill(main, h("div", { class: "page loading", "aria-busy": "true" }, h("div", { class: "spinner", "aria-hidden": "true" }), h("p", {}, `Cargando los precios de ${city.name}…`)));
+  fill(main, loadingPage(`Cargando los precios de ${city.name}…`));
   try {
-    state.catalog = await new Catalog(city.url).load();
+    const catalog = await new Catalog(city.url).load();
+    state.catalog = catalog;
     state.city = city;
     state.limit = PAGE_SIZE;
     state.lastQueryKey = "";
-    const known = new Set(state.catalog.products.map((product) => product.id));
-    state.cart = loadCart(city.slug).filter((line) => known.has(line.id));
+    state.cart = loadCart(city.slug);
     document.title = `Súper Compras · Compara precios de súper en ${city.name}`;
     for (const node of document.querySelectorAll("[data-city]")) fill(node, citySelect());
     render();
+    // El índice completo se baja en segundo plano; al llegar se quitan de Mi compra
+    // los productos que ya no están en el catálogo.
+    catalog.loadIndex().then(() => {
+      if (state.catalog !== catalog) return;
+      const known = new Set(catalog.products.map((product) => product.id));
+      const kept = state.cart.filter((line) => known.has(line.id));
+      if (kept.length !== state.cart.length) { state.cart = kept; renderChrome(); }
+    }).catch(() => {});
   } catch (error) {
     fill(main, h("div", { class: "page empty" }, h("strong", {}, "No pudimos cargar los precios."), h("p", {}, error.message),
       h("button", { type: "button", class: "primary", onclick: () => location.reload() }, "Reintentar")));

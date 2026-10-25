@@ -433,6 +433,13 @@ def export_consumer_catalog(
 
 SEARCH_SCHEMA = "rpi-consumer-search/v1"
 SEARCH_FILE = "search.json"
+# Portada: lo que Inicio necesita sin bajar el índice (≈11 KB gzip contra ≈1.4 MB).
+# Se midió partir el índice en trozos por id: 16 trozos pesan 35 % más en total
+# que el archivo entero y buscar los necesita todos, así que el índice sigue siendo uno.
+HOME_SCHEMA = "rpi-consumer-home/v1"
+HOME_FILE = "home.json"
+# Filas por sección de la portada (la app muestra 12; el resto es margen).
+HOME_ROWS = 16
 SEARCH_COLUMNS = (
     "id", "product_name", "brand", "presentation", "category", "product_type",
     "partition", "best_price", "unit_amount", "unit_per", "retailers", "promo",
@@ -551,14 +558,84 @@ def attach_search_index(output_directory: Path, manifest: dict[str, object]) -> 
         "row_count": len(entries),
         "rows": entries,
     }
-    content = json.dumps(document, ensure_ascii=False, separators=(",", ":"), sort_keys=False).encode("utf-8")
-    _core._atomic_bytes(output_directory / SEARCH_FILE, content)
-    files = [item for item in manifest.get("files", []) if not (isinstance(item, dict) and item.get("path") == SEARCH_FILE)]  # type: ignore[union-attr]
-    files.append(_core._file_metadata(output_directory, SEARCH_FILE))
+    written = {SEARCH_FILE: _compact_json(document), HOME_FILE: _compact_json(_home_document(document))}
+    for relative, content in written.items():
+        _core._atomic_bytes(output_directory / relative, content)
+    files = [item for item in manifest.get("files", []) if not (isinstance(item, dict) and str(item.get("path")) in written)]  # type: ignore[union-attr]
+    files.extend(_core._file_metadata(output_directory, relative) for relative in written)
     manifest["files"] = files
     manifest["search_file"] = SEARCH_FILE
+    manifest["home_file"] = HOME_FILE
     _core._atomic_bytes(output_directory / "manifest.json", _core._json_bytes(manifest))
     return manifest
+
+
+def _compact_json(document: dict[str, object]) -> bytes:
+    return json.dumps(document, ensure_ascii=False, separators=(",", ":"), sort_keys=False).encode("utf-8")
+
+
+def _home_document(document: dict[str, object]) -> dict[str, object]:
+    """Portada (``home.json``): lo que la app necesita para pintar Inicio sin el índice.
+
+    Lleva las ofertas y los productos más comparados con el mismo criterio que la
+    app, los departamentos con su conteo, la base de precio unitario más común por
+    tipo y las medianas de precio por unidad por tipo y base (para esconder
+    medidas imposibles igual que con el índice completo).
+    """
+    columns = {name: index for index, name in enumerate(SEARCH_COLUMNS)}
+    rows: list[list[object]] = document["rows"]  # type: ignore[assignment]
+    deals = sorted(
+        (row for row in rows if row[columns["promo"]] == 1 and row[columns["best_price"]]),
+        key=lambda row: (-len(row[columns["retailers"]]), -int(row[columns["other_presentations"]] or 0)),
+    )[:HOME_ROWS]
+    shown = {row[0] for row in deals}
+    compared = sorted(
+        (row for row in rows if len(row[columns["retailers"]]) >= 3 and row[0] not in shown),
+        key=lambda row: (-len(row[columns["retailers"]]), len(str(row[columns["product_name"]]))),
+    )[:HOME_ROWS]
+    departments: dict[str, int] = {}
+    bases: dict[str, dict[str, int]] = {}
+    groups: dict[str, list[float]] = {}
+    for row in rows:
+        category = row[columns["category"]]
+        if category:
+            departments[str(category)] = departments.get(str(category), 0) + 1
+        product_type, unit_per, unit_amount = row[columns["product_type"]], row[columns["unit_per"]], row[columns["unit_amount"]]
+        if not product_type or not unit_per:
+            continue
+        counts = bases.setdefault(str(product_type), {})
+        counts[str(unit_per)] = counts.get(str(unit_per), 0) + 1
+        try:
+            amount = float(unit_amount) if unit_amount is not None else 0.0
+        except (TypeError, ValueError):
+            amount = 0.0
+        if amount > 0 and unit_per != "unidad":
+            groups.setdefault(f"{product_type}|{unit_per}", []).append(amount)
+    medians = {}
+    for key, values in groups.items():
+        if len(values) < 8:
+            continue
+        values.sort()
+        medians[key] = values[len(values) // 2]
+    return {
+        "schema": HOME_SCHEMA,
+        "as_of": document["as_of"],
+        "columns": document["columns"],
+        "retailers": document["retailers"],
+        "partitions": document["partitions"],
+        "row_count": document["row_count"],
+        "departments": [
+            {"name": name, "count": count}
+            for name, count in sorted(departments.items(), key=lambda item: (-item[1], item[0]))
+        ],
+        "unit_basis": {
+            product_type: max(counts.items(), key=lambda item: item[1])[0]
+            for product_type, counts in sorted(bases.items())
+        },
+        "unit_medians": medians,
+        "sections": {"deals": [row[0] for row in deals], "compared": [row[0] for row in compared]},
+        "rows": deals + compared,
+    }
 
 
 def main(argv: Sequence[str] | None = None) -> int:

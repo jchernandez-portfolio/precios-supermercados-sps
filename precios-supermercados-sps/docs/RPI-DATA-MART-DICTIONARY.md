@@ -207,6 +207,22 @@ de la oferta comprable más barata, `retailers` (índices), `promo` (0/1),
 fuente, `i` individual). Se deriva de las particiones ya escritas y debe tener
 exactamente `visible_rows` filas; no cambia identidad ni el contrato v3.
 
+## Portada `home.json` (aditivo, 2026-10-25)
+
+`manifest.home_file = "home.json"`, listado en `files` con SHA-256. Esquema
+`rpi-consumer-home/v1`: mismas `columns`, `retailers` y `partitions` que el
+índice, `row_count` (filas del índice), `departments` (`name`, `count`,
+ordenados por cantidad), `unit_basis` (base de precio por unidad más común por
+tipo), `unit_medians` (mediana del precio por unidad por `tipo|base`, con al
+menos 8 valores) y `sections` con los ids de las dos listas de Inicio: `deals`
+(ofertas: `promo` = 1 y precio, por número de súper y otras presentaciones) y
+`compared` (3 o más súper, no repetidos en `deals`, por número de súper y
+nombre corto), 16 filas cada una; `rows` trae esas filas del índice en ese
+orden. Pesa ≈11 KB gzip: Súper Compras pinta Inicio con este archivo y baja el
+índice completo en segundo plano. Se midió partir el índice en 16 trozos por
+id: pesan 35 % más en total y buscar los necesita todos, así que el índice
+sigue siendo un solo archivo.
+
 ## Serving particionado
 
 La publicación contiene:
