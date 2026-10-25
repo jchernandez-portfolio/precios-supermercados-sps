@@ -182,7 +182,7 @@ AUTHORIZATION = Path(__file__).resolve().parents[1] / ".automation" / "product-i
 
 def test_registered_authorization_covers_default_run() -> None:
     document = fotos.load_authorization(AUTHORIZATION, api_delay=1.0, image_delay=0.15,
-                                        max_products=fotos.DEFAULT_MAX_PRODUCTS, max_image_requests=20000)
+                                        max_products=fotos.DEFAULT_MAX_PRODUCTS, max_image_requests=30000)
     assert document["approved_by"] == "project_owner"
 
 

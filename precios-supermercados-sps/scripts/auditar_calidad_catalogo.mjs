@@ -5,13 +5,15 @@
 // lista lo que está mal o incompleto por ciudad y supermercado. Sólo lee datos
 // públicos; no consulta Turso ni los supermercados.
 //
-//   node scripts/auditar_calidad_catalogo.mjs --out DIR [--previous DIR] [--data DIR]
+//   node scripts/auditar_calidad_catalogo.mjs --out DIR [--previous DIR] [--data DIR] [--photos-index FILE]
 //
 // --data lee el catálogo de una copia local de la rama `portfolio-data` en vez de
 // la red (en el workflow, recién sincronizada, sin esperar la caché de raw).
 //
-// Escribe en DIR: errores_detectados.csv, resumen.md e historial.csv (este último
-// se acumula a partir del de --previous). "detectado_desde" conserva la fecha en
+// --photos-index es el index.json de fotos v2 (bucket R2) para contar hd/sd/low.
+//
+// Escribe en DIR: errores_detectados.csv, resumen.md, historial.csv, frescura.csv y
+// fotos.csv (los tres últimos se acumulan a partir de los de --previous). "detectado_desde" conserva la fecha en
 // que cada error apareció por primera vez.
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -191,14 +193,62 @@ export function freshnessRows(cities, today) {
   return out;
 }
 
-export function summaryMarkdown(rows, cities, today, freshness = []) {
+// Cobertura de fotos por ciudad y supermercado (columna photo de search.json) y nivel
+// de detalle de las fotos v2 (index.json del bucket).
+export const PHOTO_COLUMNS = ["fecha", "ciudad", "catalogo", "supermercado", "productos", "con_foto", "sin_foto", "hd", "sd", "low"];
+
+export function photoRows(cities, today, photosIndex = null) {
+  const items = photosIndex?.items || {};
+  const out = [];
+  for (const city of cities) {
+    const products = city.products || [];
+    const hasPhoto = (product) => Boolean(product.photo);
+    const quality = { hd: 0, sd: 0, low: 0 };
+    for (const product of products) {
+      const level = typeof product.photo === "string" ? items[product.id]?.q : null;
+      if (level && level in quality) quality[level] += 1;
+    }
+    const total = { fecha: today, ciudad: city.name, catalogo: city.as_of, supermercado: "Total",
+      productos: products.length, con_foto: products.filter(hasPhoto).length, ...quality };
+    total.sin_foto = total.productos - total.con_foto;
+    out.push(total);
+    const retailers = [...new Set(products.flatMap((product) => product.retailers || []))].sort();
+    for (const retailer of retailers) {
+      const own = products.filter((product) => (product.retailers || []).includes(retailer));
+      const withPhoto = own.filter(hasPhoto).length;
+      out.push({ fecha: today, ciudad: city.name, catalogo: city.as_of, supermercado: RETAILER_NAMES[retailer] || retailer,
+        productos: own.length, con_foto: withPhoto, sin_foto: own.length - withPhoto, hd: "", sd: "", low: "" });
+    }
+  }
+  return out;
+}
+
+export function photosMarkdown(photos) {
+  if (!photos.length) return [];
+  const pct = (part, whole) => (whole ? `${Math.round((part / whole) * 100)} %` : "–");
+  const lines = ["## Fotos de producto", ""];
+  const totals = photos.filter((row) => row.supermercado === "Total");
+  const withPhoto = totals.reduce((sum, row) => sum + row.con_foto, 0);
+  const all = totals.reduce((sum, row) => sum + row.productos, 0);
+  lines.push(`${withPhoto.toLocaleString("es-HN")} de ${all.toLocaleString("es-HN")} productos con foto (${pct(withPhoto, all)}). ` +
+    "Las fotos v2 se publican en dos tamaños; hd = detalle real para 800 px, sd = suficiente para tarjetas, low = foto chica.", "",
+    "| Ciudad | Supermercado | Productos | Con foto | Sin foto | % | hd | sd | low |", "|---|---|---:|---:|---:|---:|---:|---:|---:|");
+  for (const row of photos) {
+    lines.push(`| ${row.ciudad} | ${row.supermercado} | ${row.productos} | ${row.con_foto} | ${row.sin_foto} | ${pct(row.con_foto, row.productos)} | ${row.hd} | ${row.sd} | ${row.low} |`);
+  }
+  lines.push("");
+  return lines;
+}
+
+export function summaryMarkdown(rows, cities, today, freshness = [], photos = []) {
   const lines = [
     "# Errores de datos en Súper Compras", "",
     `Actualizado automáticamente el ${today} a partir del catálogo publicado (${cities.map((c) => `${c.name}: ${c.as_of}`).join("; ")}).`, "",
     "- [`errores_detectados.csv`](errores_detectados.csv): todo lo que la revisión automática encuentra hoy, una fila por producto y supermercado, con enlace al producto.",
     "- [`errores_confirmados.csv`](errores_confirmados.csv): errores revisados a mano, de dónde vienen (súper o Súper Compras) y su estado.",
     "- [`historial.csv`](historial.csv): cuántos errores había en cada publicación.",
-    "- [`frescura.csv`](frescura.csv): última captura aceptada de cada supermercado, día a día.", "",
+    "- [`frescura.csv`](frescura.csv): última captura aceptada de cada supermercado, día a día.",
+    "- [`fotos.csv`](fotos.csv): cobertura de fotos por ciudad y supermercado, día a día.", "",
   ];
   if (freshness.length) {
     const late = freshness.filter((item) => item.estado !== "Al día");
@@ -211,6 +261,7 @@ export function summaryMarkdown(rows, cities, today, freshness = []) {
     }
     lines.push("");
   }
+  lines.push(...photosMarkdown(photos));
   for (const city of cities) {
     const own = rows.filter((row) => row.ciudad === city.name);
     const retailers = [...new Set(own.map((row) => row.supermercado))].sort();
@@ -281,7 +332,16 @@ async function main(argv) {
   mkdirSync(out, { recursive: true });
   writeFileSync(join(out, "errores_detectados.csv"), toCsv(rows));
   const freshness = freshnessRows(cities, today);
-  writeFileSync(join(out, "resumen.md"), summaryMarkdown(rows, cities, today, freshness));
+  const photosPath = argv.includes("--photos-index") ? argv[argv.indexOf("--photos-index") + 1] : null;
+  let photosIndex = null;
+  if (photosPath && existsSync(photosPath)) {
+    try { photosIndex = JSON.parse(readFileSync(photosPath, "utf8")); } catch { photosIndex = null; }
+    if (photosIndex?.schema !== "super-compras-product-images/v2") photosIndex = null;
+  }
+  const photos = photoRows(cities, today, photosIndex);
+  writeFileSync(join(out, "resumen.md"), summaryMarkdown(rows, cities, today, freshness, photos));
+  const pastPhotos = parseCsv(read("fotos.csv")).filter((row) => row.fecha !== today);
+  writeFileSync(join(out, "fotos.csv"), toCsv([...pastPhotos, ...photos], PHOTO_COLUMNS));
   const freshnessColumns = ["fecha", "ciudad", "supermercado", "sucursal", "ultima_captura", "horas_de_atraso", "estado"];
   const pastFreshness = parseCsv(read("frescura.csv")).filter((row) => row.fecha !== today);
   writeFileSync(join(out, "frescura.csv"), toCsv([...pastFreshness, ...freshness], freshnessColumns));

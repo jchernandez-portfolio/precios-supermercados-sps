@@ -82,3 +82,25 @@ console.log(JSON.stringify({{ rows: rows.map(r => [r.supermercado, r.estado, r.h
     result = json.loads(_node(script))
     assert result["rows"] == [["Colonial", "Atrasado", 57], ["Walmart", "Al día", 9]]
     assert "1 sucursal(es) sin captura aceptada hoy" in result["md"]
+
+
+def test_photo_rows_count_coverage_and_quality() -> None:
+    script = f"""
+import {{ photoRows, photosMarkdown, summaryMarkdown, PHOTO_COLUMNS, toCsv }} from '{SCRIPT.as_uri()}';
+const city = {{ name: 'San Pedro Sula', slug: 'san-pedro-sula', as_of: 'x', products: [
+  {{ id: 'a1', photo: '0123456789', retailers: ['walmart', 'colonial'] }},
+  {{ id: 'b2', photo: 3, retailers: ['walmart'] }},
+  {{ id: 'c3', photo: 0, retailers: ['colonial'] }},
+  {{ id: 'd4', photo: 'ffffffffff', retailers: ['colonial'] }},
+] }};
+const index = {{ schema: 'super-compras-product-images/v2', items: {{ a1: {{ q: 'hd' }}, d4: {{ q: 'low' }} }} }};
+const rows = photoRows([city], '2026-10-25', index);
+const md = summaryMarkdown([], [city], '2026-10-25', [], rows);
+console.log(JSON.stringify({{ rows: rows.map(r => [r.supermercado, r.productos, r.con_foto, r.sin_foto, r.hd, r.sd, r.low]), md, csv: toCsv(rows, PHOTO_COLUMNS).split('\\n')[0] }}));
+"""
+    result = json.loads(_node(script))
+    assert result["rows"] == [
+        ["Total", 4, 3, 1, 1, 0, 1], ["Colonial", 3, 2, 1, "", "", ""], ["Walmart", 2, 2, 0, "", "", ""],
+    ]
+    assert "## Fotos de producto" in result["md"] and "3 de 4 productos con foto (75 %)" in result["md"]
+    assert result["csv"] == "fecha,ciudad,catalogo,supermercado,productos,con_foto,sin_foto,hd,sd,low"

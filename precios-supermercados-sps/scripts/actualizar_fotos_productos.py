@@ -48,7 +48,7 @@ CATALOG_BASE = f"{REPOSITORY_RAW}/portfolio-data/precios-supermercados-sps/publi
 PUBLIC_BASE = "https://pub-0dcb2204775c484dbe6681e659eee236.r2.dev"
 R2_PREFIX = "fotos/v2/"
 INDEX_URL = f"{PUBLIC_BASE}/{R2_PREFIX}index.json"
-DEFAULT_MAX_PRODUCTS = 8000
+DEFAULT_MAX_PRODUCTS = 12000
 REVIEW_LOWEST = 120
 REVIEW_SAMPLE = 80
 GENERIC_URL_OWNERS = 3
@@ -345,6 +345,7 @@ def process(keys: Sequence[str], candidates: Mapping[str, Sequence[images.Candid
                           "q": quality, "px": chosen.metrics.product_pixels}
             stats["con_foto"] += 1
             stats[f"calidad_{quality}"] += 1
+            stats[f"elegida_{chosen.candidate.supermarket_id}"] += 1
             if review is not None:
                 review.append(_review_record(key, scored, chosen, paths))
     return stats

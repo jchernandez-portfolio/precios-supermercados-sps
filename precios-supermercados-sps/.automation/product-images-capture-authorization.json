@@ -1,10 +1,10 @@
 {
   "schema": "precios-sps-product-images-authorization/v1",
-  "authorization_id": "product-images-daily-r2-20261025",
+  "authorization_id": "product-images-twice-daily-r2-20261025",
   "operation": "daily_product_images",
   "approved_by": "project_owner",
   "approved_at_utc": "2026-10-25T00:00:00Z",
-  "cadence": "daily",
+  "cadence": "twice_daily",
   "live_read_only_authorized": true,
   "publication_target": "r2:super-compras-fotos",
   "allowed_api_origins": [
@@ -17,9 +17,9 @@
   ],
   "min_api_delay_seconds": 1.0,
   "min_image_delay_seconds": 0.15,
-  "max_products_per_run": 8000,
-  "max_image_requests_per_run": 20000,
+  "max_products_per_run": 12000,
+  "max_image_requests_per_run": 30000,
   "concurrency": 1,
   "requested_ref": "main",
-  "note": "Aprobación explícita del responsable del proyecto (octubre 2026) para mostrar en Súper Compras fotos de producto tomadas de las fichas públicas de cada supermercado. Read-only, sin login, una solicitud a la vez, sin evadir 403/429/anti-bot. Se elige una foto por producto, se normaliza a WebP de 800 y 320 px y se publica en el bucket R2 super-compras-fotos. El 2026-10-25 el responsable pidió foto para todos los productos en dos tamaños lo antes posible: corrida diaria, ambas ciudades (incluye Paiz) y hasta 8000 productos por corrida. El responsable aceptó el riesgo de derechos de imagen: si un supermercado lo pide se retiran sus fotos y la app vuelve a las ilustraciones. Revocar cambiando live_read_only_authorized a false."
+  "note": "Aprobación explícita del responsable del proyecto (octubre 2026) para mostrar en Súper Compras fotos de producto tomadas de las fichas públicas de cada supermercado. Read-only, sin login, una solicitud a la vez, sin evadir 403/429/anti-bot. Se elige una foto por producto, se normaliza a WebP de 800 y 320 px y se publica en el bucket R2 super-compras-fotos. El 2026-10-25 el responsable pidió foto para todos los productos en dos tamaños lo antes posible: dos corridas diarias (02:29 y 14:29 Honduras), ambas ciudades (incluye Paiz) y hasta 12000 productos / 30000 descargas por corrida, siempre una solicitud a la vez. El responsable aceptó el riesgo de derechos de imagen: si un supermercado lo pide se retiran sus fotos y la app vuelve a las ilustraciones. Revocar cambiando live_read_only_authorized a false."
 }
