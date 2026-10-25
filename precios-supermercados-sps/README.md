@@ -27,8 +27,6 @@ La app vive en [`super-compras/`](super-compras/) y se publica en el sitio del p
 
 La app solo lee archivos estáticos ya publicados (`portfolio-data`, `product-images`). No consulta Turso ni sitios de supermercados desde el navegador, no pide cuenta ni datos personales y tiene una política de seguridad de contenido estricta. La carga inicial pesa ~48 KB (~9 KB gzip, 2 requests); el catálogo se baja por partes bajo demanda.
 
-`b2c/` contiene la versión anterior ("Compra Inteligente") y ya no se enlaza desde el portafolio.
-
 ## Flujo diario
 
 ```text
@@ -94,7 +92,8 @@ Las fotos se descargan de las fuentes públicas, se convierten a WebP y se publi
 | `docs/` | estado, arquitectura, metodología, calidad y runbooks |
 | `edge/` | Worker de Cloudflare que dispara el corte diario |
 | `powerbi/` | activos reproducibles del producto analítico B2B |
-| `reports/` | evidencia histórica de capturas |
+| `portfolio/` | datos de muestra que sincroniza el portafolio (`sample-data.json`) |
+| `reports/` | evidencia de capturas (los archivos grandes viven en releases; ver `reports/EVIDENCIA.md`) |
 
 Ramas de datos: `portfolio-data` (catálogo público), `product-images` (fotos), `calidad-datos` (registro de errores).
 

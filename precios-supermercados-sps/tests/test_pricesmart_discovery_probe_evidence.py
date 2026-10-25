@@ -3,8 +3,12 @@ import json
 import socket
 from pathlib import Path
 
+from _evidencia import asegurar
+
 ROOT = Path(__file__).resolve().parents[1]
 REPORT = ROOT / "reports/pricesmart/2026-09-02-discovery-probe"
+# reproduce() relee la captura completa del 2026-09-01 (archivada en un release).
+asegurar("reports/pricesmart/2026-09-01-full/raw-capture.tar.gz")
 
 
 def _module():
