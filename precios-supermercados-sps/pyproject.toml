@@ -12,7 +12,7 @@ license = { text = "Proprietary" }
 line-length = 120
 target-version = "py312"
 src = ["src", "scripts", "tests"]
-extend-exclude = ["reports", "b2c", "edge", "powerbi"]
+extend-exclude = ["reports", "edge", "powerbi"]
 
 [tool.ruff.lint]
 # E/W estilo, F errores, B bugs probables, UP sintaxis moderna, I orden de imports.

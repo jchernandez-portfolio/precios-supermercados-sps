@@ -1,6 +1,6 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.3.5/schema.json",
-  "files": { "includes": ["super-compras/*.js", "scripts/*.mjs", "portfolio/*.js"] },
+  "files": { "includes": ["super-compras/*.js", "scripts/*.mjs"] },
   "formatter": { "enabled": false },
   "linter": { "enabled": true, "rules": { "recommended": true, "style": { "useConst": "error", "useTemplate": "off" } } },
   "javascript": { "globals": ["self", "caches", "crypto", "localStorage", "navigator"] }

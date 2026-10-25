@@ -6,7 +6,7 @@ GitHub `main`, GitHub Actions, los artifacts productivos, Turso y la rama `portf
 
 | Tema | Estado |
 | --- | --- |
-| Producto | **Súper Compras** (`super-compras/`, versión `20261024-1`): web app PWA en San Pedro Sula y Tegucigalpa con búsqueda, detalle por súper, Mi compra y aviso de precios atrasados. Reemplaza a Compra Inteligente (`b2c/`, sin enlaces desde el portafolio). Business Mart B2B para Power BI sin cambios. |
+| Producto | **Súper Compras** (`super-compras/`, versión `20261024-1`): web app PWA en San Pedro Sula y Tegucigalpa con búsqueda, detalle por súper, Mi compra y aviso de precios atrasados. Reemplaza a Compra Inteligente (`b2c/`, retirada del repositorio el 2026-10-25). Business Mart B2B para Power BI sin cambios. |
 | Catálogo publicado | 2026-10-24: 33,672 productos visibles en SPS (41,210 ofertas fuente, 4,573 comparables) y 33,705 en TGU. 390 particiones en SPS; carga inicial 47,971 B / 8,967 B gzip, 2 requests. |
 | Homologación | Contenido neto GS1 en todo el catálogo (#37, #38), precio por libra para peso variable en Walmart, Paiz, La Colonia, Colonial y Los Andes (#34, #35, #39), corrección de patrones seguros y red de seguridad para datos absurdos (#41, #42). |
 | Operación diaria | Activa. Disparo 05:17 Honduras (Worker `precios-sps-daily-trigger`, token que vence el 2027-10-10), respaldo 08:17, reintentos por cadena 08:17/12:17 (máx. 3), persistencia parcial. Colonial y Los Andes reforzados en #43 (ver incidente abajo). |
@@ -126,11 +126,11 @@ Nueva app de consumidor en [`super-compras/`](../super-compras/), estilo compara
 - Datos: lee el mismo catálogo v3 de `portfolio-data`. El exportador agrega `search.json` (`rpi-consumer-search/v1`, una fila compacta por producto, ≈5 MB / 1.3 MB gzip) listado con SHA-256 en el manifest (`search_file`); la ficha completa se carga por partición al abrir un producto. Desde 2026-10-25 también `home.json` (`rpi-consumer-home/v1`, ≈11 KB gzip, `home_file`): Inicio se pinta con él y el índice baja en segundo plano (en 3G, Inicio pasa de ≈8.6 s a ≈1.7 s; buscar y la ficha esperan el índice como antes).
 - Imágenes: por ahora ilustraciones SVG por tipo de envase y color de marca (sin fotos de terceros). Fotos de Open Food Facts (CC-BY-SA, por GTIN) pendientes de medir cobertura.
 - Seguridad: sin `innerHTML`, CSP sin scripts en línea, `?catalogo=` sólo acepta rutas relativas del mismo sitio (vista previa local).
-- Compra Inteligente (`b2c/`) sigue publicada hasta reemplazarla en el portafolio.
+- Compra Inteligente (`b2c/`) y la copia vieja de la tarjeta del portafolio (`portfolio/precios-portfolio*.js/css`) se retiraron del repositorio el 2026-10-25 (PR de limpieza); la presentación vive sólo en el repo `Portafolio` (ver `docs/portfolio-showcase.md`). Quedan en el historial.
 
-## Compra Inteligente B2C
+## Catálogo público (contrato que leen la app y el portafolio)
 
-La interfaz pública consume únicamente archivos estáticos publicados y valida tamaños/SHA-256. No consulta Turso y no hace matching en JavaScript. Es un **planificador de compra**, no una tienda ni un checkout. Se publica en el sitio del portafolio (`jchernandez-portfolio.github.io/Portafolio/precios-supermercados-sps/b2c/`) como copia de [`b2c/`](../b2c/) y lee los datos de la rama `portfolio-data` de este repositorio.
+La interfaz pública consume únicamente archivos estáticos publicados y valida tamaños/SHA-256. No consulta Turso y no hace matching en JavaScript. Es un **planificador de compra**, no una tienda ni un checkout, y lee los datos de la rama `portfolio-data` de este repositorio.
 
 ### Ciudades y alcance
 

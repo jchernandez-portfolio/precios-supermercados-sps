@@ -435,20 +435,6 @@ def test_portfolio_data_sync_reuses_safe_artifact_without_turso_reads() -> None:
     assert "schedule:" not in raw
     assert "id-token" not in raw
 
-    frontend = (
-        base.REPO_ROOT
-        / "precios-supermercados-sps"
-        / "portfolio"
-        / "precios-portfolio-current-state.js"
-    ).read_text(encoding="utf-8")
-    assert "raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/portfolio-data/precios-supermercados-sps/portfolio/sample-data.json" in frontend
-    assert "raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/main/precios-supermercados-sps/portfolio/sample-data.json" not in frontend
-    assert "['localhost', '127.0.0.1'].includes(window.location.hostname)" in frontend
-    assert "cache: 'no-store'" in frontend
-    assert "TURSO_DATABASE_URL" not in frontend
-    assert "TURSO_AUTH_TOKEN" not in frontend
-    assert "libsql://" not in frontend
-
 
 def test_turso_weekly_integrity_is_scheduled_read_only_and_owns_full_scans() -> None:
     path = base.WORKFLOW_DIR / base.TURSO_WEEKLY_INTEGRITY_WORKFLOW
