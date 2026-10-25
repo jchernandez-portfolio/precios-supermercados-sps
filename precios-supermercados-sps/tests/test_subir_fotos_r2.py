@@ -35,11 +35,23 @@ def artifact(tmp_path: Path, items=None, files=None) -> Path:
 
 
 class Client:
-    def __init__(self):
+    def __init__(self, existing=(), page_size=1000):
         self.calls = []
+        self.listed = []
+        self.existing = sorted(existing)
+        self.page_size = page_size
 
     def put_object(self, **kwargs):
         self.calls.append(kwargs)
+
+    def list_objects_v2(self, **kwargs):
+        self.listed.append(kwargs)
+        keys = [key for key in self.existing if key.startswith(kwargs["Prefix"])]
+        start = int(kwargs.get("ContinuationToken") or 0)
+        page = keys[start:start + self.page_size]
+        truncated = start + self.page_size < len(keys)
+        return {"Contents": [{"Key": key} for key in page], "IsTruncated": truncated,
+                "NextContinuationToken": str(start + self.page_size) if truncated else None}
 
 
 def test_valid_artifact_uploads_photos_first_and_index_last(tmp_path: Path) -> None:
@@ -55,6 +67,30 @@ def test_valid_artifact_uploads_photos_first_and_index_last(tmp_path: Path) -> N
     assert photo["Bucket"] == "super-compras-fotos" and photo["ContentType"] == "image/webp"
     assert photo["CacheControl"] == "public, max-age=31536000, immutable"
     assert client.calls[-1]["CacheControl"] == "public, max-age=300"
+    assert [call["Prefix"] for call in client.listed] == ["fotos/v2/800/", "fotos/v2/320/"]
+
+
+def test_photos_already_in_the_bucket_are_skipped_and_listing_is_paginated(tmp_path: Path) -> None:
+    """Una corrida interrumpida se retoma: sólo sube lo que falta (mismo nombre = mismo contenido)."""
+    files = {}
+    items = {}
+    for number in range(5):
+        key = f"aa{number:02d}"
+        items[key] = {"sig": "x", "h": HASH, "sm": "colonial"}
+        files[f"800/aa/{key}-{HASH}.webp"] = WEBP
+        files[f"320/aa/{key}-{HASH}.webp"] = WEBP
+    root = artifact(tmp_path, items=items, files=files)
+    _, uploads = r2.validate(root)
+    assert len(uploads) == 10
+    existing = [f"fotos/v2/800/aa/aa0{n}-{HASH}.webp" for n in range(3)] + [f"fotos/v2/320/aa/aa00-{HASH}.webp"]
+    client = Client(existing=existing, page_size=2)
+    messages = []
+    assert r2.upload(client, root, uploads, run_id="7", log=messages.append, workers=4) == 6
+    keys = [call["Key"] for call in client.calls]
+    assert not set(existing) & set(keys)
+    assert keys[-1] == "fotos/v2/index.json" and len(keys) == 6 + 3
+    assert len(client.listed) > 2  # paginado
+    assert messages[0] == "fotos en el artifact 10; ya en el bucket 4; por subir 6"
 
 
 @pytest.mark.parametrize("files, items, code", [

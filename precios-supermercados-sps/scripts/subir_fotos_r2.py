@@ -12,7 +12,10 @@ el artifact completo:
 * el índice tiene el esquema esperado.
 
 Sube primero las fotos (nombres inmutables, caché de un año) y al final el
-índice: el catálogo nunca apunta a una foto que todavía no existe.
+índice: el catálogo nunca apunta a una foto que todavía no existe. Antes lista
+lo que ya hay en el bucket y se salta las fotos ya subidas (mismo nombre =
+mismo contenido), así una corrida interrumpida se retoma donde quedó; sube en
+paralelo (16 hilos) porque una a una 16 000 fotos pasaban de la hora.
 """
 from __future__ import annotations
 
@@ -22,6 +25,7 @@ import os
 import re
 import sys
 from collections.abc import Callable, Iterable, Mapping
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 INDEX_SCHEMA = "super-compras-product-images/v2"
@@ -31,6 +35,7 @@ MAX_BYTES = {800: 250_000, 320: 80_000}
 PATH_PATTERN = re.compile(r"(800|320)/([0-9a-z]{2})/([0-9a-z_-]+)-([0-9a-f]{10})\.webp")
 IMMUTABLE = "public, max-age=31536000, immutable"
 SHORT = "public, max-age=300"
+WORKERS = 16
 
 
 class UploadError(RuntimeError):
@@ -91,15 +96,41 @@ def r2_client():
     )
 
 
+def existing_keys(client, prefixes: Iterable[str] = (f"{PREFIX}800/", f"{PREFIX}320/")) -> set[str]:
+    """Llaves de foto ya presentes en el bucket (una lista paginada por tamaño)."""
+    keys: set[str] = set()
+    for prefix in prefixes:
+        token = None
+        while True:
+            arguments = {"Bucket": BUCKET, "Prefix": prefix, "MaxKeys": 1000}
+            if token:
+                arguments["ContinuationToken"] = token
+            page = client.list_objects_v2(**arguments)
+            keys.update(str(item["Key"]) for item in page.get("Contents", []))
+            if not page.get("IsTruncated"):
+                break
+            token = page.get("NextContinuationToken")
+    return keys
+
+
 def upload(client, root: Path, uploads: Iterable[tuple[Path, str]], *, run_id: str,
-           log: Callable[[str], None] = print) -> int:
+           log: Callable[[str], None] = print, workers: int = WORKERS) -> int:
+    pending = list(uploads)
+    already = existing_keys(client)
+    todo = [(path, key) for path, key in pending if key not in already]
+    log(f"fotos en el artifact {len(pending)}; ya en el bucket {len(pending) - len(todo)}; por subir {len(todo)}")
     count = 0
-    for path, key in uploads:
+
+    def put(item: tuple[Path, str]) -> None:
+        path, key = item
         client.put_object(Bucket=BUCKET, Key=key, Body=path.read_bytes(), ContentType="image/webp",
                           CacheControl=IMMUTABLE)
-        count += 1
-        if count % 500 == 0:
-            log(f"subidas {count} fotos")
+
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        for _ in pool.map(put, todo):
+            count += 1
+            if count % 1000 == 0:
+                log(f"subidas {count} fotos")
     review = root / "revision.html"
     if review.is_file():
         body = review.read_bytes()
@@ -125,7 +156,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({**summary, "dry_run": True}))
         return 0
     uploaded = upload(r2_client(), args.directory, uploads, run_id=args.run_id)
-    print(json.dumps({**summary, "uploaded": uploaded}))
+    print(json.dumps({**summary, "uploaded": uploaded, "skipped": len(uploads) - uploaded}))
     return 0
 
 

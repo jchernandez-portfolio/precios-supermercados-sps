@@ -33,7 +33,9 @@ Mientras dura la migración, el catálogo usa la foto v2 si existe y si no la v1
    - deja un artifact con las fotos nuevas, el `index.json` completo y `revision.html`.
 2. **Precios SPS - Publicar fotos de producto en R2** (`contents: read`, sólo las
    llaves del bucket) valida el artifact con `scripts/subir_fotos_r2.py` (rutas,
-   cabecera WebP, tamaño, índice) y sube las fotos; el índice va al final.
+   cabecera WebP, tamaño, índice), lista lo que ya hay en el bucket, sube en
+   paralelo sólo lo que falta (mismo nombre = mismo contenido, así una corrida
+   interrumpida se retoma) y al final el índice.
 3. La publicación del catálogo lee los dos índices y llena la columna `photo` de
    `search.json`: huella v2, versión v1 o 0.
 4. La app usa 320 px en tarjetas y deja que el navegador elija 320 u 800 px en el
