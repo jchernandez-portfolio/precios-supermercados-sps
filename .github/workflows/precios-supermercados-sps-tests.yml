@@ -23,6 +23,9 @@ jobs:
 
     env:
       PYTHONPATH: ${{ github.workspace }}/precios-supermercados-sps/src
+      # Las capturas crudas grandes viven en un GitHub Release (reports/evidencia-archivada.json);
+      # las pruebas que las usan las bajan y comprueban su SHA-256.
+      PRECIOS_SPS_EVIDENCIA: descargar
 
     steps:
       - name: Descargar revisión inmutable

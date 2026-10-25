@@ -4,14 +4,16 @@ import io
 import json
 import tarfile
 from pathlib import Path
-
 import pytest
+
+from _evidencia import asegurar  # noqa: E402
+
+asegurar("reports/walmart/2026-08-31-probe/raw-capture.tar.gz")
 
 REPORT = Path(__file__).resolve().parents[1] / "reports/walmart/2026-08-31-probe"
 spec = importlib.util.spec_from_file_location("walmart_probe_evidence", REPORT / "verify.py")
 probe = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(probe)
-
 
 def test_captured_probe_reproduces_regional_price_decision():
     evidence = probe.reproduce(REPORT / "raw-capture.tar.gz")
@@ -21,7 +23,6 @@ def test_captured_probe_reproduces_regional_price_decision():
     assert all(row["current_price"] is None for row in evidence["unpriced_partition_rows"])
     assert evidence["first_product"]["current_price"] == "9.5"
     assert not evidence["remote_persistence"]
-
 
 def test_modified_response_cannot_reproduce_trusted_evidence(tmp_path):
     changed = tmp_path / "changed.tar.gz"
@@ -34,7 +35,6 @@ def test_modified_response_cannot_reproduce_trusted_evidence(tmp_path):
             target.addfile(member, io.BytesIO(body))
     with pytest.raises(ValueError, match="RAW hash mismatch"):
         probe.reproduce(changed)
-
 
 def test_zero_price_with_available_offer_is_not_silently_classified():
     with tarfile.open(REPORT / "raw-capture.tar.gz", "r:gz") as source:

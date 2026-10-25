@@ -4,7 +4,6 @@ import json
 import sqlite3
 import sys
 from pathlib import Path
-
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,8 +17,11 @@ from migrar_mvp_paiz import (  # noqa: E402
     schema_ready_sql,
 )
 
-REPORT = ROOT / "reports" / "paiz" / "2026-09-04-full"
+from _evidencia import asegurar  # noqa: E402
 
+asegurar("reports/paiz/2026-09-04-full/snapshot-paiz-multiplaza.json", "reports/paiz/2026-09-04-full/snapshot-paiz-proceres.json")
+
+REPORT = ROOT / "reports" / "paiz" / "2026-09-04-full"
 
 @pytest.mark.parametrize(
     ("filename", "location_id", "skus", "priced"),
@@ -34,7 +36,6 @@ def test_accepted_paiz_snapshots_validate(filename: str, location_id: str, skus:
     assert snapshot["skus_extracted"] == skus
     assert snapshot["skus_with_price"] == priced
     assert snapshot["availability_counts"]["out_of_stock"] == 205
-
 
 def test_normalizer_preserves_nullable_unpriced_offer() -> None:
     snapshot = validate_snapshot_bytes((REPORT / "snapshot-paiz-multiplaza.json").read_bytes())
@@ -56,7 +57,6 @@ def test_normalizer_preserves_nullable_unpriced_offer() -> None:
         "is_promotion": None,
         "availability": "out_of_stock",
     }]
-
 
 def test_paiz_migration_preserves_existing_rows_and_allows_unpriced(tmp_path: Path) -> None:
     db = tmp_path / "mvp.sqlite"
@@ -93,7 +93,6 @@ def test_paiz_migration_preserves_existing_rows_and_allows_unpriced(tmp_path: Pa
         con.commit()
     finally:
         con.close()
-
 
 def test_paiz_migration_is_idempotent(tmp_path: Path) -> None:
     db = tmp_path / "mvp.sqlite"

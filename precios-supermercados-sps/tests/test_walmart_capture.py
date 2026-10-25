@@ -7,7 +7,6 @@ import socket
 import sys
 import tarfile
 from pathlib import Path
-
 import pytest
 import requests
 
@@ -18,6 +17,9 @@ REPORT = ROOT / "reports/walmart/2026-08-31-full"
 sys.path.insert(0, str(ROOT / "scripts"))
 import actualizar_mvp_sqlite_la_colonia as local
 
+from _evidencia import asegurar  # noqa: E402
+
+asegurar("reports/walmart/2026-08-31-full/raw-capture.tar.gz")
 
 @pytest.fixture(scope="module")
 def capture(tmp_path_factory):
@@ -35,7 +37,6 @@ def capture(tmp_path_factory):
     assert ledger["retries"] == 0 <= ledger["max_retries"]
     assert ledger["elapsed_seconds"] < ledger["max_seconds"] and ledger["concurrency"] == 1
     return directory
-
 
 def test_complete_raw_reproduces_all_three_snapshots_without_http(capture, monkeypatch):
     def forbidden(*args, **kwargs):
@@ -59,7 +60,6 @@ def test_complete_raw_reproduces_all_three_snapshots_without_http(capture, monke
     assert (b["current_price"], b["reported_regular_price"], b["is_promotion"]) == ("1895.00", "1895.00", False)
     assert sum(r["current_price"] is None for s in snapshots for r in s["products"]) == 1597
 
-
 @pytest.mark.parametrize("file,reason", [
     ("recovery.json", "page_count_or_duplicate"),
     ("partition-recovery.json", "product_membership_overlap"),
@@ -70,14 +70,12 @@ def test_primary_capture_is_rejected_without_required_membership_repair(capture,
     with pytest.raises(WalmartError, match=reason):
         reconcile_capture(capture)
 
-
 def test_changed_raw_is_not_accepted(capture, monkeypatch):
     original = Path.read_bytes
     target = capture/json.loads((capture/"requests.json").read_text())["records"][0]["file"]
     monkeypatch.setattr(Path, "read_bytes", lambda p: b"altered" if p == target else original(p))
     with pytest.raises(WalmartError, match="raw_hash_mismatch"):
         reconcile_capture(capture)
-
 
 def source_product():
     return {"productId": "10", "productName": "Producto", "brand": "Marca",
@@ -86,7 +84,6 @@ def source_product():
         "measurementUnit": "kg", "unitMultiplier": 0.25,
         "sellers": [{"sellerId": "1", "commertialOffer": {
             "Price": 9.5, "ListPrice": 12, "AvailableQuantity": 10000}}]}]}
-
 
 def test_variants_missing_reference_and_weighted_price_preserved():
     product = source_product()
@@ -97,7 +94,6 @@ def test_variants_missing_reference_and_weighted_price_preserved():
     assert len(rows) == 2 and all(r["current_price"] == "9.50" for r in rows)
     assert rows[0]["reference"] is None and rows[1]["availability"] == "unknown"
     assert details["100"]["unit_multiplier"] == 0.25
-
 
 @pytest.mark.parametrize("mutation", ["zero_available", "negative", "fraction", "nan", "infinite_quantity", "boolean_quantity", "regular_below", "two_sellers", "duplicate", "missing_items"])
 def test_ambiguous_or_invalid_offers_rejected(mutation):
@@ -113,7 +109,6 @@ def test_ambiguous_or_invalid_offers_rejected(mutation):
     elif mutation == "duplicate": product["items"].append(copy.deepcopy(item))
     else: product["items"] = []
     with pytest.raises(WalmartError): parse_products([product])
-
 
 def test_unavailable_zero_offer_retains_identity_but_never_free_price():
     product = source_product()
