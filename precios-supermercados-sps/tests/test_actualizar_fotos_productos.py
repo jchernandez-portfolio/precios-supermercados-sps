@@ -77,6 +77,23 @@ def test_load_catalog_reads_only_catalog_partitions() -> None:
     assert seen == ["https://x.test/manifest.json", "https://x.test/catalog/p0.json"]
 
 
+def test_load_catalogs_merges_every_published_city() -> None:
+    def fetch(url):
+        if url.endswith("cities.json"):
+            return {"cities": [{"manifest": "manifest.json"}, {"manifest": "cities/tegucigalpa/manifest.json"},
+                               {"manifest": "../evil/manifest.json"}]}
+        if url.endswith("manifest.json"):
+            return {"files": [{"path": "catalog/p0.json"}]}
+        if "tegucigalpa" in url:
+            return {"rows": [{"row_id": "canonical-aa11", "offers": [{"source_product_id": "paiz:9"}]},
+                             {"row_id": "source-dd44", "offers": [{"source_product_id": "paiz:10"}]}]}
+        return catalog_document()
+
+    rows = {row.key: row.offers for row in fotos.load_catalogs(fetch, "https://x.test/")}
+    assert rows["aa11"] == (("walmart", 1), ("colonial", 2), ("paiz", 9))
+    assert set(rows) == {"aa11", "bb22", "dd44"}
+
+
 def setup():
     rows = fotos.parse_catalog_rows(catalog_document())
     refs = {1: fotos.SourceRef("walmart", ("501",), "7401"), 2: fotos.SourceRef("colonial", ("9001",), "7401"),
@@ -114,12 +131,22 @@ def test_process_writes_normalized_photo_and_index(tmp_path: Path) -> None:
     }
     downloader = Downloader(files)
     index = {"aa11": {"sig": "old", "v": 3}}
-    stats = fotos.process(["aa11", "bb22"], candidates, downloader, tmp_path, index, log=lambda _: None)
+    review: list = []
+    stats = fotos.process(["aa11", "bb22"], candidates, downloader, tmp_path, index, log=lambda _: None,
+                          review=review)
     assert stats["con_foto"] == 1 and stats["sin_foto"] == 1 and stats["error_descarga"] == 1
-    assert index["aa11"]["sm"] == "colonial" and index["aa11"]["v"] == 4
+    entry = index["aa11"]
+    assert entry["sm"] == "colonial" and len(entry["h"]) == 10 and entry["q"] in {"hd", "sd", "low"}
+    assert "v" not in entry and entry["px"] > 0
     assert index["bb22"] == {"sig": fotos.signature(candidates["bb22"]), "none": 1}
-    output = Image.open(tmp_path / "img" / "aa" / "aa11.webp")
-    assert output.format == "WEBP" and output.size == (400, 400)
+    for size in (800, 320):
+        output = Image.open(tmp_path / str(size) / "aa" / f"aa11-{entry['h']}.webp")
+        assert output.format == "WEBP" and output.size == (size, size)
+    assert [item["key"] for item in review] == ["aa11", "bb22"]
+    assert review[0]["file"] == f"320/aa/aa11-{entry['h']}.webp" and review[1]["chosen"] is None
+    page = fotos.write_review(tmp_path, review, fotos.PUBLIC_BASE, stats).read_text(encoding="utf-8")
+    assert f"{fotos.PUBLIC_BASE}/fotos/v2/320/aa/aa11-{entry['h']}.webp" in page and "sin foto" in page
+    assert "<script" not in page
     # La segunda foto de Walmart sólo se pidió porque la principal era pequeña.
     assert len([url for url in downloader.urls if "walmarthn" in url]) == 2
     path = fotos.write_index(tmp_path, index, stats)
@@ -153,8 +180,8 @@ AUTHORIZATION = Path(__file__).resolve().parents[1] / ".automation" / "product-i
 
 
 def test_registered_authorization_covers_default_run() -> None:
-    document = fotos.load_authorization(AUTHORIZATION, api_delay=1.0, image_delay=0.15, max_products=4000,
-                                        max_image_requests=12000)
+    document = fotos.load_authorization(AUTHORIZATION, api_delay=1.0, image_delay=0.15,
+                                        max_products=fotos.DEFAULT_MAX_PRODUCTS, max_image_requests=20000)
     assert document["approved_by"] == "project_owner"
 
 

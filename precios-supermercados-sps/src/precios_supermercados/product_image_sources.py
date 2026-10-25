@@ -31,14 +31,20 @@ PRICESMART_ROWS = 200
 PRICESMART_MAX_PAGES = 60
 MAX_IMAGES_PER_ITEM = 2
 MAX_IMAGE_BYTES = 6_000_000
-SOURCE_SIZE = 800
+# VTEX agranda si se le pide más que el original (La Colonia guarda 1000 px y Walmart
+# 3000 px): 1000 px da detalle real para la versión de 800 sin bajar fotos de 700 KB.
+SOURCE_SIZE = 1000
+SHOPIFY_WIDTH = 1200  # Shopify nunca agranda; Colonial guarda 1040 px.
 
 STORE_ORIGINS = {
     "walmart": "https://www.walmart.com.hn",
     "la_colonia": "https://www.lacolonia.com",
     "colonial": "https://supercolonial.com",
     "pricesmart": "https://www.pricesmart.com",
+    # Paiz comparte catálogo VTEX y fotos (walmarthn.vteximg.com.br) con Walmart.
+    "paiz": "https://www.paiz.com.hn",
 }
+VTEX_STORES = frozenset({"walmart", "la_colonia", "paiz"})
 PRICESMART_ENDPOINT = "https://www.pricesmart.com/api/br_discovery/getProductsByKeyword"
 PRICESMART_PUBLIC = {
     "account_id": "7024",
@@ -98,7 +104,7 @@ def vtex_resized(url: str, size: int = SOURCE_SIZE) -> str:
     return _VTEX_IDS.sub(lambda match: f"{match.group(1)}-{size}-{size}/", url, count=1)
 
 
-def shopify_resized(url: str, width: int = SOURCE_SIZE) -> str:
+def shopify_resized(url: str, width: int = SHOPIFY_WIDTH) -> str:
     parts = urlsplit(url)
     query = [(key, value) for key, value in parse_qsl(parts.query) if key != "width"]
     query.append(("width", str(width)))
@@ -106,7 +112,7 @@ def shopify_resized(url: str, width: int = SOURCE_SIZE) -> str:
 
 
 def download_url(supermarket_id: str, url: str) -> str:
-    if supermarket_id in {"walmart", "la_colonia"}:
+    if supermarket_id in VTEX_STORES:
         return vtex_resized(url)
     if supermarket_id == "colonial":
         return shopify_resized(url)

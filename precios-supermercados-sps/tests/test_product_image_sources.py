@@ -10,10 +10,12 @@ VTEX = "https://walmarthn.vteximg.com.br/arquivos/ids/412345/foto.jpg?v=1"
 
 
 def test_vtex_resize_and_shopify_width() -> None:
-    assert src.vtex_resized(VTEX) == "https://walmarthn.vteximg.com.br/arquivos/ids/412345-800-800/foto.jpg?v=1"
-    assert src.vtex_resized(src.vtex_resized(VTEX, 300)).count("-800-800") == 1
+    assert src.vtex_resized(VTEX) == "https://walmarthn.vteximg.com.br/arquivos/ids/412345-1000-1000/foto.jpg?v=1"
+    assert src.vtex_resized(src.vtex_resized(VTEX, 300)).count("-1000-1000") == 1
     url = src.shopify_resized("https://cdn.shopify.com/s/files/1/a.jpg?v=9&width=100")
-    assert url == "https://cdn.shopify.com/s/files/1/a.jpg?v=9&width=800"
+    assert url == "https://cdn.shopify.com/s/files/1/a.jpg?v=9&width=1200"
+    assert src.download_url("paiz", VTEX) == src.vtex_resized(VTEX)
+    assert src.STORE_ORIGINS["paiz"] == "https://www.paiz.com.hn"
     assert src.download_url("comisariato_los_andes", "x") == "x"
 
 

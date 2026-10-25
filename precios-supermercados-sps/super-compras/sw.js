@@ -1,11 +1,12 @@
 // Service worker de Súper Compras: guarda la app para abrirla sin conexión.
 // Los datos (raw.githubusercontent.com) van primero a la red y caen a la copia
 // guardada si no hay internet, así nunca se muestran precios viejos sin necesidad.
-const VERSION = "super-compras-20261024-1";
-// Las fotos llevan ?v=<versión>: una vez guardadas no cambian (primero caché).
+const VERSION = "super-compras-20261025-1";
+// Las fotos llevan ?v=<versión> o la huella en el nombre: una vez guardadas no
+// cambian (primero caché).
 const PHOTOS = "super-compras-fotos-1";
 const MAX_PHOTOS = 600;
-const SHELL = ["./", "index.html", "styles.css?v=20261024-1", "app.js?v=20261024-1", "data.js?v=20261024-1", "illustration.js?v=20261024-1",
+const SHELL = ["./", "index.html", "styles.css?v=20261025-1", "app.js?v=20261025-1", "data.js?v=20261025-1", "illustration.js?v=20261025-1",
   "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png"];
 
 self.addEventListener("install", (event) => {
@@ -22,7 +23,9 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
   const url = new URL(request.url);
-  if (url.hostname === "raw.githubusercontent.com" && url.pathname.includes("/product-images/img/")) {
+  const isPhoto = (url.hostname === "raw.githubusercontent.com" && url.pathname.includes("/product-images/img/"))
+    || (url.hostname.endsWith(".r2.dev") && url.pathname.startsWith("/fotos/"));
+  if (isPhoto) {
     event.respondWith(cachedPhoto(request));
     return;
   }

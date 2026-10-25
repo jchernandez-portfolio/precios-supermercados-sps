@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""Actualiza las fotos de producto de Súper Compras (corrida semanal incremental).
+"""Actualiza las fotos de producto de Súper Compras (corrida diaria incremental).
 
-1. Lee el catálogo público ya publicado (rama ``portfolio-data``): una fila por
-   producto con sus ofertas ``<súper>:<product_id>``.
+1. Lee el catálogo público ya publicado de cada ciudad (rama ``portfolio-data``,
+   ``cities.json``): una fila por producto con sus ofertas ``<súper>:<product_id>``.
 2. Resuelve en Turso (sólo lectura) las llaves exactas de cada producto en su súper.
 3. Pide a cada súper, por endpoints públicos, las direcciones de sus fotos.
 4. Para cada fila pendiente descarga la foto principal de cada súper (la segunda
-   sólo si la principal no alcanza), puntúa, elige una y la normaliza a WebP
-   400×400 con fondo blanco.
-5. Escribe ``img/<id[:2]>/<id>.webp`` nuevos y el ``index.json`` completo en
-   ``--output-dir``. Otro workflow (con permiso de escritura y sin secretos) los
-   copia a la rama ``product-images``.
+   sólo si la principal no alcanza), puntúa, elige una y la normaliza a WebP de
+   800 y 320 px con fondo blanco y el producto completo.
+5. Escribe ``800|320/<id[:2]>/<id>-<huella>.webp`` nuevos, el ``index.json`` completo
+   y ``revision.html`` (muestra para revisar a ojo) en ``--output-dir``. Otro
+   workflow, sólo con la llave de escritura del bucket, los valida y los sube a
+   Cloudflare R2. El nombre lleva la huella del contenido: una foto publicada no
+   cambia nunca y puede guardarse en caché un año.
 
 Una fila ya resuelta no se vuelve a descargar mientras sus direcciones de foto
 (``sig``) y la versión del proceso no cambien; las filas sin foto aceptable también
@@ -38,12 +40,17 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from precios_supermercados import product_image_sources as sources  # noqa: E402
 from precios_supermercados import product_images as images  # noqa: E402
 
-PIPELINE_VERSION = 1
-INDEX_SCHEMA = "super-compras-product-images/v1"
+PIPELINE_VERSION = 2
+INDEX_SCHEMA = "super-compras-product-images/v2"
 REPOSITORY_RAW = "https://raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps"
 CATALOG_BASE = f"{REPOSITORY_RAW}/portfolio-data/precios-supermercados-sps/published/rpi/v3/"
-INDEX_URL = f"{REPOSITORY_RAW}/product-images/index.json"
-DEFAULT_MAX_PRODUCTS = 4000
+# Dirección pública del bucket R2 (no es secreta); las fotos viven bajo fotos/v2/.
+PUBLIC_BASE = "https://pub-0dcb2204775c484dbe6681e659eee236.r2.dev"
+R2_PREFIX = "fotos/v2/"
+INDEX_URL = f"{PUBLIC_BASE}/{R2_PREFIX}index.json"
+DEFAULT_MAX_PRODUCTS = 8000
+REVIEW_LOWEST = 120
+REVIEW_SAMPLE = 80
 GENERIC_URL_OWNERS = 3
 QUERY_BATCH = 400
 KEY_COLUMNS = ("source_item_id", "source_key", "source_catalog_product_id")
@@ -88,6 +95,37 @@ def parse_catalog_rows(document: Mapping[str, object]) -> list[CatalogRow]:
         if offers:
             rows.append(CatalogRow(row_key(row["row_id"]), tuple(offers)))
     return rows
+
+
+def merge_rows(groups: Iterable[Sequence[CatalogRow]]) -> list[CatalogRow]:
+    """Une las filas de varias ciudades: el mismo producto suma las ofertas de ambas."""
+    merged: dict[str, list[tuple[str, int]]] = {}
+    for rows in groups:
+        for row in rows:
+            offers = merged.setdefault(row.key, [])
+            offers.extend(offer for offer in row.offers if offer not in offers)
+    return [CatalogRow(key, tuple(offers)) for key, offers in merged.items()]
+
+
+def load_catalogs(fetch_json: Callable[[str], object], base: str) -> list[CatalogRow]:
+    """Catálogo de todas las ciudades publicadas (``cities.json``); sin índice, sólo el base."""
+    try:
+        index = fetch_json(base + "cities.json")
+    except Exception:  # noqa: BLE001 - sin índice de ciudades se usa el manifest base
+        index = None
+    manifests = ["manifest.json"]
+    if isinstance(index, Mapping) and isinstance(index.get("cities"), list):
+        manifests = [
+            str(city["manifest"]) for city in index["cities"]
+            if isinstance(city, Mapping) and isinstance(city.get("manifest"), str)
+            and city["manifest"].endswith("manifest.json") and ".." not in city["manifest"]
+            and not city["manifest"].startswith("/") and "://" not in city["manifest"]
+        ] or manifests
+    groups = []
+    for manifest in manifests:
+        folder = manifest[: -len("manifest.json")]
+        groups.append(load_catalog(fetch_json, base + folder))
+    return merge_rows(groups)
 
 
 def load_catalog(fetch_json: Callable[[str], object], base: str) -> list[CatalogRow]:
@@ -229,12 +267,30 @@ def download_row(client, candidates: Sequence[images.Candidate], folder: Path, s
     return result
 
 
-def image_path(key: str) -> str:
-    return f"img/{key[:2]}/{key}.webp"
+def image_paths(key: str, digest: str) -> dict[int, str]:
+    return {size: f"{size}/{key[:2]}/{key}-{digest}.webp" for size in images.OUTPUT_SIZES}
+
+
+def _review_record(key: str, scored: Sequence[images.Scored], chosen: images.Scored | None,
+                   paths: Mapping[int, str] | None) -> dict[str, object]:
+    def describe(item: images.Scored) -> dict[str, object]:
+        metrics = item.metrics
+        return {
+            "sm": item.candidate.supermarket_id, "pos": item.candidate.position, "url": item.candidate.url,
+            "s": item.score, "flags": list(item.flags),
+            "q": metrics.quality if metrics else None, "px": metrics.product_pixels if metrics else None,
+            "eff": metrics.effective if metrics else None,
+            "size": f"{metrics.width}x{metrics.height}" if metrics else None,
+        }
+    return {
+        "key": key, "chosen": describe(chosen) if chosen else None,
+        "file": paths.get(320) if paths else None, "candidates": [describe(item) for item in scored],
+    }
 
 
 def process(keys: Sequence[str], candidates: Mapping[str, Sequence[images.Candidate]], client,
-            output_dir: Path, index: dict[str, dict[str, object]], *, log=print) -> Counter:
+            output_dir: Path, index: dict[str, dict[str, object]], *, log=print,
+            review: list[dict[str, object]] | None = None) -> Counter:
     stats: Counter = Counter()
     generic = generic_urls(candidates)
     with tempfile.TemporaryDirectory(prefix="fotos-") as temporary:
@@ -243,7 +299,7 @@ def process(keys: Sequence[str], candidates: Mapping[str, Sequence[images.Candid
         count = 0
         for number, key in enumerate(keys, 1):
             if client.requests + 2 * len(candidates[key]) > client.max_requests:
-                log(f"presupuesto de descargas agotado tras {number - 1} filas; el resto sigue la próxima semana")
+                log(f"presupuesto de descargas agotado tras {number - 1} filas; el resto sigue en la próxima corrida")
                 stats["filas_pospuestas"] = len(keys) - number + 1
                 break
             downloaded[key] = download_row(client, candidates[key], folder, count, generic)
@@ -262,25 +318,33 @@ def process(keys: Sequence[str], candidates: Mapping[str, Sequence[images.Candid
                 scored.append(images.Scored(item.candidate, item.metrics, value, flags))
                 stats["error_descarga" if item.error else "foto_medida"] += 1
             chosen = images.choose(scored)
-            previous = index.get(key) or {}
+            paths: dict[int, str] | None = None
+            if chosen is not None:
+                path = next(item.path for item in downloaded[key] if item.candidate == chosen.candidate)
+                try:
+                    rendered = images.render(images.load_image(path.read_bytes()), chosen.metrics.bbox)
+                except images.ProductImageError:
+                    chosen = None
             if chosen is None:
                 index[key] = {"sig": sig, "none": 1}
                 stats["sin_foto"] += 1
+                if review is not None:
+                    review.append(_review_record(key, scored, None, None))
                 continue
-            path = next(item.path for item in downloaded[key] if item.candidate == chosen.candidate)
-            try:
-                webp = images.normalize(images.load_image(path.read_bytes()), chosen.metrics.main_bbox)
-            except images.ProductImageError:
-                index[key] = {"sig": sig, "none": 1}
-                stats["sin_foto"] += 1
-                continue
-            target = output_dir / image_path(key)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(webp)
-            version = int(previous.get("v") or 0) + 1
-            index[key] = {"sig": sig, "v": version, "sm": chosen.candidate.supermarket_id, "s": chosen.score}
+            digest = hashlib.sha256(rendered[images.OUTPUT_SIZE]).hexdigest()[:10]
+            paths = image_paths(key, digest)
+            for size, relative in paths.items():
+                target = output_dir / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(rendered[size])
+                stats[f"bytes_{size}"] += len(rendered[size])
+            quality = chosen.metrics.quality
+            index[key] = {"sig": sig, "h": digest, "sm": chosen.candidate.supermarket_id, "s": chosen.score,
+                          "q": quality, "px": chosen.metrics.product_pixels}
             stats["con_foto"] += 1
-            stats["bytes_webp"] += len(webp)
+            stats[f"calidad_{quality}"] += 1
+            if review is not None:
+                review.append(_review_record(key, scored, chosen, paths))
     return stats
 
 
@@ -298,13 +362,63 @@ def write_index(output_dir: Path, index: Mapping[str, Mapping[str, object]], sta
         "schema": INDEX_SCHEMA,
         "pipeline": PIPELINE_VERSION,
         "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "with_photo": sum(1 for value in index.values() if value.get("v") and not value.get("none")),
+        "with_photo": sum(1 for value in index.values() if value.get("h") and not value.get("none")),
+        "quality": dict(Counter(str(value.get("q")) for value in index.values() if value.get("h"))),
         "last_run": dict(stats),
         "items": {key: index[key] for key in sorted(index)},
     }
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / "index.json"
     path.write_text(json.dumps(document, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    return path
+
+
+def select_review(records: Sequence[Mapping[str, object]], *, lowest: int = REVIEW_LOWEST,
+                  sample: int = REVIEW_SAMPLE) -> list[Mapping[str, object]]:
+    """Las peores elegidas, las sin foto y una muestra pareja del resto (determinista)."""
+    chosen = [item for item in records if item.get("chosen")]
+    chosen.sort(key=lambda item: (item["chosen"]["s"], item["key"]))
+    worst = chosen[:lowest]
+    rest = sorted(chosen[lowest:], key=lambda item: hashlib.sha256(str(item["key"]).encode()).hexdigest())
+    missing = [item for item in records if not item.get("chosen")][:40]
+    return [*worst, *rest[:sample], *missing]
+
+
+def write_review(output_dir: Path, records: Sequence[Mapping[str, object]], public_base: str,
+                 stats: Mapping[str, int]) -> Path:
+    """Página estática para revisar a ojo las fotos de la corrida (sin scripts)."""
+    from html import escape
+
+    def card(item: Mapping[str, object]) -> str:
+        chosen = item.get("chosen")
+        image = (f'<img src="{escape(public_base)}/{R2_PREFIX}{escape(str(item["file"]))}" width="160" height="160" '
+                 f'loading="lazy" alt="">') if item.get("file") else '<div class="none">sin foto</div>'
+        rows = "".join(
+            f'<li class="{"win" if chosen and candidate["url"] == chosen["url"] else ""}">'
+            f'<a href="{escape(str(candidate["url"]))}" rel="noreferrer">{escape(str(candidate["sm"]))}'
+            f'{" #2" if candidate["pos"] else ""}</a> {candidate["s"]} pts · {escape(str(candidate["q"]))} · '
+            f'{candidate["px"]} px · ×{candidate["eff"]} · {escape(str(candidate["size"]))}'
+            f'{" · " + escape(", ".join(candidate["flags"])) if candidate["flags"] else ""}</li>'
+            for candidate in item.get("candidates") or ()
+        )
+        return f'<article>{image}<p><b>{escape(str(item["key"]))}</b></p><ul>{rows}</ul></article>'
+
+    summary = " · ".join(f"{escape(str(key))}: {value}" for key, value in sorted(stats.items()))
+    html = (
+        '<!doctype html><html lang="es"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1"><title>Revisión de fotos</title>'
+        '<style>body{font:14px system-ui,sans-serif;margin:16px;background:#f4f5f2;color:#1b1f1d}'
+        'main{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}'
+        'article{background:#fff;border:1px solid #dde1dc;border-radius:10px;padding:10px}'
+        'img,.none{display:block;margin:auto;background:#fff}.none{width:160px;height:160px;line-height:160px;'
+        'text-align:center;color:#999;border:1px dashed #ccc}ul{padding-left:16px;margin:6px 0;font-size:12px}'
+        'li.win{font-weight:700;color:#0f6b4f}p{margin:6px 0;font-size:12px}</style></head><body>'
+        f'<h1>Revisión de fotos</h1><p>{summary}</p><p>Primero las elegidas con menor puntaje, luego una muestra '
+        'y al final productos sin foto aceptable.</p><main>'
+        + "".join(card(item) for item in select_review(records)) + "</main></body></html>"
+    )
+    path = output_dir / "revision.html"
+    path.write_text(html, encoding="utf-8")
     return path
 
 
@@ -352,7 +466,7 @@ def fetch_maps(api, rows: Sequence[CatalogRow], refs: Mapping[int, SourceRef], s
     for store in sorted(stores):
         started = time.monotonic()
         try:
-            if store in {"walmart", "la_colonia"}:
+            if store in sources.VTEX_STORES:
                 maps[store] = api.vtex(store, needed_vtex_ids(rows, refs, store))
             elif store == "colonial":
                 maps[store] = api.colonial()
@@ -385,6 +499,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         default=ROOT / ".automation" / "product-images-capture-authorization.json")
     parser.add_argument("--catalog-base", default=CATALOG_BASE)
     parser.add_argument("--index-url", default=INDEX_URL)
+    parser.add_argument("--public-base", default=PUBLIC_BASE)
     parser.add_argument("--max-products", type=int, default=DEFAULT_MAX_PRODUCTS)
     parser.add_argument("--api-delay", type=float, default=1.0)
     parser.add_argument("--image-delay", type=float, default=0.15)
@@ -401,7 +516,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     public = requests.Session()
     public.headers["User-Agent"] = sources.USER_AGENT
-    rows = load_catalog(_http_json(public), args.catalog_base)
+    rows = load_catalogs(_http_json(public), args.catalog_base)
     index = parse_index(_http_json(public, missing_ok=True)(args.index_url))
     print(f"catálogo: {len(rows)} filas; índice previo: {len(index)} filas")
 
@@ -416,9 +531,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     downloader = sources.ImageSourceClient(requests.Session(), delay=args.image_delay,
                                            max_requests=args.max_image_requests)
-    stats = process(keys, candidates, downloader, args.output_dir, index)
+    review: list[dict[str, object]] = []
+    stats = process(keys, candidates, downloader, args.output_dir, index, review=review)
     stats.update({f"error_{name}": 1 for name in api.errors})
     path = write_index(args.output_dir, index, stats)
+    write_review(args.output_dir, review, args.public_base.rstrip("/"), stats)
     print(json.dumps({"stats": dict(stats), "index": str(path)}, ensure_ascii=False))
     return 0
 

@@ -96,6 +96,23 @@ def test_search_photo_column_comes_from_images_index(tmp_path: Path) -> None:
     photos = {row[0]: row[column["photo"]] for row in _search(output)["rows"]}
     assert photos[first] == 3 and photos[second] == 0
 
+    # Versión 2 (R2): huella de 10 caracteres; gana sobre la v1 producto por producto.
+    v2 = tmp_path / "index-v2.json"
+    v2.write_text(json.dumps({"schema": "super-compras-product-images/v2", "items": {
+        second: {"sig": "c", "h": "0123456789", "sm": "colonial", "q": "hd"},
+        first: {"sig": "d", "none": 1}, "yy": {"h": "NOT-A-HASH"},
+    }}), encoding="utf-8")
+    assert MODULE.load_photo_versions(v2) == {second: "0123456789"}
+    merged = MODULE.load_photo_versions([index, v2])
+    assert merged == {first: 3, second: "0123456789"}
+    MODULE._PHOTO_VERSIONS.update(merged)
+    try:
+        MODULE.attach_search_index(output, manifest)
+    finally:
+        MODULE._PHOTO_VERSIONS.clear()
+    photos = {row[0]: row[column["photo"]] for row in _search(output)["rows"]}
+    assert photos[first] == 3 and photos[second] == "0123456789"
+
 
 def test_app_shell_is_static_safe_and_installable() -> None:
     html = (APP_DIR / "index.html").read_text(encoding="utf-8")
@@ -193,11 +210,17 @@ console.log(JSON.stringify({
 
 def test_photo_url_uses_versioned_public_branch_and_falls_back(tmp_path: Path) -> None:
     script = """
-import { photoUrl } from './data.js';
+import { photoUrl, photoSrcset } from './data.js';
+const v2 = { id: '675e7a84934e90e9d47c0f50', photo: 'a1b2c3d4e5' };
 console.log(JSON.stringify({
   ok: photoUrl({ id: '675e7a84934e90e9d47c0f50', photo: 3 }),
   none: photoUrl({ id: '675e7a84', photo: 0 }),
   bad: photoUrl({ id: '../x', photo: 2 }),
+  badHash: photoUrl({ id: '675e7a84', photo: '../../x' }),
+  v2card: photoUrl(v2),
+  v2detail: photoUrl(v2, 800),
+  srcset: photoSrcset(v2),
+  v1srcset: photoSrcset({ id: '675e7a84', photo: 3 }),
 }));
 """
     result = json.loads(_node(script, tmp_path))
@@ -205,12 +228,17 @@ console.log(JSON.stringify({
         "https://raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/"
         "product-images/img/67/675e7a84934e90e9d47c0f50.webp?v=3"
     )
-    assert result["none"] is None and result["bad"] is None
+    assert result["none"] is None and result["bad"] is None and result["badHash"] is None
+    r2 = "https://pub-0dcb2204775c484dbe6681e659eee236.r2.dev/fotos/v2/"
+    assert result["v2card"] == r2 + "320/67/675e7a84934e90e9d47c0f50-a1b2c3d4e5.webp"
+    assert result["v2detail"] == r2 + "800/67/675e7a84934e90e9d47c0f50-a1b2c3d4e5.webp"
+    assert result["srcset"] == f"{result['v2card']} 320w, {result['v2detail']} 800w"
+    assert result["v1srcset"] is None
     html = (APP_DIR / "index.html").read_text(encoding="utf-8")
-    assert "img-src 'self' data: https://raw.githubusercontent.com;" in html
+    assert "img-src 'self' data: https://raw.githubusercontent.com https://pub-0dcb2204775c484dbe6681e659eee236.r2.dev;" in html
     app = (APP_DIR / "app.js").read_text(encoding="utf-8")
     assert 'image.addEventListener("error", () => image.replaceWith(productIllustration(' in app
-    assert 'image.crossOrigin = "anonymous"' in app and 'image.loading = "lazy"' in app
+    assert 'image.crossOrigin = "anonymous"' in app and 'image.loading = sizes ? "eager" : "lazy"' in app
     assert "mix-blend-mode: multiply" in (APP_DIR / "styles.css").read_text(encoding="utf-8")
 
 

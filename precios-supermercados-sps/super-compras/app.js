@@ -2,21 +2,28 @@
 // Vistas: inicio, búsqueda, ficha de producto, ofertas y Mi compra.
 import {
   Catalog, RETAILER_COLORS, rowKey, RETAILER_INITIALS, RETAILER_NAMES, loadCart, loadCities, loadCitySlug, money,
-  photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, storeLabel,
-} from "./data.js?v=20261024-1";
-import { productIllustration } from "./illustration.js?v=20261024-1";
+  photoSrcset, photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, storeLabel,
+} from "./data.js?v=20261025-1";
+import { productIllustration } from "./illustration.js?v=20261025-1";
 
 // Foto real si existe; si no hay o falla al cargar, la ilustración de siempre.
-function productVisual(product, { size = 118, decorative = true } = {}) {
-  const url = photoUrl(product);
+// Tarjetas y miniaturas usan 320 px; el detalle deja que el navegador elija 320 u
+// 800 según la pantalla (sizes = ancho mostrado).
+function productVisual(product, { size = 118, decorative = true, sizes = null } = {}) {
+  const url = photoUrl(product, sizes ? 800 : 320);
   if (!url) return productIllustration(product, { size, decorative });
   const image = document.createElement("img");
   image.className = "photo";
   image.crossOrigin = "anonymous";
-  image.loading = "lazy";
+  image.loading = sizes ? "eager" : "lazy";
   image.decoding = "async";
-  image.width = 400;
-  image.height = 400;
+  image.width = 800;
+  image.height = 800;
+  const srcset = sizes ? photoSrcset(product) : null;
+  if (srcset) {
+    image.srcset = srcset;
+    image.sizes = sizes;
+  }
   image.alt = decorative ? "" : [product.brand, product.product_name, product.presentation].filter(Boolean).join(" ");
   image.addEventListener("error", () => image.replaceWith(productIllustration(product, { size, decorative })), { once: true });
   image.src = url;
@@ -362,7 +369,7 @@ function viewProduct(id, container) {
         },
       }, icon("share", 20))),
     h("div", { class: "product-layout" },
-      h("div", { class: "product-image" }, productVisual(product, { size: 240, decorative: false })),
+      h("div", { class: "product-image" }, productVisual(product, { size: 240, decorative: false, sizes: "(min-width: 900px) 420px, 70vw" })),
       h("div", { class: "product-info" },
         h("div", { class: "product-title" },
           h("strong", { class: "brand-xl" }, product.brand_label ?? (product.brand || product.product_type || "")),
