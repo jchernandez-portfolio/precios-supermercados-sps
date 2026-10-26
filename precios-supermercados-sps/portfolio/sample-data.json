@@ -1,7 +1,7 @@
 {
   "comparison_policy": "fail_closed_strong_identity_and_commercial_consistency",
   "currency": "HNL",
-  "published_at_utc": "2026-10-25T21:07:22Z",
+  "published_at_utc": "2026-10-26T11:54:15Z",
   "row_count": 10,
   "rows": [
     {
@@ -203,72 +203,6 @@
       "savings_vs_highest_pct": "13.65"
     },
     {
-      "best_price": "270.10",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "07500435252089",
-      "canonical_product_id": "prod_gtin_07500435252089",
-      "highest_price": "303.95",
-      "offers": [
-        {
-          "current_price": "303.95",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Downy",
-          "source_category": "Limpieza",
-          "source_name": "Suavizante Downy Intense Exótico 2.8 Lt",
-          "source_presentation": "2.8 Lt",
-          "source_record_id": "la_colonia:6313",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "270.10",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "DOWNY",
-          "source_category": "Limpieza",
-          "source_name": "Suavizante Downy Intense Exotico 2800 Ml",
-          "source_presentation": null,
-          "source_record_id": "walmart:26923",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "33.85",
-      "savings_vs_highest_pct": "11.14"
-    },
-    {
-      "best_price": "130.00",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "00099176231813",
-      "canonical_product_id": "prod_gtin_00099176231813",
-      "highest_price": "157.56",
-      "offers": [
-        {
-          "current_price": "157.56",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Suavitel",
-          "source_category": "Limpieza",
-          "source_name": "Suavizante de Telas Suavitel Complete Fresca Primavera 1.9 L",
-          "source_presentation": "1.9 L",
-          "source_record_id": "la_colonia:3868",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "130.00",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "SUAVITEL",
-          "source_category": "Limpieza",
-          "source_name": "Suavizante de Telas Suavitel Complete Fresca Primavera -1.9 L",
-          "source_presentation": null,
-          "source_record_id": "walmart:23045",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "27.56",
-      "savings_vs_highest_pct": "17.49"
-    },
-    {
       "best_price": "420.95",
       "best_supermarket_id": "la_colonia",
       "canonical_gtin": "04022025811030",
@@ -333,6 +267,72 @@
       ],
       "savings_vs_highest": "20.65",
       "savings_vs_highest_pct": "26.09"
+    },
+    {
+      "best_price": "106.55",
+      "best_supermarket_id": "la_colonia",
+      "canonical_gtin": "00787003000649",
+      "canonical_product_id": "prod_gtin_00787003000649",
+      "highest_price": "125.00",
+      "offers": [
+        {
+          "current_price": "106.55",
+          "is_best_price": true,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Yes",
+          "source_category": "Alimentos",
+          "source_name": "Yogurt Yes Sabor Fresa 1 Kg",
+          "source_presentation": "1 Kg",
+          "source_record_id": "la_colonia:2626",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "125.00",
+          "is_best_price": false,
+          "location_id": "walmart_sps",
+          "source_brand": "YES",
+          "source_category": "Alimentos",
+          "source_name": "Yogurt Yes sabor fresa - 1 kg",
+          "source_presentation": null,
+          "source_record_id": "walmart:26085",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "18.45",
+      "savings_vs_highest_pct": "14.76"
+    },
+    {
+      "best_price": "146.50",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "00795893303221",
+      "canonical_product_id": "prod_gtin_00795893303221",
+      "highest_price": "163.00",
+      "offers": [
+        {
+          "current_price": "163.00",
+          "is_best_price": false,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Leyde",
+          "source_category": "Alimentos",
+          "source_name": "Mantequilla Amarilla Leyde 454 Gr",
+          "source_presentation": "454 Gr",
+          "source_record_id": "la_colonia:863",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "146.50",
+          "is_best_price": true,
+          "location_id": "walmart_sps",
+          "source_brand": "LEYDE",
+          "source_category": "Alimentos",
+          "source_name": "Mantequilla Leyde Amarilla - 454 g",
+          "source_presentation": null,
+          "source_record_id": "walmart:26149",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "16.50",
+      "savings_vs_highest_pct": "10.12"
     }
   ],
   "schema": "precios-sps-safe-portfolio-sample/v1",
@@ -347,8 +347,8 @@
     }
   ],
   "selection_rule": "highest_absolute_savings_within_safe_common_comparable_universe",
-  "source_as_of": "2026-10-25T20:59:21.859476Z",
+  "source_as_of": "2026-10-26T11:49:41.860616Z",
   "source_head_sha": "ef95b860dce4c584e01bc5418d7e638256f6ddf9",
   "source_schema": "rpi-consumer-mart/v2",
-  "source_workflow_run_id": 40233296289
+  "source_workflow_run_id": 40317917344
 }
