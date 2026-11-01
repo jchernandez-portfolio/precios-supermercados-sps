@@ -1,7 +1,7 @@
 {
   "comparison_policy": "fail_closed_strong_identity_and_commercial_consistency",
   "currency": "HNL",
-  "published_at_utc": "2026-10-27T22:20:50Z",
+  "published_at_utc": "2026-11-01T11:54:11Z",
   "row_count": 10,
   "rows": [
     {
@@ -71,6 +71,138 @@
       "savings_vs_highest_pct": "18.02"
     },
     {
+      "best_price": "272.20",
+      "best_supermarket_id": "la_colonia",
+      "canonical_gtin": "00085000020456",
+      "canonical_product_id": "prod_gtin_00085000020456",
+      "highest_price": "343.20",
+      "offers": [
+        {
+          "current_price": "272.20",
+          "is_best_price": true,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Barefoot",
+          "source_category": "Bebidas",
+          "source_name": "Vino Barefoot Pink Moscato de 750ML Vino Barefoot Pink Moscato 750 mL",
+          "source_presentation": "750 mL",
+          "source_record_id": "la_colonia:7168",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "343.20",
+          "is_best_price": false,
+          "location_id": "walmart_sps",
+          "source_brand": "BAREFOOT",
+          "source_category": "Bebidas",
+          "source_name": "Vino Barefoot Pink Moscato - 750ml",
+          "source_presentation": null,
+          "source_record_id": "walmart:61379",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "71.00",
+      "savings_vs_highest_pct": "20.69"
+    },
+    {
+      "best_price": "130.00",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "00099176231813",
+      "canonical_product_id": "prod_gtin_00099176231813",
+      "highest_price": "196.95",
+      "offers": [
+        {
+          "current_price": "196.95",
+          "is_best_price": false,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Suavitel",
+          "source_category": "Limpieza",
+          "source_name": "Suavizante de Telas Suavitel Complete Fresca Primavera 1.9 L",
+          "source_presentation": "1.9 L",
+          "source_record_id": "la_colonia:3868",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "130.00",
+          "is_best_price": true,
+          "location_id": "walmart_sps",
+          "source_brand": "SUAVITEL",
+          "source_category": "Limpieza",
+          "source_name": "Suavizante de Telas Suavitel Complete Fresca Primavera -1.9 L",
+          "source_presentation": null,
+          "source_record_id": "walmart:23045",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "66.95",
+      "savings_vs_highest_pct": "33.99"
+    },
+    {
+      "best_price": "180.00",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "07891150103115",
+      "canonical_product_id": "prod_gtin_07891150103115",
+      "highest_price": "241.95",
+      "offers": [
+        {
+          "current_price": "241.95",
+          "is_best_price": false,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Dove",
+          "source_category": "Cuidado personal",
+          "source_name": "Acondicionador Dove Nutrición+Tri Oleos 370 Ml",
+          "source_presentation": "370 Ml",
+          "source_record_id": "la_colonia:59606",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "180.00",
+          "is_best_price": true,
+          "location_id": "walmart_sps",
+          "source_brand": "DOVE",
+          "source_category": "Cuidado personal",
+          "source_name": "Acondicionador Dove nutrición tri-óleos - 370 ml",
+          "source_presentation": null,
+          "source_record_id": "walmart:30385",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "61.95",
+      "savings_vs_highest_pct": "25.60"
+    },
+    {
+      "best_price": "145.43",
+      "best_supermarket_id": "la_colonia",
+      "canonical_gtin": "07404003390039",
+      "canonical_product_id": "prod_gtin_07404003390039",
+      "highest_price": "203.90",
+      "offers": [
+        {
+          "current_price": "145.43",
+          "is_best_price": true,
+          "location_id": "la_colonia_sps",
+          "source_brand": "El Panal",
+          "source_category": "Bebés",
+          "source_name": "Miel De Abeja El Panal 750 Gr",
+          "source_presentation": "750 Gr",
+          "source_record_id": "la_colonia:7689",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "203.90",
+          "is_best_price": false,
+          "location_id": "walmart_sps",
+          "source_brand": "EL PANAL",
+          "source_category": "Bebés",
+          "source_name": "Miel El Panal De Abeja - 750 g",
+          "source_presentation": null,
+          "source_record_id": "walmart:26853",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "58.47",
+      "savings_vs_highest_pct": "28.68"
+    },
+    {
       "best_price": "200.00",
       "best_supermarket_id": "walmart",
       "canonical_gtin": "07421800110172",
@@ -104,235 +236,103 @@
       "savings_vs_highest_pct": "22.59"
     },
     {
-      "best_price": "200.00",
+      "best_price": "109.09",
+      "best_supermarket_id": "la_colonia",
+      "canonical_gtin": "07404003390015",
+      "canonical_product_id": "prod_gtin_07404003390015",
+      "highest_price": "152.90",
+      "offers": [
+        {
+          "current_price": "109.09",
+          "is_best_price": true,
+          "location_id": "la_colonia_sps",
+          "source_brand": "El Panal",
+          "source_category": "Bebés",
+          "source_name": "Miel De Abeja El Panal 500 Gr",
+          "source_presentation": "500 Gr",
+          "source_record_id": "la_colonia:7688",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "152.90",
+          "is_best_price": false,
+          "location_id": "walmart_sps",
+          "source_brand": "EL PANAL",
+          "source_category": "Bebés",
+          "source_name": "Miel El Panal De Abeja - 500 g",
+          "source_presentation": null,
+          "source_record_id": "walmart:26854",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "43.81",
+      "savings_vs_highest_pct": "28.65"
+    },
+    {
+      "best_price": "197.56",
+      "best_supermarket_id": "la_colonia",
+      "canonical_gtin": "00041331011051",
+      "canonical_product_id": "prod_gtin_00041331011051",
+      "highest_price": "233.40",
+      "offers": [
+        {
+          "current_price": "197.56",
+          "is_best_price": true,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Goya",
+          "source_category": "Alimentos",
+          "source_name": "Aceite Goya Oliva Extra Virgen 250 ml",
+          "source_presentation": "250 ml",
+          "source_record_id": "la_colonia:2868",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "233.40",
+          "is_best_price": false,
+          "location_id": "walmart_sps",
+          "source_brand": "GOYA",
+          "source_category": "Alimentos",
+          "source_name": "Goya Aceite Oliva Extra Virgen 250 Ml",
+          "source_presentation": null,
+          "source_record_id": "walmart:20760",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "35.84",
+      "savings_vs_highest_pct": "15.36"
+    },
+    {
+      "best_price": "170.00",
       "best_supermarket_id": "walmart",
-      "canonical_gtin": "07891150103115",
-      "canonical_product_id": "prod_gtin_07891150103115",
-      "highest_price": "241.95",
+      "canonical_gtin": "07421001641338",
+      "canonical_product_id": "prod_gtin_07421001641338",
+      "highest_price": "200.95",
       "offers": [
         {
-          "current_price": "241.95",
+          "current_price": "200.95",
           "is_best_price": false,
           "location_id": "la_colonia_sps",
-          "source_brand": "Dove",
-          "source_category": "Cuidado personal",
-          "source_name": "Acondicionador Dove Nutrición+Tri Oleos 370 Ml",
-          "source_presentation": "370 Ml",
-          "source_record_id": "la_colonia:59606",
+          "source_brand": "Limpiox",
+          "source_category": "Limpieza",
+          "source_name": "Desinfectante Limpiox Lavanda 5 Lt",
+          "source_presentation": "5 Lt",
+          "source_record_id": "la_colonia:4848",
           "supermarket_id": "la_colonia"
         },
         {
-          "current_price": "200.00",
+          "current_price": "170.00",
           "is_best_price": true,
           "location_id": "walmart_sps",
-          "source_brand": "DOVE",
-          "source_category": "Cuidado personal",
-          "source_name": "Acondicionador Dove nutrición tri-óleos - 370 ml",
+          "source_brand": "LIMPIOX",
+          "source_category": "Limpieza",
+          "source_name": "Desinfectante Limpiox Lavanda - 5000 ml",
           "source_presentation": null,
-          "source_record_id": "walmart:30385",
+          "source_record_id": "walmart:31901",
           "supermarket_id": "walmart"
         }
       ],
-      "savings_vs_highest": "41.95",
-      "savings_vs_highest_pct": "17.34"
-    },
-    {
-      "best_price": "224.50",
-      "best_supermarket_id": "la_colonia",
-      "canonical_gtin": "07500435155847",
-      "canonical_product_id": "prod_gtin_07500435155847",
-      "highest_price": "260.00",
-      "offers": [
-        {
-          "current_price": "224.50",
-          "is_best_price": true,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Pantene",
-          "source_category": "Cuidado personal",
-          "source_name": "Shampoo Pantene Pro-V Bambu Nutre Y Crece 400 Ml",
-          "source_presentation": "400 Ml",
-          "source_record_id": "la_colonia:2543",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "260.00",
-          "is_best_price": false,
-          "location_id": "walmart_sps",
-          "source_brand": "PANTENE",
-          "source_category": "Cuidado personal",
-          "source_name": "Shampoo Pantene Pro-V Bambú Nutre Crece - 400 ml",
-          "source_presentation": null,
-          "source_record_id": "walmart:19217",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "35.50",
-      "savings_vs_highest_pct": "13.65"
-    },
-    {
-      "best_price": "224.50",
-      "best_supermarket_id": "la_colonia",
-      "canonical_gtin": "07500435155922",
-      "canonical_product_id": "prod_gtin_07500435155922",
-      "highest_price": "260.00",
-      "offers": [
-        {
-          "current_price": "224.50",
-          "is_best_price": true,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Pantene",
-          "source_category": "Cuidado personal",
-          "source_name": "Acondicionador Pantene Pro-V Bambu Nutre Y Crece 400 Ml",
-          "source_presentation": "400 Ml",
-          "source_record_id": "la_colonia:1962",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "260.00",
-          "is_best_price": false,
-          "location_id": "walmart_sps",
-          "source_brand": "PANTENE",
-          "source_category": "Cuidado personal",
-          "source_name": "Acondicionador Pantene Pro-V Bambú Nutre & Crece -400 ml",
-          "source_presentation": null,
-          "source_record_id": "walmart:19221",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "35.50",
-      "savings_vs_highest_pct": "13.65"
-    },
-    {
-      "best_price": "420.95",
-      "best_supermarket_id": "la_colonia",
-      "canonical_gtin": "04022025811030",
-      "canonical_product_id": "prod_gtin_04022025811030",
-      "highest_price": "443.80",
-      "offers": [
-        {
-          "current_price": "420.95",
-          "is_best_price": true,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Blue Nun",
-          "source_category": "Bebidas",
-          "source_name": "Vino Tinto Blue Nun Merlot 750 Ml",
-          "source_presentation": "750 Ml",
-          "source_record_id": "la_colonia:6857",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "443.80",
-          "is_best_price": false,
-          "location_id": "walmart_sps",
-          "source_brand": "BLUE NUN",
-          "source_category": "Bebidas",
-          "source_name": "Vino Blue Nun Tinto Merlot - 750 ml",
-          "source_presentation": null,
-          "source_record_id": "walmart:28213",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "22.85",
-      "savings_vs_highest_pct": "5.15"
-    },
-    {
-      "best_price": "58.50",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "07421000811640",
-      "canonical_product_id": "prod_gtin_07421000811640",
-      "highest_price": "79.15",
-      "offers": [
-        {
-          "current_price": "79.15",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Sula",
-          "source_category": "Bebidas",
-          "source_name": "Jugo Sula Ponche De Frutas 1.89 Lt",
-          "source_presentation": "1.89 Lt",
-          "source_record_id": "la_colonia:740",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "58.50",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "SULA",
-          "source_category": "Bebidas",
-          "source_name": "Jugo de Frutas Sula Ponche De Frutas - 1.89 L",
-          "source_presentation": null,
-          "source_record_id": "walmart:31798",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "20.65",
-      "savings_vs_highest_pct": "26.09"
-    },
-    {
-      "best_price": "106.55",
-      "best_supermarket_id": "la_colonia",
-      "canonical_gtin": "00787003000649",
-      "canonical_product_id": "prod_gtin_00787003000649",
-      "highest_price": "125.00",
-      "offers": [
-        {
-          "current_price": "106.55",
-          "is_best_price": true,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Yes",
-          "source_category": "Alimentos",
-          "source_name": "Yogurt Yes Sabor Fresa 1 Kg",
-          "source_presentation": "1 Kg",
-          "source_record_id": "la_colonia:2626",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "125.00",
-          "is_best_price": false,
-          "location_id": "walmart_sps",
-          "source_brand": "YES",
-          "source_category": "Alimentos",
-          "source_name": "Yogurt Yes sabor fresa - 1 kg",
-          "source_presentation": null,
-          "source_record_id": "walmart:26085",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "18.45",
-      "savings_vs_highest_pct": "14.76"
-    },
-    {
-      "best_price": "146.50",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "00795893303221",
-      "canonical_product_id": "prod_gtin_00795893303221",
-      "highest_price": "163.00",
-      "offers": [
-        {
-          "current_price": "163.00",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Leyde",
-          "source_category": "Alimentos",
-          "source_name": "Mantequilla Amarilla Leyde 454 Gr",
-          "source_presentation": "454 Gr",
-          "source_record_id": "la_colonia:863",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "146.50",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "LEYDE",
-          "source_category": "Alimentos",
-          "source_name": "Mantequilla Leyde Amarilla - 454 g",
-          "source_presentation": null,
-          "source_record_id": "walmart:26149",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "16.50",
-      "savings_vs_highest_pct": "10.12"
+      "savings_vs_highest": "30.95",
+      "savings_vs_highest_pct": "15.40"
     }
   ],
   "schema": "precios-sps-safe-portfolio-sample/v1",
@@ -347,8 +347,8 @@
     }
   ],
   "selection_rule": "highest_absolute_savings_within_safe_common_comparable_universe",
-  "source_as_of": "2026-10-27T22:16:47.822175Z",
+  "source_as_of": "2026-11-01T11:49:17.761505Z",
   "source_head_sha": "ef95b860dce4c584e01bc5418d7e638256f6ddf9",
   "source_schema": "rpi-consumer-mart/v2",
-  "source_workflow_run_id": 40593543265
+  "source_workflow_run_id": 41303558996
 }
