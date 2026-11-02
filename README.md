@@ -1,6 +1,6 @@
 # Errores de datos en Súper Compras
 
-Actualizado automáticamente el 2026-11-02 a partir del catálogo publicado (San Pedro Sula: 2026-11-01T22:17:04.318529Z; Tegucigalpa: 2026-11-01T22:19:45.431558Z).
+Actualizado automáticamente el 2026-11-02 a partir del catálogo publicado (San Pedro Sula: 2026-11-02T11:46:40.596305Z; Tegucigalpa: 2026-11-02T11:49:48.379598Z).
 
 - [`errores_detectados.csv`](errores_detectados.csv): todo lo que la revisión automática encuentra hoy, una fila por producto y supermercado, con enlace al producto.
 - [`errores_confirmados.csv`](errores_confirmados.csv): errores revisados a mano, de dónde vienen (súper o Súper Compras) y su estado.
@@ -10,61 +10,61 @@ Actualizado automáticamente el 2026-11-02 a partir del catálogo publicado (San
 
 ## Captura diaria
 
-⚠️ 4 sucursal(es) sin captura aceptada hoy; la web muestra la fecha de esos precios.
+⚠️ 1 sucursal(es) sin captura aceptada hoy; la web muestra la fecha de esos precios.
 
 | Ciudad | Supermercado | Sucursal | Última captura (UTC) | Horas | Estado |
 |---|---|---|---|---:|---|
-| San Pedro Sula | La Colonia | la_colonia_sps | 2026-11-01 11:32 | 10 | Al día |
-| San Pedro Sula | Colonial | colonial_sps | 2026-10-26 11:26 | 154 | Atrasado |
-| San Pedro Sula | Walmart | walmart_sps | 2026-11-01 11:25 | 10 | Al día |
-| San Pedro Sula | PriceSmart | pricesmart_sps | 2026-10-26 11:18 | 154 | Atrasado |
-| San Pedro Sula | Los Andes | comisariato_los_andes_sps | 2026-10-21 11:18 | 274 | Atrasado |
-| Tegucigalpa | La Colonia | la_colonia_tgu | 2026-11-01 11:41 | 10 | Al día |
-| Tegucigalpa | Walmart | walmart_tgu_ffaa | 2026-11-01 11:33 | 10 | Al día |
-| Tegucigalpa | Walmart | walmart_tgu_el_sauce | 2026-11-01 11:40 | 10 | Al día |
-| Tegucigalpa | PriceSmart | pricesmart_tgu | 2026-10-26 11:18 | 155 | Atrasado |
-| Tegucigalpa | Paiz | paiz_tgu_multiplaza | 2026-11-01 11:23 | 10 | Al día |
-| Tegucigalpa | Paiz | paiz_tgu_proceres | 2026-11-01 11:27 | 10 | Al día |
+| San Pedro Sula | La Colonia | la_colonia_sps | 2026-11-02 11:27 | 0 | Al día |
+| San Pedro Sula | Colonial | colonial_sps | 2026-11-02 11:26 | 0 | Al día |
+| San Pedro Sula | Walmart | walmart_sps | 2026-11-02 11:24 | 0 | Al día |
+| San Pedro Sula | PriceSmart | pricesmart_sps | 2026-11-02 11:18 | 0 | Al día |
+| San Pedro Sula | Los Andes | comisariato_los_andes_sps | 2026-10-21 11:18 | 288 | Atrasado |
+| Tegucigalpa | La Colonia | la_colonia_tgu | 2026-11-02 11:36 | 0 | Al día |
+| Tegucigalpa | Walmart | walmart_tgu_ffaa | 2026-11-02 11:31 | 0 | Al día |
+| Tegucigalpa | Walmart | walmart_tgu_el_sauce | 2026-11-02 11:39 | 0 | Al día |
+| Tegucigalpa | PriceSmart | pricesmart_tgu | 2026-11-02 11:18 | 0 | Al día |
+| Tegucigalpa | Paiz | paiz_tgu_multiplaza | 2026-11-02 11:21 | 0 | Al día |
+| Tegucigalpa | Paiz | paiz_tgu_proceres | 2026-11-02 11:25 | 0 | Al día |
 
 ## Fotos de producto
 
-40,291 de 67,447 productos con foto (60 %). Las fotos v2 se publican en dos tamaños; hd = detalle real para 800 px, sd = suficiente para tarjetas, low = foto chica.
+39,988 de 67,495 productos con foto (59 %). Las fotos v2 se publican en dos tamaños; hd = detalle real para 800 px, sd = suficiente para tarjetas, low = foto chica.
 
 | Ciudad | Supermercado | Productos | Con foto | Sin foto | % | hd | sd | low |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| San Pedro Sula | Total | 33796 | 23492 | 10304 | 70 % | 16178 | 6233 | 128 |
-| San Pedro Sula | Colonial | 8433 | 7054 | 1379 | 84 % |  |  |  |
+| San Pedro Sula | Total | 33787 | 23310 | 10477 | 69 % | 16018 | 6211 | 128 |
+| San Pedro Sula | Colonial | 8432 | 7007 | 1425 | 83 % |  |  |  |
 | San Pedro Sula | Los Andes | 6740 | 6005 | 735 | 89 % |  |  |  |
-| San Pedro Sula | La Colonia | 7176 | 6221 | 955 | 87 % |  |  |  |
-| San Pedro Sula | PriceSmart | 2613 | 1272 | 1341 | 49 % |  |  |  |
-| San Pedro Sula | Walmart | 15284 | 9377 | 5907 | 61 % |  |  |  |
-| Tegucigalpa | Total | 33651 | 16799 | 16852 | 50 % | 14809 | 1922 | 2 |
-| Tegucigalpa | La Colonia | 7691 | 6563 | 1128 | 85 % |  |  |  |
-| Tegucigalpa | Paiz | 10385 | 8334 | 2051 | 80 % |  |  |  |
-| Tegucigalpa | PriceSmart | 2627 | 1293 | 1334 | 49 % |  |  |  |
-| Tegucigalpa | Walmart | 23723 | 10595 | 13128 | 45 % |  |  |  |
+| San Pedro Sula | La Colonia | 7176 | 6218 | 958 | 87 % |  |  |  |
+| San Pedro Sula | PriceSmart | 2616 | 1188 | 1428 | 45 % |  |  |  |
+| San Pedro Sula | Walmart | 15274 | 9329 | 5945 | 61 % |  |  |  |
+| Tegucigalpa | Total | 33708 | 16678 | 17030 | 49 % | 14692 | 1918 | 2 |
+| Tegucigalpa | La Colonia | 7691 | 6561 | 1130 | 85 % |  |  |  |
+| Tegucigalpa | Paiz | 10380 | 8313 | 2067 | 80 % |  |  |  |
+| Tegucigalpa | PriceSmart | 2707 | 1213 | 1494 | 45 % |  |  |  |
+| Tegucigalpa | Walmart | 23705 | 10560 | 13145 | 45 % |  |  |  |
 
 ## San Pedro Sula
 
 | Problema | Colonial | La Colonia | Los Andes | PriceSmart | Walmart | Total |
 |---|---:|---:|---:|---:|---:|---:|
-| Peso o volumen imposible | 0 | 0 | 0 | 9 | 6 | 15 |
+| Peso o volumen imposible | 0 | 0 | 0 | 8 | 6 | 14 |
 | Precio por unidad: probable error | 7 | 7 | 8 | 7 | 25 | 54 |
-| Precio por unidad: revisar | 23 | 23 | 15 | 3 | 28 | 92 |
+| Precio por unidad: revisar | 26 | 23 | 15 | 3 | 29 | 96 |
 | Medida mal escrita por el súper | 0 | 0 | 0 | 0 | 1 | 1 |
-| Sin presentación | 90 | 44 | 109 | 19 | 348 | 610 |
-| Corregido en la web | 7 | 5 | 1 | 5 | 4 | 22 |
+| Sin presentación | 89 | 42 | 109 | 21 | 346 | 607 |
+| Corregido en la web | 7 | 5 | 1 | 3 | 4 | 20 |
 
 ## Tegucigalpa
 
 | Problema | La Colonia | Paiz | PriceSmart | Walmart | Total |
 |---|---:|---:|---:|---:|---:|
-| Peso o volumen imposible | 0 | 2 | 8 | 12 | 22 |
-| Precio por unidad: probable error | 14 | 46 | 8 | 41 | 109 |
-| Precio por unidad: revisar | 23 | 21 | 2 | 34 | 80 |
+| Peso o volumen imposible | 0 | 2 | 7 | 12 | 21 |
+| Precio por unidad: probable error | 14 | 45 | 8 | 41 | 108 |
+| Precio por unidad: revisar | 23 | 21 | 3 | 34 | 81 |
 | Medida mal escrita por el súper | 0 | 0 | 0 | 2 | 2 |
 | Distinto entre ciudades | 11 | 0 | 0 | 1 | 12 |
-| Sin presentación | 30 | 39 | 21 | 602 | 692 |
+| Sin presentación | 30 | 39 | 22 | 603 | 694 |
 | Corregido en la web | 6 | 6 | 2 | 6 | 20 |
 
 ## Qué significa cada problema
