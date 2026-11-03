@@ -1,7 +1,7 @@
 {
   "comparison_policy": "fail_closed_strong_identity_and_commercial_consistency",
   "currency": "HNL",
-  "published_at_utc": "2026-11-03T01:11:28Z",
+  "published_at_utc": "2026-11-03T11:52:03Z",
   "row_count": 10,
   "rows": [
     {
@@ -36,39 +36,6 @@
       ],
       "savings_vs_highest": "91.48",
       "savings_vs_highest_pct": "20.89"
-    },
-    {
-      "best_price": "400.00",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "00099176231837",
-      "canonical_product_id": "prod_gtin_00099176231837",
-      "highest_price": "487.95",
-      "offers": [
-        {
-          "current_price": "487.95",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Suavitel",
-          "source_category": "Limpieza",
-          "source_name": "Suavizante de Telas Suavitel Complete Fresca Primavera 5 L",
-          "source_presentation": "5 L",
-          "source_record_id": "la_colonia:3869",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "400.00",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "SUAVITEL",
-          "source_category": "Limpieza",
-          "source_name": "Suavizante de Telas Suavitel Complete Fresca Primavera - 5 L",
-          "source_presentation": null,
-          "source_record_id": "walmart:23047",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "87.95",
-      "savings_vs_highest_pct": "18.02"
     },
     {
       "best_price": "272.20",
@@ -203,6 +170,39 @@
       "savings_vs_highest_pct": "22.59"
     },
     {
+      "best_price": "435.00",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "00099176231837",
+      "canonical_product_id": "prod_gtin_00099176231837",
+      "highest_price": "487.95",
+      "offers": [
+        {
+          "current_price": "487.95",
+          "is_best_price": false,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Suavitel",
+          "source_category": "Limpieza",
+          "source_name": "Suavizante de Telas Suavitel Complete Fresca Primavera 5 L",
+          "source_presentation": "5 L",
+          "source_record_id": "la_colonia:3869",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "435.00",
+          "is_best_price": true,
+          "location_id": "walmart_sps",
+          "source_brand": "SUAVITEL",
+          "source_category": "Limpieza",
+          "source_name": "Suavizante de Telas Suavitel Complete Fresca Primavera - 5 L",
+          "source_presentation": null,
+          "source_record_id": "walmart:23047",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "52.95",
+      "savings_vs_highest_pct": "10.85"
+    },
+    {
       "best_price": "109.09",
       "best_supermarket_id": "la_colonia",
       "canonical_gtin": "07404003390015",
@@ -269,39 +269,6 @@
       "savings_vs_highest_pct": "15.36"
     },
     {
-      "best_price": "170.00",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "07421001641338",
-      "canonical_product_id": "prod_gtin_07421001641338",
-      "highest_price": "200.95",
-      "offers": [
-        {
-          "current_price": "200.95",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Limpiox",
-          "source_category": "Limpieza",
-          "source_name": "Desinfectante Limpiox Lavanda 5 Lt",
-          "source_presentation": "5 Lt",
-          "source_record_id": "la_colonia:4848",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "170.00",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "LIMPIOX",
-          "source_category": "Limpieza",
-          "source_name": "Desinfectante Limpiox Lavanda - 5000 ml",
-          "source_presentation": null,
-          "source_record_id": "walmart:31901",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "30.95",
-      "savings_vs_highest_pct": "15.40"
-    },
-    {
       "best_price": "420.95",
       "best_supermarket_id": "la_colonia",
       "canonical_gtin": "04022025811030",
@@ -333,6 +300,39 @@
       ],
       "savings_vs_highest": "22.85",
       "savings_vs_highest_pct": "5.15"
+    },
+    {
+      "best_price": "58.50",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "07421000811640",
+      "canonical_product_id": "prod_gtin_07421000811640",
+      "highest_price": "79.15",
+      "offers": [
+        {
+          "current_price": "79.15",
+          "is_best_price": false,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Sula",
+          "source_category": "Bebidas",
+          "source_name": "Jugo Sula Ponche De Frutas 1.89 Lt",
+          "source_presentation": "1.89 Lt",
+          "source_record_id": "la_colonia:740",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "58.50",
+          "is_best_price": true,
+          "location_id": "walmart_sps",
+          "source_brand": "SULA",
+          "source_category": "Bebidas",
+          "source_name": "Jugo de Frutas Sula Ponche De Frutas - 1.89 L",
+          "source_presentation": null,
+          "source_record_id": "walmart:31798",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "20.65",
+      "savings_vs_highest_pct": "26.09"
     }
   ],
   "schema": "precios-sps-safe-portfolio-sample/v1",
@@ -347,8 +347,8 @@
     }
   ],
   "selection_rule": "highest_absolute_savings_within_safe_common_comparable_universe",
-  "source_as_of": "2026-11-03T01:07:09.276413Z",
+  "source_as_of": "2026-11-03T11:44:24.233596Z",
   "source_head_sha": "ef95b860dce4c584e01bc5418d7e638256f6ddf9",
   "source_schema": "rpi-consumer-mart/v2",
-  "source_workflow_run_id": 41557560433
+  "source_workflow_run_id": 41629892739
 }
