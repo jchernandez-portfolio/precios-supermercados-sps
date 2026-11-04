@@ -32,13 +32,13 @@ Actualizado automáticamente el 2026-11-04 a partir del catálogo publicado (San
 
 | Ciudad | Supermercado | Productos | Con foto | Sin foto | % | hd | sd | low |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| San Pedro Sula | Total | 33663 | 23371 | 10292 | 69 % | 16087 | 6205 | 127 |
+| San Pedro Sula | Total | 33663 | 23371 | 10292 | 69 % | 16085 | 6206 | 127 |
 | San Pedro Sula | Colonial | 8432 | 7050 | 1382 | 84 % |  |  |  |
 | San Pedro Sula | Los Andes | 6740 | 6006 | 734 | 89 % |  |  |  |
 | San Pedro Sula | La Colonia | 7088 | 6142 | 946 | 87 % |  |  |  |
 | San Pedro Sula | PriceSmart | 2614 | 1270 | 1344 | 49 % |  |  |  |
 | San Pedro Sula | Walmart | 15197 | 9299 | 5898 | 61 % |  |  |  |
-| Tegucigalpa | Total | 33643 | 16720 | 16923 | 50 % | 14734 | 1917 | 2 |
+| Tegucigalpa | Total | 33643 | 16720 | 16923 | 50 % | 14732 | 1918 | 2 |
 | Tegucigalpa | La Colonia | 7606 | 6490 | 1116 | 85 % |  |  |  |
 | Tegucigalpa | Paiz | 10354 | 8336 | 2018 | 81 % |  |  |  |
 | Tegucigalpa | PriceSmart | 2739 | 1277 | 1462 | 47 % |  |  |  |
