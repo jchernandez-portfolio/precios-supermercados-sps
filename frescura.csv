@@ -120,3 +120,14 @@ fecha,ciudad,supermercado,sucursal,ultima_captura,horas_de_atraso,estado
 2026-11-03,Tegucigalpa,PriceSmart,pricesmart_tgu,2026-11-03T11:18:37Z,0,Al día
 2026-11-03,Tegucigalpa,Paiz,paiz_tgu_multiplaza,2026-11-03T11:22:07Z,0,Al día
 2026-11-03,Tegucigalpa,Paiz,paiz_tgu_proceres,2026-11-03T11:26:14Z,0,Al día
+2026-11-04,San Pedro Sula,La Colonia,la_colonia_sps,2026-11-03T11:28:32Z,12,Al día
+2026-11-04,San Pedro Sula,Colonial,colonial_sps,2026-11-02T11:26:37Z,36,Al día
+2026-11-04,San Pedro Sula,Walmart,walmart_sps,2026-11-03T11:24:30Z,12,Al día
+2026-11-04,San Pedro Sula,PriceSmart,pricesmart_sps,2026-11-03T11:18:09Z,12,Al día
+2026-11-04,San Pedro Sula,Los Andes,comisariato_los_andes_sps,2026-10-21T11:18:55.568550Z,324,Atrasado
+2026-11-04,Tegucigalpa,La Colonia,la_colonia_tgu,2026-11-03T11:37:38Z,12,Al día
+2026-11-04,Tegucigalpa,Walmart,walmart_tgu_ffaa,2026-11-03T11:31:19Z,12,Al día
+2026-11-04,Tegucigalpa,Walmart,walmart_tgu_el_sauce,2026-11-03T11:38:26Z,12,Al día
+2026-11-04,Tegucigalpa,PriceSmart,pricesmart_tgu,2026-11-03T11:18:37Z,12,Al día
+2026-11-04,Tegucigalpa,Paiz,paiz_tgu_multiplaza,2026-11-03T11:22:07Z,12,Al día
+2026-11-04,Tegucigalpa,Paiz,paiz_tgu_proceres,2026-11-03T11:26:14Z,12,Al día
