@@ -1,6 +1,6 @@
 # Errores de datos en Súper Compras
 
-Actualizado automáticamente el 2026-11-07 a partir del catálogo publicado (San Pedro Sula: 2026-11-07T11:47:05.122148Z; Tegucigalpa: 2026-11-07T11:48:51.047666Z).
+Actualizado automáticamente el 2026-11-07 a partir del catálogo publicado (San Pedro Sula: 2026-11-07T19:03:57.013762Z; Tegucigalpa: 2026-11-07T19:06:27.738119Z).
 
 - [`errores_detectados.csv`](errores_detectados.csv): todo lo que la revisión automática encuentra hoy, una fila por producto y supermercado, con enlace al producto.
 - [`errores_confirmados.csv`](errores_confirmados.csv): errores revisados a mano, de dónde vienen (súper o Súper Compras) y su estado.
@@ -14,35 +14,35 @@ Actualizado automáticamente el 2026-11-07 a partir del catálogo publicado (San
 
 | Ciudad | Supermercado | Sucursal | Última captura (UTC) | Horas | Estado |
 |---|---|---|---|---:|---|
-| San Pedro Sula | La Colonia | la_colonia_sps | 2026-11-07 11:26 | 0 | Al día |
-| San Pedro Sula | Colonial | colonial_sps | 2026-11-06 11:26 | 24 | Al día |
-| San Pedro Sula | Walmart | walmart_sps | 2026-11-07 11:25 | 0 | Al día |
-| San Pedro Sula | PriceSmart | pricesmart_sps | 2026-11-07 11:18 | 0 | Al día |
-| San Pedro Sula | Los Andes | comisariato_los_andes_sps | 2026-11-07 11:19 | 0 | Al día |
-| Tegucigalpa | La Colonia | la_colonia_tgu | 2026-11-07 11:35 | 0 | Al día |
-| Tegucigalpa | Walmart | walmart_tgu_ffaa | 2026-11-07 11:33 | 0 | Al día |
-| Tegucigalpa | Walmart | walmart_tgu_el_sauce | 2026-11-07 11:41 | 0 | Al día |
-| Tegucigalpa | PriceSmart | pricesmart_tgu | 2026-11-07 11:19 | 0 | Al día |
-| Tegucigalpa | Paiz | paiz_tgu_multiplaza | 2026-11-07 11:22 | 0 | Al día |
-| Tegucigalpa | Paiz | paiz_tgu_proceres | 2026-11-07 11:26 | 0 | Al día |
+| San Pedro Sula | La Colonia | la_colonia_sps | 2026-11-07 11:26 | 7 | Al día |
+| San Pedro Sula | Colonial | colonial_sps | 2026-11-07 18:56 | 0 | Al día |
+| San Pedro Sula | Walmart | walmart_sps | 2026-11-07 11:25 | 7 | Al día |
+| San Pedro Sula | PriceSmart | pricesmart_sps | 2026-11-07 11:18 | 7 | Al día |
+| San Pedro Sula | Los Andes | comisariato_los_andes_sps | 2026-11-07 11:19 | 7 | Al día |
+| Tegucigalpa | La Colonia | la_colonia_tgu | 2026-11-07 11:35 | 7 | Al día |
+| Tegucigalpa | Walmart | walmart_tgu_ffaa | 2026-11-07 11:33 | 7 | Al día |
+| Tegucigalpa | Walmart | walmart_tgu_el_sauce | 2026-11-07 11:41 | 7 | Al día |
+| Tegucigalpa | PriceSmart | pricesmart_tgu | 2026-11-07 11:19 | 7 | Al día |
+| Tegucigalpa | Paiz | paiz_tgu_multiplaza | 2026-11-07 11:22 | 7 | Al día |
+| Tegucigalpa | Paiz | paiz_tgu_proceres | 2026-11-07 11:26 | 7 | Al día |
 
 ## Fotos de producto
 
-40,140 de 67,947 productos con foto (59 %). Las fotos v2 se publican en dos tamaños; hd = detalle real para 800 px, sd = suficiente para tarjetas, low = foto chica.
+40,225 de 67,931 productos con foto (59 %). Las fotos v2 se publican en dos tamaños; hd = detalle real para 800 px, sd = suficiente para tarjetas, low = foto chica.
 
 | Ciudad | Supermercado | Productos | Con foto | Sin foto | % | hd | sd | low |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| San Pedro Sula | Total | 34099 | 23478 | 10621 | 69 % | 16145 | 6263 | 127 |
-| San Pedro Sula | Colonial | 8465 | 7084 | 1381 | 84 % |  |  |  |
-| San Pedro Sula | Los Andes | 6928 | 6055 | 873 | 87 % |  |  |  |
-| San Pedro Sula | La Colonia | 7129 | 6185 | 944 | 87 % |  |  |  |
-| San Pedro Sula | PriceSmart | 2768 | 1295 | 1473 | 47 % |  |  |  |
-| San Pedro Sula | Walmart | 15268 | 9306 | 5962 | 61 % |  |  |  |
-| Tegucigalpa | Total | 33848 | 16662 | 17186 | 49 % | 14691 | 1905 | 1 |
-| Tegucigalpa | La Colonia | 7614 | 6498 | 1116 | 85 % |  |  |  |
-| Tegucigalpa | Paiz | 10351 | 8322 | 2029 | 80 % |  |  |  |
-| Tegucigalpa | PriceSmart | 2869 | 1270 | 1599 | 44 % |  |  |  |
-| Tegucigalpa | Walmart | 23791 | 10558 | 13233 | 44 % |  |  |  |
+| San Pedro Sula | Total | 34084 | 23517 | 10567 | 69 % | 16170 | 6281 | 127 |
+| San Pedro Sula | Colonial | 8443 | 7057 | 1386 | 84 % |  |  |  |
+| San Pedro Sula | Los Andes | 6928 | 6073 | 855 | 88 % |  |  |  |
+| San Pedro Sula | La Colonia | 7129 | 6191 | 938 | 87 % |  |  |  |
+| San Pedro Sula | PriceSmart | 2768 | 1301 | 1467 | 47 % |  |  |  |
+| San Pedro Sula | Walmart | 15268 | 9335 | 5933 | 61 % |  |  |  |
+| Tegucigalpa | Total | 33847 | 16708 | 17139 | 49 % | 14734 | 1912 | 1 |
+| Tegucigalpa | La Colonia | 7614 | 6500 | 1114 | 85 % |  |  |  |
+| Tegucigalpa | Paiz | 10351 | 8335 | 2016 | 81 % |  |  |  |
+| Tegucigalpa | PriceSmart | 2869 | 1281 | 1588 | 45 % |  |  |  |
+| Tegucigalpa | Walmart | 23791 | 10586 | 13205 | 44 % |  |  |  |
 
 ## San Pedro Sula
 
@@ -50,7 +50,7 @@ Actualizado automáticamente el 2026-11-07 a partir del catálogo publicado (San
 |---|---:|---:|---:|---:|---:|---:|
 | Peso o volumen imposible | 0 | 0 | 0 | 8 | 6 | 14 |
 | Precio por unidad: probable error | 7 | 7 | 8 | 8 | 26 | 56 |
-| Precio por unidad: revisar | 25 | 23 | 17 | 3 | 28 | 96 |
+| Precio por unidad: revisar | 24 | 23 | 17 | 3 | 29 | 96 |
 | Medida mal escrita por el súper | 0 | 0 | 0 | 0 | 1 | 1 |
 | Sin presentación | 97 | 47 | 125 | 22 | 350 | 641 |
 | Corregido en la web | 7 | 5 | 1 | 5 | 3 | 21 |
