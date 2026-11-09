@@ -3,8 +3,8 @@
 import {
   Catalog, RETAILER_COLORS, rowKey, RETAILER_INITIALS, RETAILER_NAMES, loadCart, loadCities, loadCitySlug, money,
   photoSrcset, photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, storeLabel,
-} from "./data.js?v=20261025-3";
-import { productIllustration } from "./illustration.js?v=20261025-3";
+} from "./data.js?v=20261025-4";
+import { productIllustration } from "./illustration.js?v=20261025-4";
 
 // Foto real si existe; si no hay o falla al cargar, la ilustración de siempre.
 // Tarjetas y miniaturas usan 320 px; el detalle deja que el navegador elija 320 u
@@ -14,7 +14,8 @@ function productVisual(product, { size = 118, decorative = true, sizes = null } 
   if (!url) return productIllustration(product, { size, decorative });
   const image = document.createElement("img");
   image.className = "photo";
-  image.crossOrigin = "anonymous";
+  // Sin atributo de origen cruzado: las fotos no se leen desde canvas y el bucket R2 no envía CORS;
+  // con CORS la primera foto v2 caía a la ilustración (2026-10-25).
   image.loading = sizes ? "eager" : "lazy";
   image.decoding = "async";
   image.width = 800;
