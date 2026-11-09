@@ -55,11 +55,17 @@ Mientras dura la migración, el catálogo usa la foto v2 si existe y si no la v1
   agrandada sale marcada como `agrandada` y pierde contra una nítida.
 - **Nivel** de cada foto elegida en el índice: `hd` (el producto tiene al menos
   560 px útiles: 800 px nítido), `sd` (≥ 260 px) o `low`.
-- **Fondo blanco obligatorio** (criterios v3, 2026-10-25). Una foto con fondo que
-  no es blanco tras el balance de blancos (producto sobre una mesa, foto de ambiente,
-  fondo oscuro, ilustración con regla) se descarta: no se distingue el producto del
-  entorno. En la primera corrida pasaban con 55 puntos justos (2 % de las elegidas);
-  las ya publicadas con menos de 70 puntos se reevalúan una vez (campo `c` del índice).
+- **Fondo blanco** (criterios v4, 2026-11-08). Antes de medir se quitan las
+  decoraciones que Walmart pega a sus fotos: franjas de color a los lados (con el
+  peso o la presentación) y el rótulo de color de lado a lado abajo. Una foto se
+  descarta si casi nada del marco es blanco (< 35 %) o si llena los cuatro lados sin
+  marco blanco (< 85 %): son escenas (mesa, personas, comida servida). Las que tocan
+  dos o tres lados pierden puntos y sólo quedan si no hay una foto limpia en otro súper.
+- **Foto genérica** ("sin imagen", logo): la misma foto en 4 productos o más, en la
+  corrida o en el índice completo (marca `gen`). Con 2 se perdían fotos buenas: el
+  mismo artículo de Walmart publicado en las dos ciudades son dos filas del catálogo.
+- Cuando cambian los criterios (`c` en el índice) se reevalúan una vez las filas sin
+  foto y las fotos con menos de 70 puntos.
 - Puntaje: fondo blanco 25, píxeles útiles del producto 35, nitidez 10, encuadre 15,
   código de barras 5, foto principal 10; foto secundaria −20. Mínimo 55.
 - Elección: primero el nivel de detalle, después el puntaje; en empates (≤ 6

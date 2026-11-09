@@ -119,13 +119,33 @@ def test_candidates_signature_and_plan() -> None:
     assert fotos.plan(rows, candidates, {"aa11": {"sig": sig, "h": "0123456789", "s": 58}}, 10) == ["aa11", "bb22"]
     assert fotos.plan(rows, candidates, {"aa11": {"sig": sig, "h": "0123456789", "s": 92}}, 10) == ["bb22"]
     assert fotos.plan(rows, candidates, {"aa11": {"sig": sig, "h": "0123456789", "s": 58, "c": fotos.CRITERIA_VERSION}}, 10) == ["bb22"]
-    assert fotos.plan(rows, candidates, {"aa11": {"sig": sig, "none": 1}}, 10) == ["bb22"]
+    # Sin foto con criterios anteriores también se reevalúa una vez (la "genérica" de antes).
+    assert fotos.plan(rows, candidates, {"aa11": {"sig": sig, "none": 1}}, 10) == ["aa11", "bb22"]
+    assert fotos.plan(rows, candidates, {"aa11": {"sig": sig, "none": 1, "c": 3}}, 10) == ["aa11", "bb22"]
+    assert fotos.plan(rows, candidates, {"aa11": {"sig": sig, "none": 1, "c": fotos.CRITERIA_VERSION}}, 10) == ["bb22"]
 
 
-def test_generic_urls_need_three_products() -> None:
+def test_generic_urls_need_four_products() -> None:
     c = fotos.images.Candidate("walmart", 0, "u")
-    assert fotos.generic_urls({"a": [c], "b": [c]}) == set()
-    assert fotos.generic_urls({"a": [c], "b": [c], "d": [c]}) == {"u"}
+    assert fotos.generic_urls({"a": [c], "b": [c], "d": [c]}) == set()
+    assert fotos.generic_urls({"a": [c], "b": [c], "d": [c], "e": [c]}) == {"u"}
+
+
+def test_prune_generic_uses_the_whole_index(tmp_path: Path) -> None:
+    """Un "sin imagen" que llega de a pocos por corrida se detecta con el índice completo."""
+    index = {key: {"sig": "s" + key[1:], "h": "aaaaaaaaaa", "sm": "walmart", "s": 90, "q": "hd", "c": 3} for key in ("k1", "k2", "k3")}
+    index["k4"] = {"sig": "s4", "h": "bbbbbbbbbb", "sm": "walmart", "s": 90, "q": "hd", "c": 3}
+    index["k5"] = {"sig": "s5", "none": 1, "c": 3}
+    assert fotos.prune_generic(index, tmp_path) == 0  # el mismo artículo en 3 filas sigue con foto
+    index["k6"] = {"sig": "s6", "h": "aaaaaaaaaa", "sm": "paiz", "s": 80, "q": "hd", "c": 4}
+    files = [tmp_path / relative for relative in fotos.image_paths("k6", "aaaaaaaaaa").values()]
+    for path in files:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"x")
+    assert fotos.prune_generic(index, tmp_path) == 4
+    assert all(index[key] == {"sig": "s" + key[1:] if key != "k6" else "s6", "none": 1, "c": fotos.CRITERIA_VERSION, "gen": 1}
+               for key in ("k1", "k2", "k3", "k6"))
+    assert index["k4"]["h"] == "bbbbbbbbbb" and not any(path.exists() for path in files)
 
 
 def test_process_writes_normalized_photo_and_index(tmp_path: Path) -> None:

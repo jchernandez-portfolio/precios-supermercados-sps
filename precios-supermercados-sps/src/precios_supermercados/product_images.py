@@ -35,11 +35,22 @@ from PIL import Image, ImageFilter, ImageOps
 
 RETAILER_PRIORITY = ("colonial", "la_colonia", "walmart", "paiz", "comisariato_los_andes", "pricesmart")
 MIN_SCORE = 55
-# Borde blanco por debajo de esto (o por debajo de 0.85 tocando dos lados): escena,
-# fondo oscuro o ilustración, se descarta. En la primera corrida pasaban con 55 puntos
-# justos; eran el 2 % de las fotos elegidas.
-SCENE_BORDER_WHITE = 0.6
+# Escena (mesa, personas, comida servida) o fondo oscuro: borde blanco por debajo de
+# esto, o por debajo de 0.85 con la foto llena hasta los cuatro lados. Se descarta.
+# Revisión 2026-11-08 sobre 67 fotos reales rechazadas: las escenas quedan en
+# 0–0.33 y tocan los cuatro lados; los empaques con rótulo o franja de Walmart
+# quedan en 0.54–0.84 tocando dos o tres. Éstos pierden puntos pero pueden quedar.
+SCENE_BORDER_WHITE = 0.35
 NEAR_TIE_POINTS = 6
+# Una misma foto en esta cantidad de productos o más es genérica ("sin imagen", logo).
+# Con 2 se descartaban fotos buenas: el mismo artículo publicado en San Pedro Sula y
+# Tegucigalpa (dos filas del catálogo) o en Walmart y Paiz trae la misma foto
+# (revisión 2026-11-08: ~16 700 productos de Walmart en ambas ciudades).
+GENERIC_OWNERS = 4
+# Rótulo de color de lado a lado que Walmart pega abajo ("BASE CON VITAMINA C…"):
+# entre 2 % y 18 % del alto. Se quita antes de medir, como las franjas de los lados.
+BAND_MIN_SHARE = 0.02
+BAND_MAX_SHARE = 0.18
 OUTPUT_SIZES = (800, 320)
 OUTPUT_SIZE = OUTPUT_SIZES[0]
 OUTPUT_FILL = 0.86
@@ -210,6 +221,51 @@ def _content_span(runs: list[tuple[int, int, float]], length: int,
     return (min(run[0] for run in inner), max(run[1] for run in inner)), extra
 
 
+def _bottom_band(near: np.ndarray) -> int | None:
+    """Fila donde empieza el rótulo de color que cruza la foto de lado a lado abajo.
+
+    Cuenta sólo si cada fila del rótulo es de color en ambos bordes, mide entre
+    2 % y 18 % del alto, la fila de encima no cruza de lado a lado (el rótulo está
+    separado del producto) y los costados y el borde de arriba son blancos: es una
+    foto de estudio con rótulo, no una escena. Se toleran unas filas blancas al final.
+    """
+    height, width = near.shape
+    colored = 1.0 - near.mean(axis=1)
+    edge = max(2, round(width * 0.02))
+    left = 1.0 - near[:, :edge].mean(axis=1)
+    right = 1.0 - near[:, -edge:].mean(axis=1)
+    # Fila del rótulo: de color en ambos bordes y en al menos la mitad del ancho (las
+    # letras blancas del rótulo bajan el total, por eso no se pide más).
+    crossing = (left >= 0.8) & (right >= 0.8) & (colored >= 0.5)
+    bottom = height
+    while bottom > height - max(1, round(height * 0.03)) and colored[bottom - 1] < 0.1:
+        bottom -= 1
+    limit = max(2, int(height * BAND_MAX_SHARE))
+    top = bottom
+    while top > bottom - limit and crossing[top - 1]:
+        top -= 1
+    band = bottom - top
+    if band < max(2, round(height * BAND_MIN_SHARE)) or band >= limit or top < 4:
+        return None
+    if crossing[top - 1]:
+        return None
+    side = max(1, round(width * 0.03))
+    frame = np.concatenate([near[:top, :side].ravel(), near[:top, -side:].ravel(), near[:side, :].ravel()])
+    return top if frame.mean() >= 0.9 else None
+
+
+def _border_white(near: np.ndarray) -> float:
+    """Parte del marco (3 % del lado corto) que es casi blanca."""
+    h, w = near.shape
+    if not h or not w:
+        return 0.0
+    band = max(1, round(min(w, h) * 0.03))
+    border = np.zeros_like(near)
+    border[:band, :] = border[-band:, :] = True
+    border[:, :band] = border[:, -band:] = True
+    return float(near[border].mean())
+
+
 def _thumb(array: np.ndarray, box: tuple[float, float, float, float] | None) -> np.ndarray:
     """Huella de 12×12 en color del producto dentro de un cuadro (conserva forma y color)."""
     height, width = array.shape[:2]
@@ -270,23 +326,26 @@ def measure(image: Image.Image, size_bytes: int) -> Metrics:
     small = image.copy()
     small.thumbnail((ANALYSIS_SIZE, ANALYSIS_SIZE), Image.Resampling.BILINEAR)
     array = _white_balance(np.asarray(small))
-    h, w = array.shape[:2]
+    full_h, w = array.shape[:2]
     near = _near_white(array)
+    cut = _bottom_band(near)
+    band_share = 0.0
+    if cut is not None:
+        band_share = (full_h - cut) / full_h
+        array, near = array[:cut], near[:cut]
+    h = array.shape[0]
     background = _flood_from_border(near)
-    band = max(1, round(min(w, h) * 0.03))
-    border = np.zeros_like(background)
-    border[:band, :] = border[-band:, :] = True
-    border[:, :band] = border[:, -band:] = True
-    border_white = float(near[border].mean()) if border.any() else 0.0
     foreground = ~background
     fg_share = float(foreground.mean())
     gray = array.astype(np.float32) @ np.array([0.299, 0.587, 0.114], dtype=np.float32)
     lap = (4 * gray[1:-1, 1:-1] - gray[:-2, 1:-1] - gray[2:, 1:-1] - gray[1:-1, :-2] - gray[1:-1, 2:])
     sharpness = float(lap.var()) if lap.size else 0.0
     if not foreground.any() or fg_share < 0.002:
+        border_white = _border_white(near)
         return Metrics(width, height, size_bytes, border_white, 0.0, fg_share, 0, sharpness, 0.0, None, None,
                        np.zeros(THUMB_SIZE * THUMB_SIZE * 3, dtype=np.float32))
-    col_span, extra_col = _content_span(_runs(foreground.sum(axis=0), h), w)
+    col_runs = _runs(foreground.sum(axis=0), h)
+    col_span, extra_col = _content_span(col_runs, w)
     row_span, extra_row = _content_span(_runs(foreground.sum(axis=1), w), h, strips=False)
     if col_span is None or row_span is None:
         rows = np.flatnonzero(foreground.any(axis=1))
@@ -294,10 +353,15 @@ def measure(image: Image.Image, size_bytes: int) -> Metrics:
         row_span, col_span = (int(rows[0]), int(rows[-1])), (int(cols[0]), int(cols[-1]))
     x0, x1 = col_span
     y0, y1 = row_span
-    bbox = (x0 / w, y0 / h, (x1 + 1) / w, (y1 + 1) / h)
-    fill = ((x1 - x0 + 1) * (y1 - y0 + 1)) / (w * h)
+    # Borde blanco medido sin las franjas de los lados (el producto sí cuenta).
+    left = max([run[1] + 1 for run in col_runs if run[1] < x0] or [0]) if extra_col else 0
+    right = min([run[0] - 1 for run in col_runs if run[0] > x1] or [w - 1]) if extra_col else w - 1
+    border_white = _border_white(near[:, left:right + 1])
+    local = (x0 / w, y0 / h, (x1 + 1) / w, (y1 + 1) / h)
+    bbox = (x0 / w, y0 / full_h, (x1 + 1) / w, (y1 + 1) / full_h)
+    fill = ((x1 - x0 + 1) * (y1 - y0 + 1)) / (w * full_h)
     touch = sum((x0 <= 0, y0 <= 0, x1 >= w - 1, y1 >= h - 1))
-    extra = max(extra_col, extra_row)
+    extra = max(extra_col, extra_row, band_share)
     main_bbox = bbox if extra > 0.0 else None
     rounded = tuple(round(v, 4) for v in bbox)
     effective, useful = effective_resolution(image, rounded)
@@ -306,7 +370,7 @@ def measure(image: Image.Image, size_bytes: int) -> Metrics:
         fill=round(float(fill), 4), foreground=round(fg_share, 4), touch=int(touch),
         sharpness=round(sharpness, 1), strip_extra=round(float(extra), 4),
         bbox=rounded, main_bbox=rounded if main_bbox else None,
-        thumb=_thumb(array, bbox), effective=round(effective, 2), product_pixels=useful,
+        thumb=_thumb(array, local), effective=round(effective, 2), product_pixels=useful,
     )
 
 
@@ -327,7 +391,7 @@ def score(candidate: Candidate, metrics: Metrics | None, *, duplicate: bool = Fa
     # ambiente, fondo oscuro o ilustración con regla que llega a los bordes. No se
     # distingue el producto del entorno y el tamaño medido sería el del cuadro entero.
     # Mejor la ilustración. Un producto que toca un solo lado sigue valiendo, con menos puntos.
-    if metrics.border_white < SCENE_BORDER_WHITE or (metrics.border_white < 0.85 and metrics.touch >= 2):
+    if metrics.border_white < SCENE_BORDER_WHITE or (metrics.border_white < 0.85 and metrics.touch >= 4):
         return 0, ("fondo no blanco",)
     flags: list[str] = []
     if metrics.border_white < 0.85:
@@ -360,12 +424,12 @@ def score(candidate: Candidate, metrics: Metrics | None, *, duplicate: bool = Fa
     return int(round(_clamp(value, 0, 100))), tuple(flags)
 
 
-def duplicate_keys(items: Iterable[tuple[str, Metrics]]) -> set[str]:
-    """Fotos idénticas en dos o más productos (logos o "sin imagen")."""
+def duplicate_keys(items: Iterable[tuple[str, Metrics]], min_owners: int = GENERIC_OWNERS) -> set[str]:
+    """Fotos idénticas en ``min_owners`` productos o más (logos o "sin imagen")."""
     seen: dict[tuple[int, int, int], set[str]] = {}
     for product_key, metrics in items:
         seen.setdefault((metrics.width, metrics.height, metrics.bytes), set()).add(product_key)
-    return {f"{w}x{h}:{b}" for (w, h, b), owners in seen.items() if len(owners) >= 2}
+    return {f"{w}x{h}:{b}" for (w, h, b), owners in seen.items() if len(owners) >= min_owners}
 
 
 def metrics_key(metrics: Metrics) -> str:

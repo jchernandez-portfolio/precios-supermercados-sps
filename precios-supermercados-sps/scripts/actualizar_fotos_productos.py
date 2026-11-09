@@ -44,7 +44,11 @@ PIPELINE_VERSION = 2
 # Versión de los criterios de puntuación. Cuando sube, las fotos ya elegidas con
 # puntaje bajo (< RESCORE_BELOW) se vuelven a evaluar una vez, sin tocar el resto.
 # 3 (2026-10-25): fondo no blanco descarta la foto en vez de restar puntos.
-CRITERIA_VERSION = 3
+# 4 (2026-11-08): una foto es genérica desde 4 productos (antes 2) y se quita el
+#   rótulo de color de abajo de Walmart. Las filas sin foto con criterios
+#   anteriores también se reevalúan una vez (eran ~27 600, la mayoría fotos buenas
+#   de Walmart descartadas como "genérica").
+CRITERIA_VERSION = 4
 RESCORE_BELOW = 70
 INDEX_SCHEMA = "super-compras-product-images/v2"
 REPOSITORY_RAW = "https://raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps"
@@ -58,7 +62,7 @@ DEFAULT_MAX_PRODUCTS = 12000
 DEFAULT_TIME_BUDGET_MINUTES = 240
 REVIEW_LOWEST = 120
 REVIEW_SAMPLE = 80
-GENERIC_URL_OWNERS = 3
+GENERIC_URL_OWNERS = images.GENERIC_OWNERS
 QUERY_BATCH = 400
 KEY_COLUMNS = ("source_item_id", "source_key", "source_catalog_product_id")
 
@@ -239,9 +243,13 @@ def plan(rows: Sequence[CatalogRow], candidates: Mapping[str, Sequence[images.Ca
 
 
 def needs_rescore(item: Mapping[str, object]) -> bool:
-    """Foto elegida con puntaje bajo bajo criterios anteriores: se reevalúa una vez."""
+    """Con criterios anteriores: sin foto, o foto con puntaje bajo. Se reevalúa una vez."""
     try:
-        return "h" in item and int(item.get("s", 0)) < RESCORE_BELOW and int(item.get("c", 0)) < CRITERIA_VERSION  # type: ignore[arg-type]
+        if int(item.get("c", 0)) >= CRITERIA_VERSION:  # type: ignore[arg-type]
+            return False
+        if item.get("none"):
+            return True
+        return "h" in item and int(item.get("s", 0)) < RESCORE_BELOW  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return False
 
@@ -378,6 +386,32 @@ def process(keys: Sequence[str], candidates: Mapping[str, Sequence[images.Candid
             if review is not None:
                 review.append(_review_record(key, scored, chosen, paths))
     return stats
+
+
+def prune_generic(index: dict[str, dict[str, object]], output_dir: Path,
+                  *, min_owners: int = images.GENERIC_OWNERS) -> int:
+    """Quita del índice las fotos que comparten huella con ``min_owners`` productos o más.
+
+    La comparación dentro de una corrida sólo ve las filas de esa corrida; ésta mira
+    el índice completo, así un "sin imagen" que llega de a pocos también se detecta.
+    Las filas quedan sin foto (marca ``gen``) y sus archivos de esta corrida se borran
+    del artifact para que la subida no los rechace.
+    """
+    owners: dict[str, list[str]] = {}
+    for key, item in index.items():
+        digest = item.get("h")
+        if isinstance(digest, str) and not item.get("none"):
+            owners.setdefault(digest, []).append(key)
+    pruned = 0
+    for digest, keys in owners.items():
+        if len(keys) < min_owners:
+            continue
+        for key in keys:
+            for relative in image_paths(key, digest).values():
+                (output_dir / relative).unlink(missing_ok=True)
+            index[key] = {"sig": index[key].get("sig"), "none": 1, "c": CRITERIA_VERSION, "gen": 1}
+            pruned += 1
+    return pruned
 
 
 # ------------------------------------------------------------------ índice
@@ -571,6 +605,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     deadline = started + args.time_budget_minutes * 60 if args.time_budget_minutes > 0 else None
     stats = process(keys, candidates, downloader, args.output_dir, index, review=review, deadline=deadline)
     stats.update({f"error_{name}": 1 for name in api.errors})
+    pruned = prune_generic(index, args.output_dir)
+    if pruned:
+        stats["genericas_indice"] = pruned
     path = write_index(args.output_dir, index, stats)
     write_review(args.output_dir, review, args.public_base.rstrip("/"), stats)
     print(json.dumps({"stats": dict(stats), "index": str(path)}, ensure_ascii=False))
