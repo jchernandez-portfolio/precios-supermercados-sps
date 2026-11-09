@@ -11,7 +11,7 @@ GitHub `main`, GitHub Actions, los artifacts productivos, Turso y la rama `portf
 | Homologación | Contenido neto GS1 en todo el catálogo (#37, #38), precio por libra para peso variable en Walmart, Paiz, La Colonia, Colonial y Los Andes (#34, #35, #39), corrección de patrones seguros y red de seguridad para datos absurdos (#41, #42). |
 | Operación diaria | Activa. Disparo 05:17 Honduras (Worker `precios-sps-daily-trigger`, token que vence el 2027-10-10), respaldo 08:17, reintentos por cadena 08:17/12:17 (máx. 3), persistencia parcial. Colonial y Los Andes reforzados en #43 (ver incidente abajo). |
 | Calidad | Auditoría 3 veces al día (07:40, 13:40, 17:40) + tras cada sincronización; rama `calidad-datos` con `README.md`, `errores_detectados.csv`, `errores_confirmados.csv`, `historial.csv` y `frescura.csv`. 34 errores confirmados en `docs/calidad/errores-confirmados.csv`. |
-| Fotos | Rama `product-images`, WebP 400 px; ~7,600 productos con foto (cobertura parcial). Próximo paso: dos tamaños (320/800 px) en almacenamiento de imágenes dedicado. |
+| Fotos | Cloudflare R2, WebP 800/320 px, dos corridas al día (criterios v4 desde 2026-11-08). Los productos sin foto en ningún súper muestran la ilustración. La rama `product-images` (v1, 400 px) se retiró. |
 | Portafolio | Tarjeta y detalle de Súper Compras con cifras en vivo y página del caso en `Portafolio/precios-supermercados-sps/portfolio/caso/`. La app se publica desde este repo (https://jchernandez-portfolio.github.io/precios-supermercados-sps/super-compras/, GitHub Pages activado el 2026-10-25); la copia del portafolio redirige. |
 | Repositorio | `jchernandez-portfolio/precios-supermercados-sps` (secrets `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN`). Pruebas: 3,141 pasan, 21 omitidas (2026-10-24). |
 

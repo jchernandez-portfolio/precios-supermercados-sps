@@ -25,7 +25,7 @@ La app vive en [`super-compras/`](super-compras/) y se publica sola en GitHub Pa
 - **Producto:** el mismo artículo en cada supermercado, con el más barato marcado y otras presentaciones para comparar.
 - **Mi compra:** la lista completa con su costo en cada supermercado y comprando cada cosa donde está más barata. Se guarda en el dispositivo.
 
-La app solo lee archivos estáticos ya publicados (`portfolio-data`, `product-images`). No consulta Turso ni sitios de supermercados desde el navegador, no pide cuenta ni datos personales y tiene una política de seguridad de contenido estricta. La carga inicial pesa ~48 KB (~9 KB gzip, 2 requests) más la portada del catálogo (`home.json`, ~11 KB gzip); el índice de búsqueda (~1.4 MB gzip) baja en segundo plano y las fichas por partición bajo demanda.
+La app solo lee archivos estáticos ya publicados (rama `portfolio-data` y fotos en Cloudflare R2). No consulta Turso ni sitios de supermercados desde el navegador, no pide cuenta ni datos personales y tiene una política de seguridad de contenido estricta. La carga inicial pesa ~48 KB (~9 KB gzip, 2 requests) más la portada del catálogo (`home.json`, ~11 KB gzip); el índice de búsqueda (~1.4 MB gzip) baja en segundo plano y las fichas por partición bajo demanda.
 
 ## Flujo diario
 
@@ -79,7 +79,7 @@ Cuando el súper publica mal un dato, la app sigue tres reglas: **corrige** los 
 
 ## Fotos de producto
 
-Las fotos se descargan de las fuentes públicas, se convierten a WebP y se publican en la rama `product-images`. Detalle y cobertura: [`docs/super-compras-fotos.md`](docs/super-compras-fotos.md).
+Las fotos se descargan de las fuentes públicas dos veces al día, se recortan y se convierten a WebP de 800 y 320 px, y se publican en un bucket público de Cloudflare R2. Detalle y cobertura: [`docs/super-compras-fotos.md`](docs/super-compras-fotos.md).
 
 ## Estructura
 
@@ -95,7 +95,7 @@ Las fotos se descargan de las fuentes públicas, se convierten a WebP y se publi
 | `portfolio/` | datos de muestra que sincroniza el portafolio (`sample-data.json`) |
 | `reports/` | evidencia de capturas (los archivos grandes viven en releases; ver `reports/EVIDENCIA.md`) |
 
-Ramas de datos: `portfolio-data` (catálogo público), `product-images` (fotos), `calidad-datos` (registro de errores).
+Ramas de datos: `portfolio-data` (catálogo público) y `calidad-datos` (registro de errores). Fotos: Cloudflare R2 (`docs/super-compras-fotos.md`).
 
 ## Contratos vigentes
 
