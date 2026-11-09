@@ -12,7 +12,7 @@ GitHub `main`, GitHub Actions, los artifacts productivos, Turso y la rama `portf
 | Operación diaria | Activa. Disparo 05:17 Honduras (Worker `precios-sps-daily-trigger`, token que vence el 2027-10-10), respaldo 08:17, reintentos por cadena 08:17/12:17 (máx. 3), persistencia parcial. Colonial y Los Andes reforzados en #43 (ver incidente abajo). |
 | Calidad | Auditoría 3 veces al día (07:40, 13:40, 17:40) + tras cada sincronización; rama `calidad-datos` con `README.md`, `errores_detectados.csv`, `errores_confirmados.csv`, `historial.csv` y `frescura.csv`. 34 errores confirmados en `docs/calidad/errores-confirmados.csv`. |
 | Fotos | Rama `product-images`, WebP 400 px; ~7,600 productos con foto (cobertura parcial). Próximo paso: dos tamaños (320/800 px) en almacenamiento de imágenes dedicado. |
-| Portafolio | Tarjeta y detalle de Súper Compras con cifras en vivo y página del caso en `Portafolio/precios-supermercados-sps/portfolio/caso/`. |
+| Portafolio | Tarjeta y detalle de Súper Compras con cifras en vivo y página del caso en `Portafolio/precios-supermercados-sps/portfolio/caso/`. La app se publica desde este repo (https://jchernandez-portfolio.github.io/precios-supermercados-sps/super-compras/, GitHub Pages activado el 2026-10-25); la copia del portafolio redirige. |
 | Repositorio | `jchernandez-portfolio/precios-supermercados-sps` (secrets `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN`). Pruebas: 3,141 pasan, 21 omitidas (2026-10-24). |
 
 ## Incidente 2026-10-15 a 10-24 — Colonial y Los Andes sin captura algunos días (resuelto en #43)

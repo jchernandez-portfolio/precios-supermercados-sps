@@ -18,7 +18,7 @@ El web scraping es la capa de adquisición, no el producto completo. Lo que se d
 | Cifras en vivo | `precios-supermercados-sps/portfolio/super-compras-live.js` |
 | Página del caso | `precios-supermercados-sps/portfolio/caso/` |
 | Capturas de la app | `precios-supermercados-sps/portfolio/assets/*.webp` |
-| App desplegada | `precios-supermercados-sps/super-compras/` (copia de `super-compras/` de este repo) |
+| App desplegada | https://jchernandez-portfolio.github.io/precios-supermercados-sps/super-compras/ (GitHub Pages de este repo, rama `gh-pages`); `Portafolio/precios-supermercados-sps/super-compras/` sólo redirige |
 
 ## Cifras en vivo
 

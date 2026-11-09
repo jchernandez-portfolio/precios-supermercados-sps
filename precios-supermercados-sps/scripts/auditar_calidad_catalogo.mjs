@@ -23,7 +23,7 @@ import {
 
 export const DATA_BASE =
   "https://raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/portfolio-data/precios-supermercados-sps/published/rpi/v3/";
-export const SITE = "https://jchernandez-portfolio.github.io/Portafolio/precios-supermercados-sps/super-compras/";
+export const SITE = "https://jchernandez-portfolio.github.io/precios-supermercados-sps/super-compras/";
 
 export const PROBLEMS = {
   peso_imposible: {

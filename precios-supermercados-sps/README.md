@@ -2,7 +2,7 @@
 
 Sistema que **captura, valida, homologa y publica todos los días** los precios públicos de seis cadenas de supermercados en San Pedro Sula y Tegucigalpa, y los presenta en **Súper Compras**, una web app para comparar precios y saber en qué súper conviene hacer la compra.
 
-- **App:** https://jchernandez-portfolio.github.io/Portafolio/precios-supermercados-sps/super-compras/
+- **App:** https://jchernandez-portfolio.github.io/precios-supermercados-sps/super-compras/
 - **Caso de estudio:** https://jchernandez-portfolio.github.io/Portafolio/precios-supermercados-sps/portfolio/caso/
 - **Registro público de errores:** rama [`calidad-datos`](https://github.com/jchernandez-portfolio/precios-supermercados-sps/tree/calidad-datos)
 - **Estado operativo vigente:** [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md)
@@ -18,7 +18,7 @@ Seis cadenas, once sucursales. Corte publicado el **2026-10-24**: 33,672 product
 
 ## Súper Compras
 
-La app vive en [`super-compras/`](super-compras/) y se publica en el sitio del portafolio. Es JavaScript sin framework, instalable (PWA) y funciona sin conexión con lo último que cargó.
+La app vive en [`super-compras/`](super-compras/) y se publica sola en GitHub Pages de este repositorio en cada cambio (workflow `precios-supermercados-sps-pages.yml`, rama `gh-pages`); el portafolio enlaza ahí y la dirección anterior redirige. Es JavaScript sin framework, instalable (PWA) y funciona sin conexión con lo último que cargó.
 
 - **Inicio:** ofertas del día y hora de la última actualización; si una sucursal no se capturó hoy, lo dice con la fecha de ese precio.
 - **Buscar:** búsqueda por producto o marca, filtros por súper y orden por precio; cada tarjeta muestra tamaño y precio por kg, L, libra o unidad.
