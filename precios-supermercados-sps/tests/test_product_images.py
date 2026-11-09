@@ -70,7 +70,7 @@ def test_small_blurry_cropped_and_dark_background_photos_lose_points() -> None:
 
 
 def test_non_white_backgrounds_are_rejected_not_just_penalized() -> None:
-    """Producto sobre una mesa, fondo oscuro o ilustración con regla → 0 puntos.
+    """Producto sobre una mesa o fondo oscuro → 0 puntos; ilustración con regla → no se elige.
 
     En la primera corrida pasaban con 55 puntos justos: el "producto" medido era el
     cuadro entero. Un fondo casi blanco (balance de blancos) sigue siendo válido.
@@ -81,11 +81,25 @@ def test_non_white_backgrounds_are_rejected_not_just_penalized() -> None:
     draw.rounded_rectangle((380, 250, 620, 700), radius=30, fill=(200, 30, 40))
     ruler = product()  # ilustración: camiseta amarilla hasta dos bordes con el producto encima
     ImageDraw.Draw(ruler).rectangle((0, 0, 1000, 700), fill=(250, 230, 90))
-    for image in (table, product(background=(40, 40, 40)), ruler):
+    for image in (table, product(background=(40, 40, 40))):
         scene = scored("walmart", image)
         assert scene.score == 0 and scene.flags == ("fondo no blanco",)
         assert pi.choose([scene]) is None
+    drawing = scored("walmart", ruler)  # toca tres lados: pierde puntos y no alcanza el mínimo
+    assert "fondo no blanco" in drawing.flags and drawing.score < pi.MIN_SCORE
+    assert pi.choose([drawing]) is None
     assert scored("walmart", product(background=(244, 241, 234))).score >= 85
+
+
+def test_walmart_side_bar_does_not_count_as_background() -> None:
+    """Franja de color vertical a la derecha con el peso (Xedex, Oreo): la foto sirve."""
+    image = product(box=(200, 80, 760, 940))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((880, 0, 1000, 1000), fill=(20, 90, 200))
+    draw.rectangle((820, 860, 1000, 1000), fill=(20, 60, 160))
+    item = scored("walmart", image)
+    assert item.metrics.border_white >= 0.85 and "fondo no blanco" not in item.flags
+    assert item.score >= pi.MIN_SCORE and item.metrics.bbox[2] <= 0.8
 
 
 def test_secondary_photo_is_penalized() -> None:
@@ -136,12 +150,48 @@ def test_choose_returns_none_when_nothing_reaches_minimum() -> None:
 
 
 def test_duplicate_images_across_products_are_generic() -> None:
+    """Desde 4 productos es "sin imagen" o logo; 2 o 3 es el mismo artículo en otra ciudad o súper."""
     data = png(product())
     metrics = pi.measure(pi.load_image(data), len(data))
-    keys = pi.duplicate_keys([("a", metrics), ("b", metrics)])
+    assert pi.duplicate_keys([("a", metrics), ("b", metrics), ("c", metrics)]) == set()
+    keys = pi.duplicate_keys([(key, metrics) for key in "abcd"])
     assert pi.metrics_key(metrics) in keys
     value, flags = pi.score(pi.Candidate("walmart", 0, "u"), metrics, duplicate=True)
     assert value == 0 and flags == ("genérica",)
+
+
+def labeled(color=(150, 90, 60), band=(0, 900, 1000, 975)) -> Image.Image:
+    """Foto de estudio de Walmart con el rótulo de color de lado a lado abajo."""
+    image = product(box=(380, 120, 620, 820))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle(band, fill=color)
+    draw.text((band[0] + 40, band[1] + 25), "BASE CON VITAMINA C FIT ME FRESH TINT", fill=(255, 255, 255))
+    return image
+
+
+def test_walmart_bottom_label_is_cut_before_measuring() -> None:
+    """Rótulo de color abajo (revisión 2026-11-08): antes "fondo no blanco" y 0 puntos."""
+    item = scored("walmart", labeled())
+    assert item.score >= pi.MIN_SCORE and "fondo no blanco" not in item.flags
+    assert "franja recortada" in item.flags
+    x0, y0, x1, y1 = item.metrics.bbox
+    assert y1 <= 0.86 and 0.33 < x0 < 0.4 and 0.6 < x1 < 0.67  # sólo el producto, sin el rótulo
+    rendered = pi.render(pi.load_image(png(labeled())), item.metrics.bbox)
+    array = np.asarray(Image.open(io.BytesIO(rendered[800])).convert("RGB")).astype(int)
+    assert (array[-40:] >= 235).all()  # el rótulo no aparece en la foto publicada
+    # Un producto ancho apoyado abajo no es un rótulo: no se recorta.
+    wide = scored("walmart", product(box=(40, 300, 960, 999)))
+    assert wide.metrics.bbox[3] == 1.0
+
+
+def test_scene_with_colored_bottom_still_rejected() -> None:
+    """Una mesa de madera abajo no es un rótulo: los costados no son blancos."""
+    table = Image.new("RGB", (1000, 1000), (120, 80, 50))
+    draw = ImageDraw.Draw(table)
+    draw.rectangle((0, 880, 1000, 1000), fill=(90, 60, 30))
+    draw.rounded_rectangle((380, 250, 620, 700), radius=30, fill=(200, 30, 40))
+    scene = scored("walmart", table)
+    assert scene.score == 0 and scene.flags == ("fondo no blanco",)
 
 
 def test_normalize_outputs_square_white_webp_with_product_centered() -> None:

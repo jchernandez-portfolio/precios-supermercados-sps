@@ -10,7 +10,11 @@ from pathlib import Path
 import pytest
 import requests
 
+from _evidencia import asegurar
+
 REPORT = Path(__file__).resolve().parents[1]/"reports/walmart/2026-08-31-full"
+# compare_tgu.py relee la captura completa del 2026-08-31 (archivada en un release).
+asegurar("reports/walmart/2026-08-31-full/raw-capture.tar.gz")
 spec = importlib.util.spec_from_file_location("walmart_tgu_comparison", REPORT/"compare_tgu.py")
 comparison = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(comparison)
