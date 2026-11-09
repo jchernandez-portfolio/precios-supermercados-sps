@@ -5,7 +5,7 @@ Captura, validación, homologación y publicación diaria de precios públicos d
 - App: https://jchernandez-portfolio.github.io/Portafolio/precios-supermercados-sps/super-compras/
 - Caso de estudio: https://jchernandez-portfolio.github.io/Portafolio/precios-supermercados-sps/portfolio/caso/
 - Código y documentación: [`precios-supermercados-sps/`](precios-supermercados-sps/) — empieza por [`precios-supermercados-sps/README.md`](precios-supermercados-sps/README.md).
-- Ramas de datos: `portfolio-data` (catálogo público), `product-images` (fotos), `calidad-datos` (registro público de errores).
+- Datos: rama `portfolio-data` (catálogo público), rama `calidad-datos` (registro público de errores) y fotos en Cloudflare R2.
 - Portafolio: https://jchernandez-portfolio.github.io/Portafolio/
 
 El proyecto se separó del antiguo monorepo `Portafolio` conservando su historial. Se mantiene dentro de `precios-supermercados-sps/` para que las rutas de workflows, tests y datos sigan funcionando igual.

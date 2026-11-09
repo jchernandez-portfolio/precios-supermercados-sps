@@ -113,38 +113,31 @@ def test_search_photo_column_comes_from_images_index(tmp_path: Path) -> None:
     assert {row[column["photo"]] for row in search["rows"]} == {0}
 
     first, second = search["rows"][0][0], search["rows"][1][0]
-    index = tmp_path / "index.json"
-    index.write_text(json.dumps({"schema": "super-compras-product-images/v1", "items": {
-        first: {"sig": "a", "v": 3, "sm": "walmart"}, second: {"sig": "b", "none": 1}, "zz": {"v": "x"},
+    # Índice v1 (rama product-images, retirada): ya no aporta fotos.
+    v1 = tmp_path / "index.json"
+    v1.write_text(json.dumps({"schema": "super-compras-product-images/v1", "items": {
+        first: {"sig": "a", "v": 3, "sm": "walmart"},
     }}), encoding="utf-8")
-    assert MODULE.load_photo_versions(index) == {first: 3}
+    assert MODULE.load_photo_versions(v1) == {}
     assert MODULE.load_photo_versions(tmp_path / "missing.json") == {}
     (tmp_path / "bad.json").write_text("{", encoding="utf-8")
     assert MODULE.load_photo_versions(tmp_path / "bad.json") == {}
-    MODULE._PHOTO_VERSIONS.update(MODULE.load_photo_versions(index))
-    try:
-        MODULE.attach_search_index(output, manifest)
-    finally:
-        MODULE._PHOTO_VERSIONS.clear()
-    photos = {row[0]: row[column["photo"]] for row in _search(output)["rows"]}
-    assert photos[first] == 3 and photos[second] == 0
 
-    # Versión 2 (R2): huella de 10 caracteres; gana sobre la v1 producto por producto.
+    # R2: huella de 10 caracteres; "none" y huellas inválidas quedan sin foto.
     v2 = tmp_path / "index-v2.json"
     v2.write_text(json.dumps({"schema": "super-compras-product-images/v2", "items": {
         second: {"sig": "c", "h": "0123456789", "sm": "colonial", "q": "hd"},
         first: {"sig": "d", "none": 1}, "yy": {"h": "NOT-A-HASH"},
     }}), encoding="utf-8")
     assert MODULE.load_photo_versions(v2) == {second: "0123456789"}
-    merged = MODULE.load_photo_versions([index, v2])
-    assert merged == {first: 3, second: "0123456789"}
-    MODULE._PHOTO_VERSIONS.update(merged)
+    assert MODULE.load_photo_versions([v1, v2]) == {second: "0123456789"}
+    MODULE._PHOTO_VERSIONS.update(MODULE.load_photo_versions(v2))
     try:
         MODULE.attach_search_index(output, manifest)
     finally:
         MODULE._PHOTO_VERSIONS.clear()
     photos = {row[0]: row[column["photo"]] for row in _search(output)["rows"]}
-    assert photos[first] == 3 and photos[second] == "0123456789"
+    assert photos[first] == 0 and photos[second] == "0123456789"
 
 
 def test_app_shell_is_static_safe_and_installable() -> None:
@@ -296,12 +289,12 @@ console.log(JSON.stringify({
     }
 
 
-def test_photo_url_uses_versioned_public_branch_and_falls_back(tmp_path: Path) -> None:
+def test_photo_url_uses_r2_by_content_hash_and_falls_back(tmp_path: Path) -> None:
     script = """
 import { photoUrl, photoSrcset } from './data.js';
 const v2 = { id: '675e7a84934e90e9d47c0f50', photo: 'a1b2c3d4e5' };
 console.log(JSON.stringify({
-  ok: photoUrl({ id: '675e7a84934e90e9d47c0f50', photo: 3 }),
+  v1: photoUrl({ id: '675e7a84934e90e9d47c0f50', photo: 3 }),
   none: photoUrl({ id: '675e7a84', photo: 0 }),
   bad: photoUrl({ id: '../x', photo: 2 }),
   badHash: photoUrl({ id: '675e7a84', photo: '../../x' }),
@@ -312,10 +305,7 @@ console.log(JSON.stringify({
 }));
 """
     result = json.loads(_node(script, tmp_path))
-    assert result["ok"] == (
-        "https://raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/"
-        "product-images/img/67/675e7a84934e90e9d47c0f50.webp?v=3"
-    )
+    assert result["v1"] is None  # fotos v1 (rama product-images) retiradas: ilustración
     assert result["none"] is None and result["bad"] is None and result["badHash"] is None
     r2 = "https://pub-0dcb2204775c484dbe6681e659eee236.r2.dev/fotos/v2/"
     assert result["v2card"] == r2 + "320/67/675e7a84934e90e9d47c0f50-a1b2c3d4e5.webp"
@@ -323,7 +313,9 @@ console.log(JSON.stringify({
     assert result["srcset"] == f"{result['v2card']} 320w, {result['v2detail']} 800w"
     assert result["v1srcset"] is None
     html = (APP_DIR / "index.html").read_text(encoding="utf-8")
-    assert "img-src 'self' data: https://raw.githubusercontent.com https://pub-0dcb2204775c484dbe6681e659eee236.r2.dev;" in html
+    assert "img-src 'self' data: https://pub-0dcb2204775c484dbe6681e659eee236.r2.dev;" in html
+    assert "product-images" not in (APP_DIR / "data.js").read_text(encoding="utf-8")
+    assert "product-images" not in (APP_DIR / "sw.js").read_text(encoding="utf-8")
     app = (APP_DIR / "app.js").read_text(encoding="utf-8")
     assert 'image.addEventListener("error", () => image.replaceWith(productIllustration(' in app
     assert "crossOrigin" not in app and 'image.loading = sizes ? "eager" : "lazy"' in app

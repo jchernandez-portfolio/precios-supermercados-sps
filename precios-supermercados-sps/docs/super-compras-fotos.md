@@ -11,11 +11,10 @@ Aprobado por el responsable del proyecto (octubre 2026). Registro:
 | Índice v2 | `fotos/v2/index.json` en el mismo bucket (`items[id]`: `sig`, `h` huella, `sm` súper, `s` puntaje, `q` nivel, `px` píxeles útiles, `c` versión de criterios; o `none`) |
 | Revisión a ojo de la última corrida | `fotos/v2/revision/latest.html` (y una por corrida) |
 | Dirección pública | `https://pub-0dcb2204775c484dbe6681e659eee236.r2.dev` (variable `R2_PUBLIC_BASE_URL`) |
-| Fotos v1 (400 px, en retiro) | rama `product-images` |
 
 El nombre de cada foto lleva la huella de su contenido: una foto publicada nunca
 cambia, se guarda en caché un año (`immutable`) y el repositorio no carga imágenes.
-Mientras dura la migración, el catálogo usa la foto v2 si existe y si no la v1.
+Las fotos v1 (400 px, rama `product-images`) se retiraron en noviembre de 2026: el catálogo sólo usa R2.
 
 ## Flujo diario
 
@@ -37,7 +36,7 @@ Mientras dura la migración, el catálogo usa la foto v2 si existe y si no la v1
    paralelo sólo lo que falta (mismo nombre = mismo contenido, así una corrida
    interrumpida se retoma) y al final el índice.
 3. La publicación del catálogo lee los dos índices y llena la columna `photo` de
-   `search.json`: huella v2, versión v1 o 0.
+   `search.json`: la huella de la foto o 0 (ilustración).
 4. La app usa 320 px en tarjetas y deja que el navegador elija 320 u 800 px en el
    detalle (`srcset`); si no hay foto o falla, dibuja la ilustración. Las fotos se
    piden sin CORS (el bucket no lo envía); el navegador las guarda un año por

@@ -115,12 +115,7 @@ jobs:
         run: |
           set -uo pipefail
           mkdir -p run-artifacts
-          # Rama pública `product-images`; si falla, el catálogo sale sin fotos.
-          curl --fail --silent --show-error --location --max-time 60 \
-            --output run-artifacts/product-images-index.json \
-            https://raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/product-images/index.json \
-            || rm -f run-artifacts/product-images-index.json
-          # Fotos v2 (800/320 px) en el bucket público R2; reemplazan a las v1 producto por producto.
+          # Fotos (800/320 px) en el bucket público R2; si falla, el catálogo sale sin fotos.
           curl --fail --silent --show-error --location --max-time 60 \
             --output run-artifacts/product-images-index-v2.json \
             https://pub-0dcb2204775c484dbe6681e659eee236.r2.dev/fotos/v2/index.json \
@@ -131,7 +126,6 @@ jobs:
         run: |
           set -euo pipefail
           python scripts/exportar_consumer_catalog.py \
-            --images-index run-artifacts/product-images-index.json \
             --images-index run-artifacts/product-images-index-v2.json \
             --turso \
             --scope la_colonia=la_colonia_sps \
@@ -149,7 +143,6 @@ jobs:
           set -euo pipefail
           python scripts/exportar_consumer_catalog_tgu.py \
             --turso \
-            --images-index run-artifacts/product-images-index.json \
             --images-index run-artifacts/product-images-index-v2.json \
             --output-directory run-artifacts/analytics/rpi-la-colonia-walmart-sps/consumer-v3-tgu \
             --require-products \

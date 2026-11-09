@@ -446,25 +446,24 @@ SEARCH_COLUMNS = (
     "other_presentations", "comparability", "photo",
 )
 # id = hash del row_id sin prefijo; comparabilidad en una letra; photo = foto del
-# producto: huella de 10 caracteres de la versión 2 (R2, 800 y 320 px), número de
-# versión de la rama ``product-images`` (v1, 400 px) o 0 (la app dibuja la ilustración).
-PHOTO_INDEX_SCHEMA = "super-compras-product-images/v1"
+# producto: huella de 10 caracteres (R2, 800 y 320 px) o 0 (la app dibuja la
+# ilustración). Las fotos v1 de la rama ``product-images`` se retiraron (2026-11).
 PHOTO_INDEX_SCHEMA_V2 = "super-compras-product-images/v2"
-_PHOTO_VERSIONS: dict[str, int | str] = {}
+_PHOTO_VERSIONS: dict[str, str] = {}
 _COMPARABILITY_CODES = {"comparable": "c", "single_source": "s", "individual": "i"}
 
 
 _PHOTO_HASH = re.compile(r"[0-9a-f]{10}")
 
 
-def load_photo_versions(path: Path | None | Sequence[Path | None]) -> dict[str, int | str]:
-    """Lee los ``index.json`` de fotos; si falta o no cuadra, el catálogo sale sin fotos.
+def load_photo_versions(path: Path | None | Sequence[Path | None]) -> dict[str, str]:
+    """Lee el ``index.json`` de fotos (R2); si falta o no cuadra, el catálogo sale sin fotos.
 
-    Acepta varios índices: el último gana. Así la versión 2 (R2) reemplaza a la 1
-    producto por producto mientras dura la migración.
+    Acepta varios índices (el último gana). Un índice v1 (rama ``product-images``)
+    ya no aporta fotos.
     """
     if isinstance(path, (list, tuple)):
-        merged: dict[str, int | str] = {}
+        merged: dict[str, str] = {}
         for item in path:
             merged.update(load_photo_versions(item))
         return merged
@@ -475,20 +474,14 @@ def load_photo_versions(path: Path | None | Sequence[Path | None]) -> dict[str, 
     except (OSError, ValueError):
         return {}
     schema = document.get("schema") if isinstance(document, dict) else None
-    items = document.get("items") if schema in {PHOTO_INDEX_SCHEMA, PHOTO_INDEX_SCHEMA_V2} else None
+    items = document.get("items") if schema == PHOTO_INDEX_SCHEMA_V2 else None
     if not isinstance(items, dict):
         return {}
-    if schema == PHOTO_INDEX_SCHEMA_V2:
-        return {
-            str(key): value["h"]
-            for key, value in items.items()
-            if isinstance(value, dict) and not value.get("none") and isinstance(value.get("h"), str)
-            and _PHOTO_HASH.fullmatch(value["h"])
-        }
     return {
-        str(key): value["v"]
+        str(key): value["h"]
         for key, value in items.items()
-        if isinstance(value, dict) and not value.get("none") and type(value.get("v")) is int and value["v"] > 0
+        if isinstance(value, dict) and not value.get("none") and isinstance(value.get("h"), str)
+        and _PHOTO_HASH.fullmatch(value["h"])
     }
 
 
