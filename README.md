@@ -1,6 +1,6 @@
 # Errores de datos en Súper Compras
 
-Actualizado automáticamente el 2026-11-09 a partir del catálogo publicado (San Pedro Sula: 2026-11-09T11:44:31.541199Z; Tegucigalpa: 2026-11-09T11:47:07.796569Z).
+Actualizado automáticamente el 2026-11-10 a partir del catálogo publicado (San Pedro Sula: 2026-11-09T11:44:31.541199Z; Tegucigalpa: 2026-11-09T11:47:07.796569Z).
 
 - [`errores_detectados.csv`](errores_detectados.csv): todo lo que la revisión automática encuentra hoy, una fila por producto y supermercado, con enlace al producto.
 - [`errores_confirmados.csv`](errores_confirmados.csv): errores revisados a mano, de dónde vienen (súper o Súper Compras) y su estado.
@@ -32,13 +32,13 @@ Actualizado automáticamente el 2026-11-09 a partir del catálogo publicado (San
 
 | Ciudad | Supermercado | Productos | Con foto | Sin foto | % | hd | sd | low |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| San Pedro Sula | Total | 33953 | 25851 | 8102 | 76 % | 18940 | 6638 | 128 |
+| San Pedro Sula | Total | 33953 | 25851 | 8102 | 76 % | 18929 | 6640 | 128 |
 | San Pedro Sula | Colonial | 8469 | 7108 | 1361 | 84 % |  |  |  |
 | San Pedro Sula | Los Andes | 6928 | 6124 | 804 | 88 % |  |  |  |
 | San Pedro Sula | La Colonia | 7129 | 6505 | 624 | 91 % |  |  |  |
 | San Pedro Sula | PriceSmart | 2685 | 1398 | 1287 | 52 % |  |  |  |
 | San Pedro Sula | Walmart | 15180 | 11152 | 4028 | 73 % |  |  |  |
-| Tegucigalpa | Total | 33693 | 22354 | 11339 | 66 % | 19795 | 2498 | 1 |
+| Tegucigalpa | Total | 33693 | 22354 | 11339 | 66 % | 19782 | 2499 | 1 |
 | Tegucigalpa | La Colonia | 7614 | 6955 | 659 | 91 % |  |  |  |
 | Tegucigalpa | Paiz | 10365 | 9121 | 1244 | 88 % |  |  |  |
 | Tegucigalpa | PriceSmart | 2823 | 1423 | 1400 | 50 % |  |  |  |
