@@ -1,0 +1,66 @@
+name: Precios SPS - Auditoría de identidad de producto
+
+# Sólo lectura y sólo a mano. Mide, sobre el catálogo público vigente de cada
+# ciudad, códigos de barra (EAN/GTIN), marca y contenido neto separados,
+# tarjetas agrupadas y GTIN repartidos en varias tarjetas, y el estado del
+# producto maestro; además vuelca el esquema real de Turso y una muestra de 100
+# productos (maíz, margarina, café, conflictos). El script sólo ejecuta SELECT
+# y PRAGMA table_info (cualquier otra sentencia se rechaza); no escribe en el
+# repositorio: deja un artifact.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: precios-sps-identity-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    if: ${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: precios-supermercados-sps
+    env:
+      PYTHONPATH: ${{ github.workspace }}/precios-supermercados-sps/src
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - name: Descargar revisión inmutable
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Configurar Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias fijadas
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check requests==2.34.2 numpy==2.3.3 Pillow==11.3.0 PyYAML==6.0.3
+
+      - name: Auditar identidad (sólo lectura)
+        shell: bash
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          python scripts/auditar_identidad_productos.py --output-dir run-artifacts/identidad
+
+      - name: Guardar resumen, esquema y muestra
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: identidad-productos-${{ github.run_id }}
+          path: precios-supermercados-sps/run-artifacts/identidad
+          if-no-files-found: error
+          retention-days: 14

@@ -89,6 +89,13 @@ PRODUCT_IMAGES_SYNC_CHECKOUT = {
     "sparse-checkout-cone-mode": "false",
     "persist-credentials": "false",
 }
+base.IDENTITY_AUDIT_WORKFLOW = "precios-supermercados-sps-identity-audit.yml"
+base.EXPECTED_PERMISSIONS[base.IDENTITY_AUDIT_WORKFLOW] = {"contents": "read"}
+base.EXPECTED_TRIGGERS[base.IDENTITY_AUDIT_WORKFLOW] = {"workflow_dispatch"}
+base.ALLOWED_SECRET_REFERENCES[base.IDENTITY_AUDIT_WORKFLOW] = {
+    base.TURSO_DATABASE_URL_SECRET,
+    base.TURSO_AUTH_TOKEN_SECRET,
+}
 base.PAGES_WORKFLOW = "precios-supermercados-sps-pages.yml"
 base.EXPECTED_PERMISSIONS[base.PAGES_WORKFLOW] = {"contents": "write"}
 base.EXPECTED_TRIGGERS[base.PAGES_WORKFLOW] = {"push", "workflow_dispatch"}
@@ -675,3 +682,26 @@ def test_data_quality_audit_only_publishes_public_derivations_without_secrets() 
     assert "secrets." not in text and "TURSO" not in text
     assert "git -C \"$repository\" push origin HEAD:calidad-datos" in text
     assert text.count("push origin") == 1
+
+
+def test_identity_audit_is_manual_read_only_and_leaves_an_artifact() -> None:
+    path = base.WORKFLOW_DIR / base.IDENTITY_AUDIT_WORKFLOW
+    workflow = base.load_workflow(path)
+    assert workflow["permissions"] == {"contents": "read"}
+    assert set(workflow["on"]) == {"workflow_dispatch"}
+    job = base.jobs(workflow)["audit"]
+    assert set(base.jobs(workflow)) == {"audit"}
+    assert "github.ref == 'refs/heads/main'" in job["if"]
+    raw = path.read_text(encoding="utf-8")
+    assert "python scripts/auditar_identidad_productos.py --output-dir run-artifacts/identidad" in raw
+    assert "actions/upload-artifact@" in raw and "identidad-productos-${{ github.run_id }}" in raw
+    for forbidden in ("contents: write", "git push", "--apply", "pull_request", "schedule:", "id-token"):
+        assert forbidden not in raw, forbidden
+    # Las llaves de Turso sólo existen en el paso que audita.
+    run = next(step for step in base.steps(workflow) if "auditar_identidad_productos.py" in str(step.get("run", "")))
+    assert set(run["env"]) == {"TURSO_DATABASE_URL", "TURSO_AUTH_TOKEN"}
+    others = [step for step in base.steps(workflow) if step is not run]
+    assert not any("secrets." in str(step) for step in others)
+    script = (base.REPO_ROOT / "precios-supermercados-sps" / "scripts" / "auditar_identidad_productos.py").read_text(encoding="utf-8")
+    for statement in ("INSERT INTO", "UPDATE ", "DELETE FROM", "DROP TABLE", "CREATE TABLE", "ALTER TABLE", "REPLACE INTO"):
+        assert statement not in script.upper(), statement
