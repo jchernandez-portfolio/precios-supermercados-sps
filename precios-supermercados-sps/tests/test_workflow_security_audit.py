@@ -103,6 +103,25 @@ base.ALLOWED_SECRET_REFERENCES[base.OPEN_FOOD_FACTS_WORKFLOW] = {
     base.TURSO_DATABASE_URL_SECRET,
     base.TURSO_AUTH_TOKEN_SECRET,
 }
+base.SIZE_DECISIONS_WORKFLOW = "precios-supermercados-sps-size-decisions.yml"
+base.EXPECTED_PERMISSIONS[base.SIZE_DECISIONS_WORKFLOW] = {"contents": "read"}
+base.EXPECTED_TRIGGERS[base.SIZE_DECISIONS_WORKFLOW] = {"workflow_dispatch"}
+base.ALLOWED_JOB_PERMISSIONS[base.SIZE_DECISIONS_WORKFLOW] = {"apply": {"contents": "read", "actions": "write"}}
+base.ALLOWED_SECRET_REFERENCES[base.SIZE_DECISIONS_WORKFLOW] = {
+    base.TURSO_DATABASE_URL_SECRET,
+    base.TURSO_AUTH_TOKEN_SECRET,
+}
+base.SIZE_QUEUE_WORKFLOW = "precios-supermercados-sps-size-queue.yml"
+base.EXPECTED_PERMISSIONS[base.SIZE_QUEUE_WORKFLOW] = {"contents": "write"}
+base.EXPECTED_TRIGGERS[base.SIZE_QUEUE_WORKFLOW] = {"workflow_run", "workflow_dispatch"}
+base.ALLOWED_SECRET_REFERENCES[base.SIZE_QUEUE_WORKFLOW] = {
+    base.TURSO_DATABASE_URL_SECRET,
+    base.TURSO_AUTH_TOKEN_SECRET,
+}
+SIZE_QUEUE_CHECKOUTS = [
+    {"ref": "main", "path": "source", "persist-credentials": "false"},
+    {"ref": "revision-tamanos", "path": "cola", "fetch-depth": "1"},
+]
 base.PAGES_WORKFLOW = "precios-supermercados-sps-pages.yml"
 base.EXPECTED_PERMISSIONS[base.PAGES_WORKFLOW] = {"contents": "write"}
 base.EXPECTED_TRIGGERS[base.PAGES_WORKFLOW] = {"push", "workflow_dispatch"}
@@ -148,6 +167,11 @@ def _checkout_identity_with_derived_workflows() -> None:
             # Código de main sin credenciales; ramas de datos sólo como archivos; sólo
             # la rama `calidad-datos` conserva credenciales para su commit.
             assert [step["with"] for step in checkout_steps] == DATA_QUALITY_CHECKOUTS
+            continue
+        if path.name == base.SIZE_QUEUE_WORKFLOW:
+            # Código de main sin credenciales; sólo la rama pública de la cola
+            # conserva credenciales para su commit.
+            assert [step["with"] for step in checkout_steps] == SIZE_QUEUE_CHECKOUTS
             continue
         if path.name == base.AUDIT_WORKFLOW:
             assert len(checkout_steps) == 1
@@ -734,3 +758,19 @@ def test_open_food_facts_probe_is_manual_read_only_and_polite() -> None:
     script = (base.REPO_ROOT / "precios-supermercados-sps" / "scripts" / "probar_open_food_facts.py").read_text(encoding="utf-8")
     for statement in ("INSERT INTO", "UPDATE ", "DELETE FROM", "DROP TABLE", "CREATE TABLE", "ALTER TABLE", "REPLACE INTO"):
         assert statement not in script.upper(), statement
+
+
+def test_size_decisions_workflow_is_owner_only_and_never_inlines_the_payload() -> None:
+    path = base.WORKFLOW_DIR / base.SIZE_DECISIONS_WORKFLOW
+    workflow = base.load_workflow(path)
+    job = base.jobs(workflow)["apply"]
+    assert "github.ref == 'refs/heads/main'" in job["if"]
+    assert "github.actor == 'Jchernand3z19'" in job["if"]
+    assert job["env"]["DECISIONS_JSON"] == "${{ inputs.decisions }}"
+    for step in base.steps(workflow):
+        # El JSON del panel sólo entra por variable de entorno, nunca en el comando.
+        assert "inputs." not in str(step.get("run", "")), step.get("name")
+        if "TURSO_AUTH_TOKEN" in str(step.get("env", {})):
+            assert "aplicar_decisiones_tamano.py" in str(step["run"])
+    raw = path.read_text(encoding="utf-8")
+    assert "gh workflow run precios-supermercados-sps-homologation-refresh.yml" in raw

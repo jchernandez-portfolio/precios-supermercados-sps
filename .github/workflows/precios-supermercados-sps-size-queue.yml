@@ -1,0 +1,81 @@
+name: Precios SPS - Cola de revisión de tamaños
+
+# Después de cada refresco de homologación recalcula los grupos GTIN con tamaños
+# en conflicto (sólo SELECT en Turso) y publica `cola.json` en la rama pública
+# `revision-tamanos`, que lee el panel #/admin/revision. Sólo contiene datos ya
+# públicos (cadena, nombre y tamaño publicados). Omite los GTIN ya decididos.
+on:
+  workflow_run:
+    workflows:
+      - "Precios SPS - Refrescar homologación derivada"
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: precios-sps-size-queue
+  cancel-in-progress: false
+
+jobs:
+  queue:
+    if: >-
+      ${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' &&
+          (github.event_name == 'workflow_dispatch' ||
+           (github.event.workflow_run.conclusion == 'success' &&
+            github.event.workflow_run.head_branch == 'main')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: ${{ github.workspace }}/source/precios-supermercados-sps/src
+    steps:
+      - name: Descargar código de main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          path: source
+          persist-credentials: false
+
+      - name: Descargar rama de la cola sin ejecutar su contenido
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: revision-tamanos
+          path: cola
+          fetch-depth: 1
+
+      - name: Configurar Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias fijadas
+        run: python -m pip install --disable-pip-version-check requests==2.34.2 PyYAML==6.0.3
+
+      - name: Calcular cola (sólo lectura)
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/cola
+          python source/precios-supermercados-sps/scripts/exportar_cola_tamanos.py --output-dir /tmp/cola
+
+      - name: Publicar en un solo commit y push
+        env:
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id || github.run_id }}
+        run: |
+          set -euo pipefail
+          repository="$GITHUB_WORKSPACE/cola"
+          if [ -L "$repository/cola.json" ]; then echo "cola_symlink_boundary_invalid" >&2; exit 1; fi
+          cp /tmp/cola/cola.json "$repository/cola.json"
+          git -C "$repository" config user.name "github-actions[bot]"
+          git -C "$repository" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$repository" add -- cola.json
+          if git -C "$repository" diff --cached --quiet; then
+            echo "cola_already_current=true"
+            exit 0
+          fi
+          git -C "$repository" commit -q -m "data: cola de revisión de tamaños (run $SOURCE_RUN_ID)"
+          git -C "$repository" push origin HEAD:revision-tamanos

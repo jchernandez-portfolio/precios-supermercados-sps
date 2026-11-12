@@ -70,11 +70,24 @@ from precios_supermercados.product_master import (  # noqa: E402
     DEFAULT_POLICY_PATH,
     MasterPolicy,
     ProductMasterError,
+    gtin_master_id,
     load_master_policy,
     member_profiles,
     profile_state_digest,
     reviewed_decision_links,
     sync_product_master,
+)
+from precios_supermercados.size_decisions import (  # noqa: E402
+    SELECT_SQL as SIZE_DECISIONS_SELECT_SQL,
+)
+from precios_supermercados.size_decisions import (  # noqa: E402
+    TABLE_NAME as SIZE_DECISIONS_TABLE,
+)
+from precios_supermercados.size_decisions import (  # noqa: E402
+    SizeDecision,
+    decision_from_row,
+    human_attributes,
+    index_decisions,
 )
 
 STAGE_TABLE = "product_homologation_profiles_stage"
@@ -311,6 +324,23 @@ def _fetch_pricesmart_spec_attributes(url: str, token: str) -> dict[int, tuple[s
             None if hint is None else str(hint),
         )
     return result
+
+
+def _fetch_size_decisions(url: str, token: str) -> dict[str, SizeDecision]:
+    """Decisiones humanas de tamaño (panel de revisión). Sin tabla todavía: ninguna."""
+    exists = _query(url, token, "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (SIZE_DECISIONS_TABLE,))
+    if not exists:
+        return {}
+    return index_decisions(decision_from_row(row) for row in _query(url, token, SIZE_DECISIONS_SELECT_SQL))
+
+
+def size_decision_master_attributes(decisions: dict[str, SizeDecision]) -> dict[str, dict[str, dict[str, object]]]:
+    """Maestro del GTIN → contenido neto oficial (sólo decisiones de tamaño)."""
+    return {
+        gtin_master_id(gtin): attributes
+        for gtin, decision in sorted(decisions.items())
+        if (attributes := human_attributes(decision))
+    }
 
 
 def _fetch_profile_state(url: str, token: str) -> dict[int, tuple[str, str]]:
@@ -594,6 +624,7 @@ def _sync_master(
     apply: bool,
     policy: MasterPolicy | None = None,
     decisions_path: Path = REVIEWED_DECISIONS_PATH,
+    size_decisions: dict[str, SizeDecision] | None = None,
 ) -> dict[str, object]:
     try:
         policy = policy or load_master_policy(DEFAULT_POLICY_PATH)
@@ -625,6 +656,7 @@ def _sync_master(
             reviewed_links=reviewed,
             engine_links=engine,
             apply=apply,
+            size_decision_attributes=size_decision_master_attributes(size_decisions or {}),
         )
         if reviewed_diagnostics:
             result["reviewed_decisions"] = reviewed_diagnostics
@@ -661,10 +693,12 @@ def backfill_turso(
         products, spec_enrichment = apply_source_spec_attributes(
             products, _fetch_pricesmart_spec_attributes(database_url, auth_token)
         )
+    size_decisions = _fetch_size_decisions(database_url, auth_token)
     derived = build_homologation_rows(
         products,
         updated_at_utc=timestamp,
         normalization_version=NORMALIZATION_VERSION,
+        size_decisions=size_decisions,
     )
     derived_state = {
         row.product_id: (row.profile_hash, row.normalization_version)
@@ -703,12 +737,14 @@ def backfill_turso(
             timestamp=timestamp,
             apply=applied,
             policy=master_policy,
+            size_decisions=size_decisions,
         )
 
     if not apply:
         return {
             "normalization_version": NORMALIZATION_VERSION,
             "pricesmart_spec_enrichment": spec_enrichment,
+            "size_decisions": len(size_decisions),
             "processed": len(derived),
             "inserted": inserted,
             "updated": updated,
@@ -727,6 +763,7 @@ def backfill_turso(
         return {
             "normalization_version": NORMALIZATION_VERSION,
             "pricesmart_spec_enrichment": spec_enrichment,
+            "size_decisions": len(size_decisions),
             "processed": len(derived),
             "inserted": 0,
             "updated": 0,
@@ -766,6 +803,7 @@ def backfill_turso(
     return {
         "normalization_version": NORMALIZATION_VERSION,
         "pricesmart_spec_enrichment": spec_enrichment,
+        "size_decisions": len(size_decisions),
         "processed": len(derived),
         "no_op": False,
         "staging_written": True,

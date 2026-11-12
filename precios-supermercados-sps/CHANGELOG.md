@@ -7,6 +7,8 @@ número son cambios directos. El detalle de cada incidente vive en
 
 ## 2026-11-12
 
+- Panel de revisión de tamaños (`#/admin/revision`): tabla `size_decisions`, workflow que guarda las decisiones del panel y relanza el refresco, cola pública `revision-tamanos/cola.json` y motor que agrupa sólo las ofertas con el tamaño oficial.
+- #66 Prueba de enriquecimiento con Open Food Facts (sólo lectura).
 - Regla de onzas en grupos GTIN (motor v2.8): 8 oz = 237 ml / 24 oz = 680 g con el mismo código, "nunca empeorar" y precio por unidad para la onza convertida.
 - #64 Medición (sólo lectura): simular la regla de onzas.
 - #63 Tegucigalpa: una tarjeta por producto con todas sus sucursales.

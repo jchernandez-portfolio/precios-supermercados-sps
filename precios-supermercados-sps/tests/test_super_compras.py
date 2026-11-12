@@ -171,7 +171,7 @@ def test_app_shell_is_static_safe_and_installable() -> None:
 
 
 def test_app_never_injects_html_or_reads_private_sources() -> None:
-    for name in ("app.js", "data.js", "illustration.js", "sw.js"):
+    for name in ("app.js", "data.js", "illustration.js", "sw.js", "admin.js"):
         source = (APP_DIR / name).read_text(encoding="utf-8")
         assert "innerHTML" not in source and "outerHTML" not in source and "insertAdjacentHTML" not in source, name
         assert "eval(" not in source and "new Function" not in source, name
@@ -641,3 +641,72 @@ console.log(JSON.stringify(out));
     assert result["store"] == "walmart_tgu_el_sauce"
     assert result["link"] == "newkey000000000000000001"
     assert result["missing"] is None and result["noFile"] is None
+
+
+def test_size_review_panel_sends_only_validated_decisions_to_github(tmp_path: Path) -> None:
+    (tmp_path / "admin.js").write_text((APP_DIR / "admin.js").read_text(encoding="utf-8"), encoding="utf-8")
+    script = """
+import { sizeDecisionsBody, sendSizeDecisions, loadSizeQueue } from './data.js';
+import { ean13, sizeOptions, decisionOf } from './admin.js';
+const calls = [];
+globalThis.fetch = async (url, options = {}) => {
+  calls.push({ url, method: options.method || 'GET', headers: options.headers || {}, body: options.body || null,
+               credentials: options.credentials || null });
+  if (url.endsWith('cola.json')) return { ok: true, status: 200, json: async () => ({ schema: 'rpi-size-queue/v1', items: [] }) };
+  return { ok: false, status: calls.length > 2 ? 403 : 204 };
+};
+const out = {};
+const decisions = [
+  { gtin: '00049733830119', decision: 'size', value: '5', unit: 'oz', note: ' etiqueta 5 fl oz ' },
+  { gtin: '07501017003075', decision: 'different_products', value: '9', unit: 'g' },
+];
+out.body = sizeDecisionsBody(decisions);
+out.queue = (await loadSizeQueue()).schema;
+out.sent = await sendSizeDecisions('github_pat_' + 'A'.repeat(40), decisions);
+out.request = calls[1];
+try { await sendSizeDecisions('github_pat_' + 'A'.repeat(40), decisions); } catch (error) { out.forbidden = error.message; }
+try { await sendSizeDecisions('mi-clave', decisions); } catch (error) { out.badToken = error.message; }
+try { sizeDecisionsBody([{ gtin: '00049733830119', decision: 'size', value: '', unit: 'oz' }]); } catch (error) { out.incomplete = error.message; }
+out.calls = calls.length;
+out.ean = [ean13('00049733830119'), ean13('00000012345670')];
+out.options = sizeOptions({ offers: [
+  { store: 'walmart', value: '150', unit: 'g' }, { store: 'paiz', value: '150', unit: 'g' },
+  { store: 'colonial', value: '150', unit: 'ml' }, { store: 'pricesmart', value: null, unit: null },
+] });
+out.decision = [decisionOf({ value: '5', unit: 'oz' }), decisionOf({ value: '5', unit: '' }), decisionOf({ different: true }), decisionOf(null)];
+console.log(JSON.stringify(out));
+"""
+    result = json.loads(_node(script, tmp_path))
+    body = result["body"]
+    assert body["ref"] == "main" and set(body["inputs"]) == {"decisions"}
+    assert json.loads(body["inputs"]["decisions"]) == {
+        "schema": "rpi-size-decisions/v1",
+        "decisions": [
+            {"gtin": "00049733830119", "decision": "size", "value": "5", "unit": "oz", "note": "etiqueta 5 fl oz"},
+            {"gtin": "07501017003075", "decision": "different_products"},
+        ],
+    }
+    assert result["queue"] == "rpi-size-queue/v1" and result["sent"] == {"sent": 2}
+    request = result["request"]
+    assert request["url"] == (
+        "https://api.github.com/repos/jchernandez-portfolio/precios-supermercados-sps/actions/workflows/"
+        "precios-supermercados-sps-size-decisions.yml/dispatches"
+    )
+    assert request["method"] == "POST" and request["credentials"] == "omit"
+    assert request["headers"]["Authorization"].startswith("Bearer github_pat_")
+    assert "github_pat_" not in request["url"] and "github_pat_" not in request["body"]
+    assert "Actions: read and write" in result["forbidden"]
+    assert "formato" in result["badToken"] and "incompleto" in result["incomplete"]
+    assert result["calls"] == 3  # la llave mal formada y el tamaño incompleto no llegan a la red
+    assert result["ean"] == ["0049733830119", "12345670"]
+    assert result["options"] == [
+        {"value": "150", "unit": "g", "stores": ["Walmart", "Paiz"]},
+        {"value": "150", "unit": "ml", "stores": ["Colonial"]},
+    ]
+    assert result["decision"] == ["size", None, "different_products", None]
+    html = (APP_DIR / "index.html").read_text(encoding="utf-8")
+    assert "connect-src 'self' https://raw.githubusercontent.com https://api.github.com;" in html
+    admin = (APP_DIR / "admin.js").read_text(encoding="utf-8")
+    assert "sessionStorage" in admin and "localStorage" not in admin
+    app = (APP_DIR / "app.js").read_text(encoding="utf-8")
+    assert 'const ADMIN_ROUTE = "/admin/revision";' in app and 'await import("./admin.js?v=' in app
