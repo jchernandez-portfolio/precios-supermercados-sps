@@ -34,3 +34,14 @@ def test_all_turso_persistors_share_optional_derived_table_guard() -> None:
         source = (ROOT / "scripts" / filename).read_text(encoding="utf-8")
         assert "_validate_table_names(str(row[0]) for row in _execute_rows(results[0]))" in source
         assert "!= EXPECTED_TABLES" not in source
+
+
+def test_every_derived_table_the_project_creates_is_tolerated_by_the_daily_guard() -> None:
+    """La tabla del panel de tamaños rompió el refresco del 12-nov por faltar aquí."""
+    from precios_supermercados.product_homologation_persistence import TABLE_NAME as PROFILES
+    from precios_supermercados.product_master import MASTER_TABLES
+    from precios_supermercados.size_decisions import TABLE_NAME as SIZE_DECISIONS
+
+    for table in (PROFILES, SIZE_DECISIONS, *MASTER_TABLES):
+        assert table in updater.OPTIONAL_DERIVED_TABLES, table
+    updater._validate_table_names(updater.EXPECTED_TABLES | {SIZE_DECISIONS})

@@ -38,6 +38,7 @@ OPTIONAL_COUNTED_TABLES = (
     "master_link_rejections",
     "catalog_unpriced_observations",
     "pricesmart_product_specs",
+    "size_decisions",
 )
 DUPLICATE_OPEN_PERIODS_SQL = (
     "SELECT COUNT(*) FROM (SELECT product_id,location_id FROM price_history "
