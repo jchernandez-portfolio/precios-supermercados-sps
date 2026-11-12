@@ -271,3 +271,72 @@ def test_queue_sizes_are_rounded_to_two_decimals() -> None:
     sizes = {offer["store"]: (offer["value"], offer["size"]) for item in cola.queue_items(groups, skip=set())
              for offer in item["offers"]}
     assert sizes == {"colonial": ("997.9", "997.9 g"), "la_colonia": ("907.18", "907.18 g")}
+
+
+# ------------------------------------------------------------ motor (IA)
+
+
+def test_engine_decisions_never_replace_a_human_one_and_humans_replace_the_engine() -> None:
+    connection = database()
+    store = SQLiteMasterStore(connection)
+    aplicar.apply_size_decisions(store, payload({"gtin": CHOLULA, "decision": "size", "value": "5", "unit": "oz"}),
+                                 actor="Jchernand3z19", apply=True, now=NOW)
+    engine = json.dumps({"schema": "rpi-size-decisions/v1", "decisions": [
+        {"gtin": CHOLULA, "decision": "size", "value": "150", "unit": "g", "note": "Gemini: 150 g"},
+        {"gtin": MCCORMICK, "decision": "size", "value": "180", "unit": "ml", "note": "Gemini: Cont. neto 180 ml"},
+        {"gtin": "07501017003075", "decision": "size", "value": "820", "unit": "g"},
+    ]})
+    result = aplicar.apply_engine_decisions(store, engine, engine="gemini_auto", apply=True, now=NOW)
+    assert result["decisions"] == 1 and result["skipped_human"] == [CHOLULA]
+    assert result["skipped_unknown"] == ["07501017003075"]
+    rows = dict(connection.execute("SELECT canonical_gtin, decided_by FROM size_decisions").fetchall())
+    assert rows == {CHOLULA: "human:Jchernand3z19", MCCORMICK: "engine:gemini_auto"}
+    human = json.loads(connection.execute("SELECT human_attributes_json FROM master_products").fetchone()[0])
+    assert human["net_content_unit"]["value"] == "oz"  # la IA no tocó el maestro decidido por una persona
+
+    # Una persona corrige a la IA: su decisión reemplaza la del motor.
+    aplicar.apply_size_decisions(store, payload({"gtin": MCCORMICK, "decision": "different_products"}),
+                                 actor="Jchernand3z19", apply=True, now=NOW)
+    assert connection.execute("SELECT decided_by FROM size_decisions WHERE canonical_gtin=?", (MCCORMICK,)).fetchone() == (
+        "human:Jchernand3z19",)
+
+
+def test_engine_upsert_guard_protects_a_human_row_written_in_between() -> None:
+    connection = database()
+    store = SQLiteMasterStore(connection)
+    decisions = parse_payload(payload({"gtin": CHOLULA, "decision": "size", "value": "150", "unit": "g"}),
+                              decided_by="gemini_auto", decided_at_utc=NOW, engine=True)
+    steps, _, _ = aplicar.plan(store, decisions, now=NOW, engine=True)
+    aplicar.apply_size_decisions(store, payload({"gtin": CHOLULA, "decision": "size", "value": "5", "unit": "oz"}),
+                                 actor="Jchernand3z19", apply=True, now=NOW)
+    store.write(steps)  # llega tarde: la fila humana ya existe
+    assert connection.execute("SELECT decided_by FROM size_decisions").fetchone() == ("human:Jchernand3z19",)
+    human = json.loads(connection.execute("SELECT human_attributes_json FROM master_products").fetchone()[0])
+    assert human["net_content_value"]["value"] == "5"
+
+
+def test_engine_actor_is_an_allowlist_and_humans_cannot_pose_as_the_engine() -> None:
+    text = payload({"gtin": CHOLULA, "decision": "different_products"})
+    with pytest.raises(SizeDecisionError, match="actor_invalid"):
+        parse_payload(text, decided_by="otra_ia", decided_at_utc=NOW, engine=True)
+    assert parse_payload(text, decided_by="engine", decided_at_utc=NOW)[0].decided_by == "human:engine"
+    with pytest.raises(SystemExit):
+        aplicar.main(["--sqlite", "x.db", "--engine", "otra_ia"])
+
+
+def test_queue_offers_carry_their_card_photo_and_who_it_came_from() -> None:
+    from auditar_identidad_productos import CatalogRow
+
+    key_a, key_b = "a" * 24, "b" * 24
+    cities = {"sps": [CatalogRow("sps", key_a, "x", [("colonial", 3), ("los_andes", 4)]),
+                      CatalogRow("sps", key_b, "y", [("walmart", 5)]), CatalogRow("sps", "c" * 24, "z", [("paiz", 6)])]}
+    index = {key_a: {"h": "1111111111", "sm": "comisariato_los_andes"}, key_b: {"h": "2222222222", "sm": "walmart"},
+             "c" * 24: {"none": 1, "h": "3333333333"}}
+    photos = cola.photo_names(cities, index)
+    assert photos == {"colonial:3": (f"{key_a}-1111111111", "comisariato_los_andes"),
+                      "los_andes:4": (f"{key_a}-1111111111", "comisariato_los_andes"),
+                      "walmart:5": (f"{key_b}-2222222222", "walmart")}
+    items = [{"offers": [{"ref": "colonial:3"}, {"ref": "paiz:6"}]}]
+    assert cola.attach_photos(items, photos) == 1
+    assert items[0]["offers"][0]["foto_de"] == "comisariato_los_andes" and "foto" not in items[0]["offers"][1]
+    assert cola.photo_url(f"{key_b}-2222222222", 320).endswith(f"/320/bb/{key_b}-2222222222.webp")

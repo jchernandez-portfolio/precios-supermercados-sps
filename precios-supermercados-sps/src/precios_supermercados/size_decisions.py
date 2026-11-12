@@ -36,6 +36,8 @@ MAX_VALUE = {"g": Decimal("100000"), "ml": Decimal("100000"), "oz": Decimal("350
 _POUND_TO_GRAMS = Decimal("453.59237")
 _DIMENSION = {"g": "mass_g", "ml": "volume_ml", "oz": "ounce", "unit": "count"}
 _ACTOR = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})")
+# Decisiones automáticas: sólo los motores de esta lista (nunca llegan por el panel).
+ENGINE_ACTORS = frozenset({"gemini_auto"})
 _RELATIVE_TOLERANCE = Decimal("0.02")
 _ABSOLUTE_TOLERANCE = Decimal("1.5")
 
@@ -129,14 +131,21 @@ def canonical_size(value: Decimal, unit: str) -> tuple[Decimal, str]:
     return value, unit
 
 
-def parse_payload(text: str, *, decided_by: str, decided_at_utc: str) -> list[SizeDecision]:
-    """JSON del panel → decisiones válidas. Falla cerrado ante cualquier dato raro."""
+def parse_payload(text: str, *, decided_by: str, decided_at_utc: str, engine: bool = False) -> list[SizeDecision]:
+    """JSON del panel (o de un motor) → decisiones válidas. Falla cerrado ante cualquier dato raro.
+
+    Con ``engine=True`` el autor es un motor de ``ENGINE_ACTORS`` y queda como
+    ``engine:<motor>``; si no, una cuenta de GitHub, ``human:<cuenta>``.
+    """
     if not isinstance(text, str) or not text.strip():
         raise SizeDecisionError("size_decisions_empty")
     if len(text) > MAX_PAYLOAD_CHARS:
         raise SizeDecisionError("size_decisions_too_large")
-    if not _ACTOR.fullmatch(decided_by or ""):
+    if engine and decided_by not in ENGINE_ACTORS:
         raise SizeDecisionError("size_decisions_actor_invalid")
+    if not engine and not _ACTOR.fullmatch(decided_by or ""):
+        raise SizeDecisionError("size_decisions_actor_invalid")
+    author = f"engine:{decided_by}" if engine else f"human:{decided_by}"
     try:
         document = json.loads(text)
     except ValueError as error:
@@ -161,7 +170,7 @@ def parse_payload(text: str, *, decided_by: str, decided_at_utc: str) -> list[Si
         seen.add(gtin)
         kind = item.get("decision")
         note = _clean_text(item.get("note"))
-        common = {"canonical_gtin": gtin, "note": note, "decided_by": f"human:{decided_by}",
+        common = {"canonical_gtin": gtin, "note": note, "decided_by": author,
                   "decided_at_utc": decided_at_utc}
         if kind == "different_products":
             if item.get("value") is not None or item.get("unit") is not None:

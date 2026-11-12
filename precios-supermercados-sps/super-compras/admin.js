@@ -1,14 +1,16 @@
 // Panel interno de revisión de tamaños (#/admin/revision).
-// Mismo código de barras con tamaños distintos entre súper: una persona revisa la
-// etiqueta en la página del súper y fija el tamaño oficial (o marca que no es el
-// mismo producto). "Guardar" lanza el workflow que valida y guarda la decisión; el
+// Mismo código de barras con tamaños distintos entre súper. Lo claro lo resuelve la
+// IA (Gemini) sola; aquí llega lo que no pudo leer o donde hay conflicto. Cada oferta
+// muestra la foto que ya tenemos en el sistema (la misma que leyó la IA) y lo que la
+// IA leyó en ella; una persona fija el tamaño oficial (o marca que no es el mismo
+// producto). La búsqueda en la web del súper queda como respaldo. "Guardar" lanza el workflow que valida y guarda la decisión; el
 // motor la aplica en el siguiente refresco: las ofertas con el tamaño oficial
 // comparan y las demás quedan aparte.
 // La llave de GitHub se guarda sólo en esta pestaña (sessionStorage) y sólo viaja
 // en el encabezado Authorization a api.github.com.
 import {
   RETAILER_NAMES, SIZE_DECISIONS_RUNS_URL, SIZE_UNITS, loadSizeQueue, sendSizeDecisions,
-} from "./data.js?v=20261112-4";
+} from "./data.js?v=20261112-5";
 
 const TOKEN_KEY = "super-compras-admin-github-token";
 const UNIT_LABEL = { g: "g", ml: "ml", oz: "oz", lb: "lb", unit: "unidades" };
@@ -24,6 +26,10 @@ const STORE_SEARCH = {
   colonial: (ean) => `https://supercolonial.com/search?q=${ean}`,
   comisariato_los_andes: () => "https://comisariatolosandes.com/todos",
 };
+
+// Fotos de Súper Compras en el bucket R2 (las mismas que lee la IA).
+const PHOTO_BASE = "https://pub-0dcb2204775c484dbe6681e659eee236.r2.dev/fotos/v2/";
+const PHOTO_NAME = /^[0-9a-f]{24}-[0-9a-f]{6,64}$/;
 
 const review = { queue: null, error: null, loading: null, filter: "todos", decisions: {}, sent: new Set(), status: null, sending: false };
 
@@ -78,18 +84,52 @@ async function copyText(text) {
 }
 
 const AI_REASONS = {
-  ilegible: "La etiqueta no se lee en la foto.",
-  otra_presentacion: "La foto parece de otra presentación: lo leído no coincide con ningún tamaño publicado.",
+  ilegible: "La etiqueta no se lee en ninguna foto.",
+  otro_producto: "La foto parece de otro producto (otra marca o variante).",
+  sin_respuesta: "La IA no dio una lectura para esta foto.",
   respuesta_invalida: "La IA no dio una respuesta válida.",
+  fotos_distintas: "Las fotos dicen tamaños distintos.",
+  minoria: "Lo leído coincide sólo con una parte de los súper (no con la mayoría).",
 };
 
-// Sugerencia de la IA de visión (Gemini) para el item: botón, aviso o nada.
-// Sólo se sugiere con status "sugerencia" y un tamaño válido; todo lo demás es "No legible".
+export function photoUrls(offer) {
+  const name = offer?.foto;
+  if (typeof name !== "string" || !PHOTO_NAME.test(name)) return null;
+  const path = `${name.slice(0, 2)}/${name}.webp`;
+  return { thumb: `${PHOTO_BASE}320/${path}`, full: `${PHOTO_BASE}800/${path}` };
+}
+
+const sizeText = (value, unit) => `${value} ${UNIT_LABEL[unit] || unit}`;
+
+// Lo que la IA leyó en la foto de una oferta: verde si coincide con su título, alerta si no.
+export function offerReading(offer) {
+  const ia = offer?.ia;
+  if (!ia || typeof ia !== "object") return null;
+  if (ia.status === "leido" && Number(ia.value) > 0 && SIZE_UNITS.includes(ia.unit)) {
+    return {
+      kind: ia.coincide ? "ok" : "alert",
+      label: `🤖 IA leyó: ${sizeText(ia.value, ia.unit)}${ia.coincide ? " ✓" : " ⚠"}`,
+      title: [ia.text ? `Texto en la foto: ${ia.text}` : "", ia.coincide ? "Coincide con el título." : "No coincide con el título de este súper."]
+        .filter(Boolean).join(" · "),
+    };
+  }
+  return { kind: "muted", label: "🤖 No legible", title: AI_REASONS[ia.reason] || AI_REASONS.ilegible };
+}
+
+// Resumen de la IA para el código: botón con el tamaño leído, aviso o nada.
 export function aiSuggestion(item) {
   const ai = item?.ia;
   if (!ai || typeof ai !== "object") return null;
-  if (ai.status === "sugerencia" && Number(ai.value) > 0 && SIZE_UNITS.includes(ai.unit)) {
-    return { kind: "suggest", value: String(ai.value), unit: ai.unit, text: typeof ai.text === "string" ? ai.text : "" };
+  const valid = Number(ai.value) > 0 && SIZE_UNITS.includes(ai.unit);
+  const text = typeof ai.text === "string" ? ai.text : "";
+  if (valid && ["auto", "sugerencia", "conflicto", "discrepancia"].includes(ai.status)) {
+    const labels = {
+      auto: "🤖 Resuelto por IA", sugerencia: "🤖 Sugerencia", conflicto: "🤖 IA leyó (conflicto)", discrepancia: "🤖 IA leyó (no coincide con ningún título)",
+    };
+    return {
+      kind: "suggest", status: ai.status, value: String(ai.value), unit: ai.unit, text,
+      label: `${labels[ai.status]}: ${sizeText(ai.value, ai.unit)}`, title: [text && `Leído: ${text}`, AI_REASONS[ai.reason]].filter(Boolean).join(" · "),
+    };
   }
   if (ai.status === "sin_foto") return { kind: "note", label: "🤖 Sin foto", title: "Ninguna oferta tiene foto para leer." };
   return { kind: "note", label: "🤖 No legible", title: AI_REASONS[ai.reason] || AI_REASONS.ilegible };
@@ -134,6 +174,7 @@ export function mountSizeReview(main, { h, fill }) {
 
   const chips = [
     ["todos", "Todos"], ["empate", "Empate"], ["atipico", "Un súper distinto"], ["pendiente", "Sin decidir"],
+    ["ia", "Resueltos por IA"],
   ].map(([key, label]) => {
     const chip = h("button", { type: "button", class: "rv-chip", "aria-pressed": String(review.filter === key) }, label);
     chip.addEventListener("click", () => {
@@ -157,21 +198,34 @@ export function mountSizeReview(main, { h, fill }) {
   function offerRow(item, offer) {
     const search = STORE_SEARCH[offer.store];
     const own = storeCode(offer);
+    const photos = photoUrls(offer);
+    const reading = offerReading(offer);
     const links = search && offer.store !== "comisariato_los_andes"
       ? searchVariants(item.gtin).map(({ label, code }) => h("a", {
         class: `rv-search${own === code ? " own" : ""}`, href: search(code), target: "_blank", rel: "noopener noreferrer",
         title: own === code ? `Buscar ${code} (así lo publica este súper)` : `Buscar ${code}`,
       }, `${label} díg.`))
       : [search ? h("a", { class: "rv-search", href: search(""), target: "_blank", rel: "noopener noreferrer" }, "Catálogo ↗") : null];
-    return h("div", { class: `rv-offer${offer.excluded ? " out" : ""}` },
-      h("div", { class: "rv-offer-main" },
-        h("span", {},
-          h("strong", {}, RETAILER_NAMES[offer.store] || offer.store),
-          h("span", { class: "rv-source" }, offer.name)),
-        h("span", { class: "rv-size" }, offer.size || "sin tamaño")),
-      h("div", { class: "rv-codes" },
-        own ? h("span", { class: "rv-code" }, h("span", { class: "muted" }, "Código del súper: "), h("code", {}, own), copyButton(own)) : null,
-        h("span", { class: "rv-links" }, h("span", { class: "muted" }, "Buscar:"), links)));
+    const sharedFrom = photos && offer.foto_de && offer.foto_de !== offer.store ? (RETAILER_NAMES[offer.foto_de] || offer.foto_de) : null;
+    const thumb = photos
+      ? h("a", { class: "rv-thumb", href: photos.full, target: "_blank", rel: "noopener noreferrer", title: "Abrir la foto en grande" },
+        h("img", { src: photos.thumb, alt: `Foto de ${RETAILER_NAMES[offer.store] || offer.store}: ${offer.name}`, loading: "lazy", width: "96", height: "96" }))
+      : h("span", { class: "rv-thumb empty" }, "Sin foto");
+    return h("div", { class: `rv-offer${offer.excluded ? " out" : ""}${reading?.kind === "alert" ? " alert" : ""}` },
+      thumb,
+      h("div", { class: "rv-offer-body" },
+        h("div", { class: "rv-offer-main" },
+          h("span", {},
+            h("strong", {}, RETAILER_NAMES[offer.store] || offer.store),
+            h("span", { class: "rv-source" }, offer.name)),
+          h("span", { class: "rv-size", title: "Tamaño publicado por el súper" }, offer.size || "sin tamaño")),
+        reading ? h("span", { class: `rv-reading ${reading.kind}`, title: reading.title }, reading.label) : null,
+        sharedFrom ? h("span", { class: "rv-shared" }, `Foto compartida con la de ${sharedFrom}`) : null,
+        h("details", { class: "rv-more" },
+          h("summary", {}, "Buscar en el súper (respaldo)"),
+          h("div", { class: "rv-codes" },
+            own ? h("span", { class: "rv-code" }, h("span", { class: "muted" }, "Código del súper: "), h("code", {}, own), copyButton(own)) : null,
+            h("span", { class: "rv-links" }, links)))));
   }
 
   function rowFor(item) {
@@ -189,8 +243,9 @@ export function mountSizeReview(main, { h, fill }) {
       h("option", { value: "" }, "Unidad"),
       SIZE_UNITS.map((key) => h("option", { value: key, selected: entry.unit === key }, UNIT_LABEL[key])));
     unit.addEventListener("change", () => update({ unit: unit.value, different: false }));
-    const different = h("input", { type: "checkbox", checked: Boolean(entry.different) });
-    different.addEventListener("change", () => update({ different: different.checked }));
+    const different = h("button", { type: "button", class: "rv-pick rv-different", "aria-pressed": String(Boolean(entry.different)) },
+      "No es el mismo producto");
+    different.addEventListener("click", () => update({ different: !entry.different }));
     const note = h("input", { type: "text", maxlength: "200", placeholder: "Nota (opcional): p. ej. la etiqueta dice 5 fl oz", "aria-label": "Nota", value: entry.note ?? "" });
     note.addEventListener("change", () => update({ note: note.value }));
     const picks = sizeOptions(item).map((option) => {
@@ -205,9 +260,9 @@ export function mountSizeReview(main, { h, fill }) {
     if (suggestion?.kind === "suggest") {
       const active = !entry.different && entry.value === suggestion.value && entry.unit === suggestion.unit;
       aiNode = h("button", {
-        type: "button", class: "rv-pick rv-ai", "aria-pressed": String(active),
-        title: suggestion.text ? `Leído en la foto: ${suggestion.text}` : "Leído en la foto del producto",
-      }, `🤖 Sugerencia: ${suggestion.value} ${UNIT_LABEL[suggestion.unit] || suggestion.unit}`);
+        type: "button", class: `rv-pick rv-ai ${suggestion.status}`, "aria-pressed": String(active),
+        title: suggestion.title || "Leído en la foto del producto",
+      }, suggestion.label);
       aiNode.addEventListener("click", () => update({ value: suggestion.value, unit: suggestion.unit, different: false }));
     } else if (suggestion) {
       aiNode = h("span", { class: "rv-ai-note", title: suggestion.title }, suggestion.label);
@@ -221,15 +276,18 @@ export function mountSizeReview(main, { h, fill }) {
       h("div", { class: "rv-decide" },
         sent ? h("p", { class: "rv-sent" }, "Enviado: se aplica en el próximo refresco.") : null,
         h("p", { class: "rv-label" }, "Tamaño correcto"),
-        h("div", { class: "rv-picks" }, aiNode, picks),
+        item.ia?.status === "auto"
+          ? h("p", { class: "rv-auto" }, "La IA guardó este tamaño sola. Si está mal, elige el correcto y guarda: tu decisión reemplaza la de la IA.")
+          : null,
+        h("div", { class: "rv-picks" }, aiNode, picks, different),
         h("div", { class: "rv-manual" }, value, unit),
-        h("label", { class: "rv-different" }, different, " No es el mismo producto (código reutilizado)"),
         note));
     return row;
   }
 
   function visibleItems() {
     const items = review.queue?.items || [];
+    if (review.filter === "ia") return review.queue?.auto_resueltas || [];
     if (review.filter === "todos") return items;
     if (review.filter === "pendiente") return items.filter((item) => !decisionOf(review.decisions[item.gtin]) && !review.sent.has(item.gtin));
     return items.filter((item) => item.kind === review.filter);
@@ -238,7 +296,8 @@ export function mountSizeReview(main, { h, fill }) {
   function renderCount() {
     const pending = pendingDecisions().length;
     const total = review.queue?.items.length || 0;
-    count.textContent = `${pending} por enviar · ${review.sent.size} enviados · ${total} en la cola`;
+    const auto = review.queue?.auto_resueltas?.length || 0;
+    count.textContent = `${pending} por enviar · ${review.sent.size} enviados · ${total} en la cola · ${auto} resueltos por IA`;
     send.disabled = review.sending || pending === 0;
   }
 
@@ -281,7 +340,7 @@ export function mountSizeReview(main, { h, fill }) {
     h("header", { class: "rv-head" },
       h("div", {},
         h("h1", {}, "Revisión de tamaños"),
-        h("p", { class: "muted" }, "Mismo código de barras, distinto tamaño publicado. Revisa la etiqueta en el súper y elige el tamaño correcto.")),
+        h("p", { class: "muted" }, "Mismo código de barras, distinto tamaño publicado. Lo claro lo resolvió la IA; aquí queda lo que no pudo leer o tiene conflicto. Mira las fotos y elige el tamaño correcto.")),
       h("div", { class: "rv-auth" },
         h("label", { for: "rv-token" }, "Llave de GitHub (sólo esta pestaña)"),
         token, forget)),
