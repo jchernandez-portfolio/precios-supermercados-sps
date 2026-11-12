@@ -53,6 +53,11 @@ PREFERRED_MODEL = "gemini-flash-latest"
 MAX_PHOTOS = 3
 DEFAULT_DELAY = 6.5  # ~9 consultas por minuto: dentro de la capa gratuita
 DEFAULT_MINUTES = 25
+# 500/502/503/504 son pasajeros (p. ej. "modelo saturado"): se reintenta con espera
+# creciente; tras varios productos seguidos sin respuesta se detiene la corrida.
+TRANSIENT_CODES = frozenset({500, 502, 503, 504})
+RETRY_WAITS = (15, 45)
+MAX_CONSECUTIVE_UNAVAILABLE = 5
 UNITS_FROM_MODEL = {"g": ("g", 1), "kg": ("g", 1000), "ml": ("ml", 1), "l": ("ml", 1000), "oz": ("oz", 1),
                     "fl_oz": ("oz", 1), "lb": ("lb", 1), "unit": ("unit", 1)}
 DIMENSION = {"g": "mass_g", "ml": "volume_ml", "oz": "ounce", "unit": "count"}
@@ -86,6 +91,10 @@ class SuggestionError(RuntimeError):
 
 class QuotaExceeded(SuggestionError):
     """La API respondió 429: se acabó la cuota por ahora."""
+
+
+class TemporarilyUnavailable(SuggestionError):
+    """La API siguió sin responder (5xx) después de los reintentos."""
 
 
 # ------------------------------------------------------------------ fotos
@@ -122,19 +131,25 @@ def cache_key(urls: Sequence[str]) -> str:
 # ------------------------------------------------------------------- modelo
 
 
-def resolve_model(models: Sequence[str]) -> str:
-    """El alias ``gemini-flash-latest`` si existe; si no, el Flash numerado más nuevo (no Lite)."""
+def model_candidates(models: Sequence[str]) -> list[str]:
+    """Modelos Flash en orden de preferencia: alias vigente, Flash numerados (más nuevo
+    primero) y, como respaldo si los anteriores no responden, los Flash-Lite."""
     names = {name.removeprefix("models/") for name in models}
-    if PREFERRED_MODEL in names:
-        return PREFERRED_MODEL
-    numbered = []
-    for name in names:
-        match = re.fullmatch(r"gemini-(\d+(?:\.\d+)?)-flash", name)
-        if match:
-            numbered.append((Decimal(match.group(1)), name))
-    if not numbered:
+    ranked: list[str] = [PREFERRED_MODEL] if PREFERRED_MODEL in names else []
+    for pattern in (r"gemini-(\d+(?:\.\d+)?)-flash", r"gemini-(\d+(?:\.\d+)?)-flash-lite"):
+        numbered = sorted(((Decimal(match.group(1)), name) for name in names
+                           if (match := re.fullmatch(pattern, name))), reverse=True)
+        ranked += [name for _, name in numbered]
+        if pattern.endswith("lite") and "gemini-flash-lite-latest" in names:
+            ranked.insert(len(ranked) - len(numbered), "gemini-flash-lite-latest")
+    if not ranked:
         raise SuggestionError("modelo_flash_no_disponible")
-    return max(numbered)[1]
+    return ranked
+
+
+def resolve_model(models: Sequence[str]) -> str:
+    """El primer candidato: el alias ``gemini-flash-latest`` o el Flash numerado más nuevo."""
+    return model_candidates(models)[0]
 
 
 def interpret(raw: object, offers: Sequence[Mapping[str, object]]) -> dict[str, object]:
@@ -170,31 +185,56 @@ def interpret(raw: object, offers: Sequence[Mapping[str, object]]) -> dict[str, 
 
 
 class Gemini:
-    def __init__(self, key: str, *, opener: Callable = urllib.request.urlopen) -> None:
+    def __init__(self, key: str, *, opener: Callable = urllib.request.urlopen,
+                 sleep: Callable[[float], None] = time.sleep) -> None:
         self.key = key
         self.opener = opener
+        self.sleep = sleep
         self.model: str | None = None
+        self.candidates: list[str] = []
+        self.retries = 0
+        self.last_error: str | None = None
 
     def _request(self, url: str, body: Mapping[str, object] | None = None) -> object:
         data = None if body is None else json.dumps(body).encode("utf-8")
-        request = urllib.request.Request(url, data=data, method="GET" if body is None else "POST", headers={
-            "x-goog-api-key": self.key, "Content-Type": "application/json", "User-Agent": USER_AGENT,
-        })
-        try:
-            with self.opener(request, timeout=90) as response:
-                return json.loads(response.read().decode("utf-8"))
-        except urllib.error.HTTPError as error:
-            if error.code == 429:
-                raise QuotaExceeded("cuota_agotada_429") from error
-            raise SuggestionError(f"gemini_http_{error.code}") from error
+        for attempt in range(len(RETRY_WAITS) + 1):
+            request = urllib.request.Request(url, data=data, method="GET" if body is None else "POST", headers={
+                "x-goog-api-key": self.key, "Content-Type": "application/json", "User-Agent": USER_AGENT,
+            })
+            try:
+                with self.opener(request, timeout=90) as response:
+                    return json.loads(response.read().decode("utf-8"))
+            except urllib.error.HTTPError as error:
+                self.last_error = _error_message(error)
+                if error.code == 429:
+                    raise QuotaExceeded("cuota_agotada_429") from error
+                if error.code not in TRANSIENT_CODES:
+                    raise SuggestionError(f"gemini_http_{error.code}") from error
+                if attempt == len(RETRY_WAITS):
+                    raise TemporarilyUnavailable(f"gemini_http_{error.code}") from error
+            except (urllib.error.URLError, TimeoutError) as error:
+                if attempt == len(RETRY_WAITS):
+                    raise TemporarilyUnavailable("gemini_sin_conexion") from error
+            self.retries += 1
+            self.sleep(RETRY_WAITS[attempt])
+        raise TemporarilyUnavailable("gemini_sin_respuesta")
 
     def pick_model(self) -> str:
         if self.model is None:
             listing = self._request(API_BASE + "models?pageSize=1000")
             models = [str(item.get("name", "")) for item in (listing.get("models") or ())
                       if isinstance(item, Mapping) and "generateContent" in (item.get("supportedGenerationMethods") or ())]
-            self.model = resolve_model(models)
+            self.candidates = model_candidates(models)
+            self.model = self.candidates[0]
         return self.model
+
+    def _next_model(self) -> bool:
+        """Pasa al siguiente modelo candidato (el actual no responde). False si no hay más."""
+        position = self.candidates.index(self.model) if self.model in self.candidates else len(self.candidates)
+        if position + 1 >= len(self.candidates):
+            return False
+        self.model = self.candidates[position + 1]
+        return True
 
     def read_label(self, name: str, images: Sequence[bytes]) -> object:
         parts: list[dict[str, object]] = [{"text": PROMPT.format(name=name.replace('"', "'")[:120])}]
@@ -205,11 +245,27 @@ class Gemini:
             "generationConfig": {"temperature": 0, "responseMimeType": "application/json",
                                  "responseSchema": RESPONSE_SCHEMA},
         }
-        answer = self._request(f"{API_BASE}models/{self.pick_model()}:generateContent", body)
+        while True:
+            try:
+                answer = self._request(f"{API_BASE}models/{self.pick_model()}:generateContent", body)
+                break
+            except TemporarilyUnavailable:
+                if not self._next_model():
+                    raise
         try:
             return json.loads(answer["candidates"][0]["content"]["parts"][0]["text"])
         except (KeyError, IndexError, TypeError, ValueError):
             return None
+
+
+def _error_message(error: urllib.error.HTTPError) -> str:
+    """Mensaje corto del error de la API (sin encabezados: la llave nunca aparece)."""
+    try:
+        document = json.loads(error.read(4000).decode("utf-8", "replace"))
+        message = document.get("error", {}).get("message") if isinstance(document, Mapping) else None
+    except (OSError, ValueError, AttributeError):
+        message = None
+    return f"{error.code}: {' '.join(str(message or '').split())[:160]}"
 
 
 # ------------------------------------------------------------------- corrida
@@ -231,7 +287,9 @@ def annotate(queue: dict[str, object], photos: Mapping[str, str], cache: dict[st
              sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic,
              now: str = "") -> dict[str, object]:
     """Anota ``item["ia"]`` con lo guardado y consulta lo nuevo mientras quede tiempo y cuota."""
-    stats = {"sugerencia": 0, "no_legible": 0, "sin_foto": 0, "pendiente": 0, "consultas": 0, "errores": 0}
+    stats = {"sugerencia": 0, "no_legible": 0, "sin_foto": 0, "pendiente": 0, "consultas": 0, "errores": 0,
+             "no_disponible": 0}
+    unavailable_in_a_row = 0
     stop: str | None = None if client else "sin_llave"
     deadline = clock() + minutes * 60
     for item in queue.get("items") or ():
@@ -250,10 +308,17 @@ def annotate(queue: dict[str, object], photos: Mapping[str, str], cache: dict[st
                 images = [fetch_image(url) for url in urls]
                 raw = client.read_label(str(item.get("name") or ""), images)
                 stats["consultas"] += 1
+                unavailable_in_a_row = 0
                 entry = {"key": key, "raw": raw if isinstance(raw, Mapping) else None, "at": now}
                 cache[gtin] = entry
             except QuotaExceeded:
                 stop = "cuota_agotada"
+            except TemporarilyUnavailable as error:
+                # Este producto queda pendiente; se sigue con el próximo salvo que la API siga caída.
+                stats["no_disponible"] += 1
+                unavailable_in_a_row += 1
+                if unavailable_in_a_row >= MAX_CONSECUTIVE_UNAVAILABLE:
+                    stop = f"no_disponible:{error}"
             except SuggestionError as error:
                 stop = str(error)
             except (OSError, ValueError):
@@ -266,7 +331,9 @@ def annotate(queue: dict[str, object], photos: Mapping[str, str], cache: dict[st
         stats[str(result["status"])] += 1
     if stop is None and clock() >= deadline:
         stop = "tiempo_agotado"
-    return {**stats, "detenido_por": stop, "modelo": client.model if client else None}
+    return {**stats, "detenido_por": stop, "modelo": client.model if client else None,
+            "reintentos": client.retries if client else 0,
+            "ultimo_error_api": client.last_error if client else None}
 
 
 def _fetch_json(url: str) -> object:

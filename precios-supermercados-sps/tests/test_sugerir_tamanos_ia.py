@@ -78,6 +78,8 @@ class FakeClient:
         self.answers = answers
         self.calls: list[tuple[str, int]] = []
         self.model = "gemini-flash-latest"
+        self.retries = 0
+        self.last_error = None
 
     def read_label(self, name: str, images: list[bytes]) -> object:
         self.calls.append((name, len(images)))
@@ -189,3 +191,67 @@ def test_cache_file_is_read_defensively(tmp_path: Path) -> None:
     assert ia.load_cache(path) == {}
     path.write_text(json.dumps({"schema": ia.CACHE_SCHEMA, "entries": {"0001": {"key": "k"}, "x": 3}}))
     assert ia.load_cache(path) == {"0001": {"key": "k"}}
+
+
+def test_overloaded_model_is_retried_with_backoff_before_giving_up() -> None:
+    calls: list[str] = []
+    waits: list[float] = []
+    answers = [503, 503, "ok"]
+
+    def opener(request, timeout):
+        calls.append(request.full_url)
+        answer = answers.pop(0)
+        if answer != "ok":
+            raise urllib.error.HTTPError(request.full_url, answer, "x", {}, io.BytesIO(b""))
+        return Response(json.dumps({"models": [
+            {"name": "models/gemini-flash-latest", "supportedGenerationMethods": ["generateContent"]}]}).encode())
+
+    client = ia.Gemini("k", opener=opener, sleep=waits.append)
+    assert client.pick_model() == "gemini-flash-latest"
+    assert len(calls) == 3 and waits == [15, 45] and client.retries == 2
+
+    waits.clear()
+    always = ia.Gemini("k", opener=lambda request, timeout: (_ for _ in ()).throw(
+        urllib.error.HTTPError(request.full_url, 503, "x", {}, io.BytesIO(b""))), sleep=waits.append)
+    with pytest.raises(ia.TemporarilyUnavailable):
+        always.pick_model()
+    assert waits == [15, 45] and always.last_error.startswith("503")
+
+
+def test_candidates_put_the_alias_first_then_numbered_flash_then_lite() -> None:
+    models = ["models/gemini-3.5-flash-lite", "models/gemini-flash-latest", "models/gemini-2.5-flash",
+              "models/gemini-3.5-flash", "models/gemini-flash-lite-latest", "models/gemini-3.5-pro"]
+    assert ia.model_candidates(models) == ["gemini-flash-latest", "gemini-3.5-flash", "gemini-2.5-flash",
+                                           "gemini-flash-lite-latest", "gemini-3.5-flash-lite"]
+
+
+def test_an_overloaded_model_falls_back_to_the_next_flash() -> None:
+    used: list[str] = []
+
+    def opener(request, timeout):
+        if request.full_url.endswith("models?pageSize=1000"):
+            return Response(json.dumps({"models": [
+                {"name": f"models/{name}", "supportedGenerationMethods": ["generateContent"]}
+                for name in ("gemini-flash-latest", "gemini-3.5-flash")]}).encode())
+        model = request.full_url.rsplit("/", 1)[-1].split(":")[0]
+        used.append(model)
+        if model == "gemini-flash-latest":
+            body = json.dumps({"error": {"code": 503, "message": "The model is overloaded."}}).encode()
+            raise urllib.error.HTTPError(request.full_url, 503, "x", {}, io.BytesIO(body))
+        answer = {"legible": True, "same_product": True, "value": 240, "unit": "g"}
+        return Response(json.dumps({"candidates": [{"content": {"parts": [{"text": json.dumps(answer)}]}}]}).encode())
+
+    client = ia.Gemini("k", opener=opener, sleep=lambda _: None)
+    assert client.read_label("x", [b"img"])["value"] == 240
+    assert used == ["gemini-flash-latest"] * 3 + ["gemini-3.5-flash"]
+    assert client.model == "gemini-3.5-flash" and client.last_error == "503: The model is overloaded."
+
+
+def test_unavailable_items_stay_pending_and_the_run_stops_if_the_api_stays_down() -> None:
+    items = [{**EL_MIGO, "gtin": f"0001265600{n:04d}"} for n in range(7)]
+    client = FakeClient([ia.TemporarilyUnavailable("gemini_http_503"),
+                         {"legible": False, "same_product": True}] + [ia.TemporarilyUnavailable("gemini_http_503")] * 5)
+    stats = ia.annotate(queue(*items), PHOTOS, {}, client=client, fetch_image=lambda url: b"", minutes=5, delay=0,
+                        sleep=lambda _: None)
+    assert stats["consultas"] == 1 and stats["no_disponible"] == 6
+    assert stats["detenido_por"] == "no_disponible:gemini_http_503" and stats["pendiente"] == 6
