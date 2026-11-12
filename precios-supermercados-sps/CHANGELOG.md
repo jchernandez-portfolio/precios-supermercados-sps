@@ -5,6 +5,12 @@ número son cambios directos. El detalle de cada incidente vive en
 [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md) y el de cada error de datos en
 [`docs/calidad/errores-confirmados.csv`](docs/calidad/errores-confirmados.csv).
 
+## 2026-11-11
+
+- Tegucigalpa: una tarjeta por producto con todas sus sucursales (antes una por sucursal: 7,175 duplicados); fotos heredadas y "Mi compra" y enlaces viejos traducidos con `legacy-ids-tgu.json`.
+- #62 Paso 0: medición de reglas de identidad (sólo lectura).
+- #61 Auditoría de identidad de producto (sólo lectura).
+
 ## 2026-10-25
 
 - #46 Fotos: leer las ofertas de Tegucigalpa (llevan la sucursal en el id).

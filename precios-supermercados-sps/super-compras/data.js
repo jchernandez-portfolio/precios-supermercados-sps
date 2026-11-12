@@ -569,10 +569,26 @@ export class Catalog {
     return new Map(products.map((product) => [product.id, product]));
   }
 
-  // Un producto por id, esperando el índice si todavía no llegó.
+  // Un producto por id, esperando el índice si todavía no llegó. Un enlace viejo
+  // (llave de antes de unir sucursales) se traduce a la llave actual.
   async product(id) {
     if (!this.ready) await this.loadIndex();
-    return this.byId.get(id) || null;
+    if (this.byId.has(id)) return this.byId.get(id);
+    const legacy = await this.legacyIds().catch(() => null);
+    return this.byId.get(legacy?.current(id)) || null;
+  }
+
+  // Llaves de tarjeta anteriores → llave actual (Tegucigalpa, 2026-11: una tarjeta
+  // por producto en vez de una por sucursal). Se pide sólo cuando hace falta.
+  legacyIds() {
+    const file = this.manifest?.legacy_ids_file;
+    if (!file || !this.files?.has(file)) return Promise.resolve(null);
+    if (!this.legacyPromise) {
+      this.legacyPromise = this.fetchJson(file).then((document) => (
+        document.schema === "rpi-consumer-legacy-ids/v1" ? legacyIndex(document) : null
+      )).catch((error) => { this.legacyPromise = null; throw error; });
+    }
+    return this.legacyPromise;
   }
 
   get asOf() { return this.manifest?.as_of; }
@@ -719,6 +735,43 @@ export function loadCart(city) {
   } catch {
     return [];
   }
+}
+
+// { locations, rows: { llave actual: [[prefijo de llave vieja, índice de sucursal]] } }
+// → buscador por prefijo: llave actual y sucursal de la tarjeta vieja.
+export function legacyIndex(document) {
+  const length = Number(document?.prefix_length) || 12;
+  const locations = Array.isArray(document?.locations) ? document.locations : [];
+  const map = new Map();
+  for (const [current, olds] of Object.entries(document?.rows || {})) {
+    for (const old of Array.isArray(olds) ? olds : []) {
+      const [prefix, place] = Array.isArray(old) ? old : [old, null];
+      map.set(String(prefix), { id: current, store: typeof locations[place] === "string" ? locations[place] : null });
+    }
+  }
+  const find = (id) => map.get(String(id ?? "").slice(0, length)) || null;
+  return { current: (id) => find(id)?.id || null, store: (id) => find(id)?.store || null };
+}
+
+// Traduce las líneas de Mi compra con llaves viejas; las demás quedan igual. Una
+// línea sin súper elegido queda fijada en la sucursal de su tarjeta vieja (era la
+// única oferta de esa tarjeta: el precio que vio no cambia solo). Si dos líneas caen
+// en el mismo producto y súper, se suman; nunca se agregan líneas.
+export function migrateCartLines(lines, known, legacy) {
+  const result = [];
+  for (const line of lines) {
+    let next = line;
+    if (!known.has(line.id)) {
+      const current = legacy?.current(line.id);
+      if (current && known.has(current)) {
+        const store = line.store || legacy.store(line.id);
+        next = store ? { ...line, id: current, store } : { ...line, id: current };
+      }
+    }
+    const twin = result.find((item) => item.id === next.id && (item.store || null) === (next.store || null));
+    if (twin) twin.qty += next.qty; else result.push({ ...next });
+  }
+  return result;
 }
 
 export function saveCart(lines, city) {

@@ -24,6 +24,14 @@ Mientras dura la migración, el catálogo usa la foto v2 si existe y si no la v1
    `scripts/actualizar_fotos_productos.py`:
    - lee el catálogo publicado de **todas las ciudades** (`cities.json`) y une las
      filas del mismo producto;
+   - hereda la foto de las tarjetas por sucursal de Tegucigalpa: desde 2026-11 la
+     tarjeta de un producto sin identidad comparable es una por producto (llave de
+     `walmart:51`, la misma que en SPS) y no una por sucursal (llave de
+     `walmart:51@walmart_tgu_ffaa`). Si la llave nueva no tiene foto, copia del
+     propio bucket (8 descargas en paralelo) la de las llaves viejas con criterios
+     más nuevos y, entre ésas, la de mejor puntaje (verifica la huella y marca `de`
+     en el índice); no vuelve a pedir nada a las tiendas. Una foto
+     heredada no cuenta como otro dueño para la regla de genéricas;
    - resuelve en Turso la llave exacta de cada oferta;
    - pide direcciones de foto a endpoints públicos (`product_image_sources.py`):
      Walmart, Paiz y La Colonia (VTEX, 1000 px), Colonial (Shopify, hasta 1200 px),

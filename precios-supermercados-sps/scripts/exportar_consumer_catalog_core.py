@@ -496,6 +496,9 @@ def _historical_summary(
         "historical_position": position,
         "windows": {"30d": window_payload(30), "90d": window_payload(90)},
     }
+def public_product_id(source_product_id: str) -> str:
+    """``walmart:51@walmart_tgu_ffaa`` → ``walmart:51`` (sin sucursal)."""
+    return source_product_id.split("@", 1)[0]
 def _row_id(prefix: str, value: str) -> str:
     return f"{prefix}-{hashlib.sha256(value.encode('utf-8')).hexdigest()[:24]}"
 def _category_key(value: str | None) -> str:
@@ -636,7 +639,10 @@ def build_rows(
     for identity_mode, group in _identity_groups(offers):
         representative = _representative(group)
         canonical_id = representative.canonical_product_id if identity_mode == "comparable" else None
-        identity_value = canonical_id or representative.source_product_id
+        # La tarjeta sin identidad comparable es el producto de su súper, no la
+        # sucursal: Tegucigalpa publica "walmart:51@walmart_tgu_ffaa" por oferta y
+        # la fila usa "walmart:51" (la misma llave que el producto en SPS).
+        identity_value = canonical_id or public_product_id(representative.source_product_id)
         mode = _comparability_today(identity_mode, group)
         states = _relative_states(mode, group, freshness_by_scope)
         assignment = _public_assignment(group)
