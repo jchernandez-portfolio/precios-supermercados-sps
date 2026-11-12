@@ -208,14 +208,14 @@ fecha,ciudad,supermercado,sucursal,ultima_captura,horas_de_atraso,estado
 2026-11-11,Tegucigalpa,PriceSmart,pricesmart_tgu,2026-11-10T11:18:24Z,12,Al día
 2026-11-11,Tegucigalpa,Paiz,paiz_tgu_multiplaza,2026-11-10T11:21:45Z,12,Al día
 2026-11-11,Tegucigalpa,Paiz,paiz_tgu_proceres,2026-11-10T11:25:36Z,12,Al día
-2026-11-12,San Pedro Sula,La Colonia,la_colonia_sps,2026-11-11T11:27:33Z,13,Al día
-2026-11-12,San Pedro Sula,Colonial,colonial_sps,2026-11-12T00:51:56Z,0,Al día
-2026-11-12,San Pedro Sula,Walmart,walmart_sps,2026-11-11T11:25:31Z,13,Al día
-2026-11-12,San Pedro Sula,PriceSmart,pricesmart_sps,2026-11-11T11:18:43Z,13,Al día
-2026-11-12,San Pedro Sula,Los Andes,comisariato_los_andes_sps,2026-11-11T11:19:25.428752Z,13,Al día
-2026-11-12,Tegucigalpa,La Colonia,la_colonia_tgu,2026-11-11T11:37:37Z,13,Al día
-2026-11-12,Tegucigalpa,Walmart,walmart_tgu_ffaa,2026-11-11T11:33:12Z,13,Al día
-2026-11-12,Tegucigalpa,Walmart,walmart_tgu_el_sauce,2026-11-11T11:40:33Z,13,Al día
-2026-11-12,Tegucigalpa,PriceSmart,pricesmart_tgu,2026-11-11T11:19:11Z,13,Al día
-2026-11-12,Tegucigalpa,Paiz,paiz_tgu_multiplaza,2026-11-11T11:23:10Z,13,Al día
-2026-11-12,Tegucigalpa,Paiz,paiz_tgu_proceres,2026-11-11T11:27:46Z,13,Al día
+2026-11-12,San Pedro Sula,La Colonia,la_colonia_sps,2026-11-11T11:27:33Z,17,Al día
+2026-11-12,San Pedro Sula,Colonial,colonial_sps,2026-11-12T00:51:56Z,3,Al día
+2026-11-12,San Pedro Sula,Walmart,walmart_sps,2026-11-11T11:25:31Z,17,Al día
+2026-11-12,San Pedro Sula,PriceSmart,pricesmart_sps,2026-11-11T11:18:43Z,17,Al día
+2026-11-12,San Pedro Sula,Los Andes,comisariato_los_andes_sps,2026-11-11T11:19:25.428752Z,17,Al día
+2026-11-12,Tegucigalpa,La Colonia,la_colonia_tgu,2026-11-11T11:37:37Z,17,Al día
+2026-11-12,Tegucigalpa,Walmart,walmart_tgu_ffaa,2026-11-11T11:33:12Z,17,Al día
+2026-11-12,Tegucigalpa,Walmart,walmart_tgu_el_sauce,2026-11-11T11:40:33Z,17,Al día
+2026-11-12,Tegucigalpa,PriceSmart,pricesmart_tgu,2026-11-11T11:19:11Z,17,Al día
+2026-11-12,Tegucigalpa,Paiz,paiz_tgu_multiplaza,2026-11-11T11:23:10Z,17,Al día
+2026-11-12,Tegucigalpa,Paiz,paiz_tgu_proceres,2026-11-11T11:27:46Z,17,Al día
