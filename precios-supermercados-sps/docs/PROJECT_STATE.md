@@ -141,7 +141,7 @@ La interfaz pública consume únicamente archivos estáticos publicados y valida
 | San Pedro Sula | La Colonia, Colonial, Walmart, PriceSmart, Comisariato Los Andes |
 | Tegucigalpa | La Colonia, Walmart FFAA, Walmart El Sauce, PriceSmart Florencia, Paiz Multiplaza, Paiz Próceres |
 
-En Tegucigalpa las sucursales de una misma cadena se mantienen separadas; no se fusionan precios entre sucursales.
+En Tegucigalpa cada sucursal conserva su propia oferta (`location_id`, precio e histórico); no se fusionan precios entre sucursales. Desde 2026-11-11 un producto sin identidad comparable es **una tarjeta con todas sus sucursales** (antes una tarjeta por sucursal: 7,175 duplicados medidos con `scripts/medir_reglas_identidad.py`). La llave de esa tarjeta sale de `súper:product_id` sin sucursal, la misma que en SPS. `legacy-ids-tgu.json` (en el manifest como `legacy_ids_file`) traduce las llaves viejas para "Mi compra" y enlaces guardados; puede retirarse cuando ya no haya carritos viejos.
 
 ### Corte publicado vigente (2026-09-21)
 

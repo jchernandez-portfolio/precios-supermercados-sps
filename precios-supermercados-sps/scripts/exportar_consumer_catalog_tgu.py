@@ -9,6 +9,7 @@ ubicación. El proceso es sólo lectura.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from collections.abc import Iterable, Sequence
@@ -36,6 +37,12 @@ TGU_RETAILERS = (
     ("paiz", "paiz_tgu_proceres", "Paiz Próceres"),
 )
 FACETS_FILE = "facets-tgu.json"
+# Llaves de tarjeta anteriores (una por sucursal) → llave actual (una por
+# producto). La app la lee sólo si "Mi compra" o un enlace guardado traen una
+# llave que ya no existe; puede retirarse cuando ya no haya carritos viejos.
+LEGACY_IDS_FILE = "legacy-ids-tgu.json"
+LEGACY_IDS_SCHEMA = "rpi-consumer-legacy-ids/v1"
+LEGACY_PREFIX = 12
 CITY = {"city": "Tegucigalpa", "country_code": "HN"}
 
 
@@ -72,13 +79,18 @@ def public_source_id(source_product_id: str, location_id: str) -> str:
 def identity_groups_exact_context(
     offers: Iterable[base.VisibleOffer],
 ) -> list[tuple[str, list[base.VisibleOffer]]]:
-    """Agrupa sólo identidades fuertes sin ambigüedad dentro de una sucursal.
+    """Agrupa identidades fuertes sin ambigüedad y une las sucursales de un producto.
 
     Una identidad canónica sólo se publica como comparable cuando participa más
     de una cadena y existe exactamente una oferta fuente por contexto físico. Si
     una sucursal aporta dos filas a la misma identidad, no se elige ni se fusiona
-    ninguna: todo el grupo se degrada a filas individuales, igual que el contrato
-    SPS degrada las colisiones por supermercado.
+    ninguna: el grupo se degrada, igual que el contrato SPS degrada las colisiones
+    por supermercado.
+
+    Lo que no es comparable se publica por producto, no por sucursal: las ofertas
+    de ``walmart:51`` en FFAA y El Sauce van en una sola tarjeta (cada oferta
+    conserva su ``location_id`` y su precio). Antes cada sucursal era una tarjeta
+    aparte (7,175 duplicados medidos el 2026-11-11).
     """
     values = tuple(offers)
     candidates: dict[str, list[base.VisibleOffer]] = {}
@@ -102,13 +114,14 @@ def identity_groups_exact_context(
         else:
             individual.extend(grouped)
 
-    groups.extend(
-        (
-            "single_source" if offer.comparison_status == "single_source" else "individual",
-            [offer],
-        )
-        for offer in individual
-    )
+    by_product: dict[str, list[base.VisibleOffer]] = {}
+    for offer in individual:
+        by_product.setdefault(base._core.public_product_id(offer.source_product_id), []).append(offer)
+    for product_offers in by_product.values():
+        if len({offer.location_id for offer in product_offers}) != len(product_offers):
+            raise ExportError("consumer_catalog_tgu_branch_offer_duplicate")
+        single = all(offer.comparison_status == "single_source" for offer in product_offers)
+        groups.append(("single_source" if single else "individual", product_offers))
     if sum(len(group) for _, group in groups) != len(values):
         raise ExportError("consumer_catalog_tgu_identity_partition_invalid")
     return groups
@@ -168,6 +181,36 @@ def _context_counts_from_offers(offers: Iterable[base.VisibleOffer]) -> dict[tup
     return counts
 
 
+def legacy_row_ids(output: Path, manifest: dict[str, object]) -> dict[str, list[str]]:
+    """Llave actual de cada tarjeta por producto → llaves que tenía por sucursal.
+
+    Antes, una oferta sin identidad comparable era su propia tarjeta y su llave
+    salía del ``source_product_id`` público con sucursal
+    (``sha256("walmart:51@walmart_tgu_ffaa")``). Se publica el prefijo de 12
+    caracteres de cada llave vieja: alcanza para no confundir (48 bits) y reduce
+    el archivo a la mitad.
+    """
+    result: dict[str, list[str]] = {}
+    for item in manifest.get("files", []):
+        path = item.get("path") if isinstance(item, dict) else None
+        if not isinstance(path, str) or not path.startswith("catalog/"):
+            continue
+        document = json.loads((output / path).read_text(encoding="utf-8"))
+        for row in document.get("rows", []):
+            row_id = str(row.get("row_id", ""))
+            if not row_id.startswith("source-"):
+                continue
+            key = row_id.split("-", 1)[1]
+            old = sorted({
+                hashlib.sha256(str(offer["source_product_id"]).encode("utf-8")).hexdigest()[:LEGACY_PREFIX]
+                for offer in row.get("offers", [])
+                if "@" in str(offer.get("source_product_id", ""))
+            })
+            if old:
+                result[key] = old
+    return dict(sorted(result.items()))
+
+
 def _rewrite_public_metadata(output: Path, manifest: dict[str, object], counts: dict[tuple[str, str], int]) -> dict[str, object]:
     old_facets = output / "facets-sps.json"
     if not old_facets.is_file():
@@ -184,8 +227,11 @@ def _rewrite_public_metadata(output: Path, manifest: dict[str, object], counts: 
         path = item.get("path")
         if path == "facets-sps.json":
             files.append(base._file_metadata(output, FACETS_FILE))
-        else:
+        elif path != LEGACY_IDS_FILE:
             files.append(item)
+    legacy = {"schema": LEGACY_IDS_SCHEMA, "prefix_length": LEGACY_PREFIX, "rows": legacy_row_ids(output, manifest)}
+    base._atomic_bytes(output / LEGACY_IDS_FILE, base._json_bytes(legacy))
+    files.append(base._file_metadata(output, LEGACY_IDS_FILE))
 
     manifest["location"] = CITY
     manifest["scope"] = [
@@ -206,6 +252,7 @@ def _rewrite_public_metadata(output: Path, manifest: dict[str, object], counts: 
     ]
     manifest["visibility_policy"] = "accepted_current_source_offers_in_city_scope"
     manifest["initial_files"] = [FACETS_FILE]
+    manifest["legacy_ids_file"] = LEGACY_IDS_FILE
     manifest["files"] = files
     facets_meta = next(item for item in files if item.get("path") == FACETS_FILE)
     manifest["initial_payload"] = {

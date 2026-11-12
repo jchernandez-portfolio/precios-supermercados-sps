@@ -569,10 +569,26 @@ export class Catalog {
     return new Map(products.map((product) => [product.id, product]));
   }
 
-  // Un producto por id, esperando el índice si todavía no llegó.
+  // Un producto por id, esperando el índice si todavía no llegó. Un enlace viejo
+  // (llave de antes de unir sucursales) se traduce a la llave actual.
   async product(id) {
     if (!this.ready) await this.loadIndex();
-    return this.byId.get(id) || null;
+    if (this.byId.has(id)) return this.byId.get(id);
+    const legacy = await this.legacyIds().catch(() => null);
+    return this.byId.get(legacy?.current(id)) || null;
+  }
+
+  // Llaves de tarjeta anteriores → llave actual (Tegucigalpa, 2026-11: una tarjeta
+  // por producto en vez de una por sucursal). Se pide sólo cuando hace falta.
+  legacyIds() {
+    const file = this.manifest?.legacy_ids_file;
+    if (!file || !this.files?.has(file)) return Promise.resolve(null);
+    if (!this.legacyPromise) {
+      this.legacyPromise = this.fetchJson(file).then((document) => (
+        document.schema === "rpi-consumer-legacy-ids/v1" ? legacyIndex(document) : null
+      )).catch((error) => { this.legacyPromise = null; throw error; });
+    }
+    return this.legacyPromise;
   }
 
   get asOf() { return this.manifest?.as_of; }
@@ -719,6 +735,29 @@ export function loadCart(city) {
   } catch {
     return [];
   }
+}
+
+// { rows: { llave actual: [prefijos de llaves viejas] } } → buscador por prefijo.
+export function legacyIndex(document) {
+  const length = Number(document?.prefix_length) || 12;
+  const map = new Map();
+  for (const [current, olds] of Object.entries(document?.rows || {})) {
+    for (const old of Array.isArray(olds) ? olds : []) map.set(String(old), current);
+  }
+  return { current: (id) => map.get(String(id ?? "").slice(0, length)) || null };
+}
+
+// Traduce las líneas de Mi compra con llaves viejas; las demás quedan igual. Si dos
+// líneas caen en el mismo producto y súper, se suman.
+export function migrateCartLines(lines, known, legacy) {
+  const result = [];
+  for (const line of lines) {
+    const current = known.has(line.id) ? line.id : legacy?.current(line.id);
+    const id = current && known.has(current) ? current : line.id;
+    const twin = result.find((item) => item.id === id && (item.store || null) === (line.store || null));
+    if (twin) twin.qty += line.qty; else result.push({ ...line, id });
+  }
+  return result;
 }
 
 export function saveCart(lines, city) {

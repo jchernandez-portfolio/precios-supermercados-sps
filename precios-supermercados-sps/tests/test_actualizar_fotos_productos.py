@@ -238,3 +238,62 @@ def test_authorization_is_fail_closed(tmp_path: Path, change, code) -> None:
     path.write_text(json.dumps(document), encoding="utf-8")
     with pytest.raises(fotos.PhotoUpdateError, match=code):
         fotos.load_authorization(path, api_delay=1.0, image_delay=0.15, max_products=4000, max_image_requests=12000)
+
+
+# ------------------------------------------- Tegucigalpa: una tarjeta por producto
+
+def _key(text: str) -> str:
+    return fotos.card_key(text)
+
+
+def _webp(tag: bytes) -> bytes:
+    return b"RIFF\x00\x00\x00\x00WEBP" + tag
+
+
+def test_branch_photo_moves_before_and_after_tegucigalpa_merges_branches() -> None:
+    ffaa, sauce, merged = _key("walmart:51@walmart_tgu_ffaa"), _key("walmart:51@walmart_tgu_el_sauce"), _key("walmart:51")
+    index = {ffaa: {"h": "a" * 10, "s": 80, "sig": "x"}, sauce: {"h": "b" * 10, "s": 95, "sig": "x"}}
+    before = fotos.parse_catalog_rows({"rows": [
+        {"row_id": f"source-{ffaa}", "offers": [{"source_product_id": "walmart:51@walmart_tgu_ffaa"}]},
+        {"row_id": f"source-{sauce}", "offers": [{"source_product_id": "walmart:51@walmart_tgu_el_sauce"}]},
+        {"row_id": "product-cc", "offers": [{"source_product_id": "paiz:7@paiz_tgu_proceres"}]},
+    ]})
+    after = fotos.parse_catalog_rows({"rows": [
+        {"row_id": f"source-{merged}", "offers": [{"source_product_id": "walmart:51@walmart_tgu_ffaa"},
+                                                  {"source_product_id": "walmart:51@walmart_tgu_el_sauce"}]},
+    ]})
+    # Antes y después del cambio se hereda la misma foto: la de mejor puntaje.
+    assert fotos.branch_photo_moves(before, index) == [(merged, sauce)]
+    assert fotos.branch_photo_moves(after, index) == [(merged, sauce)]
+    # Con foto propia (p. ej. la misma llave en SPS) no se toca; las filas comparables tampoco.
+    assert fotos.branch_photo_moves(after, {**index, merged: {"h": "c" * 10}}) == []
+    assert after[0].branch_ids and after[0].source_row and not before[2].source_row
+
+
+def test_adopt_branch_photos_copies_published_files_and_checks_the_hash(tmp_path: Path) -> None:
+    import hashlib
+
+    donor, target, bad_donor, bad_target = "ab" + "1" * 22, "cd" + "2" * 22, "ef" + "3" * 22, "gh" + "4" * 22
+    big = _webp(b"800")
+    digest = hashlib.sha256(big).hexdigest()[:10]
+    index = {donor: {"h": digest, "s": 90, "sig": "x", "c": 4}, bad_donor: {"h": "f" * 10, "s": 90}}
+    served = {f"https://r2.test/fotos/v2/800/ab/{donor}-{digest}.webp": big,
+              f"https://r2.test/fotos/v2/320/ab/{donor}-{digest}.webp": _webp(b"320"),
+              f"https://r2.test/fotos/v2/800/ef/{bad_donor}-{'f' * 10}.webp": _webp(b"otra"),
+              f"https://r2.test/fotos/v2/320/ef/{bad_donor}-{'f' * 10}.webp": _webp(b"otra")}
+    stats = fotos.adopt_branch_photos([(target, donor), (bad_target, bad_donor)], index, tmp_path,
+                                      served.__getitem__, "https://r2.test", log=lambda _: None)
+    assert stats == {"fotos_heredadas_de_sucursal": 1, "herencia_huella_distinta": 1}
+    assert index[target] == {"h": digest, "s": 90, "sig": "x", "c": 4, "de": donor}
+    assert bad_target not in index
+    assert (tmp_path / f"800/cd/{target}-{digest}.webp").read_bytes() == big
+    assert (tmp_path / f"320/cd/{target}-{digest}.webp").read_bytes() == _webp(b"320")
+
+
+def test_inherited_photos_do_not_count_as_generic_owners(tmp_path: Path) -> None:
+    index = {"k1": {"h": "a" * 10}, "k2": {"h": "a" * 10}, "k3": {"h": "a" * 10},
+             "n1": {"h": "a" * 10, "de": "k1"}, "n2": {"h": "a" * 10, "de": "k2"}}
+    assert fotos.prune_generic(index, tmp_path) == 0  # 3 dueños reales (< 4)
+    index["k4"] = {"h": "a" * 10}
+    assert fotos.prune_generic(index, tmp_path) == 6  # genérica: caen también las heredadas
+    assert all(item.get("gen") for item in index.values())

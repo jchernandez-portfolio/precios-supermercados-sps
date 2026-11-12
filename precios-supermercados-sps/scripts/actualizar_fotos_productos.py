@@ -75,6 +75,11 @@ class PhotoUpdateError(RuntimeError):
 class CatalogRow:
     key: str
     offers: tuple[tuple[str, int], ...]
+    # Ofertas públicas con sucursal ("walmart:51@walmart_tgu_ffaa") y si la fila es
+    # de un producto sin identidad comparable ("source-…"): sirven para heredar la
+    # foto de las tarjetas por sucursal cuando Tegucigalpa pasó a una por producto.
+    branch_ids: tuple[str, ...] = ()
+    source_row: bool = False
 
 
 @dataclass(frozen=True)
@@ -97,27 +102,35 @@ def parse_catalog_rows(document: Mapping[str, object]) -> list[CatalogRow]:
         if not isinstance(row, Mapping) or not row.get("row_id"):
             continue
         offers: list[tuple[str, int]] = []
+        branches: list[str] = []
         for offer in row.get("offers") or ():
             if not isinstance(offer, Mapping):
                 continue
             # SPS: "walmart:51"; Tegucigalpa agrega la sucursal: "la_colonia:24@la_colonia_tgu".
-            supermarket, _, product = str(offer.get("source_product_id") or "").partition(":")
+            source_id = str(offer.get("source_product_id") or "")
+            supermarket, _, product = source_id.partition(":")
             product = product.split("@", 1)[0]
             if supermarket and product.isdigit() and (supermarket, int(product)) not in offers:
                 offers.append((supermarket, int(product)))
+            if "@" in source_id and source_id not in branches:
+                branches.append(source_id)
         if offers:
-            rows.append(CatalogRow(row_key(row["row_id"]), tuple(offers)))
+            rows.append(CatalogRow(row_key(row["row_id"]), tuple(offers), tuple(branches),
+                                   str(row["row_id"]).startswith("source-")))
     return rows
 
 
 def merge_rows(groups: Iterable[Sequence[CatalogRow]]) -> list[CatalogRow]:
     """Une las filas de varias ciudades: el mismo producto suma las ofertas de ambas."""
-    merged: dict[str, list[tuple[str, int]]] = {}
+    merged: dict[str, tuple[list[tuple[str, int]], list[str], list[bool]]] = {}
     for rows in groups:
         for row in rows:
-            offers = merged.setdefault(row.key, [])
+            offers, branches, source = merged.setdefault(row.key, ([], [], []))
             offers.extend(offer for offer in row.offers if offer not in offers)
-    return [CatalogRow(key, tuple(offers)) for key, offers in merged.items()]
+            branches.extend(item for item in row.branch_ids if item not in branches)
+            source.append(row.source_row)
+    return [CatalogRow(key, tuple(offers), tuple(branches), all(source))
+            for key, (offers, branches, source) in merged.items()]
 
 
 def load_catalogs(fetch_json: Callable[[str], object], base: str) -> list[CatalogRow]:
@@ -388,6 +401,78 @@ def process(keys: Sequence[str], candidates: Mapping[str, Sequence[images.Candid
     return stats
 
 
+# ------------------------------------------------------ fotos por sucursal
+
+def card_key(public_id: str) -> str:
+    """Llave de tarjeta de un producto sin identidad comparable (``source-<llave>``)."""
+    return hashlib.sha256(public_id.encode("utf-8")).hexdigest()[:24]
+
+
+def _usable(item: object) -> bool:
+    return isinstance(item, Mapping) and isinstance(item.get("h"), str) and not item.get("none")
+
+
+def branch_photo_moves(rows: Sequence[CatalogRow], index: Mapping[str, Mapping[str, object]]) -> list[tuple[str, str]]:
+    """``(llave por producto, llave por sucursal con foto)`` que hay que heredar.
+
+    Tegucigalpa publicaba una tarjeta por sucursal (llave de "walmart:51@walmart_tgu_ffaa")
+    y ahora una por producto (llave de "walmart:51", la misma que en SPS). Sirve antes
+    y después del cambio: la llave nueva se calcula del producto y las viejas de cada
+    oferta. Si la llave nueva ya tiene foto no se toca; si no, hereda la mejor de las
+    viejas (mayor puntaje). Son las mismas fotos de los mismos súper: no se vuelve a
+    pedir nada a las tiendas.
+    """
+    donors: dict[str, set[str]] = {}
+    for row in rows:
+        if not row.source_row or not row.branch_ids:
+            continue
+        products = {item.split("@", 1)[0] for item in row.branch_ids}
+        if len(products) != 1:
+            continue
+        target = card_key(next(iter(products)))
+        if _usable(index.get(target)):
+            continue
+        donors.setdefault(target, set()).update(
+            key for key in (row.key, *(card_key(item) for item in row.branch_ids))
+            if key != target and _usable(index.get(key))
+        )
+    return sorted(
+        (target, max(keys, key=lambda key: (int(index[key].get("s", 0) or 0), key)))
+        for target, keys in donors.items() if keys
+    )
+
+
+def adopt_branch_photos(moves: Sequence[tuple[str, str]], index: dict[str, dict[str, object]], output_dir: Path,
+                        fetch_bytes: Callable[[str], bytes], public_base: str, *, log=print) -> Counter:
+    """Copia los WebP publicados de la llave vieja a la nueva y registra la herencia (``de``).
+
+    Lee del propio bucket público; verifica la huella del archivo de 800 px antes de
+    escribirlo, así la subida (que exige huella e índice) recibe lo mismo que ya estaba.
+    """
+    stats: Counter = Counter()
+    for number, (target, donor) in enumerate(moves, 1):
+        item = index[donor]
+        digest = str(item["h"])
+        try:
+            files = {size: fetch_bytes(f"{public_base}/{R2_PREFIX}{relative}")
+                     for size, relative in image_paths(donor, digest).items()}
+        except Exception:  # noqa: BLE001 - una foto que no baja se deja para otra corrida
+            stats["herencia_error_descarga"] += 1
+            continue
+        if hashlib.sha256(files[images.OUTPUT_SIZE]).hexdigest()[:10] != digest:
+            stats["herencia_huella_distinta"] += 1
+            continue
+        for size, relative in image_paths(target, digest).items():
+            path = output_dir / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(files[size])
+        index[target] = {**{key: value for key, value in item.items() if key != "de"}, "de": donor}
+        stats["fotos_heredadas_de_sucursal"] += 1
+        if number % 500 == 0:
+            log(f"heredadas {number}/{len(moves)} fotos de tarjetas por sucursal")
+    return stats
+
+
 def prune_generic(index: dict[str, dict[str, object]], output_dir: Path,
                   *, min_owners: int = images.GENERIC_OWNERS) -> int:
     """Quita del índice las fotos que comparten huella con ``min_owners`` productos o más.
@@ -398,15 +483,18 @@ def prune_generic(index: dict[str, dict[str, object]], output_dir: Path,
     del artifact para que la subida no los rechace.
     """
     owners: dict[str, list[str]] = {}
+    inherited: dict[str, list[str]] = {}
     for key, item in index.items():
         digest = item.get("h")
         if isinstance(digest, str) and not item.get("none"):
-            owners.setdefault(digest, []).append(key)
+            # Una foto heredada de la tarjeta por sucursal es el mismo producto: no
+            # cuenta como otro dueño, pero cae junto con la original si ésta es genérica.
+            (inherited if item.get("de") else owners).setdefault(digest, []).append(key)
     pruned = 0
     for digest, keys in owners.items():
         if len(keys) < min_owners:
             continue
-        for key in keys:
+        for key in [*keys, *inherited.get(digest, ())]:
             for relative in image_paths(key, digest).values():
                 (output_dir / relative).unlink(missing_ok=True)
             index[key] = {"sig": index[key].get("sig"), "none": 1, "c": CRITERIA_VERSION, "gen": 1}
@@ -589,6 +677,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     rows = load_catalogs(_http_json(public), args.catalog_base)
     index = parse_index(_http_json(public, missing_ok=True)(args.index_url))
     print(f"catálogo: {len(rows)} filas; índice previo: {len(index)} filas")
+    moves = branch_photo_moves(rows, index)
+
+    def fetch_bytes(url: str) -> bytes:
+        response = public.get(url, timeout=60)
+        response.raise_for_status()
+        return response.content
+
+    inherited = adopt_branch_photos(moves, index, args.output_dir, fetch_bytes, args.public_base.rstrip("/"))
+    print(f"fotos por sucursal heredadas: {dict(inherited)} de {len(moves)}")
 
     backend = TursoBackend(os.environ.get("TURSO_DATABASE_URL", ""), os.environ.get("TURSO_AUTH_TOKEN", ""))
     refs = fetch_source_refs(backend, (product for row in rows for _, product in row.offers))
@@ -604,6 +701,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     review: list[dict[str, object]] = []
     deadline = started + args.time_budget_minutes * 60 if args.time_budget_minutes > 0 else None
     stats = process(keys, candidates, downloader, args.output_dir, index, review=review, deadline=deadline)
+    stats.update(inherited)
     stats.update({f"error_{name}": 1 for name in api.errors})
     pruned = prune_generic(index, args.output_dir)
     if pruned:

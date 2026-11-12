@@ -597,3 +597,43 @@ console.log(JSON.stringify([c.staleRetailers().map((x) => x.id),
   c.staleSince({ supermarket_id: 'la_colonia', location_id: 'la_colonia_sps' })]));
 """
     assert json.loads(_node(script, tmp_path)) == [["comisariato_los_andes"], "2026-10-21T11:18:55Z", None]
+
+
+def test_old_branch_keys_in_my_cart_and_links_move_to_the_product_card(tmp_path: Path) -> None:
+    """Tegucigalpa pasó de una tarjeta por sucursal a una por producto (2026-11)."""
+    script = """
+import { Catalog, legacyIndex, migrateCartLines } from './data.js';
+const legacy = legacyIndex({ schema: 'rpi-consumer-legacy-ids/v1', prefix_length: 12,
+  rows: { newkey000000000000000001: ['aaaaaaaaaaaa', 'bbbbbbbbbbbb'] } });
+const known = new Set(['newkey000000000000000001', 'other']);
+const cart = [
+  { id: 'aaaaaaaaaaaa111111111111', qty: 1, store: 'walmart_tgu_ffaa' },
+  { id: 'bbbbbbbbbbbb222222222222', qty: 2, store: 'walmart_tgu_el_sauce' },
+  { id: 'aaaaaaaaaaaa111111111111', qty: 1 },
+  { id: 'bbbbbbbbbbbb222222222222', qty: 3 },
+  { id: 'other', qty: 1 },
+  { id: 'gone', qty: 1 },
+];
+const out = { migrated: migrateCartLines(cart, known, legacy), none: migrateCartLines(cart.slice(4), known, null) };
+const c = Object.create(Catalog.prototype);
+c.ready = true;
+c.byId = new Map([['newkey000000000000000001', { id: 'newkey000000000000000001' }]]);
+c.legacyIds = async () => legacy;
+out.link = (await c.product('bbbbbbbbbbbb222222222222'))?.id;
+out.missing = await c.product('cccccccccccc333333333333');
+c.manifest = {}; c.files = new Map();
+delete c.legacyIds;
+out.noFile = await Catalog.prototype.legacyIds.call(c);
+console.log(JSON.stringify(out));
+"""
+    result = json.loads(_node(script, tmp_path))
+    assert result["migrated"] == [
+        {"id": "newkey000000000000000001", "qty": 1, "store": "walmart_tgu_ffaa"},
+        {"id": "newkey000000000000000001", "qty": 2, "store": "walmart_tgu_el_sauce"},
+        {"id": "newkey000000000000000001", "qty": 4},  # dos líneas "más barato" se suman
+        {"id": "other", "qty": 1},
+        {"id": "gone", "qty": 1},  # desconocida: la app la quita después, sin borrarla del guardado
+    ]
+    assert result["none"] == [{"id": "other", "qty": 1}, {"id": "gone", "qty": 1}]
+    assert result["link"] == "newkey000000000000000001"
+    assert result["missing"] is None and result["noFile"] is None

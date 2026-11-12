@@ -1,8 +1,8 @@
 // Súper Compras: comparador de precios de supermercados (San Pedro Sula y Tegucigalpa).
 // Vistas: inicio, búsqueda, ficha de producto, ofertas y Mi compra.
 import {
-  Catalog, RETAILER_COLORS, rowKey, RETAILER_INITIALS, RETAILER_NAMES, loadCart, loadCities, loadCitySlug, money,
-  photoSrcset, photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, storeLabel,
+  Catalog, RETAILER_COLORS, rowKey, RETAILER_INITIALS, RETAILER_NAMES, loadCart, loadCities, loadCitySlug,
+  migrateCartLines, money, photoSrcset, photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, storeLabel,
 } from "./data.js?v=20261025-4";
 import { productIllustration } from "./illustration.js?v=20261025-4";
 
@@ -383,7 +383,7 @@ function historyBlock(offer) {
 
 function viewProduct(id, container) {
   const catalog = state.catalog;
-  if (catalog.ready) return renderProduct(catalog.byId.get(id), container);
+  if (catalog.ready && catalog.byId.has(id)) return renderProduct(catalog.byId.get(id), container);
   // Enlace abierto antes de tener el índice: se espera a que llegue.
   const token = state.renderToken;
   fill(container, loadingPage("Abriendo el producto…"));
@@ -643,13 +643,20 @@ async function loadCity(city) {
     document.title = `Súper Compras · Compara precios de súper en ${city.name}`;
     for (const node of document.querySelectorAll("[data-city]")) fill(node, citySelect());
     render();
-    // El índice completo se baja en segundo plano; al llegar se quitan de Mi compra
-    // los productos que ya no están en el catálogo.
-    catalog.loadIndex().then(() => {
+    // El índice completo se baja en segundo plano; al llegar se traducen las llaves
+    // viejas de Mi compra (tarjetas por sucursal) y se quitan los productos que ya
+    // no están en el catálogo.
+    catalog.loadIndex().then(async () => {
       if (state.catalog !== catalog) return;
       const known = new Set(catalog.products.map((product) => product.id));
-      const kept = state.cart.filter((line) => known.has(line.id));
-      if (kept.length !== state.cart.length) { state.cart = kept; renderChrome(); }
+      if (!state.cart.some((line) => !known.has(line.id))) return;
+      const legacy = await catalog.legacyIds().catch(() => null);
+      if (state.catalog !== catalog) return;
+      const migrated = migrateCartLines(state.cart, known, legacy);
+      if (JSON.stringify(migrated) !== JSON.stringify(state.cart)) saveCart(migrated, city.slug);
+      state.cart = migrated.filter((line) => known.has(line.id));
+      renderChrome();
+      if (route().path.startsWith("/compra")) render();
     }).catch(() => {});
   } catch (error) {
     fill(main, h("div", { class: "page empty" }, h("strong", {}, "No pudimos cargar los precios."), h("p", {}, error.message),
