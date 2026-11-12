@@ -8,7 +8,7 @@
 // en el encabezado Authorization a api.github.com.
 import {
   RETAILER_NAMES, SIZE_DECISIONS_RUNS_URL, SIZE_UNITS, loadSizeQueue, sendSizeDecisions,
-} from "./data.js?v=20261112-2";
+} from "./data.js?v=20261112-4";
 
 const TOKEN_KEY = "super-compras-admin-github-token";
 const UNIT_LABEL = { g: "g", ml: "ml", oz: "oz", lb: "lb", unit: "unidades" };
@@ -75,6 +75,24 @@ async function copyText(text) {
     field.remove();
     return copied;
   }
+}
+
+const AI_REASONS = {
+  ilegible: "La etiqueta no se lee en la foto.",
+  otra_presentacion: "La foto parece de otra presentación: lo leído no coincide con ningún tamaño publicado.",
+  respuesta_invalida: "La IA no dio una respuesta válida.",
+};
+
+// Sugerencia de la IA de visión (Gemini) para el item: botón, aviso o nada.
+// Sólo se sugiere con status "sugerencia" y un tamaño válido; todo lo demás es "No legible".
+export function aiSuggestion(item) {
+  const ai = item?.ia;
+  if (!ai || typeof ai !== "object") return null;
+  if (ai.status === "sugerencia" && Number(ai.value) > 0 && SIZE_UNITS.includes(ai.unit)) {
+    return { kind: "suggest", value: String(ai.value), unit: ai.unit, text: typeof ai.text === "string" ? ai.text : "" };
+  }
+  if (ai.status === "sin_foto") return { kind: "note", label: "🤖 Sin foto", title: "Ninguna oferta tiene foto para leer." };
+  return { kind: "note", label: "🤖 No legible", title: AI_REASONS[ai.reason] || AI_REASONS.ilegible };
 }
 
 // Tamaños publicados, el más repetido primero: son los botones rápidos.
@@ -182,6 +200,18 @@ export function mountSizeReview(main, { h, fill }) {
       button.addEventListener("click", () => update({ value: option.value, unit: option.unit, different: false }));
       return button;
     });
+    const suggestion = aiSuggestion(item);
+    let aiNode = null;
+    if (suggestion?.kind === "suggest") {
+      const active = !entry.different && entry.value === suggestion.value && entry.unit === suggestion.unit;
+      aiNode = h("button", {
+        type: "button", class: "rv-pick rv-ai", "aria-pressed": String(active),
+        title: suggestion.text ? `Leído en la foto: ${suggestion.text}` : "Leído en la foto del producto",
+      }, `🤖 Sugerencia: ${suggestion.value} ${UNIT_LABEL[suggestion.unit] || suggestion.unit}`);
+      aiNode.addEventListener("click", () => update({ value: suggestion.value, unit: suggestion.unit, different: false }));
+    } else if (suggestion) {
+      aiNode = h("span", { class: "rv-ai-note", title: suggestion.title }, suggestion.label);
+    }
     const row = h("article", { class: `rv-row${decided ? " done" : ""}${sent ? " sent" : ""}` },
       h("div", {},
         h("h2", { class: "rv-name" }, item.name),
@@ -191,7 +221,7 @@ export function mountSizeReview(main, { h, fill }) {
       h("div", { class: "rv-decide" },
         sent ? h("p", { class: "rv-sent" }, "Enviado: se aplica en el próximo refresco.") : null,
         h("p", { class: "rv-label" }, "Tamaño correcto"),
-        h("div", { class: "rv-picks" }, picks),
+        h("div", { class: "rv-picks" }, aiNode, picks),
         h("div", { class: "rv-manual" }, value, unit),
         h("label", { class: "rv-different" }, different, " No es el mismo producto (código reutilizado)"),
         note));

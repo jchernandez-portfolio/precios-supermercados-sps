@@ -647,7 +647,7 @@ def test_size_review_panel_sends_only_validated_decisions_to_github(tmp_path: Pa
     (tmp_path / "admin.js").write_text((APP_DIR / "admin.js").read_text(encoding="utf-8"), encoding="utf-8")
     script = """
 import { sizeDecisionsBody, sendSizeDecisions, loadSizeQueue } from './data.js';
-import { searchVariants, storeCode, sizeOptions, decisionOf } from './admin.js';
+import { searchVariants, storeCode, sizeOptions, decisionOf, aiSuggestion } from './admin.js';
 const calls = [];
 globalThis.fetch = async (url, options = {}) => {
   calls.push({ url, method: options.method || 'GET', headers: options.headers || {}, body: options.body || null,
@@ -668,6 +668,13 @@ try { await sendSizeDecisions('github_pat_' + 'A'.repeat(40), decisions); } catc
 try { await sendSizeDecisions('mi-clave', decisions); } catch (error) { out.badToken = error.message; }
 try { sizeDecisionsBody([{ gtin: '00049733830119', decision: 'size', value: '', unit: 'oz' }]); } catch (error) { out.incomplete = error.message; }
 out.calls = calls.length;
+out.ai = [
+  aiSuggestion({ ia: { status: 'sugerencia', value: '240', unit: 'g', text: 'PESO NETO 240 g' } }),
+  aiSuggestion({ ia: { status: 'sugerencia', value: '-1', unit: 'g' } }),
+  aiSuggestion({ ia: { status: 'no_legible', reason: 'otra_presentacion' } }),
+  aiSuggestion({ ia: { status: 'sin_foto' } }),
+  aiSuggestion({}),
+];
 out.codes = ['00049733830119', '07411000204139', '17411000204136', ''].map((g) => searchVariants(g).map((v) => v.label + ':' + v.code));
 out.own = [storeCode({ code: ' 0049733830119 ' }), storeCode({ code: '12' }), storeCode({})];
 out.options = sizeOptions({ offers: [
@@ -707,6 +714,10 @@ console.log(JSON.stringify(out));
         [],
     ]
     assert result["own"] == ["0049733830119", None, None]
+    suggest, invalid, other, no_photo, pending = result["ai"]
+    assert suggest == {"kind": "suggest", "value": "240", "unit": "g", "text": "PESO NETO 240 g"}
+    assert invalid["label"] == other["label"] == "🤖 No legible" and "otra presentación" in other["title"]
+    assert no_photo["label"] == "🤖 Sin foto" and pending is None
     assert result["options"] == [
         {"value": "150", "unit": "g", "stores": ["Walmart", "Paiz"]},
         {"value": "150", "unit": "ml", "stores": ["Colonial"]},

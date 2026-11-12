@@ -258,6 +258,7 @@ def test_queue_lists_ties_and_outliers_and_skips_decided_gtins() -> None:
     assert (cholula["comisariato_los_andes"]["value"], cholula["comisariato_los_andes"]["unit"]) == ("5", "oz")
     assert cholula["paiz"]["size"] == "150 g"
     assert cholula["paiz"]["code"] == "0049733830119"  # forma publicada por el súper
+    assert cholula["paiz"]["ref"] == "paiz:6"  # para hallar la foto de su tarjeta
     assert [item["gtin"] for item in cola.queue_items(groups, skip={MCCORMICK})] == [CHOLULA]
 
 

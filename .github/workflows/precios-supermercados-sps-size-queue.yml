@@ -4,6 +4,9 @@ name: Precios SPS - Cola de revisión de tamaños
 # en conflicto (sólo SELECT en Turso) y publica `cola.json` en la rama pública
 # `revision-tamanos`, que lee el panel #/admin/revision. Sólo contiene datos ya
 # públicos (cadena, nombre y tamaño publicados). Omite los GTIN ya decididos.
+# Sugerencias de IA: Gemini lee el contenido neto en las fotos públicas de cada
+# código (sólo los nuevos; lo leído se guarda en `ia-tamanos.json`). La llave
+# GEMINI_API_KEY sólo entra a ese paso; sin llave se aplica sólo lo guardado.
 on:
   workflow_run:
     workflows:
@@ -11,6 +14,12 @@ on:
     types:
       - completed
   workflow_dispatch:
+    inputs:
+      ia_minutos:
+        description: "Minutos máximos de consultas a Gemini (0 = sólo aplicar lo guardado)"
+        required: false
+        default: "25"
+        type: string
 
 permissions:
   contents: write
@@ -27,7 +36,7 @@ jobs:
            (github.event.workflow_run.conclusion == 'success' &&
             github.event.workflow_run.head_branch == 'main')) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 150
     env:
       PYTHONPATH: ${{ github.workspace }}/source/precios-supermercados-sps/src
     steps:
@@ -62,17 +71,39 @@ jobs:
           rm -rf /tmp/cola
           python source/precios-supermercados-sps/scripts/exportar_cola_tamanos.py --output-dir /tmp/cola
 
+      - name: Sugerencias de tamaño con IA (Gemini)
+        continue-on-error: true
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          IA_MINUTOS: ${{ inputs.ia_minutos || '25' }}
+        run: |
+          set -euo pipefail
+          case "$IA_MINUTOS" in (''|*[!0-9]*) echo "ia_minutos_invalido" >&2; exit 1;; esac
+          if [ "$IA_MINUTOS" -gt 120 ]; then IA_MINUTOS=120; fi
+          if [ -L cola/ia-tamanos.json ]; then echo "ia_cache_symlink_invalid" >&2; exit 1; fi
+          cp /tmp/cola/cola.json /tmp/cola/cola-sin-ia.json
+          if ! python source/precios-supermercados-sps/scripts/sugerir_tamanos_ia.py \
+              --queue /tmp/cola/cola.json --cache-in cola/ia-tamanos.json \
+              --cache-out /tmp/cola/ia-tamanos.json --minutes "$IA_MINUTOS"; then
+            cp /tmp/cola/cola-sin-ia.json /tmp/cola/cola.json
+            exit 1
+          fi
+
       - name: Publicar en un solo commit y push
         env:
           SOURCE_RUN_ID: ${{ github.event.workflow_run.id || github.run_id }}
         run: |
           set -euo pipefail
           repository="$GITHUB_WORKSPACE/cola"
-          if [ -L "$repository/cola.json" ]; then echo "cola_symlink_boundary_invalid" >&2; exit 1; fi
+          for name in cola.json ia-tamanos.json; do
+            if [ -L "$repository/$name" ]; then echo "cola_symlink_boundary_invalid:$name" >&2; exit 1; fi
+          done
           cp /tmp/cola/cola.json "$repository/cola.json"
+          if [ -f /tmp/cola/ia-tamanos.json ]; then cp /tmp/cola/ia-tamanos.json "$repository/ia-tamanos.json"; fi
           git -C "$repository" config user.name "github-actions[bot]"
           git -C "$repository" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git -C "$repository" add -- cola.json
+          if [ -f "$repository/ia-tamanos.json" ]; then git -C "$repository" add -- ia-tamanos.json; fi
           if git -C "$repository" diff --cached --quiet; then
             echo "cola_already_current=true"
             exit 0

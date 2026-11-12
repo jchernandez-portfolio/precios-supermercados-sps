@@ -101,6 +101,7 @@ def queue_items(groups: Sequence[Mapping[str, object]], skip: set[str]) -> list[
                 "store": member.record.supermarket_id,
                 "name": member.record.source_name,
                 "code": source_code(member),
+                "ref": member.record.source_record_id,
                 "size": None if size is None else size["text"],
                 "value": None if size is None else size["value"],
                 "unit": None if size is None else size["unit"],
