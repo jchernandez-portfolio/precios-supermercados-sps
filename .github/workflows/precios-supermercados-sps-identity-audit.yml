@@ -4,9 +4,11 @@ name: Precios SPS - Auditoría de identidad de producto
 # ciudad, códigos de barra (EAN/GTIN), marca y contenido neto separados,
 # tarjetas agrupadas y GTIN repartidos en varias tarjetas, y el estado del
 # producto maestro; además vuelca el esquema real de Turso y una muestra de 100
-# productos (maíz, margarina, café, conflictos). El script sólo ejecuta SELECT
-# y PRAGMA table_info (cualquier otra sentencia se rechaza); no escribe en el
-# repositorio: deja un artifact.
+# productos (maíz, margarina, café, conflictos). El paso 0 mide motivos de
+# bloqueo de los grupos GTIN y simula unir sucursales (TGU) y aislar ofertas con
+# conflicto de tamaño. Los scripts sólo ejecutan SELECT y PRAGMA table_info
+# (cualquier otra sentencia se rechaza); no escriben en el repositorio: dejan un
+# artifact.
 
 on:
   workflow_dispatch:
@@ -22,7 +24,7 @@ jobs:
   audit:
     if: ${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: precios-supermercados-sps
@@ -56,6 +58,15 @@ jobs:
         run: |
           set -euo pipefail
           python scripts/auditar_identidad_productos.py --output-dir run-artifacts/identidad
+
+      - name: Medir reglas de identidad (paso 0, sólo lectura)
+        shell: bash
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          python scripts/medir_reglas_identidad.py --output-dir run-artifacts/identidad/reglas
 
       - name: Guardar resumen, esquema y muestra
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2

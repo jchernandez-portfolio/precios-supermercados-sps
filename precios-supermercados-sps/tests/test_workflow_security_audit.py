@@ -697,11 +697,17 @@ def test_identity_audit_is_manual_read_only_and_leaves_an_artifact() -> None:
     assert "actions/upload-artifact@" in raw and "identidad-productos-${{ github.run_id }}" in raw
     for forbidden in ("contents: write", "git push", "--apply", "pull_request", "schedule:", "id-token"):
         assert forbidden not in raw, forbidden
-    # Las llaves de Turso sólo existen en el paso que audita.
-    run = next(step for step in base.steps(workflow) if "auditar_identidad_productos.py" in str(step.get("run", "")))
-    assert set(run["env"]) == {"TURSO_DATABASE_URL", "TURSO_AUTH_TOKEN"}
-    others = [step for step in base.steps(workflow) if step is not run]
+    assert "python scripts/medir_reglas_identidad.py --output-dir run-artifacts/identidad/reglas" in raw
+    # Las llaves de Turso sólo existen en los dos pasos de sólo lectura.
+    names = ("auditar_identidad_productos.py", "medir_reglas_identidad.py")
+    readers = [step for step in base.steps(workflow) if any(name in str(step.get("run", "")) for name in names)]
+    assert len(readers) == 2
+    for run in readers:
+        assert set(run["env"]) == {"TURSO_DATABASE_URL", "TURSO_AUTH_TOKEN"}
+    others = [step for step in base.steps(workflow) if all(step is not run for run in readers)]
     assert not any("secrets." in str(step) for step in others)
-    script = (base.REPO_ROOT / "precios-supermercados-sps" / "scripts" / "auditar_identidad_productos.py").read_text(encoding="utf-8")
-    for statement in ("INSERT INTO", "UPDATE ", "DELETE FROM", "DROP TABLE", "CREATE TABLE", "ALTER TABLE", "REPLACE INTO"):
-        assert statement not in script.upper(), statement
+    for name in names:
+        script = (base.REPO_ROOT / "precios-supermercados-sps" / "scripts" / name).read_text(encoding="utf-8")
+        for statement in ("INSERT INTO", "UPDATE ", "DELETE FROM", "DROP TABLE", "CREATE TABLE", "ALTER TABLE",
+                          "REPLACE INTO"):
+            assert statement not in script.upper(), (name, statement)
