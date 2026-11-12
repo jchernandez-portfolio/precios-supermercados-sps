@@ -8,7 +8,7 @@
 // en el encabezado Authorization a api.github.com.
 import {
   RETAILER_NAMES, SIZE_DECISIONS_RUNS_URL, SIZE_UNITS, loadSizeQueue, sendSizeDecisions,
-} from "./data.js?v=20261112-1";
+} from "./data.js?v=20261112-2";
 
 const TOKEN_KEY = "super-compras-admin-github-token";
 const UNIT_LABEL = { g: "g", ml: "ml", oz: "oz", lb: "lb", unit: "unidades" };
@@ -37,17 +37,44 @@ function writeToken(value) {
   } catch { /* sin almacenamiento: la llave vive sólo en el campo */ }
 }
 
-// Formas del código para buscar en el súper: [principal, alternativa | null].
-// El GTIN guardado tiene 14 dígitos con ceros a la izquierda; los súper no
-// encuentran "0049733830119" pero sí el UPC-A original "049733830119". Por eso la
-// principal es el código más corto válido (EAN-8, UPC-A de 12 o EAN-13) y la
-// alternativa, la forma de 13 dígitos cuando difiere.
-export function searchCodes(gtin) {
-  const digits = String(gtin || "").replace(/\D/g, "").replace(/^0+/, "");
-  if (!digits) return [null, null];
-  if (digits.length <= 8) return [digits.padStart(8, "0"), digits.padStart(12, "0")];
-  if (digits.length <= 12) return [digits.padStart(12, "0"), digits.padStart(13, "0")];
-  return [digits, null];
+// Formas del código para buscar en el súper. El GTIN guardado tiene 14 dígitos y
+// cada súper indexa una forma distinta (probado el 12-nov: Walmart encuentra
+// "0049733830119" de 13 y Colonial sólo "049733830119" de 12). 13 y 12 existen
+// sólo si los ceros que se quitan están ahí (un 742… no tiene forma de 12).
+export function searchVariants(gtin) {
+  const digits = String(gtin || "").replace(/\D/g, "");
+  if (digits.length !== 14) return [];
+  return [
+    { label: "14", code: digits },
+    digits.startsWith("0") ? { label: "13", code: digits.slice(1) } : null,
+    digits.startsWith("00") ? { label: "12", code: digits.slice(2) } : null,
+  ].filter(Boolean);
+}
+
+// El código tal como lo publica el súper (sin espacios); null si no lo trae.
+export function storeCode(offer) {
+  const digits = String(offer?.code || "").replace(/\D/g, "");
+  return digits.length >= 8 && digits.length <= 14 ? digits : null;
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // Respaldo sin permisos de portapapeles: selección temporal + copiar.
+    const field = document.createElement("textarea");
+    field.value = text;
+    field.setAttribute("readonly", "");
+    field.style.position = "fixed";
+    field.style.opacity = "0";
+    document.body.append(field);
+    field.select();
+    let copied = false;
+    try { copied = document.execCommand("copy"); } catch { copied = false; }
+    field.remove();
+    return copied;
+  }
 }
 
 // Tamaños publicados, el más repetido primero: son los botones rápidos.
@@ -99,19 +126,34 @@ export function mountSizeReview(main, { h, fill }) {
     return chip;
   });
 
+  function copyButton(text, label = "Copiar") {
+    const button = h("button", { type: "button", class: "rv-copy", title: `Copiar ${text}` }, label);
+    button.addEventListener("click", async () => {
+      const copied = await copyText(text);
+      button.textContent = copied ? "Copiado ✓" : "No se pudo";
+      setTimeout(() => { button.textContent = label; }, 1500);
+    });
+    return button;
+  }
+
   function offerRow(item, offer) {
     const search = STORE_SEARCH[offer.store];
-    const [code, alternative] = searchCodes(item.gtin);
-    const link = (value, label, extra = "") => h("a", {
-      class: `rv-ext${extra}`, href: search(value), target: "_blank", rel: "noopener noreferrer", title: `Buscar ${value}`,
-    }, label);
+    const own = storeCode(offer);
+    const links = search && offer.store !== "comisariato_los_andes"
+      ? searchVariants(item.gtin).map(({ label, code }) => h("a", {
+        class: `rv-search${own === code ? " own" : ""}`, href: search(code), target: "_blank", rel: "noopener noreferrer",
+        title: own === code ? `Buscar ${code} (así lo publica este súper)` : `Buscar ${code}`,
+      }, `${label} díg.`))
+      : [search ? h("a", { class: "rv-search", href: search(""), target: "_blank", rel: "noopener noreferrer" }, "Catálogo ↗") : null];
     return h("div", { class: `rv-offer${offer.excluded ? " out" : ""}` },
-      h("span", {},
-        h("strong", {}, RETAILER_NAMES[offer.store] || offer.store),
-        h("span", { class: "rv-source" }, offer.name)),
-      h("span", { class: "rv-size" }, offer.size || "sin tamaño"),
-      search && code ? h("span", { class: "rv-links" }, link(code, "Ver ↗"),
-        alternative && offer.store !== "comisariato_los_andes" ? link(alternative, `${alternative.length} díg.`, " rv-alt") : null) : h("span"));
+      h("div", { class: "rv-offer-main" },
+        h("span", {},
+          h("strong", {}, RETAILER_NAMES[offer.store] || offer.store),
+          h("span", { class: "rv-source" }, offer.name)),
+        h("span", { class: "rv-size" }, offer.size || "sin tamaño")),
+      h("div", { class: "rv-codes" },
+        own ? h("span", { class: "rv-code" }, h("span", { class: "muted" }, "Código del súper: "), h("code", {}, own), copyButton(own)) : null,
+        h("span", { class: "rv-links" }, h("span", { class: "muted" }, "Buscar:"), links)));
   }
 
   function rowFor(item) {
@@ -143,7 +185,8 @@ export function mountSizeReview(main, { h, fill }) {
     const row = h("article", { class: `rv-row${decided ? " done" : ""}${sent ? " sent" : ""}` },
       h("div", {},
         h("h2", { class: "rv-name" }, item.name),
-        h("p", { class: "rv-meta" }, `Código ${searchCodes(item.gtin)[0] || item.gtin} · ${KIND_LABEL[item.kind] || item.kind}`),
+        h("p", { class: "rv-meta" }, h("span", { class: "rv-gtin" }, "GTIN-14 ", h("code", {}, item.gtin), copyButton(item.gtin)),
+          ` · ${KIND_LABEL[item.kind] || item.kind}`),
         h("div", { class: "rv-offers" }, item.offers.map((offer) => offerRow(item, offer)))),
       h("div", { class: "rv-decide" },
         sent ? h("p", { class: "rv-sent" }, "Enviado: se aplica en el próximo refresco.") : null,

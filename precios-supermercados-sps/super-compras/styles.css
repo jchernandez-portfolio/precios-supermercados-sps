@@ -288,13 +288,19 @@ main { outline: none; }
 .rv-name { font-size: 1.05rem; font-weight: 700; overflow-wrap: anywhere; }
 .rv-meta { margin: 2px 0 0; font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .rv-offers { display: grid; gap: 6px; margin-top: 10px; }
-.rv-offer { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 6px 8px; border-radius: 8px; background: var(--tile); font-size: .9rem; }
+.rv-offer { display: grid; gap: 6px; padding: 8px 10px; border-radius: 8px; background: var(--tile); font-size: .9rem; }
+.rv-offer-main { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; }
 .rv-offer.out { background: var(--amber-soft); }
 .rv-source { display: block; color: var(--muted); font-size: .8rem; overflow-wrap: anywhere; }
 .rv-size { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.rv-ext { color: var(--green); font-weight: 600; font-size: .85rem; white-space: nowrap; }
-.rv-links { display: inline-flex; gap: 8px; align-items: baseline; }
-.rv-ext.rv-alt { color: var(--muted); font-weight: 500; font-size: .75rem; }
+.rv-codes { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: .8rem; }
+.rv-code, .rv-gtin { display: inline-flex; gap: 6px; align-items: center; }
+.rv-page code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .85em; font-variant-numeric: tabular-nums; user-select: all; }
+.rv-copy { padding: 2px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font-size: .75rem; font-weight: 600; cursor: pointer; }
+.rv-links { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.rv-search { padding: 2px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--green); font-weight: 600; white-space: nowrap; }
+.rv-search.own { border-color: var(--green); background: var(--green-soft); }
+.rv-search.own::after { content: " ★"; }
 .rv-decide { display: grid; gap: 8px; align-content: start; }
 .rv-label { margin: 0; font-size: .75rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
 .rv-picks { display: flex; flex-wrap: wrap; gap: 6px; }
