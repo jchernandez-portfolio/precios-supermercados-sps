@@ -737,25 +737,39 @@ export function loadCart(city) {
   }
 }
 
-// { rows: { llave actual: [prefijos de llaves viejas] } } → buscador por prefijo.
+// { locations, rows: { llave actual: [[prefijo de llave vieja, índice de sucursal]] } }
+// → buscador por prefijo: llave actual y sucursal de la tarjeta vieja.
 export function legacyIndex(document) {
   const length = Number(document?.prefix_length) || 12;
+  const locations = Array.isArray(document?.locations) ? document.locations : [];
   const map = new Map();
   for (const [current, olds] of Object.entries(document?.rows || {})) {
-    for (const old of Array.isArray(olds) ? olds : []) map.set(String(old), current);
+    for (const old of Array.isArray(olds) ? olds : []) {
+      const [prefix, place] = Array.isArray(old) ? old : [old, null];
+      map.set(String(prefix), { id: current, store: typeof locations[place] === "string" ? locations[place] : null });
+    }
   }
-  return { current: (id) => map.get(String(id ?? "").slice(0, length)) || null };
+  const find = (id) => map.get(String(id ?? "").slice(0, length)) || null;
+  return { current: (id) => find(id)?.id || null, store: (id) => find(id)?.store || null };
 }
 
-// Traduce las líneas de Mi compra con llaves viejas; las demás quedan igual. Si dos
-// líneas caen en el mismo producto y súper, se suman.
+// Traduce las líneas de Mi compra con llaves viejas; las demás quedan igual. Una
+// línea sin súper elegido queda fijada en la sucursal de su tarjeta vieja (era la
+// única oferta de esa tarjeta: el precio que vio no cambia solo). Si dos líneas caen
+// en el mismo producto y súper, se suman; nunca se agregan líneas.
 export function migrateCartLines(lines, known, legacy) {
   const result = [];
   for (const line of lines) {
-    const current = known.has(line.id) ? line.id : legacy?.current(line.id);
-    const id = current && known.has(current) ? current : line.id;
-    const twin = result.find((item) => item.id === id && (item.store || null) === (line.store || null));
-    if (twin) twin.qty += line.qty; else result.push({ ...line, id });
+    let next = line;
+    if (!known.has(line.id)) {
+      const current = legacy?.current(line.id);
+      if (current && known.has(current)) {
+        const store = line.store || legacy.store(line.id);
+        next = store ? { ...line, id: current, store } : { ...line, id: current };
+      }
+    }
+    const twin = result.find((item) => item.id === next.id && (item.store || null) === (next.store || null));
+    if (twin) twin.qty += next.qty; else result.push({ ...next });
   }
   return result;
 }

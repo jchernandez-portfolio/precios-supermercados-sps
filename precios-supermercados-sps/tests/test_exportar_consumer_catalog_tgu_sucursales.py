@@ -89,7 +89,8 @@ def test_legacy_ids_map_new_cards_to_their_old_branch_keys(tmp_path: Path) -> No
         {"row_id": "product-abc", "offers": [{"source_product_id": "paiz:9@paiz_tgu_proceres"}]},
     ]}), encoding="utf-8")
     legacy = tgu.legacy_row_ids(tmp_path, {"files": [{"path": "search.json"}, {"path": "catalog/p0.json"}]})
-    old = sorted(hashlib.sha256(f"walmart:51@{place}".encode()).hexdigest()[:12]
+    locations = [location for _, location in tgu.TGU_SCOPE]
+    old = sorted([hashlib.sha256(f"walmart:51@{place}".encode()).hexdigest()[:12], locations.index(place)]
                  for place in ("walmart_tgu_ffaa", "walmart_tgu_el_sauce"))
     assert legacy == {new: old}
 
@@ -120,6 +121,8 @@ def test_tgu_export_has_one_card_per_product_and_publishes_old_keys(tmp_path: Pa
     assert entry["sha256"] == hashlib.sha256(content).hexdigest()
     legacy = json.loads(content)
     assert legacy["schema"] == tgu.LEGACY_IDS_SCHEMA and legacy["prefix_length"] == 12
+    assert legacy["locations"] == [location for _, location in tgu.TGU_SCOPE]
+    assert all(0 <= place < len(legacy["locations"]) for pairs in legacy["rows"].values() for _, place in pairs)
     assert set(legacy["rows"]) == {str(row["row_id"]).split("-", 1)[1] for row in rows
                                    if str(row["row_id"]).startswith("source-")}
     sps = json.loads((tmp_path / "out" / "sps" / "manifest.json").read_text(encoding="utf-8"))

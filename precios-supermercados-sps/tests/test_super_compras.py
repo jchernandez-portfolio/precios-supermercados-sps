@@ -604,17 +604,19 @@ def test_old_branch_keys_in_my_cart_and_links_move_to_the_product_card(tmp_path:
     script = """
 import { Catalog, legacyIndex, migrateCartLines } from './data.js';
 const legacy = legacyIndex({ schema: 'rpi-consumer-legacy-ids/v1', prefix_length: 12,
-  rows: { newkey000000000000000001: ['aaaaaaaaaaaa', 'bbbbbbbbbbbb'] } });
+  locations: ['la_colonia_tgu', 'walmart_tgu_ffaa', 'walmart_tgu_el_sauce'],
+  rows: { newkey000000000000000001: [['aaaaaaaaaaaa', 1], ['bbbbbbbbbbbb', 2]] } });
 const known = new Set(['newkey000000000000000001', 'other']);
 const cart = [
   { id: 'aaaaaaaaaaaa111111111111', qty: 1, store: 'walmart_tgu_ffaa' },
-  { id: 'bbbbbbbbbbbb222222222222', qty: 2, store: 'walmart_tgu_el_sauce' },
+  { id: 'bbbbbbbbbbbb222222222222', qty: 2 },
   { id: 'aaaaaaaaaaaa111111111111', qty: 1 },
-  { id: 'bbbbbbbbbbbb222222222222', qty: 3 },
+  { id: 'bbbbbbbbbbbb222222222222', qty: 3, store: 'walmart_tgu_el_sauce' },
   { id: 'other', qty: 1 },
   { id: 'gone', qty: 1 },
 ];
-const out = { migrated: migrateCartLines(cart, known, legacy), none: migrateCartLines(cart.slice(4), known, null) };
+const out = { migrated: migrateCartLines(cart, known, legacy), none: migrateCartLines(cart.slice(4), known, null),
+  store: legacy.store('bbbbbbbbbbbb222222222222') };
 const c = Object.create(Catalog.prototype);
 c.ready = true;
 c.byId = new Map([['newkey000000000000000001', { id: 'newkey000000000000000001' }]]);
@@ -628,12 +630,14 @@ console.log(JSON.stringify(out));
 """
     result = json.loads(_node(script, tmp_path))
     assert result["migrated"] == [
-        {"id": "newkey000000000000000001", "qty": 1, "store": "walmart_tgu_ffaa"},
-        {"id": "newkey000000000000000001", "qty": 2, "store": "walmart_tgu_el_sauce"},
-        {"id": "newkey000000000000000001", "qty": 4},  # dos líneas "más barato" se suman
+        # Cada línea vieja queda en su sucursal (la sin súper elegido, en la de su tarjeta):
+        # el precio no cambia solo; las del mismo producto y sucursal se suman.
+        {"id": "newkey000000000000000001", "qty": 2, "store": "walmart_tgu_ffaa"},
+        {"id": "newkey000000000000000001", "qty": 5, "store": "walmart_tgu_el_sauce"},
         {"id": "other", "qty": 1},
         {"id": "gone", "qty": 1},  # desconocida: la app la quita después, sin borrarla del guardado
     ]
     assert result["none"] == [{"id": "other", "qty": 1}, {"id": "gone", "qty": 1}]
+    assert result["store"] == "walmart_tgu_el_sauce"
     assert result["link"] == "newkey000000000000000001"
     assert result["missing"] is None and result["noFile"] is None

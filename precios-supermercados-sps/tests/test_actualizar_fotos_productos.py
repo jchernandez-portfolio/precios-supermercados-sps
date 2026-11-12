@@ -265,6 +265,9 @@ def test_branch_photo_moves_before_and_after_tegucigalpa_merges_branches() -> No
     # Antes y después del cambio se hereda la misma foto: la de mejor puntaje.
     assert fotos.branch_photo_moves(before, index) == [(merged, sauce)]
     assert fotos.branch_photo_moves(after, index) == [(merged, sauce)]
+    # Criterios más nuevos antes que puntaje: una foto de criterios v3 con más puntaje no gana.
+    newer = {**index, ffaa: {**index[ffaa], "c": 4}, sauce: {**index[sauce], "c": 3}}
+    assert fotos.branch_photo_moves(after, newer) == [(merged, ffaa)]
     # Con foto propia (p. ej. la misma llave en SPS) no se toca; las filas comparables tampoco.
     assert fotos.branch_photo_moves(after, {**index, merged: {"h": "c" * 10}}) == []
     assert after[0].branch_ids and after[0].source_row and not before[2].source_row
@@ -281,9 +284,12 @@ def test_adopt_branch_photos_copies_published_files_and_checks_the_hash(tmp_path
               f"https://r2.test/fotos/v2/320/ab/{donor}-{digest}.webp": _webp(b"320"),
               f"https://r2.test/fotos/v2/800/ef/{bad_donor}-{'f' * 10}.webp": _webp(b"otra"),
               f"https://r2.test/fotos/v2/320/ef/{bad_donor}-{'f' * 10}.webp": _webp(b"otra")}
-    stats = fotos.adopt_branch_photos([(target, donor), (bad_target, bad_donor)], index, tmp_path,
-                                      served.__getitem__, "https://r2.test", log=lambda _: None)
-    assert stats == {"fotos_heredadas_de_sucursal": 1, "herencia_huella_distinta": 1}
+    missing_target, missing_donor = "ij" + "5" * 22, "kl" + "6" * 22
+    index[missing_donor] = {"h": "e" * 10, "s": 50}
+    stats = fotos.adopt_branch_photos([(target, donor), (bad_target, bad_donor), (missing_target, missing_donor)],
+                                      index, tmp_path, served.__getitem__, "https://r2.test", log=lambda _: None,
+                                      workers=3)
+    assert stats == {"fotos_heredadas_de_sucursal": 1, "herencia_huella_distinta": 1, "herencia_error_descarga": 1}
     assert index[target] == {"h": digest, "s": 90, "sig": "x", "c": 4, "de": donor}
     assert bad_target not in index
     assert (tmp_path / f"800/cd/{target}-{digest}.webp").read_bytes() == big

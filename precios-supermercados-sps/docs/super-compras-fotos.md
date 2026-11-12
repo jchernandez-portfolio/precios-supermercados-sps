@@ -28,8 +28,9 @@ Mientras dura la migración, el catálogo usa la foto v2 si existe y si no la v1
      tarjeta de un producto sin identidad comparable es una por producto (llave de
      `walmart:51`, la misma que en SPS) y no una por sucursal (llave de
      `walmart:51@walmart_tgu_ffaa`). Si la llave nueva no tiene foto, copia del
-     propio bucket la de mejor puntaje de las llaves viejas (verifica la huella y
-     marca `de` en el índice); no vuelve a pedir nada a las tiendas. Una foto
+     propio bucket (8 descargas en paralelo) la de las llaves viejas con criterios
+     más nuevos y, entre ésas, la de mejor puntaje (verifica la huella y marca `de`
+     en el índice); no vuelve a pedir nada a las tiendas. Una foto
      heredada no cuenta como otro dueño para la regla de genéricas;
    - resuelve en Turso la llave exacta de cada oferta;
    - pide direcciones de foto a endpoints públicos (`product_image_sources.py`):

@@ -181,16 +181,18 @@ def _context_counts_from_offers(offers: Iterable[base.VisibleOffer]) -> dict[tup
     return counts
 
 
-def legacy_row_ids(output: Path, manifest: dict[str, object]) -> dict[str, list[str]]:
+def legacy_row_ids(output: Path, manifest: dict[str, object]) -> dict[str, list[list[object]]]:
     """Llave actual de cada tarjeta por producto → llaves que tenía por sucursal.
 
     Antes, una oferta sin identidad comparable era su propia tarjeta y su llave
     salía del ``source_product_id`` público con sucursal
-    (``sha256("walmart:51@walmart_tgu_ffaa")``). Se publica el prefijo de 12
-    caracteres de cada llave vieja: alcanza para no confundir (48 bits) y reduce
-    el archivo a la mitad.
+    (``sha256("walmart:51@walmart_tgu_ffaa")``). Cada llave vieja se publica como
+    ``[prefijo de 12 caracteres, índice de su sucursal en "locations"]``: el
+    prefijo alcanza para no confundir (48 bits) y la sucursal deja fijada en
+    "Mi compra" la tienda de esa tarjeta, así el precio elegido no cambia solo.
     """
-    result: dict[str, list[str]] = {}
+    locations = [location for _, location in TGU_SCOPE]
+    result: dict[str, list[list[object]]] = {}
     for item in manifest.get("files", []):
         path = item.get("path") if isinstance(item, dict) else None
         if not isinstance(path, str) or not path.startswith("catalog/"):
@@ -202,12 +204,13 @@ def legacy_row_ids(output: Path, manifest: dict[str, object]) -> dict[str, list[
                 continue
             key = row_id.split("-", 1)[1]
             old = sorted({
-                hashlib.sha256(str(offer["source_product_id"]).encode("utf-8")).hexdigest()[:LEGACY_PREFIX]
-                for offer in row.get("offers", [])
-                if "@" in str(offer.get("source_product_id", ""))
+                (hashlib.sha256(source.encode("utf-8")).hexdigest()[:LEGACY_PREFIX],
+                 locations.index(source.split("@", 1)[1]))
+                for source in (str(offer.get("source_product_id", "")) for offer in row.get("offers", []))
+                if "@" in source and source.split("@", 1)[1] in locations
             })
             if old:
-                result[key] = old
+                result[key] = [list(pair) for pair in old]
     return dict(sorted(result.items()))
 
 
@@ -229,7 +232,12 @@ def _rewrite_public_metadata(output: Path, manifest: dict[str, object], counts: 
             files.append(base._file_metadata(output, FACETS_FILE))
         elif path != LEGACY_IDS_FILE:
             files.append(item)
-    legacy = {"schema": LEGACY_IDS_SCHEMA, "prefix_length": LEGACY_PREFIX, "rows": legacy_row_ids(output, manifest)}
+    legacy = {
+        "schema": LEGACY_IDS_SCHEMA,
+        "prefix_length": LEGACY_PREFIX,
+        "locations": [location for _, location in TGU_SCOPE],
+        "rows": legacy_row_ids(output, manifest),
+    }
     base._atomic_bytes(output / LEGACY_IDS_FILE, base._json_bytes(legacy))
     files.append(base._file_metadata(output, LEGACY_IDS_FILE))
 

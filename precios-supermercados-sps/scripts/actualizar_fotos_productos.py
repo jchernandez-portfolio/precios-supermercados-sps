@@ -29,6 +29,7 @@ import tempfile
 import time
 from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -64,6 +65,9 @@ REVIEW_LOWEST = 120
 REVIEW_SAMPLE = 80
 GENERIC_URL_OWNERS = images.GENERIC_OWNERS
 QUERY_BATCH = 400
+# Descargas en paralelo desde el propio bucket al heredar fotos por sucursal.
+ADOPT_WORKERS = 8
+ADOPT_CHUNK = 64
 KEY_COLUMNS = ("source_item_id", "source_key", "source_catalog_product_id")
 
 
@@ -408,6 +412,13 @@ def card_key(public_id: str) -> str:
     return hashlib.sha256(public_id.encode("utf-8")).hexdigest()[:24]
 
 
+def _number(value: object) -> int:
+    try:
+        return int(value or 0)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0
+
+
 def _usable(item: object) -> bool:
     return isinstance(item, Mapping) and isinstance(item.get("h"), str) and not item.get("none")
 
@@ -419,8 +430,9 @@ def branch_photo_moves(rows: Sequence[CatalogRow], index: Mapping[str, Mapping[s
     y ahora una por producto (llave de "walmart:51", la misma que en SPS). Sirve antes
     y después del cambio: la llave nueva se calcula del producto y las viejas de cada
     oferta. Si la llave nueva ya tiene foto no se toca; si no, hereda la mejor de las
-    viejas (mayor puntaje). Son las mismas fotos de los mismos súper: no se vuelve a
-    pedir nada a las tiendas.
+    viejas: primero la evaluada con los criterios más nuevos (``c``), luego la de mayor
+    puntaje. Son las mismas fotos de los mismos súper: no se vuelve a pedir nada a las
+    tiendas.
     """
     donors: dict[str, set[str]] = {}
     for row in rows:
@@ -437,39 +449,54 @@ def branch_photo_moves(rows: Sequence[CatalogRow], index: Mapping[str, Mapping[s
             if key != target and _usable(index.get(key))
         )
     return sorted(
-        (target, max(keys, key=lambda key: (int(index[key].get("s", 0) or 0), key)))
+        (target, max(keys, key=lambda key: (_number(index[key].get("c")), _number(index[key].get("s")), key)))
         for target, keys in donors.items() if keys
     )
 
 
 def adopt_branch_photos(moves: Sequence[tuple[str, str]], index: dict[str, dict[str, object]], output_dir: Path,
-                        fetch_bytes: Callable[[str], bytes], public_base: str, *, log=print) -> Counter:
+                        fetch_bytes: Callable[[str], bytes], public_base: str, *, log=print,
+                        workers: int = ADOPT_WORKERS) -> Counter:
     """Copia los WebP publicados de la llave vieja a la nueva y registra la herencia (``de``).
 
-    Lee del propio bucket público; verifica la huella del archivo de 800 px antes de
+    Lee del propio bucket público (en paralelo: no son las tiendas, y una por una
+    4 000 fotos tomaban ~1 h); verifica la huella del archivo de 800 px antes de
     escribirlo, así la subida (que exige huella e índice) recibe lo mismo que ya estaba.
     """
-    stats: Counter = Counter()
-    for number, (target, donor) in enumerate(moves, 1):
-        item = index[donor]
-        digest = str(item["h"])
+
+    def download(move: tuple[str, str]) -> dict[int, bytes] | None:
+        _, donor = move
         try:
-            files = {size: fetch_bytes(f"{public_base}/{R2_PREFIX}{relative}")
-                     for size, relative in image_paths(donor, digest).items()}
+            return {size: fetch_bytes(f"{public_base}/{R2_PREFIX}{relative}")
+                    for size, relative in image_paths(donor, str(index[donor]["h"])).items()}
         except Exception:  # noqa: BLE001 - una foto que no baja se deja para otra corrida
-            stats["herencia_error_descarga"] += 1
-            continue
-        if hashlib.sha256(files[images.OUTPUT_SIZE]).hexdigest()[:10] != digest:
-            stats["herencia_huella_distinta"] += 1
-            continue
-        for size, relative in image_paths(target, digest).items():
-            path = output_dir / relative
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(files[size])
-        index[target] = {**{key: value for key, value in item.items() if key != "de"}, "de": donor}
-        stats["fotos_heredadas_de_sucursal"] += 1
-        if number % 500 == 0:
-            log(f"heredadas {number}/{len(moves)} fotos de tarjetas por sucursal")
+            return None
+
+    stats: Counter = Counter()
+    def downloaded(pool: ThreadPoolExecutor) -> Iterable[tuple[tuple[str, str], dict[int, bytes] | None]]:
+        # De a tandas: así en memoria sólo hay unas decenas de fotos a la vez.
+        for start in range(0, len(moves), ADOPT_CHUNK):
+            chunk = moves[start:start + ADOPT_CHUNK]
+            yield from zip(chunk, pool.map(download, chunk))
+
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        for number, ((target, donor), files) in enumerate(downloaded(pool), 1):
+            item = index[donor]
+            digest = str(item["h"])
+            if files is None:
+                stats["herencia_error_descarga"] += 1
+                continue
+            if hashlib.sha256(files[images.OUTPUT_SIZE]).hexdigest()[:10] != digest:
+                stats["herencia_huella_distinta"] += 1
+                continue
+            for size, relative in image_paths(target, digest).items():
+                path = output_dir / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(files[size])
+            index[target] = {**{key: value for key, value in item.items() if key != "de"}, "de": donor}
+            stats["fotos_heredadas_de_sucursal"] += 1
+            if number % 500 == 0:
+                log(f"heredadas {number}/{len(moves)} fotos de tarjetas por sucursal")
     return stats
 
 
