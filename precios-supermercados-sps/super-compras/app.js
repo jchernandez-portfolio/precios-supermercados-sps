@@ -4,8 +4,8 @@
 import {
   Catalog, RETAILER_COLORS, rowKey, RETAILER_INITIALS, RETAILER_NAMES, loadCart, loadCities, loadCitySlug,
   migrateCartLines, money, photoSrcset, photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, storeLabel,
-} from "./data.js?v=20261112-4";
-import { productIllustration } from "./illustration.js?v=20261112-4";
+} from "./data.js?v=20261112-5";
+import { productIllustration } from "./illustration.js?v=20261112-5";
 
 // Foto real si existe; si no hay o falla al cargar, la ilustración de siempre.
 // Tarjetas y miniaturas usan 320 px; el detalle deja que el navegador elija 320 u
@@ -620,7 +620,7 @@ async function renderAdmin(main) {
   main.dataset.view = "admin";
   fill(main, loadingPage("Abriendo el panel de revisión…"));
   try {
-    adminModule = adminModule || await import("./admin.js?v=20261112-4");
+    adminModule = adminModule || await import("./admin.js?v=20261112-5");
     if (route().path.startsWith(ADMIN_ROUTE) && main.dataset.view === "admin") adminModule.mountSizeReview(main, { h, fill });
   } catch (error) {
     delete main.dataset.view;
@@ -683,6 +683,8 @@ async function loadCity(city) {
       if (route().path.startsWith("/compra")) render();
     }).catch(() => {});
   } catch (error) {
+    // El panel interno no depende del catálogo: un fallo al cargar precios no lo tapa.
+    if (main.dataset.view === "admin") return;
     fill(main, h("div", { class: "page empty" }, h("strong", {}, "No pudimos cargar los precios."), h("p", {}, error.message),
       h("button", { type: "button", class: "primary", onclick: () => location.reload() }, "Reintentar")));
   }

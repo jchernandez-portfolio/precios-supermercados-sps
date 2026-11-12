@@ -43,6 +43,7 @@ from precios_supermercados.product_master import (  # noqa: E402
     gtin_master_id,
 )
 from precios_supermercados.size_decisions import (  # noqa: E402
+    ENGINE_ACTORS,
     TABLE_NAME,
     TABLE_SQL,
     SizeDecision,
@@ -61,15 +62,20 @@ UPSERT_SQL = (
     "declared_value=excluded.declared_value,declared_unit=excluded.declared_unit,note=excluded.note,"
     "decided_by=excluded.decided_by,decided_at_utc=excluded.decided_at_utc"
 )
+# Una decisión del motor nunca reemplaza una humana (ni aunque llegue al mismo tiempo).
+ENGINE_UPSERT_SQL = UPSERT_SQL + f" WHERE {TABLE_NAME}.decided_by NOT LIKE 'human:%'"
+# El maestro sólo se toca si la fila guardada es de este mismo autor.
+_SAME_AUTHOR = f" AND EXISTS (SELECT 1 FROM {TABLE_NAME} WHERE canonical_gtin=? AND decided_by=?)"
 SET_SIZE_SQL = (
     f"UPDATE {MASTER_TABLE} SET human_attributes_json=json_set(human_attributes_json,"
-    "'$.net_content_value',json(?),'$.net_content_unit',json(?)) WHERE master_product_id=?"
+    "'$.net_content_value',json(?),'$.net_content_unit',json(?)) WHERE master_product_id=?" + _SAME_AUTHOR
 )
 CLEAR_SIZE_SQL = (
     f"UPDATE {MASTER_TABLE} SET human_attributes_json=json_remove(human_attributes_json,"
     "'$.net_content_value','$.net_content_unit') WHERE master_product_id=? "
-    f"AND json_extract(human_attributes_json,'$.net_content_value.source')='{TABLE_NAME}'"
+    f"AND json_extract(human_attributes_json,'$.net_content_value.source')='{TABLE_NAME}'" + _SAME_AUTHOR
 )
+ENGINE_CHUNK = 300
 DIRTY_SQL = (
     f"INSERT INTO {DIRTY_TABLE}(master_product_id,reason,marked_at_utc) VALUES(?,?,?) "
     "ON CONFLICT(master_product_id) DO UPDATE SET reason=excluded.reason, marked_at_utc=excluded.marked_at_utc"
@@ -102,8 +108,21 @@ def _present(store: MasterStore, table: str, column: str, values: Sequence[str])
     return found
 
 
+def human_decided(store: MasterStore, gtins: Sequence[str]) -> set[str]:
+    if not store.query("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (TABLE_NAME,)):
+        return set()
+    found: set[str] = set()
+    for start in range(0, len(gtins), IN_CHUNK):
+        chunk = tuple(gtins[start : start + IN_CHUNK])
+        placeholders = ",".join("?" for _ in chunk)
+        rows = store.query(f"SELECT canonical_gtin FROM {TABLE_NAME} WHERE canonical_gtin IN ({placeholders}) "
+                           "AND decided_by LIKE 'human:%'", chunk)
+        found.update(str(row[0]) for row in rows)
+    return found
+
+
 def plan(
-    store: MasterStore, decisions: Sequence[SizeDecision], *, now: str
+    store: MasterStore, decisions: Sequence[SizeDecision], *, now: str, engine: bool = False
 ) -> tuple[list[tuple[str, str, tuple[object, ...]]], dict[str, int], list[str]]:
     tables = _tables(store)
     if PROFILE_TABLE not in tables:
@@ -125,7 +144,7 @@ def plan(
         counts[decision.decision] += 1
         steps.append((
             f"upsert_{decision.canonical_gtin}",
-            UPSERT_SQL,
+            ENGINE_UPSERT_SQL if engine else UPSERT_SQL,
             (
                 decision.canonical_gtin,
                 decision.decision,
@@ -146,10 +165,12 @@ def plan(
             steps.append((
                 f"master_{master_id}",
                 SET_SIZE_SQL,
-                (_json(attributes["net_content_value"]), _json(attributes["net_content_unit"]), master_id),
+                (_json(attributes["net_content_value"]), _json(attributes["net_content_unit"]), master_id,
+                 decision.canonical_gtin, decision.decided_by),
             ))
         else:
-            steps.append((f"master_{master_id}", CLEAR_SIZE_SQL, (master_id,)))
+            steps.append((f"master_{master_id}", CLEAR_SIZE_SQL,
+                          (master_id, decision.canonical_gtin, decision.decided_by)))
         dirty.append(master_id)
     for master_id in sorted(set(dirty)):
         steps.append((f"dirty_{master_id}", DIRTY_SQL, (master_id, DIRTY_REASON, now)))
@@ -181,13 +202,52 @@ def apply_size_decisions(
     return result
 
 
+def apply_engine_decisions(
+    store: MasterStore, payload: str, *, engine: str, apply: bool = False, now: str | None = None
+) -> dict[str, object]:
+    """Decisiones de un motor (p. ej. la IA): en lotes de 300, sin tocar las humanas.
+
+    A diferencia del panel, un código que ya no está en los perfiles o que ya tiene
+    decisión humana se omite (se informa) en vez de rechazar todo el envío.
+    """
+    now = now or _utc_now()
+    document = json.loads(payload or "{}")
+    items = document.get("decisions") if isinstance(document, dict) else None
+    if not isinstance(items, list):
+        raise SizeDecisionError("size_decisions_schema_invalid")
+    result: dict[str, object] = {"decisions": 0, "skipped_human": [], "skipped_unknown": [], "written": False,
+                                 "dry_run": not apply, "batches": 0}
+    for start in range(0, len(items), ENGINE_CHUNK):
+        chunk = json.dumps({"schema": document.get("schema"), "decisions": items[start : start + ENGINE_CHUNK]})
+        decisions = parse_payload(chunk, decided_by=engine, decided_at_utc=now, engine=True)
+        gtins = [decision.canonical_gtin for decision in decisions]
+        human = human_decided(store, gtins)
+        known = _present(store, PROFILE_TABLE, "canonical_gtin", gtins)
+        keep = [d for d in decisions if d.canonical_gtin not in human and d.canonical_gtin in known]
+        result["skipped_human"] += sorted(human)
+        result["skipped_unknown"] += sorted(set(gtins) - known)
+        if not keep:
+            continue
+        steps, _, errors = plan(store, keep, now=now, engine=True)
+        if errors:
+            raise SizeDecisionError("engine_plan_errors")
+        result["decisions"] += len(keep)
+        result["batches"] += 1
+        if apply:
+            store.write(steps)
+            result["written"] = True
+    return result
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     target = parser.add_mutually_exclusive_group(required=True)
     target.add_argument("--sqlite", type=Path)
     target.add_argument("--turso", action="store_true")
     parser.add_argument("--payload-file", type=Path, help="JSON del panel (si no, DECISIONS_JSON)")
-    parser.add_argument("--actor", required=True, help="cuenta de GitHub que envió las decisiones")
+    author = parser.add_mutually_exclusive_group(required=True)
+    author.add_argument("--actor", help="cuenta de GitHub que envió las decisiones (panel)")
+    author.add_argument("--engine", choices=sorted(ENGINE_ACTORS), help="motor automático (p. ej. gemini_auto)")
     parser.add_argument("--summary", type=Path, help="escribe el resultado en este archivo JSON")
     parser.add_argument("--apply", action="store_true", help="escribe (por defecto dry-run)")
     args = parser.parse_args(argv)
@@ -198,7 +258,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 raise SystemExit("sqlite_file_missing")
             connection = sqlite3.connect(args.sqlite, isolation_level=None)
             try:
-                result = apply_size_decisions(SQLiteMasterStore(connection), payload, actor=args.actor, apply=args.apply)
+                result = _run(SQLiteMasterStore(connection), payload, args)
             finally:
                 connection.close()
         else:
@@ -208,7 +268,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             token = os.environ.get("TURSO_AUTH_TOKEN", "")
             if not url.strip() or not token.strip():
                 raise SystemExit("turso_credentials_missing")
-            result = apply_size_decisions(TursoMasterStore(url, token), payload, actor=args.actor, apply=args.apply)
+            result = _run(TursoMasterStore(url, token), payload, args)
     except SizeDecisionError as error:
         result = {"refused": str(error), "written": False}
     text = json.dumps(result, ensure_ascii=False, indent=1, sort_keys=True)
@@ -217,6 +277,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.summary.write_text(text + "\n", encoding="utf-8")
     print(text)
     return 1 if result.get("refused") else 0
+
+
+def _run(store: MasterStore, payload: str, args: argparse.Namespace) -> dict[str, object]:
+    if args.engine:
+        return apply_engine_decisions(store, payload, engine=args.engine, apply=args.apply)
+    return apply_size_decisions(store, payload, actor=args.actor, apply=args.apply)
 
 
 if __name__ == "__main__":

@@ -786,3 +786,13 @@ def test_size_queue_gives_the_gemini_key_only_to_the_suggestion_step() -> None:
     assert "sugerir_tamanos_ia.py" in step["run"] and "inputs." not in step["run"]
     assert step["continue-on-error"] == "true"  # sin IA la cola se publica igual
     assert "secrets.GEMINI_API_KEY" not in path.read_text(encoding="utf-8").split("Sugerencias de tamaño")[0]
+
+
+def test_size_queue_saves_ai_decisions_only_as_the_engine() -> None:
+    path = base.WORKFLOW_DIR / base.SIZE_QUEUE_WORKFLOW
+    workflow = base.load_workflow(path)
+    with_turso = {step["name"]: step for step in base.steps(workflow) if "TURSO_AUTH_TOKEN" in str(step.get("env", {}))}
+    assert set(with_turso) == {"Calcular cola (sólo lectura)", "Guardar decisiones automáticas de la IA"}
+    save = with_turso["Guardar decisiones automáticas de la IA"]
+    assert "--engine gemini_auto" in save["run"] and "--actor" not in save["run"] and "inputs." not in save["run"]
+    assert "GEMINI_API_KEY" not in str(save.get("env", {}))

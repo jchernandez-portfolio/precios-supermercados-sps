@@ -4,9 +4,11 @@ name: Precios SPS - Cola de revisión de tamaños
 # en conflicto (sólo SELECT en Turso) y publica `cola.json` en la rama pública
 # `revision-tamanos`, que lee el panel #/admin/revision. Sólo contiene datos ya
 # públicos (cadena, nombre y tamaño publicados). Omite los GTIN ya decididos.
-# Sugerencias de IA: Gemini lee el contenido neto en las fotos públicas de cada
-# código (sólo los nuevos; lo leído se guarda en `ia-tamanos.json`). La llave
-# GEMINI_API_KEY sólo entra a ese paso; sin llave se aplica sólo lo guardado.
+# IA: Gemini lee el contenido neto en la foto de cada oferta (las mismas fotos del
+# panel; sólo lo nuevo; lo leído se guarda en `ia-tamanos.json`). Si todas las fotos
+# confirman el tamaño de la mayoría, la decisión se guarda sola (engine:gemini_auto,
+# nunca sobre una humana) y el código sale de la cola. La llave GEMINI_API_KEY sólo
+# entra al paso de lectura; los secretos de Turso, sólo a los pasos de Turso.
 on:
   workflow_run:
     workflows:
@@ -84,9 +86,26 @@ jobs:
           cp /tmp/cola/cola.json /tmp/cola/cola-sin-ia.json
           if ! python source/precios-supermercados-sps/scripts/sugerir_tamanos_ia.py \
               --queue /tmp/cola/cola.json --cache-in cola/ia-tamanos.json \
-              --cache-out /tmp/cola/ia-tamanos.json --minutes "$IA_MINUTOS"; then
+              --cache-out /tmp/cola/ia-tamanos.json --minutes "$IA_MINUTOS" \
+              --auto-out /tmp/cola/auto-decisiones.json --queue-with-auto /tmp/cola/cola-con-auto.json; then
             cp /tmp/cola/cola-sin-ia.json /tmp/cola/cola.json
+            rm -f /tmp/cola/auto-decisiones.json
             exit 1
+          fi
+
+      - name: Guardar decisiones automáticas de la IA
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ ! -s /tmp/cola/auto-decisiones.json ]; then echo "sin_decisiones_automaticas"; exit 0; fi
+          # Si no se pudieron guardar, se publica la cola con esos códigos todavía adentro.
+          if ! python source/precios-supermercados-sps/scripts/aplicar_decisiones_tamano.py --turso --apply \
+              --engine gemini_auto --payload-file /tmp/cola/auto-decisiones.json \
+              --summary /tmp/cola/auto-resultado.json; then
+            cp /tmp/cola/cola-con-auto.json /tmp/cola/cola.json
+            echo "decisiones_automaticas_no_guardadas" >&2
           fi
 
       - name: Publicar en un solo commit y push

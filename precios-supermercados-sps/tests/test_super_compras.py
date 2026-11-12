@@ -647,7 +647,7 @@ def test_size_review_panel_sends_only_validated_decisions_to_github(tmp_path: Pa
     (tmp_path / "admin.js").write_text((APP_DIR / "admin.js").read_text(encoding="utf-8"), encoding="utf-8")
     script = """
 import { sizeDecisionsBody, sendSizeDecisions, loadSizeQueue } from './data.js';
-import { searchVariants, storeCode, sizeOptions, decisionOf, aiSuggestion } from './admin.js';
+import { searchVariants, storeCode, sizeOptions, decisionOf, aiSuggestion, photoUrls, offerReading } from './admin.js';
 const calls = [];
 globalThis.fetch = async (url, options = {}) => {
   calls.push({ url, method: options.method || 'GET', headers: options.headers || {}, body: options.body || null,
@@ -671,9 +671,16 @@ out.calls = calls.length;
 out.ai = [
   aiSuggestion({ ia: { status: 'sugerencia', value: '240', unit: 'g', text: 'PESO NETO 240 g' } }),
   aiSuggestion({ ia: { status: 'sugerencia', value: '-1', unit: 'g' } }),
-  aiSuggestion({ ia: { status: 'no_legible', reason: 'otra_presentacion' } }),
+  aiSuggestion({ ia: { status: 'conflicto', reason: 'minoria', value: '1000', unit: 'g', text: 'CONT. NETO 1 KILO' } }),
   aiSuggestion({ ia: { status: 'sin_foto' } }),
   aiSuggestion({}),
+];
+out.photos = [photoUrls({ foto: 'a'.repeat(24) + '-1111111111' }), photoUrls({ foto: '../x' }), photoUrls({})];
+out.readings = [
+  offerReading({ ia: { status: 'leido', value: '1000', unit: 'g', coincide: false, text: '1 KILO' } }),
+  offerReading({ ia: { status: 'leido', value: '908', unit: 'g', coincide: true } }),
+  offerReading({ ia: { status: 'no_legible', reason: 'ilegible' } }),
+  offerReading({}),
 ];
 out.codes = ['00049733830119', '07411000204139', '17411000204136', ''].map((g) => searchVariants(g).map((v) => v.label + ':' + v.code));
 out.own = [storeCode({ code: ' 0049733830119 ' }), storeCode({ code: '12' }), storeCode({})];
@@ -714,10 +721,19 @@ console.log(JSON.stringify(out));
         [],
     ]
     assert result["own"] == ["0049733830119", None, None]
-    suggest, invalid, other, no_photo, pending = result["ai"]
-    assert suggest == {"kind": "suggest", "value": "240", "unit": "g", "text": "PESO NETO 240 g"}
-    assert invalid["label"] == other["label"] == "🤖 No legible" and "otra presentación" in other["title"]
+    suggest, invalid, conflict, no_photo, pending = result["ai"]
+    assert suggest["label"] == "🤖 Sugerencia: 240 g" and (suggest["value"], suggest["unit"]) == ("240", "g")
+    assert invalid["label"] == "🤖 No legible" and conflict["status"] == "conflicto"
+    assert conflict["label"] == "🤖 IA leyó (conflicto): 1000 g" and "mayoría" in conflict["title"]
     assert no_photo["label"] == "🤖 Sin foto" and pending is None
+    r2 = "https://pub-0dcb2204775c484dbe6681e659eee236.r2.dev/fotos/v2/"
+    assert result["photos"][0] == {"thumb": f"{r2}320/aa/{'a' * 24}-1111111111.webp",
+                                   "full": f"{r2}800/aa/{'a' * 24}-1111111111.webp"}
+    assert result["photos"][1] is None and result["photos"][2] is None
+    alert, ok, unreadable, nothing = result["readings"]
+    assert alert["kind"] == "alert" and alert["label"] == "🤖 IA leyó: 1000 g ⚠"
+    assert ok["kind"] == "ok" and ok["label"] == "🤖 IA leyó: 908 g ✓"
+    assert unreadable["label"] == "🤖 No legible" and nothing is None
     assert result["options"] == [
         {"value": "150", "unit": "g", "stores": ["Walmart", "Paiz"]},
         {"value": "150", "unit": "ml", "stores": ["Colonial"]},
@@ -730,3 +746,5 @@ console.log(JSON.stringify(out));
     assert "searchVariants(item.gtin)" in admin and "navigator.clipboard.writeText" in admin
     app = (APP_DIR / "app.js").read_text(encoding="utf-8")
     assert 'const ADMIN_ROUTE = "/admin/revision";' in app and 'await import("./admin.js?v=' in app
+    # Un fallo al cargar el catálogo no tapa el panel (lo encontró la vista previa del 12-nov).
+    assert 'if (main.dataset.view === "admin") return;' in app

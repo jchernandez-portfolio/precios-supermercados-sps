@@ -10,16 +10,20 @@ tamaño oficial:
 - ``atipico``: el grupo compara, pero una o más ofertas quedaron fuera por
   tamaño.
 
-Omite los GTIN que ya tienen fila en ``size_decisions``. Sólo publica datos que
-ya son públicos en el catálogo (cadena, nombre y tamaño publicados).
+Omite los GTIN que ya tienen fila en ``size_decisions`` (y publica cuáles decidió
+la IA, para auditarlos). Cada oferta lleva la foto de su tarjeta en el bucket R2
+(``foto``: la misma que lee Gemini) y de qué súper vino esa foto. Sólo publica
+datos que ya son públicos en el catálogo.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import re
 import sys
-from collections.abc import Mapping, Sequence
+import urllib.request
+from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
@@ -28,7 +32,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from auditar_identidad_productos import ReadOnly  # noqa: E402
+from auditar_identidad_productos import CATALOG_BASE, ReadOnly, load_cities  # noqa: E402
 from medir_reglas_identidad import (  # noqa: E402
     SIZE_REASONS,
     build_profiles,
@@ -45,6 +49,9 @@ QUEUE_FILE = "cola.json"
 MAX_ITEMS = 1500
 UNIT = {"mass_g": "g", "volume_ml": "ml", "ounce": "oz", "count": "unit"}
 _CENT = Decimal("0.01")
+PHOTO_BASE = "https://pub-0dcb2204775c484dbe6681e659eee236.r2.dev/fotos/v2/"
+PHOTO_INDEX_SCHEMA = "super-compras-product-images/v2"
+_PHOTO_NAME = re.compile(r"[0-9a-f]{24}-[0-9a-f]{6,64}")
 
 
 def _amount(value: Decimal) -> str:
@@ -59,11 +66,60 @@ def source_code(profile: ProductProfile) -> str | None:
     return digits if 8 <= len(digits) <= 14 else None
 
 
-def decided_gtins(db: ReadOnly) -> set[str]:
+def decided_gtins(db: ReadOnly) -> dict[str, str]:
+    """GTIN ya decidido → quién lo decidió (``human:<cuenta>`` o ``engine:gemini_auto``)."""
     present = db.query("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (DECISIONS_TABLE,))
     if not present:
-        return set()
-    return {str(row[0]) for row in db.query(f"SELECT canonical_gtin FROM {DECISIONS_TABLE}")}
+        return {}
+    return {str(gtin): str(by) for gtin, by in db.query(f"SELECT canonical_gtin, decided_by FROM {DECISIONS_TABLE}")}
+
+
+# --------------------------------------------------------------------- fotos
+
+
+def photo_names(cities: Mapping[str, Sequence[object]], index: Mapping[str, Mapping[str, object]]
+                ) -> dict[str, tuple[str, str | None]]:
+    """``"walmart:51"`` → (``<tarjeta>-<huella>``, súper de donde salió la foto)."""
+    result: dict[str, tuple[str, str | None]] = {}
+    for rows in cities.values():
+        for row in rows:
+            entry = index.get(row.key)
+            digest = entry.get("h") if isinstance(entry, Mapping) else None
+            name = f"{row.key}-{digest}"
+            if not isinstance(digest, str) or entry.get("none") or not _PHOTO_NAME.fullmatch(name):
+                continue
+            store = entry.get("sm") if isinstance(entry.get("sm"), str) else None
+            for supermarket, product_id in row.offers:
+                result.setdefault(f"{supermarket}:{product_id}", (name, store))
+    return result
+
+
+def photo_url(name: str, size: int = 800) -> str:
+    return f"{PHOTO_BASE}{size}/{name[:2]}/{name}.webp"
+
+
+def attach_photos(items: Sequence[dict[str, object]], photos: Mapping[str, tuple[str, str | None]]) -> int:
+    attached = 0
+    for item in items:
+        for offer in item["offers"]:
+            found = photos.get(str(offer.get("ref")))
+            if found:
+                offer["foto"], offer["foto_de"] = found
+                attached += 1
+    return attached
+
+
+def load_photos(fetch: Callable[[str], object]) -> dict[str, tuple[str, str | None]]:
+    cities = load_cities(fetch, CATALOG_BASE)
+    document = fetch(PHOTO_BASE + "index.json")
+    index = document.get("items") if isinstance(document, Mapping) and document.get("schema") == PHOTO_INDEX_SCHEMA else None
+    return photo_names(cities, index if isinstance(index, Mapping) else {})
+
+
+def _fetch_json(url: str) -> object:
+    request = urllib.request.Request(url, headers={"User-Agent": "precios-sps-cola-tamanos/1.0"})
+    with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310 - URLs fijas https
+        return json.loads(response.read().decode("utf-8"))
 
 
 def offer_size(profile: ProductProfile) -> dict[str, object] | None:
@@ -114,19 +170,26 @@ def queue_items(groups: Sequence[Mapping[str, object]], skip: set[str]) -> list[
     return items[:MAX_ITEMS]
 
 
-def build_queue(db) -> dict[str, object]:
+def build_queue(db, fetch: Callable[[str], object] | None = None) -> dict[str, object]:
     reader = ReadOnly(db)
     products = fetch_all_products(reader)
     specs = fetch_spec_attributes(reader)
     if specs is not None:
         products, _ = apply_source_spec_attributes(products, specs)
     profiles = build_profiles([record for _, record in products])
-    skip = decided_gtins(reader)
-    items = queue_items(resolve_groups(profiles), skip)
+    decided = decided_gtins(reader)
+    items = queue_items(resolve_groups(profiles), set(decided))
+    photos_error = None
+    try:  # sin fotos la cola se publica igual
+        attach_photos(items, load_photos(fetch or _fetch_json))
+    except Exception as error:  # noqa: BLE001
+        photos_error = type(error).__name__
     return {
         "schema": QUEUE_SCHEMA,
         "generated_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "decided": len(skip),
+        "decided": len(decided),
+        "decididas_ia": sorted(gtin for gtin, by in decided.items() if by.startswith("engine:")),
+        "fotos_error": photos_error,
         "counts": {
             "empate": sum(item["kind"] == "empate" for item in items),
             "atipico": sum(item["kind"] == "atipico" for item in items),
