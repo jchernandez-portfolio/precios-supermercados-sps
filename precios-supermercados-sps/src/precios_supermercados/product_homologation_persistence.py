@@ -18,6 +18,8 @@ from .product_identity_v2 import (
     IDENTITY_NORMALIZATION_VERSION,
     build_brand_lexicon,
     canonical_presentation_fields,
+    canonical_presentation_from_signature,
+    converted_ounce,
     homologate_products_v2,
     resolve_brand,
     resolve_presentation_v2,
@@ -200,7 +202,9 @@ def build_homologation_rows(
     brand_lexicon = build_brand_lexicon(records)
     profile_by_source = {profile.record.source_record_id: profile for profile in result.profiles}
     group_by_source: dict[str, tuple[str, tuple[str, ...]]] = {}
+    ounce_readings: dict[str, str] = {}
     for group in result.exact_gtin_groups:
+        ounce_readings.update(group.ounce_readings)
         for source_record_id in group.source_record_ids:
             group_by_source[source_record_id] = (
                 group.comparison_status,
@@ -228,6 +232,14 @@ def build_homologation_rows(
 
         presentation = profile.presentation
         canonical_presentation = canonical_presentation_fields(record, profile.taxonomy)
+        reading = ounce_readings.get(record.source_record_id)
+        if reading is not None:
+            # La onza que su grupo GTIN confirma como líquido o peso pasa a ml/g:
+            # así tiene precio por unidad y vota bien el contenido neto del maestro.
+            presentation = converted_ounce(presentation, reading)
+            canonical_presentation = canonical_presentation_from_signature(
+                canonical_presentation.raw_presentation, presentation, canonical_presentation.status
+            )
         brand_resolution = resolve_brand(record, brand_lexicon=brand_lexicon)
         payload: dict[str, object] = {
             "product_id": product_id,

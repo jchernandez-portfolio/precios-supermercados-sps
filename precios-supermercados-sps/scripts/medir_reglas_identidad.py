@@ -2,7 +2,7 @@
 """Paso 0: medición de reglas de identidad (sólo lectura; no cambia ninguna regla).
 
 Recalcula en memoria, con el mismo código que usa producción
-(``profile_product_v2`` + ``_resolve_gtin_members``, igual que
+(``profile_product_v2`` + ``resolve_gtin_group``, igual que
 ``build_homologation_rows``), los grupos GTIN exactos y responde:
 
 1. cuántos grupos exactos (GTIN en ≥ 2 cadenas) quedan bloqueados
@@ -44,7 +44,6 @@ from auditar_identidad_productos import (  # noqa: E402
     _http_json,
     load_cities,
 )
-from precios_supermercados import product_identity_v2  # noqa: E402
 from precios_supermercados.pricesmart_specs_persistence import PROFILE_ATTRIBUTES_SQL  # noqa: E402
 from precios_supermercados.pricesmart_specs_persistence import TABLE_NAME as SPECS_TABLE  # noqa: E402
 from precios_supermercados.product_homologation import (  # noqa: E402
@@ -52,7 +51,6 @@ from precios_supermercados.product_homologation import (  # noqa: E402
     ProductProfile,
     ounces_as_mass,
     ounces_as_volume,
-    presentations_compatible,
 )
 from precios_supermercados.product_homologation_persistence import (  # noqa: E402
     apply_source_spec_attributes,
@@ -63,7 +61,9 @@ from precios_supermercados.product_identity_v2 import (  # noqa: E402
     _resolve_gtin_members,
     build_brand_lexicon,
     candidate_presentations_compatible,
+    ounce_reading,
     profile_product_v2,
+    resolve_gtin_group,
 )
 
 PAGE = 2000
@@ -146,7 +146,7 @@ def build_profiles(records: Sequence[object]) -> tuple[ProductProfile, ...]:
                         key=lambda profile: profile.record.source_record_id))
 
 
-def resolve_groups(profiles: Sequence[ProductProfile]) -> list[dict[str, object]]:
+def resolve_groups(profiles: Sequence[ProductProfile], *, ounce_rule: bool = True) -> list[dict[str, object]]:
     """Grupos GTIN en ≥ 2 cadenas con la resolución de producción, miembro a miembro."""
     by_gtin: dict[str, list[ProductProfile]] = defaultdict(list)
     for profile in profiles:
@@ -156,7 +156,10 @@ def resolve_groups(profiles: Sequence[ProductProfile]) -> list[dict[str, object]
     for gtin, members in sorted(by_gtin.items()):
         if len({member.record.supermarket_id for member in members}) < 2:
             continue
-        remaining, excluded, group_reasons = _resolve_gtin_members(gtin, list(members))
+        if ounce_rule:  # resolución vigente (regla de onzas con "nunca empeorar")
+            (remaining, excluded, group_reasons), _ = resolve_gtin_group(gtin, list(members))
+        else:  # como era antes de la regla de onzas
+            remaining, excluded, group_reasons = _resolve_gtin_members(gtin, list(members))
         ready = len({member.record.supermarket_id for member in remaining}) >= 2
         groups.append({
             "gtin": gtin, "members": members, "remaining": remaining,
@@ -219,47 +222,8 @@ def simulate(group: Mapping[str, object], readmit_reasons: frozenset[str]) -> di
 # ------------------------------------------------- regla de onzas (simulada)
 
 def ounce_basis(left: PresentationSignature | None, right: PresentationSignature | None) -> str | None:
-    """``fluid``/``mass`` si una onza sin convertir coincide con el tamaño métrico del otro.
-
-    Usa las funciones reales de conversión (``ounces_as_volume`` 29.5735 ml,
-    ``ounces_as_mass`` 28.3495 g) y ``presentations_compatible`` (tolerancia
-    imperial 2 % o 1.5 unidades). Sólo aplica cuando un lado es onza sin convertir y
-    el otro g o ml con el mismo número de unidades; nunca cambia una onza que el
-    sistema ya convirtió por su categoría.
-    """
-    if left is None or right is None:
-        return None
-    for ounce, metric in ((left, right), (right, left)):
-        if ounce.dimension != "ounce" or metric.dimension not in {"mass_g", "volume_ml"}:
-            continue
-        if ounce.pack_count != metric.pack_count:
-            return None
-        if metric.dimension == "volume_ml" and presentations_compatible(ounces_as_volume(ounce), metric):
-            return "fluid"
-        if metric.dimension == "mass_g" and presentations_compatible(ounces_as_mass(ounce), metric):
-            return "mass"
-    return None
-
-
-def resolve_groups_with_ounce_rule(profiles: Sequence[ProductProfile]) -> list[dict[str, object]]:
-    """Misma resolución de producción, quitando el conflicto de tamaño que la onza explica.
-
-    Sólo en memoria y sólo durante esta llamada: envuelve ``_gtin_pair_conflicts``
-    (lo que haría la regla) y lo restaura siempre.
-    """
-    original = product_identity_v2._gtin_pair_conflicts
-
-    def with_ounce_rule(left: ProductProfile, right: ProductProfile) -> set[str]:
-        reasons = original(left, right)
-        if "cross_source_presentation_conflict" in reasons and ounce_basis(left.presentation, right.presentation):
-            reasons = set(reasons) - {"cross_source_presentation_conflict"}
-        return reasons
-
-    product_identity_v2._gtin_pair_conflicts = with_ounce_rule
-    try:
-        return resolve_groups(profiles)
-    finally:
-        product_identity_v2._gtin_pair_conflicts = original
+    """Lectura de la onza (``fluid``/``mass``): la misma función de producción."""
+    return ounce_reading(left, right)
 
 
 def _converted_text(profile: ProductProfile, basis: str | None) -> str | None:
@@ -473,8 +437,8 @@ def measure(db, fetch: Callable[[str], object], base: str = CATALOG_BASE) -> tup
             "ofertas_que_vuelven_a_su_tarjeta": rejoined_offers,
         }
 
-    # Regla de onzas (simulada en memoria, con el código real de resolución).
-    ounce_summary, ounce_lines, ounce_sets = simulate_ounce_rule(groups, resolve_groups_with_ounce_rule(profiles),
+    # Efecto de la regla de onzas: resolución sin la regla contra la vigente.
+    ounce_summary, ounce_lines, ounce_sets = simulate_ounce_rule(resolve_groups(profiles, ounce_rule=False), groups,
                                                                  product_of)
     merge_sets["paso_1_y_regla_de_onzas"] = ounce_sets
 
