@@ -306,6 +306,9 @@ main { outline: none; }
 .rv-picks { display: flex; flex-wrap: wrap; gap: 6px; }
 .rv-pick { padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); font-weight: 600; cursor: pointer; }
 .rv-pick[aria-pressed="true"] { border-color: var(--green); background: var(--green-soft); }
+.rv-ai { border-color: #7C3AED; background: #F5F0FF; }
+.rv-ai[aria-pressed="true"] { border-color: #7C3AED; background: #E9DDFF; }
+.rv-ai-note { display: inline-flex; align-items: center; padding: 6px 10px; border: 1px dashed var(--line); border-radius: 8px; color: var(--muted); font-size: .85rem; cursor: help; }
 .rv-manual { display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 8px; }
 .rv-different { display: flex; gap: 8px; align-items: center; font-size: .9rem; color: var(--muted); }
 .rv-sent { margin: 0; color: var(--green); font-weight: 600; font-size: .9rem; }

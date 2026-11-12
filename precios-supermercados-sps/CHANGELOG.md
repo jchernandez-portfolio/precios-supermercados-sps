@@ -7,6 +7,7 @@ número son cambios directos. El detalle de cada incidente vive en
 
 ## 2026-11-12
 
+- Panel de tamaños: sugerencia de IA de visión (Gemini) por código, "🤖 No legible" cuando la foto no sirve.
 - Panel de tamaños: código visible con "Copiar", búsquedas de 14/13/12 dígitos marcando la forma de cada súper y tamaños de la cola redondeados a 2 decimales.
 - Panel de revisión de tamaños (`#/admin/revision`): tabla `size_decisions`, workflow que guarda las decisiones del panel y relanza el refresco, cola pública `revision-tamanos/cola.json` y motor que agrupa sólo las ofertas con el tamaño oficial.
 - #66 Prueba de enriquecimiento con Open Food Facts (sólo lectura).

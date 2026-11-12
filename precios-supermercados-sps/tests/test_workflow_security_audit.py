@@ -117,6 +117,7 @@ base.EXPECTED_TRIGGERS[base.SIZE_QUEUE_WORKFLOW] = {"workflow_run", "workflow_di
 base.ALLOWED_SECRET_REFERENCES[base.SIZE_QUEUE_WORKFLOW] = {
     base.TURSO_DATABASE_URL_SECRET,
     base.TURSO_AUTH_TOKEN_SECRET,
+    "GEMINI_API_KEY",
 }
 SIZE_QUEUE_CHECKOUTS = [
     {"ref": "main", "path": "source", "persist-credentials": "false"},
@@ -774,3 +775,14 @@ def test_size_decisions_workflow_is_owner_only_and_never_inlines_the_payload() -
             assert "aplicar_decisiones_tamano.py" in str(step["run"])
     raw = path.read_text(encoding="utf-8")
     assert "gh workflow run precios-supermercados-sps-homologation-refresh.yml" in raw
+
+
+def test_size_queue_gives_the_gemini_key_only_to_the_suggestion_step() -> None:
+    path = base.WORKFLOW_DIR / base.SIZE_QUEUE_WORKFLOW
+    workflow = base.load_workflow(path)
+    with_key = [step for step in base.steps(workflow) if "GEMINI_API_KEY" in str(step.get("env", {}))]
+    assert [step["name"] for step in with_key] == ["Sugerencias de tamaño con IA (Gemini)"]
+    step = with_key[0]
+    assert "sugerir_tamanos_ia.py" in step["run"] and "inputs." not in step["run"]
+    assert step["continue-on-error"] == "true"  # sin IA la cola se publica igual
+    assert "secrets.GEMINI_API_KEY" not in path.read_text(encoding="utf-8").split("Sugerencias de tamaño")[0]

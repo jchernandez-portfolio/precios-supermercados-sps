@@ -16,6 +16,7 @@ súper y fija el **tamaño oficial**; el motor aplica la regla en cada refresco:
 | `src/precios_supermercados/size_decisions.py` | Contrato, unidades (lb → g; la onza queda como onza) y comparación con el oficial (contenido total, 2 % o 1.5 unidades, onza líquida o de peso). |
 | `product_identity_v2.resolve_gtin_group(..., decision)` | Con decisión de tamaño: ofertas distintas → `human_size_decision_mismatch`; con "no es el mismo producto" → `human_different_products` (el GTIN no se agrupa). |
 | `precios-supermercados-sps-size-queue.yml` + `scripts/exportar_cola_tamanos.py` | Tras cada refresco recalcula los grupos (sólo SELECT) y publica `cola.json` en la rama pública `revision-tamanos`: `empate` (grupo bloqueado) y `atipico` (una cadena fuera). Omite los GTIN ya decididos. |
+| `scripts/sugerir_tamanos_ia.py` (paso del workflow de la cola) | Gemini (alias `gemini-flash-latest`; si no existe, el Flash numerado más nuevo) lee el contenido neto en hasta 3 fotos públicas del código. Sugiere sólo si es legible, del mismo producto y coincide con algún tamaño publicado; si no, "No legible". Guarda las respuestas en `ia-tamanos.json` (rama `revision-tamanos`) y sólo consulta lo nuevo; se detiene ante 429 o al agotar el tiempo (25 min por corrida; a mano hasta 120). La llave `GEMINI_API_KEY` sólo entra a ese paso y viaja en el encabezado `x-goog-api-key`. |
 
 Cambiar de opinión: se envía otra decisión del mismo GTIN; reemplaza la anterior.
 
