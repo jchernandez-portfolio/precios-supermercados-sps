@@ -257,4 +257,16 @@ def test_queue_lists_ties_and_outliers_and_skips_decided_gtins() -> None:
     assert cholula["colonial"]["excluded"] is True and cholula["walmart"]["excluded"] is False
     assert (cholula["comisariato_los_andes"]["value"], cholula["comisariato_los_andes"]["unit"]) == ("5", "oz")
     assert cholula["paiz"]["size"] == "150 g"
+    assert cholula["paiz"]["code"] == "0049733830119"  # forma publicada por el súper
     assert [item["gtin"] for item in cola.queue_items(groups, skip={MCCORMICK})] == [CHOLULA]
+
+
+def test_queue_sizes_are_rounded_to_two_decimals() -> None:
+    rows = [
+        (21, "colonial", "Harina Pan 2.2 lb", "PAN", None, "Harinas", "0739907000010"),
+        (22, "la_colonia", "Harina Pan De Maiz Blanco 2 Lb", "PAN", None, "Harinas", "0739907000010"),
+    ]
+    groups = resolve_groups(build_profiles([record for _, record in records_from_product_rows(rows)]))
+    sizes = {offer["store"]: (offer["value"], offer["size"]) for item in cola.queue_items(groups, skip=set())
+             for offer in item["offers"]}
+    assert sizes == {"colonial": ("997.9", "997.9 g"), "la_colonia": ("907.18", "907.18 g")}
