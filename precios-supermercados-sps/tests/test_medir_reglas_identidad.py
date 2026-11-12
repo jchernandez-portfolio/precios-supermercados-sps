@@ -44,16 +44,18 @@ class Backend:
         return [tuple(row) for row in self.connection.execute(sql, tuple(args)).fetchall()]
 
 
-def database(path: Path, stored: dict[int, str] | None = None) -> Backend:
+def database(path: Path, stored: dict[int, str] | None = None, products=None) -> Backend:
     con = sqlite3.connect(path)
     con.executescript("""
         CREATE TABLE products (product_id INTEGER PRIMARY KEY, supermarket_id TEXT NOT NULL, name TEXT NOT NULL,
             brand TEXT, presentation TEXT, category TEXT, ean TEXT);
         CREATE TABLE product_homologation_profiles (product_id INTEGER PRIMARY KEY, comparison_status TEXT NOT NULL);
     """)
-    con.executemany("INSERT INTO products VALUES (?,?,?,?,?,?,?)", PRODUCTS)
+    con.executemany("INSERT INTO products VALUES (?,?,?,?,?,?,?)", products or PRODUCTS)
     statuses = {1: "review_required", 2: "review_required", 3: "ready", 4: "ready", 5: "review_required",
                 6: "review_required", 7: "review_required", 8: "single_source"} | (stored or {})
+    if products is not None:
+        statuses = stored or {}
     con.executemany("INSERT INTO product_homologation_profiles VALUES (?,?)", sorted(statuses.items()))
     con.commit()
     con.close()
@@ -147,3 +149,48 @@ def test_outputs(tmp_path: Path) -> None:
     with (tmp_path / "out" / "grupos-reglas.csv").open(encoding="utf-8") as handle:
         read = list(csv.DictReader(handle))
     assert list(read[0]) == list(rules.CSV_COLUMNS) and len(read) == 7
+
+
+OUNCE_PRODUCTS = [
+    # Kraft Ranch: 8 oz contra 237 ml (8 × 29.57 = 236.6 ml) → hoy bloqueado; con la regla, listo.
+    (21, "la_colonia", "Aderezo Kraft Ranch Classic 8 Oz", "Kraft", "8 Oz", "Aderezos", "0021000643592"),
+    (22, "walmart", "Aderezo Kraft Ranch - 237 ml", "Kraft", None, "Aderezos", "0021000643592"),
+    # 16.9 oz contra 300 ml: ninguna lectura coincide → sigue bloqueado.
+    (23, "comisariato_los_andes", "Lee kum kee salsa soya 16.9 oz", "Lee Kum Kee", "UN", "Salsas", "0078895128895"),
+    (24, "walmart", "Salsa Lee Kum Kee Soya 300 ml", "Lee Kum Kee", None, "Salsas", "0078895128895"),
+]
+
+
+def test_ounce_rule_resolves_only_matching_ounces(tmp_path: Path) -> None:
+    stored = {21: "review_required", 22: "review_required", 23: "review_required", 24: "review_required"}
+    backend = database(tmp_path / "db.sqlite", stored, OUNCE_PRODUCTS)
+    summary, _ = rules.measure(backend, catalog().__getitem__, BASE)
+    assert summary["verificacion_contra_perfiles_guardados"] == {"coincide": 4}
+    ounce = summary["simulacion_regla_de_onzas"]
+    assert ounce["grupos_con_onza_y_conflicto_de_tamano"] == 2
+    assert ounce["bloqueados_a_listos"] == 1 and ounce["siguen_igual"] == 1
+    assert ounce["base_fluid"] == 1 and ounce["productos_en_onzas_que_ganan_precio_unitario"] == 1
+    assert "grupos_que_empeoran" not in ounce
+    lines = summary["_lineas_onzas"]
+    assert {(line["product_id"], line["presentacion_convertida"]) for line in lines} == {(21, "236.6 ml"), (22, None)}
+    # La simulación no deja la función de producción cambiada.
+    assert rules.product_identity_v2._gtin_pair_conflicts.__name__ == "_gtin_pair_conflicts"
+    rules.write_outputs(tmp_path / "out", summary, [])
+    with (tmp_path / "out" / "onzas-grupos.csv").open(encoding="utf-8") as handle:
+        assert len(list(csv.DictReader(handle))) == 2
+    assert "_lineas_onzas" not in json.loads((tmp_path / "out" / "medicion-reglas.json").read_text(encoding="utf-8"))
+
+
+def test_ounce_basis_uses_real_conversions() -> None:
+    from decimal import Decimal
+
+    from precios_supermercados.product_homologation import PresentationSignature
+
+    def sig(dimension, total, pack=1):
+        return PresentationSignature(dimension=dimension, total_base=Decimal(total), pack_count=pack,
+                                     unit_amount_base=Decimal(total) / pack)
+    assert rules.ounce_basis(sig("ounce", "8"), sig("volume_ml", "237")) == "fluid"
+    assert rules.ounce_basis(sig("mass_g", "680"), sig("ounce", "24")) == "mass"
+    assert rules.ounce_basis(sig("ounce", "8"), sig("mass_g", "241")) is None  # 226.8 g: 6 % de diferencia
+    assert rules.ounce_basis(sig("ounce", "16", 2), sig("volume_ml", "473")) is None  # distinto paquete
+    assert rules.ounce_basis(sig("mass_g", "100"), sig("volume_ml", "100")) is None  # sin onzas no aplica

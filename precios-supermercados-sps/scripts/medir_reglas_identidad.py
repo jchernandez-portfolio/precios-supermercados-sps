@@ -29,6 +29,7 @@ import sys
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -43,9 +44,16 @@ from auditar_identidad_productos import (  # noqa: E402
     _http_json,
     load_cities,
 )
+from precios_supermercados import product_identity_v2  # noqa: E402
 from precios_supermercados.pricesmart_specs_persistence import PROFILE_ATTRIBUTES_SQL  # noqa: E402
 from precios_supermercados.pricesmart_specs_persistence import TABLE_NAME as SPECS_TABLE  # noqa: E402
-from precios_supermercados.product_homologation import ProductProfile  # noqa: E402
+from precios_supermercados.product_homologation import (  # noqa: E402
+    PresentationSignature,
+    ProductProfile,
+    ounces_as_mass,
+    ounces_as_volume,
+    presentations_compatible,
+)
 from precios_supermercados.product_homologation_persistence import (  # noqa: E402
     apply_source_spec_attributes,
     records_from_product_rows,
@@ -70,6 +78,10 @@ ASKED_REASONS = (
     "product_type_conflict",
     "restricted_gtin_outside_shared_master",
     "ambiguous_multipack_presentation",
+)
+OUNCE_CSV_COLUMNS = (
+    "gtin", "cambio", "base_onza", "supermercado", "product_id", "nombre", "presentacion",
+    "presentacion_convertida", "rol_antes", "rol_con_regla",
 )
 CSV_COLUMNS = (
     "gtin", "estado_actual", "estado_simulado", "tamano", "rol", "supermercado", "product_id",
@@ -202,6 +214,112 @@ def simulate(group: Mapping[str, object], readmit_reasons: frozenset[str]) -> di
         "readmitted": readmitted, "kept": kept, "grouped": len(chains) >= 2,
         "size": "mayoria" if majority else "empate_o_sin_tamano",
     }
+
+
+# ------------------------------------------------- regla de onzas (simulada)
+
+def ounce_basis(left: PresentationSignature | None, right: PresentationSignature | None) -> str | None:
+    """``fluid``/``mass`` si una onza sin convertir coincide con el tamaño métrico del otro.
+
+    Usa las funciones reales de conversión (``ounces_as_volume`` 29.5735 ml,
+    ``ounces_as_mass`` 28.3495 g) y ``presentations_compatible`` (tolerancia
+    imperial 2 % o 1.5 unidades). Sólo aplica cuando un lado es onza sin convertir y
+    el otro g o ml con el mismo número de unidades; nunca cambia una onza que el
+    sistema ya convirtió por su categoría.
+    """
+    if left is None or right is None:
+        return None
+    for ounce, metric in ((left, right), (right, left)):
+        if ounce.dimension != "ounce" or metric.dimension not in {"mass_g", "volume_ml"}:
+            continue
+        if ounce.pack_count != metric.pack_count:
+            return None
+        if metric.dimension == "volume_ml" and presentations_compatible(ounces_as_volume(ounce), metric):
+            return "fluid"
+        if metric.dimension == "mass_g" and presentations_compatible(ounces_as_mass(ounce), metric):
+            return "mass"
+    return None
+
+
+def resolve_groups_with_ounce_rule(profiles: Sequence[ProductProfile]) -> list[dict[str, object]]:
+    """Misma resolución de producción, quitando el conflicto de tamaño que la onza explica.
+
+    Sólo en memoria y sólo durante esta llamada: envuelve ``_gtin_pair_conflicts``
+    (lo que haría la regla) y lo restaura siempre.
+    """
+    original = product_identity_v2._gtin_pair_conflicts
+
+    def with_ounce_rule(left: ProductProfile, right: ProductProfile) -> set[str]:
+        reasons = original(left, right)
+        if "cross_source_presentation_conflict" in reasons and ounce_basis(left.presentation, right.presentation):
+            reasons = set(reasons) - {"cross_source_presentation_conflict"}
+        return reasons
+
+    product_identity_v2._gtin_pair_conflicts = with_ounce_rule
+    try:
+        return resolve_groups(profiles)
+    finally:
+        product_identity_v2._gtin_pair_conflicts = original
+
+
+def _converted_text(profile: ProductProfile, basis: str | None) -> str | None:
+    if profile.presentation is None or profile.presentation.dimension != "ounce" or basis is None:
+        return None
+    converted = (ounces_as_volume if basis == "fluid" else ounces_as_mass)(profile.presentation)
+    total = converted.total_base.quantize(Decimal("0.1"))
+    return f"{total} {'ml' if basis == 'fluid' else 'g'}"
+
+
+def simulate_ounce_rule(groups: Sequence[Mapping[str, object]], ounce_groups: Sequence[Mapping[str, object]],
+                        product_of: Mapping[str, int]) -> tuple[dict[str, object], list[dict[str, object]], list[frozenset[str]]]:
+    """Compara grupo por grupo la resolución vigente con la de la regla de onzas."""
+    after = {str(group["gtin"]): group for group in ounce_groups}
+    stats: Counter = Counter()
+    lines: list[dict[str, object]] = []
+    merge_sets: list[frozenset[str]] = []
+    unit_price_offers = 0
+    for group in groups:
+        gtin = str(group["gtin"])
+        new = after[gtin]
+        members = group["members"]
+        has_ounce = any(m.presentation is not None and m.presentation.dimension == "ounce" for m in members)
+        size_conflict = "cross_source_presentation_conflict" in group["group_reasons"] or any(
+            "cross_source_presentation_conflict" in reasons for reasons in group["excluded"].values())
+        if has_ounce and size_conflict:
+            stats["grupos_con_onza_y_conflicto_de_tamano"] += 1
+            stats[f"de_esos_{group['status']}"] += 1
+        before_in = {m.record.source_record_id for m in group["remaining"]}
+        after_in = {m.record.source_record_id for m in new["remaining"]}
+        unblocked = group["status"] == "review_required" and new["status"] == "ready"
+        rejoined = group["status"] == "ready" and new["status"] == "ready" and after_in > before_in
+        if new["status"] == "review_required" and group["status"] == "ready":
+            stats["grupos_que_empeoran"] += 1  # no debería pasar: la regla sólo quita conflictos
+        if not (unblocked or rejoined):
+            if has_ounce and size_conflict:
+                stats["siguen_igual"] += 1
+            continue
+        stats["bloqueados_a_listos" if unblocked else "listos_que_recuperan_ofertas"] += 1
+        stats["ofertas_que_entran_a_comparar"] += len(after_in - before_in)
+        merge_sets.append(frozenset(after_in))
+        bases = {ounce_basis(a.presentation, b.presentation) for a in new["remaining"] for b in new["remaining"]} - {None}
+        basis = next(iter(bases)) if len(bases) == 1 else None
+        stats[f"base_{basis or 'mixta'}"] += 1
+        gained = [m for m in new["remaining"] if m.presentation is not None and m.presentation.dimension == "ounce"]
+        if basis:
+            unit_price_offers += len(gained)
+            stats["grupos_con_precio_unitario_nuevo"] += 1 if gained else 0
+        for member in members:
+            source_id = member.record.source_record_id
+            lines.append({
+                "gtin": gtin, "cambio": "bloqueado_a_listo" if unblocked else "recupera_ofertas",
+                "base_onza": basis or "mixta", "supermercado": member.record.supermarket_id,
+                "product_id": product_of[source_id], "nombre": member.record.source_name,
+                "presentacion": _presentation_text(member), "presentacion_convertida": _converted_text(member, basis),
+                "rol_antes": "comparable" if source_id in before_in else "fuera",
+                "rol_con_regla": "comparable" if source_id in after_in else "fuera",
+            })
+    summary = dict(sorted(stats.items())) | {"productos_en_onzas_que_ganan_precio_unitario": unit_price_offers}
+    return summary, lines, merge_sets
 
 
 # ------------------------------------------------------------ tarjetas
@@ -355,6 +473,11 @@ def measure(db, fetch: Callable[[str], object], base: str = CATALOG_BASE) -> tup
             "ofertas_que_vuelven_a_su_tarjeta": rejoined_offers,
         }
 
+    # Regla de onzas (simulada en memoria, con el código real de resolución).
+    ounce_summary, ounce_lines, ounce_sets = simulate_ounce_rule(groups, resolve_groups_with_ounce_rule(profiles),
+                                                                 product_of)
+    merge_sets["paso_1_y_regla_de_onzas"] = ounce_sets
+
     rows_by_city = load_cities(fetch, base)
     cards = {city: simulate_cards(rows, merge_sets) for city, rows in rows_by_city.items()}
 
@@ -371,15 +494,22 @@ def measure(db, fetch: Callable[[str], object], base: str = CATALOG_BASE) -> tup
         "motivos": reasons_table,
         "combinaciones_de_motivos_en_bloqueados": dict(combos.most_common(15)),
         "simulacion_paso_3": simulation,
+        "simulacion_regla_de_onzas": ounce_summary,
         "tarjetas_por_ciudad": cards,
         "sentencias_ejecutadas": reader.statements,
+        "_lineas_onzas": ounce_lines,
     }
     return summary, lines
 
 
 def write_outputs(output: Path, summary: Mapping[str, object], lines: Sequence[Mapping[str, object]]) -> None:
     output.mkdir(parents=True, exist_ok=True)
-    (output / "medicion-reglas.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    public = {key: value for key, value in summary.items() if not key.startswith("_")}
+    (output / "medicion-reglas.json").write_text(json.dumps(public, ensure_ascii=False, indent=2), encoding="utf-8")
+    with (output / "onzas-grupos.csv").open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=OUNCE_CSV_COLUMNS)
+        writer.writeheader()
+        writer.writerows(summary.get("_lineas_onzas") or ())
     with (output / "grupos-reglas.csv").open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=CSV_COLUMNS)
         writer.writeheader()
@@ -396,7 +526,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     backend = TursoBackend(os.environ.get("TURSO_DATABASE_URL", ""), os.environ.get("TURSO_AUTH_TOKEN", ""))
     summary, lines = measure(backend, _http_json, args.catalog_base)
     write_outputs(args.output_dir, summary, lines)
-    print(json.dumps(summary, ensure_ascii=False, indent=1))
+    print(json.dumps({key: value for key, value in summary.items() if not key.startswith("_")},
+                     ensure_ascii=False, indent=1))
     return 0
 
 
