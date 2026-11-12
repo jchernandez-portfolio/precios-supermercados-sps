@@ -25,6 +25,7 @@ from .product_identity_v2 import (
     resolve_presentation_v2,
     source_brand_role,
 )
+from .size_decisions import SizeDecision
 
 NORMALIZATION_VERSION = IDENTITY_NORMALIZATION_VERSION
 TABLE_NAME = "product_homologation_profiles"
@@ -180,8 +181,13 @@ def build_homologation_rows(
     *,
     updated_at_utc: str | None = None,
     normalization_version: str = NORMALIZATION_VERSION,
+    size_decisions: Mapping[str, SizeDecision] | None = None,
 ) -> tuple[ProductHomologationRow, ...]:
-    """Convierte productos fuente en filas derivadas deterministas."""
+    """Convierte productos fuente en filas derivadas deterministas.
+
+    ``size_decisions`` (GTIN → decisión humana del panel de revisión) fija el
+    tamaño oficial de los grupos en desacuerdo.
+    """
 
     entries = tuple(products)
     if not entries:
@@ -198,7 +204,7 @@ def build_homologation_rows(
         raise ProductHomologationPersistenceError("normalization_version_invalid")
 
     records = tuple(record for _, record in entries)
-    result = homologate_products_v2(records)
+    result = homologate_products_v2(records, size_decisions=dict(size_decisions or {}))
     brand_lexicon = build_brand_lexicon(records)
     profile_by_source = {profile.record.source_record_id: profile for profile in result.profiles}
     group_by_source: dict[str, tuple[str, tuple[str, ...]]] = {}

@@ -777,3 +777,76 @@ export function migrateCartLines(lines, known, legacy) {
 export function saveCart(lines, city) {
   try { localStorage.setItem(cartKey(city), JSON.stringify(lines)); } catch { /* modo privado: sin guardar */ }
 }
+
+// ------------------------------------------------------------------ panel de revisión de tamaños
+// La cola es pública (rama `revision-tamanos`); el envío lanza el workflow
+// "Guardar decisiones de tamaño" con el token fino de GitHub del dueño. El token
+// sólo viaja en el encabezado Authorization a api.github.com (nunca en la URL).
+export const SIZE_QUEUE_URL =
+  "https://raw.githubusercontent.com/jchernandez-portfolio/precios-supermercados-sps/revision-tamanos/cola.json";
+export const SIZE_DECISIONS_DISPATCH_URL =
+  "https://api.github.com/repos/jchernandez-portfolio/precios-supermercados-sps/actions/workflows/precios-supermercados-sps-size-decisions.yml/dispatches";
+export const SIZE_DECISIONS_RUNS_URL =
+  "https://github.com/jchernandez-portfolio/precios-supermercados-sps/actions/workflows/precios-supermercados-sps-size-decisions.yml";
+export const SIZE_DECISIONS_SCHEMA = "rpi-size-decisions/v1";
+export const SIZE_UNITS = ["g", "ml", "oz", "lb", "unit"];
+const SIZE_MAX_DECISIONS = 300;
+const SIZE_MAX_INPUT_CHARS = 60000;
+const GITHUB_TOKEN_PATTERN = /^(github_pat_|ghp_)[A-Za-z0-9_]{20,255}$/;
+
+export async function loadSizeQueue(url = SIZE_QUEUE_URL) {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) throw new Error(response.status === 404 ? "Todavía no hay cola publicada." : `No pudimos leer la cola (${response.status}).`);
+  const queue = await response.json();
+  if (queue?.schema !== "rpi-size-queue/v1" || !Array.isArray(queue.items)) throw new Error("La cola tiene un formato desconocido.");
+  return queue;
+}
+
+// Decisiones del panel → cuerpo del workflow_dispatch. Falla antes de enviar si
+// algo no cumple lo que valida el workflow (mismo contrato, más estricto allá).
+export function sizeDecisionsBody(decisions) {
+  const clean = [];
+  for (const item of decisions) {
+    if (!/^\d{8,14}$/.test(String(item.gtin || ""))) throw new Error(`Código inválido: ${item.gtin}`);
+    const note = String(item.note || "").trim().slice(0, 200);
+    if (item.decision === "different_products") {
+      clean.push({ gtin: item.gtin, decision: "different_products", ...(note ? { note } : {}) });
+    } else if (item.decision === "size") {
+      const value = String(item.value ?? "").trim().replace(",", ".");
+      if (!(Number(value) > 0) || !SIZE_UNITS.includes(item.unit)) throw new Error(`Tamaño incompleto en ${item.gtin}`);
+      clean.push({ gtin: item.gtin, decision: "size", value, unit: item.unit, ...(note ? { note } : {}) });
+    }
+  }
+  if (!clean.length) throw new Error("No hay decisiones para enviar.");
+  if (clean.length > SIZE_MAX_DECISIONS) throw new Error(`Envía como máximo ${SIZE_MAX_DECISIONS} decisiones a la vez.`);
+  const text = JSON.stringify({ schema: SIZE_DECISIONS_SCHEMA, decisions: clean });
+  if (text.length > SIZE_MAX_INPUT_CHARS) throw new Error("El envío es muy grande; divídelo en dos.");
+  return { ref: "main", inputs: { decisions: text } };
+}
+
+export async function sendSizeDecisions(token, decisions) {
+  const key = String(token || "").trim();
+  if (!GITHUB_TOKEN_PATTERN.test(key)) throw new Error("La llave de GitHub no tiene el formato esperado (github_pat_…).");
+  const body = sizeDecisionsBody(decisions);
+  const response = await fetch(SIZE_DECISIONS_DISPATCH_URL, {
+    method: "POST",
+    cache: "no-store",
+    credentials: "omit",
+    referrerPolicy: "no-referrer",
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+    body: JSON.stringify(body),
+  });
+  if (response.status === 204) return { sent: JSON.parse(body.inputs.decisions).decisions.length };
+  const reasons = {
+    401: "GitHub no aceptó la llave (vencida o mal copiada).",
+    403: "La llave no tiene permiso “Actions: read and write” en este repositorio.",
+    404: "GitHub no encontró el workflow con esta llave (¿repositorio correcto?).",
+    422: "GitHub rechazó el envío (el workflow debe estar en main).",
+  };
+  throw new Error(reasons[response.status] || `GitHub respondió ${response.status}.`);
+}

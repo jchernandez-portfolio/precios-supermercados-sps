@@ -48,6 +48,7 @@ from .product_homologation import (
     profile_product,
     resolve_presentation,
 )
+from .size_decisions import SizeDecision, match_official
 
 # v2.8 (2026-11-12): regla de onzas en grupos GTIN (con "nunca empeorar") y la
 # onza sin convertir de esos grupos pasa a g/ml para tener precio por unidad.
@@ -1987,9 +1988,9 @@ def _sku_gtin_brand_contradiction(left: ProductProfile, right: ProductProfile) -
     return SequenceMatcher(None, left_brand, right_brand).ratio() < 0.75
 
 
-def _member_intrinsic_conflicts(member: ProductProfile) -> set[str]:
+def _member_intrinsic_conflicts(member: ProductProfile, *, size_decided: bool = False) -> set[str]:
     reasons: set[str] = set()
-    if member.presentation_status == "conflict":
+    if member.presentation_status == "conflict" and not size_decided:
         reasons.add("source_presentation_conflict")
     if member.presentation_status == "ambiguous_multipack":
         reasons.add("ambiguous_multipack_presentation")
@@ -2001,6 +2002,7 @@ def _resolve_gtin_members(
     members: list[ProductProfile],
     *,
     ounce_rule: bool = False,
+    size_decided: bool = False,
 ) -> tuple[list[ProductProfile], dict[str, set[str]], set[str]]:
     """Separa miembros comparables de los que tienen un conflicto atribuible.
 
@@ -2038,7 +2040,7 @@ def _resolve_gtin_members(
     remaining = [member for member in remaining if member.record.source_record_id not in excluded]
 
     for member in remaining:
-        intrinsic = _member_intrinsic_conflicts(member)
+        intrinsic = _member_intrinsic_conflicts(member, size_decided=size_decided)
         if intrinsic:
             exclude(member, intrinsic)
     remaining = [member for member in remaining if member.record.source_record_id not in excluded]
@@ -2049,6 +2051,9 @@ def _resolve_gtin_members(
         for index, left in enumerate(remaining):
             for right in remaining[index + 1 :]:
                 reasons = _gtin_pair_conflicts(left, right, ounce_rule=ounce_rule)
+                if size_decided:
+                    # El tamaño lo fijó una persona: se compara contra él más abajo.
+                    reasons.discard("cross_source_presentation_conflict")
                 if not reasons:
                     continue
                 for member in (left, right):
@@ -2073,9 +2078,52 @@ def _chains(members: Iterable[ProductProfile]) -> int:
     return len({member.record.supermarket_id for member in members})
 
 
+def _resolve_with_decision(
+    gtin: str,
+    members: list[ProductProfile],
+    decision: SizeDecision,
+) -> tuple[tuple[list[ProductProfile], dict[str, set[str]], set[str]], dict[str, str]]:
+    """Grupo con decisión humana (``size_decisions``).
+
+    ``different_products``: código reutilizado, nadie se agrupa. ``size``: los demás
+    bloqueos (tipo, sabor, código derivado de SKU, multipack ambiguo...) siguen
+    igual; el tamaño ya no se discute entre cadenas sino contra el oficial: las
+    ofertas que coinciden forman el grupo y las demás quedan aisladas.
+    """
+    if decision.decision == "different_products":
+        excluded = {member.record.source_record_id: {"human_different_products"} for member in members}
+        return ([], excluded, {"human_different_products"}), {}
+    remaining, excluded, _ = _resolve_gtin_members(gtin, members, size_decided=True)
+    official = decision.official
+    assert official is not None
+    kept: list[ProductProfile] = []
+    readings: dict[str, str] = {}
+    for member in remaining:
+        matches, reading = match_official(official, member.presentation)
+        source_id = member.record.source_record_id
+        if not matches:
+            excluded.setdefault(source_id, set()).add("human_size_decision_mismatch")
+            continue
+        kept.append(member)
+        if reading is not None and member.presentation is not None and member.presentation.dimension == "ounce":
+            readings[source_id] = reading
+    if _chains(kept) < 2:
+        return (kept, excluded, set().union(*excluded.values()) if excluded else set()), {}
+    # Oficial en onzas ("5 oz"): la lectura de cada onza la dan los compañeros en g/ml.
+    for member in kept:
+        source_id = member.record.source_record_id
+        if source_id in readings or member.presentation is None or member.presentation.dimension != "ounce":
+            continue
+        found = {ounce_reading(member.presentation, other.presentation) for other in kept if other is not member} - {None}
+        if len(found) == 1:
+            readings[source_id] = next(iter(found))
+    return (kept, excluded, set()), readings
+
+
 def resolve_gtin_group(
     gtin: str,
     members: list[ProductProfile],
+    decision: SizeDecision | None = None,
 ) -> tuple[tuple[list[ProductProfile], dict[str, set[str]], set[str]], dict[str, str]]:
     """Resolución vigente de un grupo GTIN: regla de onzas con "nunca empeorar".
 
@@ -2084,7 +2132,11 @@ def resolve_gtin_group(
     Cholula: 150 ml + 5 oz contra 150 g + 150 g es un empate que hoy se "gana" sólo
     porque la onza chocaba con todos). Devuelve además, para el grupo comparable,
     la lectura de cada onza (``fluid``/``mass``) que confirman sus compañeros.
+
+    Una decisión humana de ``size_decisions`` manda sobre ambas resoluciones.
     """
+    if decision is not None:
+        return _resolve_with_decision(gtin, members, decision)
     current = _resolve_gtin_members(gtin, members)
     if not any(member.presentation is not None and member.presentation.dimension == "ounce" for member in members):
         return current, {}
@@ -2115,7 +2167,10 @@ def converted_ounce(signature: PresentationSignature | None, reading: str | None
     return ounces_as_volume(signature) if reading == "fluid" else ounces_as_mass(signature)
 
 
-def _exact_groups(profiles: tuple[ProductProfile, ...]) -> tuple[ExactGtinGroup, ...]:
+def _exact_groups(
+    profiles: tuple[ProductProfile, ...],
+    size_decisions: dict[str, SizeDecision] | None = None,
+) -> tuple[ExactGtinGroup, ...]:
     index: dict[str, list[ProductProfile]] = defaultdict(list)
     for profile in profiles:
         if profile.canonical_gtin is not None:
@@ -2125,7 +2180,9 @@ def _exact_groups(profiles: tuple[ProductProfile, ...]) -> tuple[ExactGtinGroup,
         supermarkets = sorted({member.record.supermarket_id for member in members})
         if len(supermarkets) < 2:
             continue
-        (remaining, excluded, group_reasons), readings = resolve_gtin_group(gtin, members)
+        (remaining, excluded, group_reasons), readings = resolve_gtin_group(
+            gtin, members, (size_decisions or {}).get(gtin)
+        )
         remaining_supermarkets = sorted({member.record.supermarket_id for member in remaining})
         if len(remaining_supermarkets) >= 2:
             groups.append(
@@ -2161,6 +2218,7 @@ def homologate_products_v2(
     records: Iterable[SourceProductRecord],
     *,
     candidate_threshold: Decimal = Decimal("0.72"),
+    size_decisions: dict[str, SizeDecision] | None = None,
 ) -> HomologationResult:
     if candidate_threshold < 0 or candidate_threshold > 1:
         raise ProductHomologationError("candidate_threshold_invalid")
@@ -2174,7 +2232,7 @@ def homologate_products_v2(
             key=lambda profile: profile.record.source_record_id,
         )
     )
-    exact_groups = _exact_groups(profiles)
+    exact_groups = _exact_groups(profiles, size_decisions)
 
     brand_blocks: dict[tuple[str, str, int, int, str], list[ProductProfile]] = defaultdict(list)
     token_blocks: dict[tuple[str, str, int, int, str], list[ProductProfile]] = defaultdict(list)

@@ -23,7 +23,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 APP_DIR = ROOT / "super-compras"
-FILES = ("index.html", "app.js", "data.js", "sw.js", "illustration.js")
+FILES = ("index.html", "app.js", "data.js", "sw.js", "illustration.js", "admin.js")
 VERSION = re.compile(r"\d{8}-[0-9a-z]+")
 TOKEN = re.compile(r"(\?v=|super-compras-)(\d{8}-[0-9a-z]+)")
 

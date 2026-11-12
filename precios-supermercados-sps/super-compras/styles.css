@@ -268,3 +268,47 @@ main { outline: none; }
   .city-select svg { display: none; }
   .city-select select { font-size: .8rem; padding: 0 24px 0 10px; max-width: 42vw; background-position: calc(100% - 13px) 50%, calc(100% - 8px) 50%; }
 }
+
+/* Panel interno de revisión de tamaños (#/admin/revision). */
+.rv-page { display: grid; gap: 16px; }
+.rv-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; justify-content: space-between; }
+.rv-head p { margin: 4px 0 0; max-width: 60ch; }
+.rv-auth { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--tile); }
+.rv-auth label { font-size: .85rem; color: var(--muted); }
+.rv-auth input, .rv-decide input, .rv-decide select { min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.rv-auth input:focus-visible, .rv-decide input:focus-visible, .rv-decide select:focus-visible, .rv-page button:focus-visible, .rv-page a:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.rv-link { border: 0; background: none; color: var(--green); font-weight: 600; cursor: pointer; padding: 4px; }
+.rv-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.rv-chip { padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); font-size: .85rem; font-weight: 600; cursor: pointer; }
+.rv-chip[aria-pressed="true"] { background: var(--green); border-color: var(--green); color: #fff; }
+.rv-list { display: grid; gap: 12px; }
+.rv-row { display: grid; grid-template-columns: 1fr; gap: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); }
+.rv-row.done { border-color: var(--green); box-shadow: inset 4px 0 0 var(--green); }
+.rv-row.sent { opacity: .7; }
+.rv-name { font-size: 1.05rem; font-weight: 700; overflow-wrap: anywhere; }
+.rv-meta { margin: 2px 0 0; font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rv-offers { display: grid; gap: 6px; margin-top: 10px; }
+.rv-offer { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 6px 8px; border-radius: 8px; background: var(--tile); font-size: .9rem; }
+.rv-offer.out { background: var(--amber-soft); }
+.rv-source { display: block; color: var(--muted); font-size: .8rem; overflow-wrap: anywhere; }
+.rv-size { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rv-ext { color: var(--green); font-weight: 600; font-size: .85rem; white-space: nowrap; }
+.rv-links { display: inline-flex; gap: 8px; align-items: baseline; }
+.rv-ext.rv-alt { color: var(--muted); font-weight: 500; font-size: .75rem; }
+.rv-decide { display: grid; gap: 8px; align-content: start; }
+.rv-label { margin: 0; font-size: .75rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.rv-picks { display: flex; flex-wrap: wrap; gap: 6px; }
+.rv-pick { padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); font-weight: 600; cursor: pointer; }
+.rv-pick[aria-pressed="true"] { border-color: var(--green); background: var(--green-soft); }
+.rv-manual { display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 8px; }
+.rv-different { display: flex; gap: 8px; align-items: center; font-size: .9rem; color: var(--muted); }
+.rv-sent { margin: 0; color: var(--green); font-weight: 600; font-size: .9rem; }
+.rv-bar { position: sticky; bottom: calc(var(--tabbar) + env(safe-area-inset-bottom)); z-index: 15; padding: 12px 0; background: var(--bg); border-top: 1px solid var(--line); }
+.rv-bar-in { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; }
+.rv-bar .primary:disabled { opacity: .45; cursor: not-allowed; }
+.rv-status { margin: 0; font-size: .9rem; flex: 1 1 240px; }
+.rv-status.ok { color: var(--green); }
+.rv-status.warn { color: var(--danger); }
+.rv-status a { color: var(--green); font-weight: 600; text-decoration: underline; }
+@media (min-width: 760px) { .rv-row { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 14px 20px; } }
+@media (min-width: 1024px) { .rv-bar { bottom: 0; } }

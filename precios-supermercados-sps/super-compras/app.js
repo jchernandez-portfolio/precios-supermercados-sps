@@ -1,10 +1,11 @@
 // Súper Compras: comparador de precios de supermercados (San Pedro Sula y Tegucigalpa).
-// Vistas: inicio, búsqueda, ficha de producto, ofertas y Mi compra.
+// Vistas: inicio, búsqueda, ficha de producto, ofertas y Mi compra; #/admin/revision
+// (panel interno de tamaños) se carga aparte sólo cuando se abre.
 import {
   Catalog, RETAILER_COLORS, rowKey, RETAILER_INITIALS, RETAILER_NAMES, loadCart, loadCities, loadCitySlug,
   migrateCartLines, money, photoSrcset, photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, storeLabel,
-} from "./data.js?v=20261025-4";
-import { productIllustration } from "./illustration.js?v=20261025-4";
+} from "./data.js?v=20261112-1";
+import { productIllustration } from "./illustration.js?v=20261112-1";
 
 // Foto real si existe; si no hay o falla al cargar, la ilustración de siempre.
 // Tarjetas y miniaturas usan 320 px; el detalle deja que el navegador elija 320 u
@@ -610,8 +611,31 @@ function renderChrome() {
   for (const link of document.querySelectorAll("[data-nav]")) link.classList.toggle("active", link.dataset.nav === active);
 }
 
+const ADMIN_ROUTE = "/admin/revision";
+let adminModule = null;
+
+// El panel no necesita el catálogo: se monta una vez y conserva lo que se escribió.
+async function renderAdmin(main) {
+  if (main.dataset.view === "admin") return;
+  main.dataset.view = "admin";
+  fill(main, loadingPage("Abriendo el panel de revisión…"));
+  try {
+    adminModule = adminModule || await import("./admin.js?v=20261112-1");
+    if (route().path.startsWith(ADMIN_ROUTE) && main.dataset.view === "admin") adminModule.mountSizeReview(main, { h, fill });
+  } catch (error) {
+    delete main.dataset.view;
+    fill(main, h("div", { class: "page empty" }, h("strong", {}, "No pudimos abrir el panel."), h("p", {}, error.message)));
+  }
+  renderChrome();
+}
+
 function render() {
   const main = document.getElementById("main");
+  if (route().path.startsWith(ADMIN_ROUTE)) {
+    renderAdmin(main);
+    return;
+  }
+  delete main.dataset.view;
   if (!state.catalog) return;
   state.renderToken += 1;
   const { path, params } = route();
@@ -632,7 +656,7 @@ function pickCity(cities, fallback) {
 
 async function loadCity(city) {
   const main = document.getElementById("main");
-  fill(main, loadingPage(`Cargando los precios de ${city.name}…`));
+  if (main.dataset.view !== "admin") fill(main, loadingPage(`Cargando los precios de ${city.name}…`));
   try {
     const catalog = await new Catalog(city.url).load();
     state.catalog = catalog;
@@ -673,6 +697,7 @@ async function switchCity(slug) {
 }
 
 async function start() {
+  if (route().path.startsWith(ADMIN_ROUTE)) renderAdmin(document.getElementById("main"));
   const url = catalogUrl();
   // Una vista previa con ?catalogo= usa sólo ese catálogo; el sitio publicado lee cities.json.
   const { cities, fallback } = url === DEFAULT_CATALOG || url === document.body.dataset.catalogUrl

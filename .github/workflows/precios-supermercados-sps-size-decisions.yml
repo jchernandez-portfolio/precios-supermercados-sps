@@ -1,0 +1,85 @@
+name: Precios SPS - Guardar decisiones de tamaño
+
+# Lo lanza el panel de revisión de Súper Compras (#/admin/revision) con un token
+# fino de GitHub del dueño (sólo "Actions: read and write" en este repositorio).
+# El JSON llega como input y pasa al script por variable de entorno: nunca se
+# pega dentro del comando. El script valida todo y falla cerrado; con datos
+# válidos guarda `size_decisions`, ajusta `human_attributes_json` del maestro y
+# lanza el refresco de homologación para que el motor aplique la decisión.
+# Los secretos de Turso viven sólo en GitHub; el navegador nunca los ve.
+
+on:
+  workflow_dispatch:
+    inputs:
+      decisions:
+        description: "JSON rpi-size-decisions/v1 (lo arma el panel)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: precios-sps-size-decisions
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: >-
+      ${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' &&
+          github.ref == 'refs/heads/main' &&
+          github.actor == 'Jchernand3z19' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: write
+    defaults:
+      run:
+        working-directory: precios-supermercados-sps
+    env:
+      PYTHONPATH: ${{ github.workspace }}/precios-supermercados-sps/src
+      DECISIONS_JSON: ${{ inputs.decisions }}
+      DECIDED_BY: ${{ github.actor }}
+    steps:
+      - name: Descargar revisión inmutable
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Configurar Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias fijadas
+        run: python -m pip install --disable-pip-version-check PyYAML==6.0.3
+
+      - name: Validar y guardar decisiones
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          python scripts/aplicar_decisiones_tamano.py --turso --apply \
+            --actor "$DECIDED_BY" \
+            --summary run-artifacts/size-decisions/resultado.json
+
+      - name: Lanzar refresco de homologación
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run precios-supermercados-sps-homologation-refresh.yml \
+            --repo "$GITHUB_REPOSITORY" --ref main
+          echo "homologation_refresh_dispatched=true"
+
+      - name: Guardar resultado
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: size-decisions-${{ github.run_id }}
+          path: precios-supermercados-sps/run-artifacts/size-decisions
+          if-no-files-found: warn
+          retention-days: 30

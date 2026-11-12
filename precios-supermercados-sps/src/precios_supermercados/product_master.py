@@ -1573,8 +1573,12 @@ def sync_product_master(
     engine_links: Sequence[MasterLink] = (),
     apply: bool = True,
     full_threshold: float = 0.25,
+    size_decision_attributes: Mapping[str, Mapping[str, Mapping[str, object]]] | None = None,
 ) -> dict[str, object]:
     """Escribe maestros + vínculos de forma incremental y con lecturas acotadas.
+
+    ``size_decision_attributes`` (maestro → atributos humanos de ``size_decisions``)
+    fija el contenido neto oficial; manda sobre lo guardado en ``human_attributes_json``.
 
     Lecturas por corrida sin cambios: ``sqlite_master`` + 1 fila de estado +
     vínculos curados + maestros con atributos humanos + marcas *dirty*. Con
@@ -1600,6 +1604,8 @@ def sync_product_master(
     curated_existing = read_curated_links(store, {"manual_review"}) if tables_exist else ()
     engine_existing = read_curated_links(store, {"engine_auto"}) if tables_exist else ()
     human = read_human_attributes(store) if tables_exist else {}
+    for master_id, attributes in (size_decision_attributes or {}).items():
+        human[master_id] = {**human.get(master_id, {}), **{name: dict(entry) for name, entry in attributes.items()}}
     dirty = read_dirty_masters(store) if tables_exist else set()
     curated_targets = {link.master_product_id for link in (*curated_existing, *reviewed_links, *engine_links)}
     target_meta: dict[str, tuple[str, str | None]] = {}

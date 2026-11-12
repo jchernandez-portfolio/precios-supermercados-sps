@@ -16,6 +16,11 @@ from precios_supermercados.product_homologation_persistence import (  # noqa: E4
 )
 
 
+@pytest.fixture(autouse=True)
+def _no_size_decisions(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(turso, "_fetch_size_decisions", lambda *_: {})
+
+
 def row(product_id: int, hash_char: str) -> ProductHomologationRow:
     return ProductHomologationRow(
         product_id=product_id,
