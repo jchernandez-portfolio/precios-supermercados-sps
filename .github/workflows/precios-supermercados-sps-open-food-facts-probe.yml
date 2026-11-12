@@ -1,0 +1,64 @@
+name: Precios SPS - Prueba Open Food Facts
+
+# Sólo lectura y sólo a mano. Toma una muestra estratificada de 500 GTIN válidos
+# de `products` (sólo SELECT) y consulta la API pública de Open Food Facts de a
+# uno, con al menos 1 s entre consultas y un User-Agent que identifica el
+# proyecto. Mide cuántos existen y cuántos traen nombre, marca y cantidad. No
+# escribe en Turso ni en el repositorio: deja un artifact.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: precios-sps-open-food-facts-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    if: ${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: precios-supermercados-sps
+    env:
+      PYTHONPATH: ${{ github.workspace }}/precios-supermercados-sps/src
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - name: Descargar revisión inmutable
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Configurar Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias fijadas
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check requests==2.34.2 PyYAML==6.0.3
+
+      - name: Consultar Open Food Facts (sólo lectura)
+        shell: bash
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          python scripts/probar_open_food_facts.py --turso --sample 500 --output-dir run-artifacts/open-food-facts
+
+      - name: Guardar reporte
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: open-food-facts-${{ github.run_id }}
+          path: precios-supermercados-sps/run-artifacts/open-food-facts
+          if-no-files-found: error
+          retention-days: 14
