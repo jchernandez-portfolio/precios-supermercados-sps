@@ -5,9 +5,14 @@ número son cambios directos. El detalle de cada incidente vive en
 [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md) y el de cada error de datos en
 [`docs/calidad/errores-confirmados.csv`](docs/calidad/errores-confirmados.csv).
 
+## 2026-11-12
+
+- Regla de onzas en grupos GTIN (motor v2.8): 8 oz = 237 ml / 24 oz = 680 g con el mismo código, "nunca empeorar" y precio por unidad para la onza convertida.
+- #64 Medición (sólo lectura): simular la regla de onzas.
+- #63 Tegucigalpa: una tarjeta por producto con todas sus sucursales.
+
 ## 2026-11-11
 
-- Tegucigalpa: una tarjeta por producto con todas sus sucursales (antes una por sucursal: 7,175 duplicados); fotos heredadas y "Mi compra" y enlaces viejos traducidos con `legacy-ids-tgu.json`.
 - #62 Paso 0: medición de reglas de identidad (sólo lectura).
 - #61 Auditoría de identidad de producto (sólo lectura).
 

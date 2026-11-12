@@ -42,12 +42,16 @@ from .product_homologation import (
     assign_taxonomy,
     fold_text,
     normalize_brand,
+    ounces_as_mass,
+    ounces_as_volume,
     presentations_compatible,
     profile_product,
     resolve_presentation,
 )
 
-IDENTITY_NORMALIZATION_VERSION = "product-homologation-v2.7"
+# v2.8 (2026-11-12): regla de onzas en grupos GTIN (con "nunca empeorar") y la
+# onza sin convertir de esos grupos pasa a g/ml para tener precio por unidad.
+IDENTITY_NORMALIZATION_VERSION = "product-homologation-v2.8"
 
 _GENERIC_BRANDS = frozenset(
     {
@@ -1308,7 +1312,15 @@ def canonical_presentation_fields(
     """Expone cantidad/unidad/pack canónicos junto al valor raw conservado."""
 
     signature, status = resolve_presentation_v2(record, taxonomy)
-    raw = record.source_presentation
+    return canonical_presentation_from_signature(record.source_presentation, signature, status)
+
+
+def canonical_presentation_from_signature(
+    raw: str | None,
+    signature: PresentationSignature | None,
+    status: str,
+) -> CanonicalPresentation:
+    """Cantidad/unidad/pack canónicos de una firma ya resuelta."""
     if signature is None:
         return CanonicalPresentation(raw, None, None, None, None, None, status)
     unit_by_dimension = {
@@ -1741,8 +1753,35 @@ def profile_product_v2(
 _GTIN_PAIR_IGNORED_REASONS = frozenset({"brand_conflict", "different_valid_gtin", "presentation_missing"})
 
 
-def _gtin_pair_conflicts(left: ProductProfile, right: ProductProfile) -> set[str]:
-    """Conflictos materiales entre dos miembros de cadenas distintas con igual GTIN."""
+def ounce_reading(left: PresentationSignature | None, right: PresentationSignature | None) -> str | None:
+    """``fluid``/``mass`` si una onza sin convertir coincide con el tamaño métrico del otro.
+
+    "8 oz" puede ser peso o líquido; con el mismo GTIN (mismo producto) la otra
+    cadena dice cuál: 8 × 29.5735 = 236.6 ml contra "237 ml" es líquido; 24 ×
+    28.3495 = 680.4 g contra "680 g" es peso. Usa las conversiones reales y la
+    tolerancia imperial de ``presentations_compatible`` (2 % o 1.5 unidades).
+    Sólo aplica a una onza que el sistema no convirtió por su categoría, contra g o
+    ml con el mismo número de unidades.
+    """
+    if left is None or right is None:
+        return None
+    for ounce, metric in ((left, right), (right, left)):
+        if ounce.dimension != "ounce" or metric.dimension not in {"mass_g", "volume_ml"}:
+            continue
+        if ounce.pack_count != metric.pack_count:
+            return None
+        if metric.dimension == "volume_ml" and presentations_compatible(ounces_as_volume(ounce), metric):
+            return "fluid"
+        if metric.dimension == "mass_g" and presentations_compatible(ounces_as_mass(ounce), metric):
+            return "mass"
+    return None
+
+
+def _gtin_pair_conflicts(left: ProductProfile, right: ProductProfile, *, ounce_rule: bool = False) -> set[str]:
+    """Conflictos materiales entre dos miembros de cadenas distintas con igual GTIN.
+
+    Con ``ounce_rule`` el desacuerdo de tamaño que la onza explica no es conflicto.
+    """
 
     reasons: set[str] = set(one_sided_variant_conflicts(left, right))
     sku_derived = (
@@ -1762,6 +1801,10 @@ def _gtin_pair_conflicts(left: ProductProfile, right: ProductProfile) -> set[str
             reasons.add("sku_gtin_name_disagreement")
         if _model_number_conflict(left, right):
             reasons.add("model_number_conflict")
+    if ounce_rule and "cross_source_presentation_conflict" in reasons and ounce_reading(
+        left.presentation, right.presentation
+    ):
+        reasons.discard("cross_source_presentation_conflict")
     return reasons
 
 
@@ -1956,6 +1999,8 @@ def _member_intrinsic_conflicts(member: ProductProfile) -> set[str]:
 def _resolve_gtin_members(
     gtin: str,
     members: list[ProductProfile],
+    *,
+    ounce_rule: bool = False,
 ) -> tuple[list[ProductProfile], dict[str, set[str]], set[str]]:
     """Separa miembros comparables de los que tienen un conflicto atribuible.
 
@@ -2003,7 +2048,7 @@ def _resolve_gtin_members(
         pair_reasons: dict[str, set[str]] = defaultdict(set)
         for index, left in enumerate(remaining):
             for right in remaining[index + 1 :]:
-                reasons = _gtin_pair_conflicts(left, right)
+                reasons = _gtin_pair_conflicts(left, right, ounce_rule=ounce_rule)
                 if not reasons:
                     continue
                 for member in (left, right):
@@ -2024,6 +2069,52 @@ def _resolve_gtin_members(
     return remaining, excluded, group_reasons
 
 
+def _chains(members: Iterable[ProductProfile]) -> int:
+    return len({member.record.supermarket_id for member in members})
+
+
+def resolve_gtin_group(
+    gtin: str,
+    members: list[ProductProfile],
+) -> tuple[tuple[list[ProductProfile], dict[str, set[str]], set[str]], dict[str, str]]:
+    """Resolución vigente de un grupo GTIN: regla de onzas con "nunca empeorar".
+
+    Si el grupo tiene alguna onza sin convertir se resuelve con y sin la regla; se
+    queda la de la regla salvo que deje menos cadenas comparables que hoy (p. ej.
+    Cholula: 150 ml + 5 oz contra 150 g + 150 g es un empate que hoy se "gana" sólo
+    porque la onza chocaba con todos). Devuelve además, para el grupo comparable,
+    la lectura de cada onza (``fluid``/``mass``) que confirman sus compañeros.
+    """
+    current = _resolve_gtin_members(gtin, members)
+    if not any(member.presentation is not None and member.presentation.dimension == "ounce" for member in members):
+        return current, {}
+    with_rule = _resolve_gtin_members(gtin, members, ounce_rule=True)
+    if _chains(with_rule[0]) < _chains(current[0]):
+        return current, {}
+    remaining = with_rule[0]
+    if _chains(remaining) < 2:
+        return with_rule, {}
+    readings: dict[str, str] = {}
+    for member in remaining:
+        if member.presentation is None or member.presentation.dimension != "ounce":
+            continue
+        found = {
+            ounce_reading(member.presentation, other.presentation)
+            for other in remaining
+            if other is not member and other.record.supermarket_id != member.record.supermarket_id
+        } - {None}
+        if len(found) == 1:
+            readings[member.record.source_record_id] = next(iter(found))
+    return with_rule, readings
+
+
+def converted_ounce(signature: PresentationSignature | None, reading: str | None) -> PresentationSignature | None:
+    """La onza del grupo en ml (``fluid``) o g (``mass``); otras firmas no cambian."""
+    if signature is None or signature.dimension != "ounce" or reading not in {"fluid", "mass"}:
+        return signature
+    return ounces_as_volume(signature) if reading == "fluid" else ounces_as_mass(signature)
+
+
 def _exact_groups(profiles: tuple[ProductProfile, ...]) -> tuple[ExactGtinGroup, ...]:
     index: dict[str, list[ProductProfile]] = defaultdict(list)
     for profile in profiles:
@@ -2034,7 +2125,7 @@ def _exact_groups(profiles: tuple[ProductProfile, ...]) -> tuple[ExactGtinGroup,
         supermarkets = sorted({member.record.supermarket_id for member in members})
         if len(supermarkets) < 2:
             continue
-        remaining, excluded, group_reasons = _resolve_gtin_members(gtin, members)
+        (remaining, excluded, group_reasons), readings = resolve_gtin_group(gtin, members)
         remaining_supermarkets = sorted({member.record.supermarket_id for member in remaining})
         if len(remaining_supermarkets) >= 2:
             groups.append(
@@ -2049,6 +2140,7 @@ def _exact_groups(profiles: tuple[ProductProfile, ...]) -> tuple[ExactGtinGroup,
                         (source_id, tuple(sorted(reasons)))
                         for source_id, reasons in sorted(excluded.items())
                     ),
+                    ounce_readings=tuple(sorted(readings.items())),
                 )
             )
             continue

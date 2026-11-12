@@ -162,7 +162,8 @@ OUNCE_PRODUCTS = [
 
 
 def test_ounce_rule_resolves_only_matching_ounces(tmp_path: Path) -> None:
-    stored = {21: "review_required", 22: "review_required", 23: "review_required", 24: "review_required"}
+    # Con la regla vigente Kraft ya está listo; Lee Kum Kee (16.9 oz vs 300 ml) sigue bloqueado.
+    stored = {21: "ready", 22: "ready", 23: "review_required", 24: "review_required"}
     backend = database(tmp_path / "db.sqlite", stored, OUNCE_PRODUCTS)
     summary, _ = rules.measure(backend, catalog().__getitem__, BASE)
     assert summary["verificacion_contra_perfiles_guardados"] == {"coincide": 4}
@@ -173,8 +174,6 @@ def test_ounce_rule_resolves_only_matching_ounces(tmp_path: Path) -> None:
     assert "grupos_que_empeoran" not in ounce
     lines = summary["_lineas_onzas"]
     assert {(line["product_id"], line["presentacion_convertida"]) for line in lines} == {(21, "236.6 ml"), (22, None)}
-    # La simulación no deja la función de producción cambiada.
-    assert rules.product_identity_v2._gtin_pair_conflicts.__name__ == "_gtin_pair_conflicts"
     rules.write_outputs(tmp_path / "out", summary, [])
     with (tmp_path / "out" / "onzas-grupos.csv").open(encoding="utf-8") as handle:
         assert len(list(csv.DictReader(handle))) == 2
