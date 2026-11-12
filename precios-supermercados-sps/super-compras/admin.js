@@ -16,7 +16,7 @@ const KIND_LABEL = {
   empate: "Empate: hoy no se compara",
   atipico: "Un súper distinto: quedó fuera de la comparación",
 };
-// Búsqueda del código de barras en cada súper (EAN-13; Los Andes no tiene buscador por código).
+// Búsqueda del código de barras en cada súper (Los Andes no tiene buscador por código).
 const STORE_SEARCH = {
   walmart: (ean) => `https://www.walmart.com.hn/${ean}?_q=${ean}&map=ft`,
   paiz: (ean) => `https://www.paiz.com.hn/${ean}?_q=${ean}&map=ft`,
@@ -37,9 +37,17 @@ function writeToken(value) {
   } catch { /* sin almacenamiento: la llave vive sólo en el campo */ }
 }
 
-export function ean13(gtin) {
-  const digits = String(gtin || "").replace(/^0+/, "");
-  return digits.length <= 8 ? digits.padStart(8, "0") : digits.padStart(13, "0");
+// Formas del código para buscar en el súper: [principal, alternativa | null].
+// El GTIN guardado tiene 14 dígitos con ceros a la izquierda; los súper no
+// encuentran "0049733830119" pero sí el UPC-A original "049733830119". Por eso la
+// principal es el código más corto válido (EAN-8, UPC-A de 12 o EAN-13) y la
+// alternativa, la forma de 13 dígitos cuando difiere.
+export function searchCodes(gtin) {
+  const digits = String(gtin || "").replace(/\D/g, "").replace(/^0+/, "");
+  if (!digits) return [null, null];
+  if (digits.length <= 8) return [digits.padStart(8, "0"), digits.padStart(12, "0")];
+  if (digits.length <= 12) return [digits.padStart(12, "0"), digits.padStart(13, "0")];
+  return [digits, null];
 }
 
 // Tamaños publicados, el más repetido primero: son los botones rápidos.
@@ -93,12 +101,17 @@ export function mountSizeReview(main, { h, fill }) {
 
   function offerRow(item, offer) {
     const search = STORE_SEARCH[offer.store];
+    const [code, alternative] = searchCodes(item.gtin);
+    const link = (value, label, extra = "") => h("a", {
+      class: `rv-ext${extra}`, href: search(value), target: "_blank", rel: "noopener noreferrer", title: `Buscar ${value}`,
+    }, label);
     return h("div", { class: `rv-offer${offer.excluded ? " out" : ""}` },
       h("span", {},
         h("strong", {}, RETAILER_NAMES[offer.store] || offer.store),
         h("span", { class: "rv-source" }, offer.name)),
       h("span", { class: "rv-size" }, offer.size || "sin tamaño"),
-      search ? h("a", { class: "rv-ext", href: search(ean13(item.gtin)), target: "_blank", rel: "noopener noreferrer" }, "Ver ↗") : h("span"));
+      search && code ? h("span", { class: "rv-links" }, link(code, "Ver ↗"),
+        alternative && offer.store !== "comisariato_los_andes" ? link(alternative, `${alternative.length} díg.`, " rv-alt") : null) : h("span"));
   }
 
   function rowFor(item) {
@@ -130,7 +143,7 @@ export function mountSizeReview(main, { h, fill }) {
     const row = h("article", { class: `rv-row${decided ? " done" : ""}${sent ? " sent" : ""}` },
       h("div", {},
         h("h2", { class: "rv-name" }, item.name),
-        h("p", { class: "rv-meta" }, `GTIN ${item.gtin} · ${KIND_LABEL[item.kind] || item.kind}`),
+        h("p", { class: "rv-meta" }, `Código ${searchCodes(item.gtin)[0] || item.gtin} · ${KIND_LABEL[item.kind] || item.kind}`),
         h("div", { class: "rv-offers" }, item.offers.map((offer) => offerRow(item, offer)))),
       h("div", { class: "rv-decide" },
         sent ? h("p", { class: "rv-sent" }, "Enviado: se aplica en el próximo refresco.") : null,

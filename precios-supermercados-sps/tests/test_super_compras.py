@@ -647,7 +647,7 @@ def test_size_review_panel_sends_only_validated_decisions_to_github(tmp_path: Pa
     (tmp_path / "admin.js").write_text((APP_DIR / "admin.js").read_text(encoding="utf-8"), encoding="utf-8")
     script = """
 import { sizeDecisionsBody, sendSizeDecisions, loadSizeQueue } from './data.js';
-import { ean13, sizeOptions, decisionOf } from './admin.js';
+import { searchCodes, sizeOptions, decisionOf } from './admin.js';
 const calls = [];
 globalThis.fetch = async (url, options = {}) => {
   calls.push({ url, method: options.method || 'GET', headers: options.headers || {}, body: options.body || null,
@@ -668,7 +668,7 @@ try { await sendSizeDecisions('github_pat_' + 'A'.repeat(40), decisions); } catc
 try { await sendSizeDecisions('mi-clave', decisions); } catch (error) { out.badToken = error.message; }
 try { sizeDecisionsBody([{ gtin: '00049733830119', decision: 'size', value: '', unit: 'oz' }]); } catch (error) { out.incomplete = error.message; }
 out.calls = calls.length;
-out.ean = [ean13('00049733830119'), ean13('00000012345670')];
+out.codes = [searchCodes('00049733830119'), searchCodes('07411000204139'), searchCodes('00000012345670'), searchCodes('')];
 out.options = sizeOptions({ offers: [
   { store: 'walmart', value: '150', unit: 'g' }, { store: 'paiz', value: '150', unit: 'g' },
   { store: 'colonial', value: '150', unit: 'ml' }, { store: 'pricesmart', value: null, unit: null },
@@ -698,7 +698,9 @@ console.log(JSON.stringify(out));
     assert "Actions: read and write" in result["forbidden"]
     assert "formato" in result["badToken"] and "incompleto" in result["incomplete"]
     assert result["calls"] == 3  # la llave mal formada y el tamaño incompleto no llegan a la red
-    assert result["ean"] == ["0049733830119", "12345670"]
+    # Sin el cero de relleno: UPC-A de 12 dígitos primero y la forma de 13 como alternativa.
+    assert result["codes"] == [
+        ["049733830119", "0049733830119"], ["7411000204139", None], ["12345670", "000012345670"], [None, None]]
     assert result["options"] == [
         {"value": "150", "unit": "g", "stores": ["Walmart", "Paiz"]},
         {"value": "150", "unit": "ml", "stores": ["Colonial"]},
@@ -708,5 +710,6 @@ console.log(JSON.stringify(out));
     assert "connect-src 'self' https://raw.githubusercontent.com https://api.github.com;" in html
     admin = (APP_DIR / "admin.js").read_text(encoding="utf-8")
     assert "sessionStorage" in admin and "localStorage" not in admin
+    assert "search(value)" in admin and "searchCodes(item.gtin)" in admin
     app = (APP_DIR / "app.js").read_text(encoding="utf-8")
     assert 'const ADMIN_ROUTE = "/admin/revision";' in app and 'await import("./admin.js?v=' in app
