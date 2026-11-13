@@ -29,6 +29,14 @@ on:
         required: false
         default: "200"
         type: string
+      claude_model:
+        description: "Modelo de Claude que lee las fotos"
+        required: false
+        default: claude-sonnet-5-5
+        type: choice
+        options:
+          - claude-sonnet-5-5
+          - claude-haiku-5-5
 
 permissions:
   contents: write
@@ -87,6 +95,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           IA_MINUTOS: ${{ inputs.ia_minutos || '25' }}
           CLAUDE_MAX: ${{ inputs.claude_max || '200' }}
+          CLAUDE_MODEL: ${{ inputs.claude_model || 'claude-sonnet-5-5' }}
         run: |
           set -euo pipefail
           case "$IA_MINUTOS" in (''|*[!0-9]*) echo "ia_minutos_invalido" >&2; exit 1;; esac
