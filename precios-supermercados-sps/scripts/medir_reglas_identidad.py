@@ -20,7 +20,9 @@ decididos darían diferencias falsas contra producción. Antes de medir verifica
 que el estado recalculado coincide con el guardado en
 ``product_homologation_profiles``. Sólo ejecuta SELECT (envoltorio ``ReadOnly``
 de la auditoría de identidad); deja ``medicion-reglas.json`` y
-``grupos-reglas.csv`` en ``--output-dir``.
+``grupos-reglas.csv`` en ``--output-dir``. Con ``--pr-b`` mide además, sobre los
+mismos grupos, las reglas candidatas del PR B (``medir_pr_b.py``: g ≈ ml y peso
+sobre conteo) y deja ``medicion-pr-b.json`` y ``pr-b-grupos.csv``.
 """
 from __future__ import annotations
 
@@ -47,6 +49,8 @@ from auditar_identidad_productos import (  # noqa: E402
     _http_json,
     load_cities,
 )
+from medir_pr_b import CSV_COLUMNS as PR_B_CSV_COLUMNS  # noqa: E402
+from medir_pr_b import measure_pr_b  # noqa: E402
 from precios_supermercados.pricesmart_specs_persistence import PROFILE_ATTRIBUTES_SQL  # noqa: E402
 from precios_supermercados.pricesmart_specs_persistence import TABLE_NAME as SPECS_TABLE  # noqa: E402
 from precios_supermercados.product_homologation import (  # noqa: E402
@@ -376,7 +380,8 @@ def _presentation_text(profile: ProductProfile) -> str | None:
     return f"{value.pack_count}×{total} {value.dimension}" if value.pack_count > 1 else f"{total} {value.dimension}"
 
 
-def measure(db, fetch: Callable[[str], object], base: str = CATALOG_BASE) -> tuple[dict[str, object], list[dict[str, object]]]:
+def measure(db, fetch: Callable[[str], object], base: str = CATALOG_BASE, *,
+            pr_b: bool = False) -> tuple[dict[str, object], list[dict[str, object]]]:
     reader = ReadOnly(db)
     products = fetch_all_products(reader)
     specs = fetch_spec_attributes(reader)
@@ -492,6 +497,10 @@ def measure(db, fetch: Callable[[str], object], base: str = CATALOG_BASE) -> tup
         "sentencias_ejecutadas": reader.statements,
         "_lineas_onzas": ounce_lines,
     }
+    if pr_b:  # medición del PR B sobre los mismos grupos (sin otra lectura de Turso)
+        result = measure_pr_b(groups, product_of)
+        summary["medicion_pr_b_resumen"] = result["resumen"]
+        summary["_pr_b"] = result
     return summary, lines
 
 
@@ -523,17 +532,28 @@ def write_outputs(output: Path, summary: Mapping[str, object], lines: Sequence[M
         writer = csv.DictWriter(handle, fieldnames=CSV_COLUMNS)
         writer.writeheader()
         writer.writerows(lines)
+    pr_b = summary.get("_pr_b")
+    if pr_b:
+        public_pr_b = {key: value for key, value in pr_b.items() if not key.startswith("_")}
+        (output / "medicion-pr-b.json").write_text(json.dumps(public_pr_b, ensure_ascii=False, indent=2),
+                                                   encoding="utf-8")
+        with (output / "pr-b-grupos.csv").open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=PR_B_CSV_COLUMNS)
+            writer.writeheader()
+            writer.writerows(pr_b["_lineas"])
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--catalog-base", default=CATALOG_BASE)
+    parser.add_argument("--pr-b", action="store_true",
+                        help="también mide el PR B (g ≈ ml y peso sobre conteo): medicion-pr-b.json y pr-b-grupos.csv")
     args = parser.parse_args(argv)
     from exportar_modelo_analitico import TursoBackend
 
     backend = TursoBackend(os.environ.get("TURSO_DATABASE_URL", ""), os.environ.get("TURSO_AUTH_TOKEN", ""))
-    summary, lines = measure(backend, _http_json, args.catalog_base)
+    summary, lines = measure(backend, _http_json, args.catalog_base, pr_b=args.pr_b)
     write_outputs(args.output_dir, summary, lines)
     print(json.dumps({key: value for key, value in summary.items() if not key.startswith("_")},
                      ensure_ascii=False, indent=1))

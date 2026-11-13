@@ -2,10 +2,10 @@
 // Vistas: inicio, búsqueda, ficha de producto, ofertas y Mi compra; #/admin/revision
 // (panel interno de tamaños) se carga aparte sólo cuando se abre.
 import {
-  Catalog, RETAILER_COLORS, rowKey, RETAILER_INITIALS, RETAILER_NAMES, loadCart, loadCities, loadCitySlug,
+  Catalog, RETAILER_COLORS, rowKey, RETAILER_INITIALS, RETAILER_NAMES, countText, listText, loadCart, loadCities, loadCitySlug,
   migrateCartLines, money, photoSrcset, photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, storeLabel,
-} from "./data.js?v=20261113-3";
-import { productIllustration } from "./illustration.js?v=20261113-3";
+} from "./data.js?v=20261113-5";
+import { productIllustration } from "./illustration.js?v=20261113-5";
 
 // Foto real si existe; si no hay o falla al cargar, la ilustración de siempre.
 // Tarjetas y miniaturas usan 320 px; el detalle deja que el navegador elija 320 u
@@ -69,6 +69,7 @@ const ICONS = {
   share: "M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13",
   pin: "M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21zM12 7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z",
   plus: "M12 5v14M5 12h14",
+  scan: "M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8v8M10 8v8M13 8v8M17 8v8",
 };
 
 function icon(name, size = 22) {
@@ -156,6 +157,17 @@ function toast(text) {
   toastTimer = setTimeout(() => box.classList.remove("visible"), 1800);
 }
 
+// Sin red, fetch falla con un TypeError en inglés ("Failed to fetch" en Chrome, "Load
+// failed" en Safari, "NetworkError…" en Firefox): se explica en español. Los demás
+// errores ya vienen redactados por data.js.
+function errorText(error) {
+  const network = error instanceof TypeError && /fetch|network|load failed/i.test(String(error.message));
+  if (network || navigator.onLine === false) {
+    return "Parece que no hay conexión a internet. Revisa tu conexión e intenta de nuevo.";
+  }
+  return error?.message || "Ocurrió un error inesperado.";
+}
+
 function shortDate(value) {
   return new Date(value).toLocaleDateString("es-HN", { day: "numeric", month: "short" });
 }
@@ -187,7 +199,8 @@ function searchForm(value = "", { large = false } = {}) {
       if (input.value.trim()) params.set("q", input.value.trim());
       go("/buscar", params);
     },
-  }, icon("search", 18), input);
+  }, icon("search", 18), input,
+  h("button", { type: "button", class: "search-scan", "data-scan": "", "aria-label": "Escanear código de barras", title: "Escanear código de barras" }, icon("scan", 20)));
 }
 
 // Precio por unidad de una oferta: el del súper, el recalculado si la web corrigió
@@ -268,7 +281,7 @@ function whenIndexed(catalog, text = "Cargando el catálogo…") {
   catalog.loadIndex().then(() => { if (state.renderToken === token && state.catalog === catalog) render(); })
     .catch((error) => {
       if (state.renderToken !== token) return;
-      fill(document.getElementById("main"), h("div", { class: "page empty" }, h("strong", {}, "No pudimos cargar el catálogo."), h("p", {}, error.message),
+      fill(document.getElementById("main"), h("div", { class: "page empty" }, h("strong", {}, "No pudimos cargar el catálogo."), h("p", {}, errorText(error)),
         h("button", { type: "button", class: "primary", onclick: () => render() }, "Reintentar")));
     });
   return loadingPage(text);
@@ -280,7 +293,7 @@ function viewHome() {
   return h("div", { class: "page" },
     h("section", { class: "hero" },
       h("h1", {}, `Compara precios de súper en ${cityName()}`),
-      h("p", { class: "muted" }, `${catalog.productCount.toLocaleString("es-HN")} productos en ${catalog.retailers.map((id) => RETAILER_NAMES[id]).join(", ")}.`),
+      h("p", { class: "muted" }, `${countText(catalog.productCount, "producto")} en ${listText(catalog.retailers.map((id) => RETAILER_NAMES[id] || id))}.`),
       h("div", { class: "hero-search" }, searchForm("", { large: true })),
       h("p", { class: "fresh" }, icon("pin", 14), freshnessText())),
     h("section", {},
@@ -294,7 +307,7 @@ function viewHome() {
       h("div", { class: "departments" }, catalog.departments().map((department) =>
         h("a", { class: "department", href: `#/buscar?cat=${encodeURIComponent(department.name)}` },
           h("strong", {}, department.name),
-          h("span", {}, `${department.count.toLocaleString("es-HN")} productos`))))),
+          h("span", {}, countText(department.count, "producto")))))),
     h("section", { class: "stores-strip" },
       h("span", { class: "label" }, "Comparamos"),
       catalog.retailers.map((id) => h("span", { class: "chip" }, h("i", { style: { background: RETAILER_COLORS[id] } }), RETAILER_NAMES[id])),
@@ -335,7 +348,7 @@ function viewSearch(params, { offers = false } = {}) {
   const title = offers ? "Ofertas de hoy" : query ? `Resultados para “${query}”` : category || "Todos los productos";
   return h("div", { class: "page" },
     h("div", { class: "search-top" }, offers ? null : searchForm(query)),
-    h("div", { class: "results-head" }, h("h1", {}, title), h("span", { class: "muted" }, `${total.toLocaleString("es-HN")} productos`)),
+    h("div", { class: "results-head" }, h("h1", {}, title), h("span", { class: "muted" }, countText(total, "producto"))),
     filters,
     total ? resultGrid(items, query, related)
       : h("div", { class: "empty" }, h("strong", {}, "No encontramos productos con esa búsqueda."), h("p", {}, "Prueba con otra palabra, la marca o quita filtros.")),
@@ -382,26 +395,26 @@ function historyBlock(offer) {
     h("p", { class: "muted" }, verdict));
 }
 
-function viewProduct(id, container) {
+function viewProduct(id, container, code = "") {
   const catalog = state.catalog;
-  if (catalog.ready && catalog.byId.has(id)) return renderProduct(catalog.byId.get(id), container);
+  if (catalog.ready && catalog.byId.has(id)) return renderProduct(catalog.byId.get(id), container, code);
   // Enlace abierto antes de tener el índice: se espera a que llegue.
   const token = state.renderToken;
   fill(container, loadingPage("Abriendo el producto…"));
   catalog.product(id).then((product) => {
     if (state.renderToken !== token || state.catalog !== catalog) return;
-    const view = renderProduct(product, container);
+    const view = renderProduct(product, container, code);
     if (view) fill(container, view);
   }).catch((error) => {
     if (state.renderToken !== token) return;
-    fill(container, h("div", { class: "page empty" }, h("strong", {}, "No pudimos abrir el producto."), h("p", {}, error.message), h("a", { href: "#/" }, "Volver al inicio")));
+    fill(container, h("div", { class: "page empty" }, h("h1", {}, "No pudimos abrir el producto."), h("p", {}, errorText(error)), h("a", { class: "primary", href: "#/" }, "Volver al inicio")));
   });
   return null;
 }
 
-function renderProduct(product, container) {
+function renderProduct(product, container, code = "") {
   const catalog = state.catalog;
-  if (!product) return h("div", { class: "page empty" }, h("strong", {}, "Este producto ya no está en el catálogo de hoy."), h("a", { href: "#/" }, "Volver al inicio"));
+  if (!product) return h("div", { class: "page empty" }, h("h1", {}, "Este producto ya no está en el catálogo de hoy."), h("a", { class: "primary", href: "#/" }, "Volver al inicio"));
   const page = h("div", { class: "page product" },
     h("div", { class: "product-top" },
       h("button", { type: "button", class: "icon-button", "aria-label": "Volver", onclick: () => history.length > 1 ? history.back() : go("/") }, icon("back")),
@@ -435,6 +448,7 @@ function renderProduct(product, container) {
     offersBox.removeAttribute("aria-busy");
     fill(offersBox, 
       h("h2", {}, "Dónde comprar"),
+      code ? scanSummary(code, cheapest, cheapestLabel, offers.length) : null,
       offers.map((offer, index) => {
         const regular = Number(offer.reported_regular_price);
         const onSale = offer.is_promotion === true || (regular && regular > Number(offer.current_price));
@@ -501,9 +515,83 @@ function renderProduct(product, container) {
             h("span", { class: Number(alt.unit_amount) < Number(product.unit_amount) ? "good small" : "muted small" }, `${money(alt.unit_amount)} / ${alt.unit_per}`)))))) : null);
   }).catch((error) => {
     if (!page.isConnected) return;
-    fill(page.querySelector(".offers"), h("h2", {}, "Dónde comprar"), h("p", {}, `No pudimos cargar los precios: ${error.message}`));
+    const offersBox = page.querySelector(".offers");
+    offersBox.removeAttribute("aria-busy");
+    fill(offersBox, h("h2", {}, "Dónde comprar"), h("p", {}, `No pudimos cargar los precios. ${errorText(error)}`),
+      h("button", { type: "button", class: "primary", onclick: () => render() }, "Reintentar"));
   });
   return null;
+}
+
+// Después de escanear: el código leído y dónde está más barato, arriba de las ofertas.
+function scanSummary(code, cheapest, label, count) {
+  const verdict = !cheapest ? "Hoy ningún súper lo tiene con precio."
+    : count > 1 ? `Más barato hoy en ${label}: ${money(cheapest.current_price)}`
+      : `Sólo lo encontramos en ${label}: ${money(cheapest.current_price)}`;
+  return h("div", { class: "scan-hit", role: "status" },
+    h("span", { class: "muted small" }, `Código ${code}`),
+    h("strong", {}, verdict));
+}
+
+// #/codigo/<números>: un producto abre su ficha; varios, una lista; ninguno, el aviso.
+function viewBarcode(raw, params, container) {
+  const catalog = state.catalog;
+  const digits = String(raw).replace(/\D/g, "").slice(0, 20);
+  const format = params.get("f") || "";
+  const token = state.renderToken;
+  fill(container, loadingPage("Buscando el código…"));
+  catalog.findBarcode(digits, format).then((result) => {
+    if (state.renderToken !== token || state.catalog !== catalog) return;
+    if (result.products.length === 1) {
+      location.replace(`#/p/${encodeURIComponent(result.products[0].id)}?codigo=${digits}`);
+      return;
+    }
+    fill(container, barcodeResult(digits, result));
+  }).catch((error) => {
+    if (state.renderToken !== token) return;
+    fill(container, h("div", { class: "page empty" }, h("strong", {}, "No pudimos buscar el código."), h("p", {}, errorText(error)),
+      h("button", { type: "button", class: "primary", onclick: () => render() }, "Reintentar")));
+  });
+  return null;
+}
+
+function scanAgainActions() {
+  return h("div", { class: "scan-actions" },
+    h("button", { type: "button", class: "primary", "data-scan": "" }, icon("scan", 18), "Escanear otro"),
+    h("a", { class: "secondary", href: "#/buscar" }, "Buscar por nombre"));
+}
+
+function barcodeResult(digits, result) {
+  if (!result.products.length) {
+    const title = result.invalid ? "Ese código no es válido" : "No tenemos ese código todavía";
+    const detail = result.invalid
+      ? "Revisa los números: el último dígito no cuadra con los demás."
+      : `Ningún súper de ${cityName()} lo publica en línea con ese código, o todavía no lo hemos visto. Prueba buscarlo por nombre.`;
+    return h("div", { class: "page empty scan-empty" },
+      h("h1", {}, title),
+      h("p", { class: "scan-code" }, "Código leído: ", h("strong", {}, digits || "—")),
+      h("p", {}, detail),
+      scanAgainActions());
+  }
+  const catalog = state.catalog;
+  const items = result.products.map((product) => {
+    const best = h("span", { class: "muted small" }, `Desde ${money(product.best_price)}`);
+    catalog.row(product).then((row) => {
+      const offers = liveOffers(row);
+      if (offers[0]) fill(best, h("strong", { class: "good" }, `Más barato en ${storeLabel(offers[0], offers)}: ${money(offers[0].current_price)}`));
+    }).catch(() => {});
+    return h("a", { class: "alt", href: `#/p/${product.id}?codigo=${digits}` },
+      h("span", { class: "alt-tile" }, productVisual(product, { size: 52 })),
+      h("span", { class: "alt-main" },
+        h("strong", {}, [product.brand_label ?? product.brand, presentationLabel(product)].filter(Boolean).join(" · ")),
+        h("span", { class: "muted small" }, product.display_name ?? product.product_name),
+        best));
+  });
+  return h("div", { class: "page" },
+    h("div", { class: "results-head" }, h("h1", {}, "Productos con este código"), h("span", { class: "muted" }, `Código ${digits}`)),
+    h("p", { class: "muted" }, "El mismo código aparece en varias fichas (cada súper lo publica a su manera). Elige la que buscas."),
+    h("div", { class: "alt-list scan-list" }, items),
+    scanAgainActions());
 }
 
 function liveOffers(row) {
@@ -521,7 +609,7 @@ function viewCart(container) {
   const page = h("div", { class: "page cart" },
     h("div", { class: "cart-layout" },
       h("section", { class: "cart-lines" },
-        h("div", { class: "results-head" }, h("h1", {}, "Mi compra"), h("span", { class: "muted" }, `${cartCount()} artículos`)),
+        h("div", { class: "results-head" }, h("h1", {}, "Mi compra"), h("span", { class: "muted" }, countText(cartCount(), "artículo"))),
         h("p", { class: "muted" }, "Cargando precios…")),
       h("aside", { class: "cart-summary" }, h("h2", {}, "¿Dónde me sale más barato?"), h("p", { class: "muted" }, "Calculando…"))));
   fill(container, page);
@@ -571,7 +659,7 @@ function viewCart(container) {
             h("span", { class: "line-total" }, h("strong", {}, used ? money(Number(used.current_price) * line.qty) : "—")))));
     });
     fill(page.querySelector(".cart-lines"),
-      h("div", { class: "results-head" }, h("h1", {}, "Mi compra"), h("span", { class: "muted" }, `${cartCount()} artículos`)),
+      h("div", { class: "results-head" }, h("h1", {}, "Mi compra"), h("span", { class: "muted" }, countText(cartCount(), "artículo"))),
       lineViews);
 
     const stores = [...perStore.entries()].filter(([, entry]) => entry.missing < loaded.length)
@@ -594,7 +682,10 @@ function viewCart(container) {
         h("strong", {}, money(entry.total)))),
       h("p", { class: "muted small" }, `Total estimado con los precios públicos de hoy en ${cityName()}. Tu lista se guarda en este dispositivo.`));
   }).catch((error) => {
-    fill(page.querySelector(".cart-lines"), h("p", {}, `No pudimos cargar los precios: ${error.message}`));
+    if (!page.isConnected) return;
+    fill(page.querySelector(".cart-lines"), h("h1", {}, "Mi compra"), h("p", {}, `No pudimos cargar los precios. ${errorText(error)}`),
+      h("button", { type: "button", class: "primary", onclick: () => render() }, "Reintentar"));
+    fill(page.querySelector(".cart-summary"), h("h2", {}, "Tu compra"), h("p", { class: "muted" }, "Sin precios no podemos calcular el total. Tu lista sigue guardada."));
   });
   return null;
 }
@@ -620,11 +711,11 @@ async function renderAdmin(main) {
   main.dataset.view = "admin";
   fill(main, loadingPage("Abriendo el panel de revisión…"));
   try {
-    adminModule = adminModule || await import("./admin.js?v=20261113-3");
+    adminModule = adminModule || await import("./admin.js?v=20261113-5");
     if (route().path.startsWith(ADMIN_ROUTE) && main.dataset.view === "admin") adminModule.mountSizeReview(main, { h, fill });
   } catch (error) {
     delete main.dataset.view;
-    fill(main, h("div", { class: "page empty" }, h("strong", {}, "No pudimos abrir el panel."), h("p", {}, error.message)));
+    fill(main, h("div", { class: "page empty" }, h("h1", {}, "No pudimos abrir el panel."), h("p", {}, errorText(error))));
   }
   renderChrome();
 }
@@ -640,13 +731,19 @@ function render() {
   state.renderToken += 1;
   const { path, params } = route();
   let view;
-  if (path.startsWith("/p/")) view = viewProduct(decodeURIComponent(path.slice(3)), main);
+  if (path.startsWith("/p/")) view = viewProduct(safeDecode(path.slice(3)), main, (params.get("codigo") || "").replace(/\D/g, ""));
+  else if (path.startsWith("/codigo/")) view = viewBarcode(safeDecode(path.slice(8)), params, main);
   else if (path.startsWith("/buscar")) view = viewSearch(params);
   else if (path.startsWith("/ofertas")) view = viewSearch(params, { offers: true });
   else if (path.startsWith("/compra")) view = viewCart(main);
   else view = viewHome();
   if (view) fill(main, view);
   renderChrome();
+}
+
+// "#/p/%" o un enlace cortado a medias: decodeURIComponent lanza URIError.
+function safeDecode(text) {
+  try { return decodeURIComponent(text); } catch { return text; }
 }
 
 function pickCity(cities, fallback) {
@@ -685,7 +782,7 @@ async function loadCity(city) {
   } catch (error) {
     // El panel interno no depende del catálogo: un fallo al cargar precios no lo tapa.
     if (main.dataset.view === "admin") return;
-    fill(main, h("div", { class: "page empty" }, h("strong", {}, "No pudimos cargar los precios."), h("p", {}, error.message),
+    fill(main, h("div", { class: "page empty" }, h("h1", {}, "No pudimos cargar los precios."), h("p", {}, errorText(error)),
       h("button", { type: "button", class: "primary", onclick: () => location.reload() }, "Reintentar")));
   }
 }
@@ -709,7 +806,37 @@ async function start() {
   await loadCity(pickCity(cities, fallback));
 }
 
-window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); });
+// Escáner: el módulo (y la cámara) se piden sólo al tocar un botón [data-scan].
+let scannerModule = null;
+async function startScanner(opener) {
+  try {
+    scannerModule = scannerModule || await import("./scanner.js?v=20261113-5");
+    scannerModule.openScanner({
+      h, opener,
+      onCode: (code, format) => {
+        const before = location.hash;
+        go(`/codigo/${code}`, format ? new URLSearchParams({ f: format }) : null);
+        if (location.hash === before) render();  // el mismo código otra vez
+      },
+    });
+  } catch {
+    toast("No pudimos abrir el escáner");
+  }
+}
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest?.("[data-scan]");
+  if (!button) return;
+  event.preventDefault();
+  startScanner(button);
+});
+// Al cambiar de vista el foco pasa al contenido (sin mover la página): los lectores de
+// pantalla anuncian la vista nueva y el siguiente Tab sigue desde ahí.
+window.addEventListener("hashchange", () => {
+  render();
+  window.scrollTo(0, 0);
+  document.getElementById("main")?.focus({ preventScroll: true });
+});
 document.addEventListener("DOMContentLoaded", start);
 if ("serviceWorker" in navigator && location.protocol === "https:") {
   navigator.serviceWorker.register("./sw.js").catch(() => {});

@@ -28,6 +28,8 @@ from precios_supermercados.consumer_catalog_display import (  # noqa: E402
     canonical_egg_size,
     canonical_presentation,
 )
+from precios_supermercados.gtin_policy import restricted_circulation_reason  # noqa: E402
+from precios_supermercados.identifiers import canonicalize_gtin  # noqa: E402
 from precios_supermercados.matching import size_variants  # noqa: E402
 
 # Conserva la API histórica del script, incluidos helpers privados consumidos por
@@ -452,9 +454,12 @@ def export_consumer_catalog(
     _sync_core()
     WEIGHED_BY_POUND.clear()
     SOURCE_POUND.clear()
+    SOURCE_GTINS.clear()
     columns = {str(row[0]) for row in backend.query("SELECT name FROM pragma_table_info('products')")}
     if {"ean", "reference"} <= columns:  # bases mínimas de prueba no traen ean/reference
         WEIGHED_BY_POUND.update(f"{row[0]}:{row[1]}" for row in backend.query(WEIGHED_SQL))
+    if "ean" in columns:
+        SOURCE_GTINS.update(fetch_source_gtins(backend, [supermarket for supermarket, _ in scope.locations]))
     if "presentation" in columns:
         SOURCE_POUND.update(f"{row[0]}:{row[1]}" for row in backend.query(SOURCE_POUND_SQL))
     manifest = _ORIGINAL_EXPORT(
@@ -465,7 +470,113 @@ def export_consumer_catalog(
         freshness_window=freshness_window,
         require_products=require_products,
     )
-    return attach_search_index(output_directory, manifest)
+    manifest = attach_search_index(output_directory, manifest)
+    return attach_barcode_index(output_directory, manifest)
+
+
+# Escáner de Súper Compras: código de barras impreso (GTIN público) → fila del catálogo.
+BARCODES_SCHEMA = "rpi-consumer-barcodes/v1"
+BARCODES_FILE = "barcodes.json"
+# Las filas se nombran por el prefijo más corto (mínimo 8) que no se repite entre
+# las llaves publicadas (8 con las 34 mil filas de SPS del 2026-11-13). Peor caso
+# medido, un código por oferta con EAN en SPS: ≈950 KB, ≈350 KB gzip; con la llave
+# completa serían ≈600 KB gzip. La app lo resuelve contra search.json, que siempre
+# tiene cargado para mostrar la ficha.
+MIN_BARCODE_ID_PREFIX = 8
+# "supermarket_id:product_id" → GTIN-14 válido y de circulación global.
+SOURCE_GTINS: dict[str, str] = {}
+
+
+def scan_gtin(value: object) -> str | None:
+    """GTIN-14 de un código fuente; ceros de relleno más allá de 14 dígitos no cuentan."""
+    text = str(value or "").strip()
+    if len(text) > 14 and text.isdigit() and not text[:-14].strip("0"):
+        text = text[-14:]
+    return canonicalize_gtin(text)
+
+
+def fetch_source_gtins(backend: QueryBackend, supermarket_ids: Iterable[str]) -> dict[str, str]:
+    """Una sola lectura de ``products.ean`` acotada a las cadenas del scope.
+
+    Sólo GTIN válidos por dígito de control (GTIN-14 canónico: 7411000230701,
+    07411000230701 y 0007411000230701 son el mismo) y de circulación global: los
+    rangos GS1 restringidos (peso variable "2…", uso interno, cupones) se repiten
+    entre tiendas con productos distintos y no sirven para escanear.
+    """
+    supermarkets = sorted(set(supermarket_ids))
+    if not supermarkets:
+        return {}
+    placeholders = ",".join("?" for _ in supermarkets)
+    rows = backend.query(
+        f"SELECT supermarket_id, product_id, ean FROM products WHERE ean IS NOT NULL AND supermarket_id IN ({placeholders})",
+        tuple(supermarkets),
+    )
+    result: dict[str, str] = {}
+    for supermarket_id, product_id, ean in rows:
+        gtin = scan_gtin(ean)
+        if gtin is None or restricted_circulation_reason(gtin) is not None:
+            continue
+        result[f"{supermarket_id}:{product_id}"] = gtin
+    return result
+
+
+def _unique_prefix_length(keys: Sequence[str], minimum: int = MIN_BARCODE_ID_PREFIX) -> int:
+    longest = max((len(key) for key in keys), default=minimum)
+    for length in range(minimum, longest + 1):
+        if len({key[:length] for key in keys}) == len(keys):
+            return length
+    raise ExportError("consumer_barcodes_row_id_collision")
+
+
+def attach_barcode_index(output_directory: Path, manifest: dict[str, object]) -> dict[str, object]:
+    """Índice de códigos de barras (``barcodes.json``): GTIN-14 → filas públicas.
+
+    Se deriva de las particiones ya escritas (sólo filas visibles) y de los GTIN
+    leídos en ``fetch_source_gtins``: no publica nada que no esté ya en el
+    catálogo salvo el código impreso en el empaque. Una fila puede tener varios
+    códigos (ofertas de varias cadenas) y un código varias filas (la misma
+    identidad publicada aparte por no ser comparable); la app muestra una lista.
+    Queda listado con SHA-256 en el manifest como el resto de archivos.
+    """
+    partitions = [
+        str(item["path"])
+        for item in manifest.get("files", [])  # type: ignore[union-attr]
+        if isinstance(item, dict) and str(item.get("path", "")).startswith("catalog/")
+    ]
+    keys: list[str] = []
+    codes: dict[str, set[str]] = {}
+    for relative in partitions:
+        document = json.loads((output_directory / relative).read_text(encoding="utf-8"))
+        for row in document.get("rows", []):
+            key = str(row["row_id"]).split("-", 1)[-1]
+            keys.append(key)
+            for offer in row.get("offers") or ():
+                gtin = SOURCE_GTINS.get(public_product_id(str(offer.get("source_product_id", ""))))
+                if gtin:
+                    codes.setdefault(gtin, set()).add(key)
+    if len(set(keys)) != len(keys) or len(keys) != manifest.get("visible_rows"):
+        raise ExportError("consumer_barcodes_row_count_mismatch")
+    length = _unique_prefix_length(keys)
+    rows_with_code = {key for found in codes.values() for key in found}
+    document = {
+        "schema": BARCODES_SCHEMA,
+        "as_of": manifest.get("as_of"),
+        "gtin_format": "gtin14",
+        "id_prefix_length": length,
+        "code_count": len(codes),
+        "row_count": len(rows_with_code),
+        "codes": {
+            gtin: (lambda prefixes: prefixes[0] if len(prefixes) == 1 else prefixes)(sorted(key[:length] for key in found))
+            for gtin, found in sorted(codes.items())
+        },
+    }
+    _core._atomic_bytes(output_directory / BARCODES_FILE, _compact_json(document))
+    files = [item for item in manifest.get("files", []) if not (isinstance(item, dict) and item.get("path") == BARCODES_FILE)]  # type: ignore[union-attr]
+    files.append(_core._file_metadata(output_directory, BARCODES_FILE))
+    manifest["files"] = files
+    manifest["barcodes_file"] = BARCODES_FILE
+    _core._atomic_bytes(output_directory / "manifest.json", _core._json_bytes(manifest))
+    return manifest
 
 
 SEARCH_SCHEMA = "rpi-consumer-search/v1"

@@ -1,7 +1,7 @@
 {
   "name": "Súper Compras",
   "short_name": "Súper Compras",
-  "description": "Compara precios de supermercados en San Pedro Sula.",
+  "description": "Compara precios de supermercados en San Pedro Sula y Tegucigalpa.",
   "lang": "es-HN",
   "start_url": "./",
   "scope": "./",

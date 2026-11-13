@@ -32,6 +32,18 @@ export function fold(value) {
     .replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+// "1 artículo", "2 artículos", "1,234 productos": número con separador local y plural.
+export function countText(value, singular, plural = `${singular}s`) {
+  const number = Number(value) || 0;
+  return `${number.toLocaleString("es-HN")} ${number === 1 ? singular : plural}`;
+}
+
+// "La Colonia, Walmart y Paiz": lista en español con "y" antes del último.
+export function listText(items) {
+  const names = items.filter(Boolean);
+  return names.length > 1 ? `${names.slice(0, -1).join(", ")} y ${names.at(-1)}` : names.join("");
+}
+
 export function money(value) {
   const number = Number(value);
   return Number.isFinite(number) ? `L ${number.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—";
@@ -456,6 +468,51 @@ export function hondurasDay(value) {
   return Number.isFinite(time) ? new Date(time - 6 * 3600 * 1000).toISOString().slice(0, 10) : "";
 }
 
+// ------------------------------------------------------------------ códigos de barras
+// Formatos de los productos de súper (GS1): EAN-13, EAN-8, UPC-A y UPC-E.
+export const BARCODE_FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e"];
+
+// Dígito de control GS1 (8, 12, 13 o 14 dígitos).
+export function gtinValid(digits) {
+  const text = String(digits ?? "");
+  if (!/^(?:\d{8}|\d{12,14})$/.test(text)) return false;
+  let sum = 0;
+  for (let index = text.length - 2, weight = 3; index >= 0; index -= 1, weight = 4 - weight) sum += Number(text[index]) * weight;
+  return (10 - (sum % 10)) % 10 === Number(text.at(-1));
+}
+
+// UPC-E (8 dígitos, o 6/7 sin sistema o sin control) → UPC-A de 12 dígitos.
+export function expandUpcE(value) {
+  let text = String(value ?? "");
+  if (text.length === 6) text = `0${text}`;
+  if (!/^[01]\d{6,7}$/.test(text)) return null;
+  const [n, a, b, c, d, e, f] = text;
+  const body = f <= "2" ? `${n}${a}${b}${f}0000${c}${d}${e}`
+    : f === "3" ? `${n}${a}${b}${c}00000${d}${e}`
+      : f === "4" ? `${n}${a}${b}${c}${d}00000${e}`
+        : `${n}${a}${b}${c}${d}${e}0000${f}`;
+  if (text.length === 8) return `${body}${text[7]}`;
+  for (let check = 0; check <= 9; check += 1) if (gtinValid(`${body}${check}`)) return `${body}${check}`;
+  return null;
+}
+
+// Código leído o escrito → GTIN-14 posibles (con su dígito de control válido).
+// 7411000230701, 07411000230701 y 0007411000230701 dan el mismo; un código de 8
+// dígitos escrito a mano puede ser EAN-8 o UPC-E y se prueban los dos.
+export function barcodeCandidates(raw, format = "") {
+  let digits = String(raw ?? "").replace(/\D/g, "");
+  if (digits.length > 14 && /^0+$/.test(digits.slice(0, -14))) digits = digits.slice(-14);
+  const found = [];
+  const add = (code) => {
+    if (!code || !gtinValid(code)) return;
+    const gtin = code.padStart(14, "0");
+    if (!found.includes(gtin)) found.push(gtin);
+  };
+  if (format !== "upc_e") add(digits);
+  if (format === "upc_e" || (!format && digits.length === 8)) add(expandUpcE(digits));
+  return found;
+}
+
 // id público = row_id sin su prefijo ("source-…", "canonical-…").
 export function rowKey(rowId) {
   const text = String(rowId ?? "");
@@ -595,6 +652,46 @@ export class Catalog {
       )).catch((error) => { this.legacyPromise = null; throw error; });
     }
     return this.legacyPromise;
+  }
+
+  // Códigos de barras (barcodes.json): GTIN-14 → prefijo de la llave de la fila. Se
+  // pide sólo al escanear; null si el catálogo publicado todavía no lo trae.
+  barcodeIndex() {
+    const file = this.manifest?.barcodes_file;
+    if (!file || !this.files?.has(file)) return Promise.resolve(null);
+    if (!this.barcodePromise) {
+      this.barcodePromise = this.fetchJson(file).then((document) => {
+        if (document?.schema !== "rpi-consumer-barcodes/v1") throw new Error("Índice de códigos no compatible");
+        return document;
+      }).catch((error) => { this.barcodePromise = null; throw error; });
+    }
+    return this.barcodePromise;
+  }
+
+  // Productos de un código leído o escrito: { candidates, invalid, available, products }.
+  async findBarcode(raw, format = "") {
+    const candidates = barcodeCandidates(raw, format);
+    if (!candidates.length) return { candidates, invalid: true, available: true, products: [] };
+    const [index] = await Promise.all([this.barcodeIndex(), this.ready ? null : this.loadIndex()]);
+    if (!index) return { candidates, invalid: false, available: false, products: [] };
+    const length = Number(index.id_prefix_length) || 0;
+    if (this.prefixLength !== length || !this.byPrefix) {
+      this.byPrefix = new Map();
+      for (const product of this.products) {
+        const key = product.id.slice(0, length);
+        (this.byPrefix.get(key) || this.byPrefix.set(key, []).get(key)).push(product);
+      }
+      this.prefixLength = length;
+    }
+    const products = [];
+    for (const gtin of candidates) {
+      const value = Object.hasOwn(index.codes || {}, gtin) ? index.codes[gtin] : null;
+      for (const prefix of [value].flat()) {
+        for (const product of this.byPrefix.get(String(prefix)) || []) if (!products.includes(product)) products.push(product);
+      }
+    }
+    products.sort((a, b) => Number(a.best_price || Number.POSITIVE_INFINITY) - Number(b.best_price || Number.POSITIVE_INFINITY));
+    return { candidates, invalid: false, available: true, products };
   }
 
   get asOf() { return this.manifest?.as_of; }
