@@ -230,6 +230,31 @@ console.log(JSON.stringify(out));
     assert result["key"] == "abc-def"
 
 
+def test_alternatives_skip_per_piece_prices_and_generic_types(tmp_path: Path) -> None:
+    """"DEL CHEF Tortilla Maiz a Mano" (Abarrotes, 1 unidad) proponía semitas por unidad."""
+    script = """
+import { Catalog } from './data.js';
+const c = Object.create(Catalog.prototype);
+const p = (id, brand, type, presentation, unit) => ({ id, brand, product_type: type, presentation,
+  unit_amount: unit, unit_per: 'unidad', retailers: ['colonial'] });
+c.products = [
+  p('tortilla', 'Del Chef', 'Abarrotes', '1 unidad', '19.99'),
+  p('semita', 'Los Andes', 'Abarrotes', '1 unidad', '15.00'),
+  p('pack', 'Otra', 'Abarrotes', '10 unidades', '2.80'),
+  p('huevo30', 'Kiki', 'Huevo', '30 unidades', '4.50'),
+  p('huevo15', 'Rica Yema', 'Huevo', '15 unidades', '4.80'),
+  p('huevo1', 'Suelto', 'Huevo', '1 unidad', '5.00'),
+];
+console.log(JSON.stringify({
+  tortilla: c.alternatives(c.products[0]).map((x) => x.id),
+  pack: c.alternatives(c.products[2]).map((x) => x.id),
+  huevo: c.alternatives(c.products[3]).map((x) => x.id),
+}));
+"""
+    result = json.loads(_node(script, tmp_path))
+    assert result == {"tortilla": [], "pack": [], "huevo": ["huevo15"]}
+
+
 def test_catalog_paints_home_first_and_loads_the_index_once_in_the_background(tmp_path: Path) -> None:
     """Inicio sale de home.json; buscar, Mi compra y un enlace a producto esperan el índice."""
     script = """
@@ -597,6 +622,20 @@ console.log(JSON.stringify([c.staleRetailers().map((x) => x.id),
   c.staleSince({ supermarket_id: 'la_colonia', location_id: 'la_colonia_sps' })]));
 """
     assert json.loads(_node(script, tmp_path)) == [["comisariato_los_andes"], "2026-10-21T11:18:55Z", None]
+
+
+def test_fresh_capture_from_a_previous_honduras_day_is_not_today(tmp_path: Path) -> None:
+    """2026-11-13: La Colonia SPS FRESH (33 h, umbral 48 h) del 12-nov y la portada decía "Precios de hoy"."""
+    script = """
+import { Catalog, hondurasDay } from './data.js';
+const c = Object.create(Catalog.prototype);
+c.manifest = { as_of: '2026-11-13T21:10:40Z', source_freshness: [
+  { supermarket_id: 'la_colonia', location_id: 'la_colonia_sps', status: 'FRESH', last_successful_at: '2026-11-12T11:27:16Z' },
+  { supermarket_id: 'walmart', location_id: 'walmart_sps', status: 'FRESH', last_successful_at: '2026-11-13T11:26:06Z' },
+] };
+console.log(JSON.stringify([c.staleRetailers().map((x) => x.id), hondurasDay('2026-11-14T03:00:00Z'), hondurasDay('x')]));
+"""
+    assert json.loads(_node(script, tmp_path)) == [["la_colonia"], "2026-11-13", ""]
 
 
 def test_old_branch_keys_in_my_cart_and_links_move_to_the_product_card(tmp_path: Path) -> None:

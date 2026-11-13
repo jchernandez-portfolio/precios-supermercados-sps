@@ -450,6 +450,12 @@ function photoValue(value) {
   return Number(value) || 0;
 }
 
+// Fecha "AAAA-MM-DD" en Honduras (sin horario de verano: UTC-6), o "" si no es fecha.
+export function hondurasDay(value) {
+  const time = Date.parse(String(value ?? ""));
+  return Number.isFinite(time) ? new Date(time - 6 * 3600 * 1000).toISOString().slice(0, 10) : "";
+}
+
 // id público = row_id sin su prefijo ("source-…", "canonical-…").
 export function rowKey(rowId) {
   const text = String(rowId ?? "");
@@ -594,10 +600,15 @@ export class Catalog {
   get asOf() { return this.manifest?.as_of; }
   get productCount() { return this.ready ? this.products.length : (this.rowCount || 0); }
 
-  // Súper cuya última captura aceptada no es del día (manifest.source_freshness).
+  // Súper cuya última captura aceptada no es del día (manifest.source_freshness). FRESH
+  // vale 48 h (sigue entrando a la comparación si falló un día), pero "de hoy" es la
+  // fecha de Honduras del catálogo: La Colonia del 12-nov en el catálogo del 13-nov no
+  // es "de hoy" aunque siga FRESH.
   staleRetailers() {
+    const today = hondurasDay(this.manifest?.as_of);
     return (this.manifest?.source_freshness || [])
-      .filter((item) => item.status && item.status !== "FRESH" && item.last_successful_at)
+      .filter((item) => item.status && item.last_successful_at
+        && (item.status !== "FRESH" || (today && hondurasDay(item.last_successful_at) < today)))
       .map((item) => ({ id: item.supermarket_id, location: item.location_id, since: item.last_successful_at }));
   }
 
@@ -668,10 +679,16 @@ export class Catalog {
     return { total: results.length, items, related };
   }
 
+  // Precio "por unidad" sólo se compara entre productos con conteo publicado ("12
+  // unidades") y de un tipo concreto: "1 unidad" es el precio de la pieza, y en un tipo
+  // genérico (Abarrotes) una tortilla y una semita no son alternativas.
   alternatives(product, limit = 6) {
     if (!product.product_type || !product.unit_per) return [];
+    const perPiece = (item) => item.unit_per === "unidad"
+      && (item.presentation === "1 unidad" || GENERIC_TYPES.has(fold(item.product_type)));
+    if (perPiece(product)) return [];
     const peers = this.products.filter((other) => other.product_type === product.product_type
-      && other.unit_per === product.unit_per && Number(other.unit_amount) > 0);
+      && other.unit_per === product.unit_per && Number(other.unit_amount) > 0 && !perPiece(other));
     // Descarta precios por unidad imposibles (tamaños mal publicados, p. ej. "1100 Lt").
     const values = peers.map((other) => Number(other.unit_amount)).sort((a, b) => a - b);
     const median = values[Math.floor(values.length / 2)] || 0;

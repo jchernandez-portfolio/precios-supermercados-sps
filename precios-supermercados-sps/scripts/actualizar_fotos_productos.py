@@ -442,7 +442,7 @@ def branch_photo_moves(rows: Sequence[CatalogRow], index: Mapping[str, Mapping[s
         if len(products) != 1:
             continue
         target = card_key(next(iter(products)))
-        if _usable(index.get(target)):
+        if _usable(index.get(target)) or (index.get(target) or {}).get("nh"):
             continue
         donors.setdefault(target, set()).update(
             key for key in (row.key, *(card_key(item) for item in row.branch_ids))
@@ -498,6 +498,40 @@ def adopt_branch_photos(moves: Sequence[tuple[str, str]], index: dict[str, dict[
             if number % 500 == 0:
                 log(f"heredadas {number}/{len(moves)} fotos de tarjetas por sucursal")
     return stats
+
+
+def drop_foreign_inherited(rows: Sequence[CatalogRow], index: dict[str, dict[str, object]],
+                           output_dir: Path) -> int:
+    """Quita la foto heredada de sucursal cuando es la foto propia de OTRO producto.
+
+    La herencia supone que la tarjeta por sucursal tenía la foto del mismo producto.
+    Si esa misma foto (huella) es la elegida, sin herencia, para una fila publicada
+    cuyos productos no tienen nada en común con los de la fila que la heredó, la
+    herencia está mal (medido el 2026-11-13: "Refrigeradora Durabrand" con la foto de
+    "Imán de moscas Terro", "Premezcla Tres Leches" con la de "Detergente Ariel"). La
+    fila queda sin foto y marcada ``nh`` (no heredar otra vez): se vuelve a evaluar con
+    sus propias fotos en esta misma corrida o en la próxima. Nunca se elige otra foto
+    por parecido.
+    """
+    products = {row.key: set(row.offers) for row in rows}
+    owners: dict[str, list[str]] = {}
+    for key, item in index.items():
+        if key in products and _usable(item) and not item.get("de"):
+            owners.setdefault(str(item["h"]), []).append(key)
+    dropped = 0
+    for key in sorted(index):
+        item = index[key]
+        if not item.get("de") or not _usable(item) or key not in products:
+            continue
+        digest = str(item["h"])
+        others = [owner for owner in owners.get(digest, ()) if owner not in {key, item.get("de")}]
+        if not others or any(products[owner] & products[key] for owner in others):
+            continue
+        for relative in image_paths(key, digest).values():
+            (output_dir / relative).unlink(missing_ok=True)
+        index[key] = {"sig": None, "none": 1, "c": CRITERIA_VERSION, "nh": 1}
+        dropped += 1
+    return dropped
 
 
 def prune_generic(index: dict[str, dict[str, object]], output_dir: Path,
@@ -713,6 +747,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     inherited = adopt_branch_photos(moves, index, args.output_dir, fetch_bytes, args.public_base.rstrip("/"))
     print(f"fotos por sucursal heredadas: {dict(inherited)} de {len(moves)}")
+    foreign = drop_foreign_inherited(rows, index, args.output_dir)
+    if foreign:
+        inherited["herencia_de_otro_producto"] = foreign
+    print(f"fotos heredadas que eran de otro producto (quedan para reevaluar): {foreign}")
 
     backend = TursoBackend(os.environ.get("TURSO_DATABASE_URL", ""), os.environ.get("TURSO_AUTH_TOKEN", ""))
     refs = fetch_source_refs(backend, (product for row in rows for _, product in row.offers))

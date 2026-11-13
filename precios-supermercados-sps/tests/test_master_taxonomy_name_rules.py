@@ -113,3 +113,23 @@ def test_public_assignment_uses_product_name() -> None:
         comparison_status="single_source", source_category="Carnes y Refrigerados",
     )
     assert mt.public_fields(core._public_assignment([item]).node) == ("Alimentos", "Embutidos y carnes frías")
+
+
+def test_coffee_type_needs_coffee_words_in_the_name() -> None:
+    # La Colonia "Café, Tés e Infusiones": el motor deduce "Café" de la ruta. Antes la
+    # búsqueda "café" ordenada por precio empezaba por Valeriana y Manzanilla Mazo.
+    path = "Supermercado > Abarrotes > Café, Tés e Infusiones"
+
+    def public(name: str) -> tuple[str | None, str | None]:
+        return mt.public_fields(mt.assign_offer("la_colonia", path, "Café", "Bebidas", product_name=name).node)
+
+    assert public("Valeriana Mazo") == ("Bebidas y tabaco", "Té e infusiones")
+    assert public("Zacate De Limón En Polvo Dtelica 40 Gr") == ("Bebidas y tabaco", "Té e infusiones")
+    assert public("Cremora Fans No Lactea 11 Oz") == ("Bebidas y tabaco", "Cremoras y endulzantes para café")
+    # Sin regla por nombre queda en la categoría del súper, no en "Café".
+    assert public("Linaza Del Bosque Bolsa 280 Gr") == ("Bebidas y tabaco", "Café, té e infusiones")
+    assert public("Café Molido Maya 400 g") == ("Bebidas y tabaco", "Café")
+    assert public("Nescafe Clasico 200 g") == ("Bebidas y tabaco", "Café")
+    # Sin nombre (p. ej. la onza del motor) el tipo se respeta tal cual.
+    assert mt.assign_offer("la_colonia", path, "Café", "Bebidas").node.subcategory == "Café"
+    assert not mt.type_without_name_evidence("Té", "Manzanilla Mazo")

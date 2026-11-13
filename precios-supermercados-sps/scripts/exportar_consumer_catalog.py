@@ -153,6 +153,15 @@ _PIECES_RE = re.compile(
     r"(\d+)\s*(?:tabletas|tabs?|c[aá]psulas|caps|comprimidos|gomas|gomitas|sobres|softgels|grageas)(?![a-z])",
     re.IGNORECASE,
 )
+# Conteo explícito de piezas en el nombre ("Toallas Saba ... - 40 piezas") y medida de
+# peso/volumen en el nombre ("4 pzas/490 ml"): si el nombre trae conteo y ninguna
+# medida, un peso que sólo publica el campo del súper ("40 piezas" con 3 g, "Rasuradoras
+# ... 15Pzas" con 415 g) contradice el nombre (ver _hide_source_size_against_name_count).
+_NAME_COUNT_RE = re.compile(r"(\d+)\s*(pzas?|piezas|pcs|unidades|uds)(?![a-z])", re.IGNORECASE)
+_NAME_MEASURE_RE = re.compile(
+    r"\d\s*(?:-\s*)?(?:kgs?|kilos?|g|gr|grs|grms?|gramos?|mg|ml|mls|l|lt|lts|litros?|oz|onz|onzas?|lbs?|libras?|gal|gl)(?![a-z])",
+    re.IGNORECASE,
+)
 # Más de 50 kg no es un producto de súper, salvo equipo de gimnasio o sacos.
 MAX_PLAUSIBLE_GRAMS = Decimal("50000")
 MAX_PLAUSIBLE_ML = Decimal("60000")
@@ -177,12 +186,15 @@ def fix_name_measures(offer: VisibleOffer) -> VisibleOffer:
     except (InvalidOperation, TypeError, ValueError):
         return offer
     mass = offer.presentation_dimension == "mass_g"
-    dose = mass and _DOSE_RE.search(name) is not None and total < 5
+    pieces = _PIECES_RE.search(name)
+    has_dose = mass and _DOSE_RE.search(name) is not None
+    # "Now Magnesio 180 Cápsulas / 400 mg" (72 g = 180 × 400 mg): con dosis y conteo
+    # el contenido es el conteo, sea cual sea el peso que sale de multiplicarlos.
+    dose = has_dose and (total < 5 or pieces is not None)
     limit = MAX_PLAUSIBLE_GRAMS if mass else MAX_PLAUSIBLE_ML
     huge = total > limit and not _HEAVY_OK_RE.search(name)
     if not dose and not huge:
-        return offer
-    pieces = _PIECES_RE.search(name)
+        return _hide_source_size_against_name_count(offer, name)
     if pieces and int(pieces.group(1)) > 0:
         return _core.replace(offer, presentation_dimension="count", presentation_total_base=pieces.group(1),
                              presentation_status="name_only", presentation=None)
@@ -193,6 +205,25 @@ def fix_name_measures(offer: VisibleOffer) -> VisibleOffer:
     # Tamaño imposible sin conteo ("Sprite 1100 Lt"): se publica tal cual; la app lo
     # corrige con un patrón seguro o lo esconde, y la auditoría lo reporta.
     return offer
+
+
+def _hide_source_size_against_name_count(offer: VisibleOffer, name: str) -> VisibleOffer:
+    """Peso/volumen sólo del campo del súper que contradice un conteo del nombre.
+
+    No reparte el peso ni lo adivina: "N unidades" del nombre es el contenido (GS1,
+    conteo); "N piezas" se deja sin tamaño publicado (la app lo lee del nombre como
+    piezas de un juego o unidades de comida, igual que cuando el súper no publica nada).
+    """
+    if offer.presentation_status != "source_only" or _NAME_MEASURE_RE.search(name):
+        return offer
+    counted = _NAME_COUNT_RE.search(name)
+    if counted is None or int(counted.group(1)) < 2:
+        return offer
+    if counted.group(2).casefold() in {"unidades", "uds"}:
+        return _core.replace(offer, presentation_dimension="count", presentation_total_base=counted.group(1),
+                             presentation_status="name_only", presentation=None)
+    return _core.replace(offer, presentation_dimension=None, presentation_total_base=None,
+                         presentation_status="rejected_implausible", presentation=None)
 
 
 def ounce_as_mass(offer: VisibleOffer) -> VisibleOffer:
@@ -268,11 +299,17 @@ def _weighed_type(row: dict[str, object]) -> bool:
     return bool(words & WEIGHED_TYPE_WORDS)
 
 
+def _pound_key(offer: dict[str, object]) -> str:
+    """Producto de la oferta sin sucursal: Tegucigalpa publica "walmart:51@walmart_tgu_ffaa"
+    y los conjuntos de producto pesado se leen de ``products`` ("walmart:51")."""
+    return _core.public_product_id(str(offer.get("source_product_id")))
+
+
 def _price_per_pound(row: dict[str, object]) -> None:
     """Ofertas de producto pesado en tienda: precio por libra, no por paquete."""
     offers = [offer for offer in row.get("offers") or () if isinstance(offer, dict)]
-    source = [offer for offer in offers if str(offer.get("source_product_id")) in SOURCE_POUND]
-    coded = [offer for offer in offers if str(offer.get("source_product_id")) in WEIGHED_BY_POUND
+    source = [offer for offer in offers if _pound_key(offer) in SOURCE_POUND]
+    coded = [offer for offer in offers if _pound_key(offer) in WEIGHED_BY_POUND
              and offer not in source] if _weighed_type(row) else []
     weighed = source + coded
     if not weighed or _PER_UNIT_NAME.search(str(row.get("product_name") or "")):
