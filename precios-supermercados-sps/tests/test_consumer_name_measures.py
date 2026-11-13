@@ -45,3 +45,31 @@ def test_plausible_and_heavy_items_are_untouched() -> None:
     assert shown(offer("Harina Maseca 1 kg", "mass_g", "1000"))[2] == "1000"
     assert shown(offer("Estación de Fuerza Capacidad 100 kg", "mass_g", "100000"))[2] == "100000"
     assert shown(offer("Vitamina C 500 mg 100 tabletas", "count", "100"))[2] == "100"
+
+
+def test_dose_with_count_uses_the_count_even_when_the_total_looks_plausible() -> None:
+    # PriceSmart: 180 cápsulas de 400 mg salían como 72 g (L 7,221 por kg).
+    assert shown(offer("Now Magnesio 180 Cápsulas / 400 mg / 0.01 oz", "mass_g", "72")) == (
+        "180 unidades", "count", "180")
+
+
+def source_only(name, dimension, total):
+    return MODULE._core.replace(offer(name, dimension, total), presentation_status="source_only")
+
+
+def test_source_weight_against_a_name_count_is_not_shown() -> None:
+    # Paiz publica en su campo un peso que el nombre contradice.
+    assert shown(source_only("Protectores Diarios Saba Largos - 40 piezas", "mass_g", "3")) == (None, None, None)
+    assert shown(source_only("Rasuradoras Desechables Equate 2 Hojas Mango Reforzado Antidesliz - 15Pzas",
+                             "mass_g", "415")) == (None, None, None)
+    # "N unidades" del nombre es el contenido (conteo), no el peso del súper.
+    assert shown(source_only("Tapete Antifatiga 12 Unidades", "mass_g", "270")) == ("12 unidades", "count", "12")
+
+
+def test_name_count_with_a_measure_or_confirmed_size_is_untouched() -> None:
+    assert shown(source_only("Vasos altos Mainstays de vidrio-4 pzas/490 ml", "volume_ml", "490"))[1:] == (
+        "volume_ml", "490")
+    assert shown(source_only("Jabón Neutro Skin Surtido 6 Pack - 660 g", "mass_g", "660"))[1:] == ("mass_g", "660")
+    assert shown(offer("Cepillo Dental Colgate 360 - 3 Pzas", "mass_g", "61"))[1:] == ("mass_g", "61")
+    assert shown(source_only("Ambiental Pinito Fresa 1 Pack", "mass_g", "45"))[1:] == ("mass_g", "45")
+    assert shown(source_only("Vela Numero 1", "mass_g", "450"))[1:] == ("mass_g", "450")

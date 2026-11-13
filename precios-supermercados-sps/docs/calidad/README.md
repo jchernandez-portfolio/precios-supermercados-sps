@@ -30,3 +30,7 @@ Antes de esconder, la web intenta corregir errores del súper con un patrón cla
 1.1 L, "397 Oz" = 397 g, "3 78lt" = 3.78 L, "48 Unidades / 960 g" = 960 g en total) y sólo acepta la
 corrección si el precio por kg/L queda en el rango normal de su tipo. Esos casos salen en la
 auditoría como "Corregido en la web" para reportarlos al súper.
+
+Auditoría del pipeline (lo que publica Python, antes de las correcciones de la app):
+`scripts/auditar_catalogo_publico.py --data <copia de published/rpi/v3> --photos-index <index.json>`.
+Informe del 2026-11-13 con revisión visual de fotos: [auditoria-catalogo-publico-2026-11-13.md](auditoria-catalogo-publico-2026-11-13.md) (#83).

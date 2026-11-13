@@ -214,6 +214,29 @@ class Assignment:
     crosswalk_level: str | None  # None = categoría del súper sin equivalencia
 
 
+# Tipos que el motor puede deducir de la ruta del súper ("Café, Tés e Infusiones" →
+# Café) aunque el producto sea otro (manzanilla, valeriana, cremora, crema agria). En
+# la superficie pública el tipo sólo se usa si el nombre trae evidencia; si no, la
+# oferta queda en el nodo de su categoría del súper y el paso 4b decide por nombre.
+# No cambia identidad, perfiles ni comparabilidad (el motor no usa esta función).
+TYPE_NAME_EVIDENCE = {
+    "Café": (
+        "cafe", "coffee", "coffe", "cooffee", "espresso", "expreso", "capuccino", "cappuccino", "capuchino",
+        "mocha", "moka", "latte", "frappuccino", "frapuccino", "frappe", "nescafe", "roast", "tueste",
+        "tostado y molido", "gold blend", "descafeinado",
+    ),
+}
+
+
+def type_without_name_evidence(product_type: str | None, product_name: str | None) -> bool:
+    """El tipo del motor exige palabras del nombre y el nombre no trae ninguna."""
+    words = TYPE_NAME_EVIDENCE.get(product_type or "")
+    if not words or product_name is None:
+        return False
+    text = name_text(product_name)
+    return not any(_phrase(word) in text for word in words)
+
+
 def assign_offer(
     supermarket_id: str,
     source_category: str | None,
@@ -225,8 +248,11 @@ def assign_offer(
     """Nodo público de una oferta individual (pasos 3 a 5).
 
     Con ``product_name`` aplica además el paso 4b (subcategoría por nombre) a
-    las asignaciones que no llegaron a subcategoría.
+    las asignaciones que no llegaron a subcategoría, y descarta los tipos sin
+    evidencia en el nombre (``TYPE_NAME_EVIDENCE``).
     """
+    if type_without_name_evidence(product_type, product_name):
+        product_type = None
     assignment = _assign_offer(supermarket_id, source_category, product_type, identity_category, taxonomy)
     if product_name is None or assignment.source == "excluded":
         return assignment

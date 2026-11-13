@@ -303,3 +303,41 @@ def test_inherited_photos_do_not_count_as_generic_owners(tmp_path: Path) -> None
     index["k4"] = {"h": "a" * 10}
     assert fotos.prune_generic(index, tmp_path) == 6  # genérica: caen también las heredadas
     assert all(item.get("gen") for item in index.values())
+
+
+def test_inherited_photo_owned_by_another_product_is_dropped_and_not_inherited_again(tmp_path: Path) -> None:
+    # Medido el 2026-11-13: la tarjeta por sucursal de walmart:25642 (refrigeradora)
+    # tenía la foto del imán de moscas Terro (walmart:25656) y la fila por producto la heredó.
+    fridge, terro = _key("walmart:25642"), _key("walmart:25656")
+    fridge_branch = _key("walmart:25642@walmart_tgu_ffaa")
+    twin, twin_branch = _key("walmart:7"), _key("walmart:7@walmart_tgu_ffaa")
+    rows = fotos.parse_catalog_rows({"rows": [
+        {"row_id": f"source-{fridge}", "offers": [{"source_product_id": "walmart:25642@walmart_tgu_ffaa"}]},
+        {"row_id": f"source-{terro}", "offers": [{"source_product_id": "walmart:25656@walmart_tgu_ffaa"}]},
+        {"row_id": f"source-{twin}", "offers": [{"source_product_id": "walmart:7@walmart_tgu_ffaa"}]},
+        {"row_id": "product-ab", "offers": [{"source_product_id": "walmart:7@walmart_tgu_ffaa"},
+                                            {"source_product_id": "paiz:9@paiz_tgu_proceres"}]},
+    ]})
+    wrong, right = "a" * 10, "b" * 10
+    index = {
+        terro: {"sig": "s1", "h": wrong, "s": 91, "c": 4},
+        fridge_branch: {"sig": "s1", "h": wrong, "s": 91, "c": 4},
+        fridge: {"sig": "s1", "h": wrong, "s": 91, "c": 4, "de": fridge_branch},
+        # Mismo producto en otra fila (comparable con Paiz): la herencia es correcta.
+        "ab": {"sig": "s2", "h": right, "s": 90, "c": 4},
+        twin_branch: {"sig": "s2", "h": right, "s": 90, "c": 4},
+        twin: {"sig": "s2", "h": right, "s": 90, "c": 4, "de": twin_branch},
+    }
+    for size in (800, 320):
+        path = tmp_path / f"{size}/{fridge[:2]}/{fridge}-{wrong}.webp"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"x")
+    assert fotos.drop_foreign_inherited(rows, index, tmp_path) == 1
+    assert index[fridge] == {"sig": None, "none": 1, "c": fotos.CRITERIA_VERSION, "nh": 1}
+    assert index[twin]["h"] == right and index[terro]["h"] == wrong
+    assert not list(tmp_path.rglob(f"{fridge}-*.webp"))
+    # Sin foto propia todavía, la próxima corrida no vuelve a heredar la de la sucursal.
+    assert fotos.branch_photo_moves(rows, index) == []
+    # Y la fila queda pendiente para evaluarse con sus propias fotos.
+    candidates = {fridge: [fotos.images.Candidate("walmart", 0, "https://img.test/fridge.jpg", None)]}
+    assert fotos.plan(rows, candidates, index, 10) == [fridge]

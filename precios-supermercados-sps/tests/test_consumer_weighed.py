@@ -105,3 +105,22 @@ def test_name_ending_in_unit_wins() -> None:
     item["product_name"] = "COLONIAL Encurtido Rojo und"
     MODULE._price_per_pound(item)
     assert item["presentation"] == "5 lb"
+
+
+def test_tegucigalpa_offers_with_branch_suffix_are_priced_per_pound() -> None:
+    # Tegucigalpa publica la oferta con su sucursal ("walmart:24134@walmart_tgu_ffaa");
+    # el conjunto de productos pesados viene de ``products`` sin sucursal. Antes no
+    # coincidían y ninguna oferta de Tegucigalpa salía por libra (0 contra 842 en SPS).
+    MODULE.WEIGHED_BY_POUND.clear()
+    MODULE.SOURCE_POUND.clear()
+    MODULE.WEIGHED_BY_POUND.add("walmart:24134")
+    item = row(("walmart:24134@walmart_tgu_ffaa", "74.90"), ("walmart:24134@walmart_tgu_el_sauce", "74.90"),
+               product_type="Cerdo")
+    item["product_name"] = "Medallon Lomo Cerdo Don Cristobal 5 lb Empacado - Precio Indicado Por Libra"
+    MODULE._price_per_pound(item)
+    assert item["presentation"] == "por libra"
+    assert [offer["unit_price"] for offer in item["offers"]] == [{"amount": "74.90", "per": "libra"}] * 2
+    other = row(("walmart:1@walmart_tgu_ffaa", "42.00"), product_type="Cerdo")
+    MODULE._price_per_pound(other)
+    assert other["presentation"] == "5 lb"
+    MODULE.WEIGHED_BY_POUND.clear()
