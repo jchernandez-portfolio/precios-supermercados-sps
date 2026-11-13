@@ -60,7 +60,10 @@ ENGINE_BY_PROVIDER = {"claude": "claude_auto", "gemini": "gemini_auto"}
 PROVIDER_LABEL = {"claude": "Claude", "gemini": "Gemini"}
 CLAUDE_API = "https://api.anthropic.com/v1/"
 CLAUDE_VERSION = "2026-10-21"
-CLAUDE_DEFAULT_MODEL = "claude-haiku-5-5"
+# Sonnet lee mejor la letra chica de las etiquetas; el costo por código (~0.02 USD)
+# cabe en los créditos de API del plan. Haiku es el respaldo barato si falta Sonnet.
+CLAUDE_DEFAULT_MODEL = "claude-sonnet-5-5"
+CLAUDE_FAMILIES = ("sonnet", "haiku")
 CLAUDE_DEFAULT_MAX_QUERIES = 200
 CLAUDE_MAX_TOKENS = 2000
 CLAUDE_QUOTA_WAIT_MAX = 60
@@ -484,7 +487,7 @@ class Claude:
             attempt += 1
 
     def pick_model(self) -> str:
-        """El modelo configurado si la cuenta lo ofrece; si no, el Haiku más nuevo con visión."""
+        """El modelo configurado si la cuenta lo ofrece; si no, el Sonnet o Haiku más nuevo con visión."""
         if self.model is None:
             listing = self._request("models?limit=1000")
             models = [item for item in (listing.get("data") or ()) if isinstance(item, Mapping)] \
@@ -493,10 +496,10 @@ class Claude:
             if self.preferred in vision:
                 self.model = self.preferred
             else:
-                cheap = [model for model in vision if "haiku" in model]
-                if not cheap:
+                fallback = [model for family in CLAUDE_FAMILIES for model in vision if family in model]
+                if not fallback:
                     raise ProviderFailed("claude_modelo_no_disponible")
-                self.model = cheap[0]  # la API lista primero lo más nuevo
+                self.model = fallback[0]  # la API lista primero lo más nuevo
         return self.model
 
     def read_labels(self, name: str, photos: str, images: Sequence[bytes]) -> object:
