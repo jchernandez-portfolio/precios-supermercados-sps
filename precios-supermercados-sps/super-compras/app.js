@@ -2,10 +2,10 @@
 // Vistas: inicio, búsqueda, ficha de producto, ofertas y Mi compra; #/admin/revision
 // (panel interno de tamaños) se carga aparte sólo cuando se abre.
 import {
-  Catalog, RETAILER_COLORS, rowKey, RETAILER_INITIALS, RETAILER_NAMES, loadCart, loadCities, loadCitySlug,
+  Catalog, RETAILER_COLORS, rowKey, RETAILER_INITIALS, RETAILER_NAMES, countText, listText, loadCart, loadCities, loadCitySlug,
   migrateCartLines, money, photoSrcset, photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, storeLabel,
-} from "./data.js?v=20261113-3";
-import { productIllustration } from "./illustration.js?v=20261113-3";
+} from "./data.js?v=20261113-4";
+import { productIllustration } from "./illustration.js?v=20261113-4";
 
 // Foto real si existe; si no hay o falla al cargar, la ilustración de siempre.
 // Tarjetas y miniaturas usan 320 px; el detalle deja que el navegador elija 320 u
@@ -157,6 +157,17 @@ function toast(text) {
   toastTimer = setTimeout(() => box.classList.remove("visible"), 1800);
 }
 
+// Sin red, fetch falla con un TypeError en inglés ("Failed to fetch" en Chrome, "Load
+// failed" en Safari, "NetworkError…" en Firefox): se explica en español. Los demás
+// errores ya vienen redactados por data.js.
+function errorText(error) {
+  const network = error instanceof TypeError && /fetch|network|load failed/i.test(String(error.message));
+  if (network || navigator.onLine === false) {
+    return "Parece que no hay conexión a internet. Revisa tu conexión e intenta de nuevo.";
+  }
+  return error?.message || "Ocurrió un error inesperado.";
+}
+
 function shortDate(value) {
   return new Date(value).toLocaleDateString("es-HN", { day: "numeric", month: "short" });
 }
@@ -270,7 +281,7 @@ function whenIndexed(catalog, text = "Cargando el catálogo…") {
   catalog.loadIndex().then(() => { if (state.renderToken === token && state.catalog === catalog) render(); })
     .catch((error) => {
       if (state.renderToken !== token) return;
-      fill(document.getElementById("main"), h("div", { class: "page empty" }, h("strong", {}, "No pudimos cargar el catálogo."), h("p", {}, error.message),
+      fill(document.getElementById("main"), h("div", { class: "page empty" }, h("strong", {}, "No pudimos cargar el catálogo."), h("p", {}, errorText(error)),
         h("button", { type: "button", class: "primary", onclick: () => render() }, "Reintentar")));
     });
   return loadingPage(text);
@@ -282,7 +293,7 @@ function viewHome() {
   return h("div", { class: "page" },
     h("section", { class: "hero" },
       h("h1", {}, `Compara precios de súper en ${cityName()}`),
-      h("p", { class: "muted" }, `${catalog.productCount.toLocaleString("es-HN")} productos en ${catalog.retailers.map((id) => RETAILER_NAMES[id]).join(", ")}.`),
+      h("p", { class: "muted" }, `${countText(catalog.productCount, "producto")} en ${listText(catalog.retailers.map((id) => RETAILER_NAMES[id] || id))}.`),
       h("div", { class: "hero-search" }, searchForm("", { large: true })),
       h("p", { class: "fresh" }, icon("pin", 14), freshnessText())),
     h("section", {},
@@ -296,7 +307,7 @@ function viewHome() {
       h("div", { class: "departments" }, catalog.departments().map((department) =>
         h("a", { class: "department", href: `#/buscar?cat=${encodeURIComponent(department.name)}` },
           h("strong", {}, department.name),
-          h("span", {}, `${department.count.toLocaleString("es-HN")} productos`))))),
+          h("span", {}, countText(department.count, "producto")))))),
     h("section", { class: "stores-strip" },
       h("span", { class: "label" }, "Comparamos"),
       catalog.retailers.map((id) => h("span", { class: "chip" }, h("i", { style: { background: RETAILER_COLORS[id] } }), RETAILER_NAMES[id])),
@@ -337,7 +348,7 @@ function viewSearch(params, { offers = false } = {}) {
   const title = offers ? "Ofertas de hoy" : query ? `Resultados para “${query}”` : category || "Todos los productos";
   return h("div", { class: "page" },
     h("div", { class: "search-top" }, offers ? null : searchForm(query)),
-    h("div", { class: "results-head" }, h("h1", {}, title), h("span", { class: "muted" }, `${total.toLocaleString("es-HN")} productos`)),
+    h("div", { class: "results-head" }, h("h1", {}, title), h("span", { class: "muted" }, countText(total, "producto"))),
     filters,
     total ? resultGrid(items, query, related)
       : h("div", { class: "empty" }, h("strong", {}, "No encontramos productos con esa búsqueda."), h("p", {}, "Prueba con otra palabra, la marca o quita filtros.")),
@@ -396,14 +407,14 @@ function viewProduct(id, container, code = "") {
     if (view) fill(container, view);
   }).catch((error) => {
     if (state.renderToken !== token) return;
-    fill(container, h("div", { class: "page empty" }, h("strong", {}, "No pudimos abrir el producto."), h("p", {}, error.message), h("a", { href: "#/" }, "Volver al inicio")));
+    fill(container, h("div", { class: "page empty" }, h("h1", {}, "No pudimos abrir el producto."), h("p", {}, errorText(error)), h("a", { class: "primary", href: "#/" }, "Volver al inicio")));
   });
   return null;
 }
 
 function renderProduct(product, container, code = "") {
   const catalog = state.catalog;
-  if (!product) return h("div", { class: "page empty" }, h("strong", {}, "Este producto ya no está en el catálogo de hoy."), h("a", { href: "#/" }, "Volver al inicio"));
+  if (!product) return h("div", { class: "page empty" }, h("h1", {}, "Este producto ya no está en el catálogo de hoy."), h("a", { class: "primary", href: "#/" }, "Volver al inicio"));
   const page = h("div", { class: "page product" },
     h("div", { class: "product-top" },
       h("button", { type: "button", class: "icon-button", "aria-label": "Volver", onclick: () => history.length > 1 ? history.back() : go("/") }, icon("back")),
@@ -504,7 +515,10 @@ function renderProduct(product, container, code = "") {
             h("span", { class: Number(alt.unit_amount) < Number(product.unit_amount) ? "good small" : "muted small" }, `${money(alt.unit_amount)} / ${alt.unit_per}`)))))) : null);
   }).catch((error) => {
     if (!page.isConnected) return;
-    fill(page.querySelector(".offers"), h("h2", {}, "Dónde comprar"), h("p", {}, `No pudimos cargar los precios: ${error.message}`));
+    const offersBox = page.querySelector(".offers");
+    offersBox.removeAttribute("aria-busy");
+    fill(offersBox, h("h2", {}, "Dónde comprar"), h("p", {}, `No pudimos cargar los precios. ${errorText(error)}`),
+      h("button", { type: "button", class: "primary", onclick: () => render() }, "Reintentar"));
   });
   return null;
 }
@@ -535,7 +549,7 @@ function viewBarcode(raw, params, container) {
     fill(container, barcodeResult(digits, result));
   }).catch((error) => {
     if (state.renderToken !== token) return;
-    fill(container, h("div", { class: "page empty" }, h("strong", {}, "No pudimos buscar el código."), h("p", {}, error.message),
+    fill(container, h("div", { class: "page empty" }, h("strong", {}, "No pudimos buscar el código."), h("p", {}, errorText(error)),
       h("button", { type: "button", class: "primary", onclick: () => render() }, "Reintentar")));
   });
   return null;
@@ -595,7 +609,7 @@ function viewCart(container) {
   const page = h("div", { class: "page cart" },
     h("div", { class: "cart-layout" },
       h("section", { class: "cart-lines" },
-        h("div", { class: "results-head" }, h("h1", {}, "Mi compra"), h("span", { class: "muted" }, `${cartCount()} artículos`)),
+        h("div", { class: "results-head" }, h("h1", {}, "Mi compra"), h("span", { class: "muted" }, countText(cartCount(), "artículo"))),
         h("p", { class: "muted" }, "Cargando precios…")),
       h("aside", { class: "cart-summary" }, h("h2", {}, "¿Dónde me sale más barato?"), h("p", { class: "muted" }, "Calculando…"))));
   fill(container, page);
@@ -645,7 +659,7 @@ function viewCart(container) {
             h("span", { class: "line-total" }, h("strong", {}, used ? money(Number(used.current_price) * line.qty) : "—")))));
     });
     fill(page.querySelector(".cart-lines"),
-      h("div", { class: "results-head" }, h("h1", {}, "Mi compra"), h("span", { class: "muted" }, `${cartCount()} artículos`)),
+      h("div", { class: "results-head" }, h("h1", {}, "Mi compra"), h("span", { class: "muted" }, countText(cartCount(), "artículo"))),
       lineViews);
 
     const stores = [...perStore.entries()].filter(([, entry]) => entry.missing < loaded.length)
@@ -668,7 +682,10 @@ function viewCart(container) {
         h("strong", {}, money(entry.total)))),
       h("p", { class: "muted small" }, `Total estimado con los precios públicos de hoy en ${cityName()}. Tu lista se guarda en este dispositivo.`));
   }).catch((error) => {
-    fill(page.querySelector(".cart-lines"), h("p", {}, `No pudimos cargar los precios: ${error.message}`));
+    if (!page.isConnected) return;
+    fill(page.querySelector(".cart-lines"), h("h1", {}, "Mi compra"), h("p", {}, `No pudimos cargar los precios. ${errorText(error)}`),
+      h("button", { type: "button", class: "primary", onclick: () => render() }, "Reintentar"));
+    fill(page.querySelector(".cart-summary"), h("h2", {}, "Tu compra"), h("p", { class: "muted" }, "Sin precios no podemos calcular el total. Tu lista sigue guardada."));
   });
   return null;
 }
@@ -694,11 +711,11 @@ async function renderAdmin(main) {
   main.dataset.view = "admin";
   fill(main, loadingPage("Abriendo el panel de revisión…"));
   try {
-    adminModule = adminModule || await import("./admin.js?v=20261113-3");
+    adminModule = adminModule || await import("./admin.js?v=20261113-4");
     if (route().path.startsWith(ADMIN_ROUTE) && main.dataset.view === "admin") adminModule.mountSizeReview(main, { h, fill });
   } catch (error) {
     delete main.dataset.view;
-    fill(main, h("div", { class: "page empty" }, h("strong", {}, "No pudimos abrir el panel."), h("p", {}, error.message)));
+    fill(main, h("div", { class: "page empty" }, h("h1", {}, "No pudimos abrir el panel."), h("p", {}, errorText(error))));
   }
   renderChrome();
 }
@@ -714,14 +731,19 @@ function render() {
   state.renderToken += 1;
   const { path, params } = route();
   let view;
-  if (path.startsWith("/p/")) view = viewProduct(decodeURIComponent(path.slice(3)), main, (params.get("codigo") || "").replace(/\D/g, ""));
-  else if (path.startsWith("/codigo/")) view = viewBarcode(decodeURIComponent(path.slice(8)), params, main);
+  if (path.startsWith("/p/")) view = viewProduct(safeDecode(path.slice(3)), main, (params.get("codigo") || "").replace(/\D/g, ""));
+  else if (path.startsWith("/codigo/")) view = viewBarcode(safeDecode(path.slice(8)), params, main);
   else if (path.startsWith("/buscar")) view = viewSearch(params);
   else if (path.startsWith("/ofertas")) view = viewSearch(params, { offers: true });
   else if (path.startsWith("/compra")) view = viewCart(main);
   else view = viewHome();
   if (view) fill(main, view);
   renderChrome();
+}
+
+// "#/p/%" o un enlace cortado a medias: decodeURIComponent lanza URIError.
+function safeDecode(text) {
+  try { return decodeURIComponent(text); } catch { return text; }
 }
 
 function pickCity(cities, fallback) {
@@ -760,7 +782,7 @@ async function loadCity(city) {
   } catch (error) {
     // El panel interno no depende del catálogo: un fallo al cargar precios no lo tapa.
     if (main.dataset.view === "admin") return;
-    fill(main, h("div", { class: "page empty" }, h("strong", {}, "No pudimos cargar los precios."), h("p", {}, error.message),
+    fill(main, h("div", { class: "page empty" }, h("h1", {}, "No pudimos cargar los precios."), h("p", {}, errorText(error)),
       h("button", { type: "button", class: "primary", onclick: () => location.reload() }, "Reintentar")));
   }
 }
@@ -788,7 +810,7 @@ async function start() {
 let scannerModule = null;
 async function startScanner(opener) {
   try {
-    scannerModule = scannerModule || await import("./scanner.js?v=20261113-3");
+    scannerModule = scannerModule || await import("./scanner.js?v=20261113-4");
     scannerModule.openScanner({
       h, opener,
       onCode: (code, format) => {
@@ -808,7 +830,13 @@ document.addEventListener("click", (event) => {
   event.preventDefault();
   startScanner(button);
 });
-window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); });
+// Al cambiar de vista el foco pasa al contenido (sin mover la página): los lectores de
+// pantalla anuncian la vista nueva y el siguiente Tab sigue desde ahí.
+window.addEventListener("hashchange", () => {
+  render();
+  window.scrollTo(0, 0);
+  document.getElementById("main")?.focus({ preventScroll: true });
+});
 document.addEventListener("DOMContentLoaded", start);
 if ("serviceWorker" in navigator && location.protocol === "https:") {
   navigator.serviceWorker.register("./sw.js").catch(() => {});

@@ -381,6 +381,42 @@ console.log(JSON.stringify([storeLabel(offers[0], offers), storeLabel(offers[2],
     assert json.loads(_node(script, tmp_path)) == ["Walmart FF.AA.", "La Colonia", "Walmart"]
 
 
+def test_counts_and_lists_read_as_spanish(tmp_path: Path) -> None:
+    """QA 2026-11-13: "1 artículos" y "La Colonia, Walmart, Paiz." sin "y"."""
+    script = """
+import { countText, listText } from './data.js';
+console.log(JSON.stringify([countText(1, 'artículo'), countText(2, 'artículo'), countText(34293, 'producto'),
+  countText(0, 'producto'), listText(['La Colonia']), listText(['La Colonia', 'Paiz']),
+  listText(['La Colonia', 'Walmart', undefined, 'Paiz']), listText([])]));
+"""
+    assert json.loads(_node(script, tmp_path)) == [
+        "1 artículo", "2 artículos", "34,293 productos", "0 productos", "La Colonia", "La Colonia y Paiz",
+        "La Colonia, Walmart y Paiz", "",
+    ]
+
+
+def test_public_page_is_ready_to_share_and_does_not_overflow_on_phones() -> None:
+    """QA 2026-11-13: ficha más ancha que el teléfono, foto encima del título en tableta,
+    "#/p/%" rompía la app y los errores de red salían en inglés."""
+    html = (APP_DIR / "index.html").read_text(encoding="utf-8")
+    for tag in ('property="og:title"', 'property="og:description"', 'property="og:image"', 'name="twitter:card"',
+                'rel="canonical"', 'name="description"'):
+        assert tag in html, tag
+    assert "San Pedro Sula y Tegucigalpa</title>" in html
+    image = re.search(r'property="og:image" content="([^"]+)"', html).group(1)
+    assert image.startswith("https://") and (APP_DIR / image.split("/super-compras/", 1)[1]).is_file()
+    manifest = json.loads((APP_DIR / "manifest.webmanifest").read_text(encoding="utf-8"))
+    assert "Tegucigalpa" in manifest["description"]
+    styles = (APP_DIR / "styles.css").read_text(encoding="utf-8")
+    assert ".product-layout { display: grid; grid-template-columns: minmax(0, 1fr);" in styles
+    assert ".filters { position: relative;" in styles
+    assert re.search(r"\.product-image \.photo \{ position: absolute;", styles)
+    app = (APP_DIR / "app.js").read_text(encoding="utf-8")
+    assert "decodeURIComponent(path" not in app and "safeDecode(path.slice(3))" in app
+    # siempre errorText(error): sin "Failed to fetch" en pantalla
+    assert ', error.message)' not in app and "${error.message}" not in app and "function errorText(" in app
+
+
 def test_app_offers_city_selector_store_choice_and_cheapest_default() -> None:
     app = (APP_DIR / "app.js").read_text(encoding="utf-8")
     data = (APP_DIR / "data.js").read_text(encoding="utf-8")

@@ -132,7 +132,8 @@ main { outline: none; }
 .results-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 8px; }
 .results-head h1 { font-size: 1.25rem; overflow: hidden; text-overflow: ellipsis; }
 .results-head span { white-space: nowrap; font-size: .85rem; }
-.filters { display: flex; gap: 8px; overflow-x: auto; margin: 12px -16px 0; padding: 0 16px 4px; scrollbar-width: none; }
+/* relative: las etiquetas sr-only quedan dentro del carrusel y no ensanchan la página en 360 px. */
+.filters { position: relative; display: flex; gap: 8px; overflow-x: auto; margin: 12px -16px 0; padding: 0 16px 4px; scrollbar-width: none; }
 .filters::-webkit-scrollbar { display: none; }
 .filter select, .toggle { height: 38px; padding: 0 32px 0 14px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-size: .85rem; font-weight: 600; white-space: nowrap; appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 17px) 50%, calc(100% - 12px) 50%; background-size: 5px 5px; background-repeat: no-repeat; cursor: pointer; }
 .toggle { padding: 0 14px; background-image: none; }
@@ -149,10 +150,13 @@ main { outline: none; }
 
 /* ---------- product page ---------- */
 .product-top { display: flex; justify-content: space-between; }
-.product-layout { display: grid; gap: 16px; margin-top: 8px; }
-.product-image { aspect-ratio: 16 / 10; max-height: 300px; width: 100%; border-radius: 20px; background: var(--tile); display: grid; place-items: center; }
+/* minmax(0, 1fr): la foto de 800 px no ensancha la columna en el teléfono. */
+.product-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; margin-top: 8px; }
+.product-image { position: relative; overflow: hidden; aspect-ratio: 16 / 10; max-height: 300px; width: 100%; border-radius: 20px; background: var(--tile); display: grid; place-items: center; }
 .product-image .illustration { height: 78%; width: auto; filter: drop-shadow(0 10px 14px rgba(16,32,26,.14)); }
-.product-image .photo { height: 92%; width: auto; max-width: 92%; aspect-ratio: 1 / 1; }
+/* Absoluta: con max-height el alto en % se calculaba sobre el recuadro sin recortar y en
+   tableta la foto tapaba el título (2026-11-13). */
+.product-image .photo { position: absolute; top: 4%; left: 4%; width: 92%; height: 92%; }
 .product-title { display: grid; gap: 6px; }
 .brand-xl { font-size: .95rem; font-weight: 800; color: var(--green); text-transform: uppercase; letter-spacing: .03em; }
 .product-title h1 { font-size: 1.35rem; line-height: 1.2; }
@@ -181,6 +185,7 @@ main { outline: none; }
 .sizes { grid-auto-columns: 40%; }
 .size-card { padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); display: grid; gap: 4px; align-content: start; }
 .size-card.best { border: 2px solid var(--green); }
+.size-card .pill { justify-self: start; }
 .badge-text { font-size: .68rem; font-weight: 800; color: var(--green); letter-spacing: .03em; }
 .alt-list { display: grid; gap: 8px; }
 .alt, .line { display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius); }
