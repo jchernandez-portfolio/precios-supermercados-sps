@@ -14,7 +14,10 @@ Recalcula en memoria, con el mismo código que usa producción
    precio por unidad) en vez de salir de ella. Separa los casos con mayoría de
    tamaño de los empates (p. ej. 1 contra 1), que necesitan una decisión.
 
-Antes de medir verifica que el estado recalculado coincide con el guardado en
+Aplica las decisiones de tamaño (tabla ``size_decisions``: humanas y de IA)
+igual que el refresco de homologación, si la tabla existe; sin ellas los GTIN
+decididos darían diferencias falsas contra producción. Antes de medir verifica
+que el estado recalculado coincide con el guardado en
 ``product_homologation_profiles``. Sólo ejecuta SELECT (envoltorio ``ReadOnly``
 de la auditoría de identidad); deja ``medicion-reglas.json`` y
 ``grupos-reglas.csv`` en ``--output-dir``.
@@ -65,6 +68,9 @@ from precios_supermercados.product_identity_v2 import (  # noqa: E402
     profile_product_v2,
     resolve_gtin_group,
 )
+from precios_supermercados.size_decisions import SELECT_SQL as DECISIONS_SELECT_SQL  # noqa: E402
+from precios_supermercados.size_decisions import TABLE_NAME as DECISIONS_TABLE  # noqa: E402
+from precios_supermercados.size_decisions import SizeDecision, decision_from_row, index_decisions  # noqa: E402
 
 PAGE = 2000
 # Motivos que el paso 3 trataría como "tamaño en conflicto": la oferta sigue en
@@ -120,6 +126,19 @@ def fetch_spec_attributes(db: ReadOnly) -> dict[int, tuple[str | None, str | Non
     return {int(pid): (brand, hint) for pid, brand, hint in db.query(PROFILE_ATTRIBUTES_SQL)}
 
 
+def fetch_size_decisions(db: ReadOnly) -> dict[str, SizeDecision] | None:
+    """Decisiones de tamaño (humanas y de IA), como las lee el refresco. Sin tabla: ``None``."""
+    present = db.query("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (DECISIONS_TABLE,))
+    if not present:
+        return None
+    return index_decisions(decision_from_row(row) for row in db.query(DECISIONS_SELECT_SQL))
+
+
+def decision_author(decision: SizeDecision) -> str:
+    """``human`` (sin la cuenta) o ``engine:<motor>``."""
+    return decision.decided_by if decision.decided_by.startswith("engine:") else "human"
+
+
 def fetch_stored_status(db: ReadOnly) -> dict[int, str]:
     stored: dict[int, str] = {}
     cursor = 0
@@ -146,8 +165,13 @@ def build_profiles(records: Sequence[object]) -> tuple[ProductProfile, ...]:
                         key=lambda profile: profile.record.source_record_id))
 
 
-def resolve_groups(profiles: Sequence[ProductProfile], *, ounce_rule: bool = True) -> list[dict[str, object]]:
-    """Grupos GTIN en ≥ 2 cadenas con la resolución de producción, miembro a miembro."""
+def resolve_groups(profiles: Sequence[ProductProfile], *, ounce_rule: bool = True,
+                   size_decisions: Mapping[str, SizeDecision] | None = None) -> list[dict[str, object]]:
+    """Grupos GTIN en ≥ 2 cadenas con la resolución de producción, miembro a miembro.
+
+    Una decisión de ``size_decisions`` manda sobre la resolución (con o sin la
+    regla de onzas), igual que en ``_exact_groups``.
+    """
     by_gtin: dict[str, list[ProductProfile]] = defaultdict(list)
     for profile in profiles:
         if profile.canonical_gtin is not None:
@@ -156,8 +180,9 @@ def resolve_groups(profiles: Sequence[ProductProfile], *, ounce_rule: bool = Tru
     for gtin, members in sorted(by_gtin.items()):
         if len({member.record.supermarket_id for member in members}) < 2:
             continue
-        if ounce_rule:  # resolución vigente (regla de onzas con "nunca empeorar")
-            (remaining, excluded, group_reasons), _ = resolve_gtin_group(gtin, list(members))
+        decision = (size_decisions or {}).get(gtin)
+        if ounce_rule or decision is not None:  # vigente: regla de onzas con "nunca empeorar" o decisión
+            (remaining, excluded, group_reasons), _ = resolve_gtin_group(gtin, list(members), decision)
         else:  # como era antes de la regla de onzas
             remaining, excluded, group_reasons = _resolve_gtin_members(gtin, list(members))
         ready = len({member.record.supermarket_id for member in remaining}) >= 2
@@ -166,6 +191,7 @@ def resolve_groups(profiles: Sequence[ProductProfile], *, ounce_rule: bool = Tru
             "excluded": {key: frozenset(value) for key, value in excluded.items()},
             "status": "ready" if ready else "review_required",
             "group_reasons": frozenset(group_reasons),
+            "decision": decision,
         })
     return groups
 
@@ -358,10 +384,12 @@ def measure(db, fetch: Callable[[str], object], base: str = CATALOG_BASE) -> tup
         products, _ = apply_source_spec_attributes(products, specs)
     product_of = {record.source_record_id: product_id for product_id, record in products}
     profiles = build_profiles([record for _, record in products])
-    groups = resolve_groups(profiles)
+    stored_decisions = fetch_size_decisions(reader)
+    decisions = stored_decisions or {}
+    groups = resolve_groups(profiles, size_decisions=decisions)
 
-    # Guarda: la resolución recalculada debe ser la de producción.
-    production = {group.canonical_gtin: group.comparison_status for group in _exact_groups(profiles)}
+    # Guarda: la resolución recalculada debe ser la de producción (con sus decisiones).
+    production = {group.canonical_gtin: group.comparison_status for group in _exact_groups(profiles, decisions)}
     mine = {str(group["gtin"]): str(group["status"]) for group in groups}
     if production != mine:
         raise AuditError("resolucion_distinta_de_produccion")
@@ -438,8 +466,8 @@ def measure(db, fetch: Callable[[str], object], base: str = CATALOG_BASE) -> tup
         }
 
     # Efecto de la regla de onzas: resolución sin la regla contra la vigente.
-    ounce_summary, ounce_lines, ounce_sets = simulate_ounce_rule(resolve_groups(profiles, ounce_rule=False), groups,
-                                                                 product_of)
+    ounce_summary, ounce_lines, ounce_sets = simulate_ounce_rule(
+        resolve_groups(profiles, ounce_rule=False, size_decisions=decisions), groups, product_of)
     merge_sets["paso_1_y_regla_de_onzas"] = ounce_sets
 
     rows_by_city = load_cities(fetch, base)
@@ -449,6 +477,7 @@ def measure(db, fetch: Callable[[str], object], base: str = CATALOG_BASE) -> tup
         "generado_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "alcance": "toda la base (productos) para grupos GTIN; catálogo público vigente para tarjetas",
         "verificacion_contra_perfiles_guardados": dict(sorted(agreement.items())),
+        "decisiones_de_tamano": decision_stats(decisions, groups, table_present=stored_decisions is not None),
         "grupos_gtin_en_2_o_mas_cadenas": {
             "total": len(groups),
             "listos_sin_exclusiones": sum(1 for g in groups if g["status"] == "ready" and not g["excluded"]),
@@ -464,6 +493,22 @@ def measure(db, fetch: Callable[[str], object], base: str = CATALOG_BASE) -> tup
         "_lineas_onzas": ounce_lines,
     }
     return summary, lines
+
+
+def decision_stats(decisions: Mapping[str, SizeDecision], groups: Sequence[Mapping[str, object]], *,
+                   table_present: bool) -> dict[str, object]:
+    """Cuántas decisiones se aplicaron, de quién y qué estado dejan (sin nombres de cuentas)."""
+    decided = [group for group in groups if group["decision"] is not None]
+    return {
+        "tabla_size_decisions": "presente" if table_present else "ausente",
+        "decisiones_leidas": len(decisions),
+        "por_tipo": dict(sorted(Counter(decision.decision for decision in decisions.values()).items())),
+        "por_autor": dict(sorted(Counter(decision_author(decision) for decision in decisions.values()).items())),
+        "aplicadas_a_grupos_en_2_o_mas_cadenas": len(decided),
+        "grupos_decididos_listos": sum(1 for group in decided if group["status"] == "ready"),
+        "grupos_decididos_en_revision": sum(1 for group in decided if group["status"] == "review_required"),
+        "decisiones_sin_grupo_vigente": len(decisions) - len(decided),
+    }
 
 
 def write_outputs(output: Path, summary: Mapping[str, object], lines: Sequence[Mapping[str, object]]) -> None:
