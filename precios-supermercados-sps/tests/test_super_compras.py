@@ -171,7 +171,7 @@ def test_app_shell_is_static_safe_and_installable() -> None:
 
 
 def test_app_never_injects_html_or_reads_private_sources() -> None:
-    for name in ("app.js", "data.js", "illustration.js", "sw.js", "admin.js"):
+    for name in ("app.js", "data.js", "illustration.js", "sw.js", "admin.js", "scanner.js"):
         source = (APP_DIR / name).read_text(encoding="utf-8")
         assert "innerHTML" not in source and "outerHTML" not in source and "insertAdjacentHTML" not in source, name
         assert "eval(" not in source and "new Function" not in source, name
