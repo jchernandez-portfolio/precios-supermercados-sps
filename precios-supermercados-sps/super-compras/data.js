@@ -32,6 +32,18 @@ export function fold(value) {
     .replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+// "1 artículo", "2 artículos", "1,234 productos": número con separador local y plural.
+export function countText(value, singular, plural = `${singular}s`) {
+  const number = Number(value) || 0;
+  return `${number.toLocaleString("es-HN")} ${number === 1 ? singular : plural}`;
+}
+
+// "La Colonia, Walmart y Paiz": lista en español con "y" antes del último.
+export function listText(items) {
+  const names = items.filter(Boolean);
+  return names.length > 1 ? `${names.slice(0, -1).join(", ")} y ${names.at(-1)}` : names.join("");
+}
+
 export function money(value) {
   const number = Number(value);
   return Number.isFinite(number) ? `L ${number.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—";
