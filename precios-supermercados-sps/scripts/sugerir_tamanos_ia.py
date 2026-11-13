@@ -731,6 +731,17 @@ def merge_history(resolved: Sequence[Mapping[str, object]], cache: Mapping[str, 
     return history[:MAX_AUTO_HISTORY]
 
 
+def merge_engine_items(history: list[dict[str, object]], items: object) -> list[dict[str, object]]:
+    """Agrega lo que resolvió un motor fuera de esta corrida (p. ej. Claude en sesión, aprobado
+    por una persona) para que también se vea en "Resueltos por IA"."""
+    seen = {item.get("gtin") for item in history}
+    extra = [dict(item) for item in items if isinstance(item, Mapping) and item.get("gtin") not in seen] \
+        if isinstance(items, list) else []
+    merged = [*history, *extra]
+    merged.sort(key=lambda item: str(item.get("resuelto_utc") or ""), reverse=True)
+    return merged[:MAX_AUTO_HISTORY]
+
+
 def _fetch_image(url: str) -> bytes:
     if not url.startswith(PHOTO_BASE):
         raise ValueError("foto_fuera_del_bucket")
@@ -782,6 +793,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     for item in resolved:
         cache[str(item["gtin"])]["auto_item"] = {**item, "resuelto_utc": now}
     history = merge_history(resolved, cache, queue.get("decididas_ia") or (), now)
+    history = merge_engine_items(history, queue.pop("resueltas_motor", None))
     queue["ia"] = {**summary, "actualizado_utc": now}
     queue["counts"] = {kind: sum(item.get("kind") == kind for item in queue["items"]) for kind in ("empate", "atipico")}
     # Si guardar lo automático falla, se publica esta cola: lo "auto" vuelve como sugerencia.

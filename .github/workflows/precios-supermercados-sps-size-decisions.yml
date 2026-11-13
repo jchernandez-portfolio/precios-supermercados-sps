@@ -7,6 +7,9 @@ name: Precios SPS - Guardar decisiones de tamaño
 # válidos guarda `size_decisions`, ajusta `human_attributes_json` del maestro y
 # lanza el refresco de homologación para que el motor aplique la decisión.
 # Los secretos de Turso viven sólo en GitHub; el navegador nunca los ve.
+# `fuente=claude_sesion`: tanda revisada por Claude en una sesión de Claude Code y
+# aprobada por el dueño; se guarda como engine:claude_sesion con "aprobado por
+# <cuenta>" en la nota (nunca reemplaza una decisión humana).
 
 on:
   workflow_dispatch:
@@ -15,6 +18,14 @@ on:
         description: "JSON rpi-size-decisions/v1 (lo arma el panel)"
         required: true
         type: string
+      fuente:
+        description: "Quién propone las decisiones"
+        required: false
+        default: panel
+        type: choice
+        options:
+          - panel
+          - claude_sesion
 
 permissions:
   contents: read
@@ -41,6 +52,7 @@ jobs:
       PYTHONPATH: ${{ github.workspace }}/precios-supermercados-sps/src
       DECISIONS_JSON: ${{ inputs.decisions }}
       DECIDED_BY: ${{ github.actor }}
+      FUENTE: ${{ inputs.fuente || 'panel' }}
     steps:
       - name: Descargar revisión inmutable
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -62,8 +74,12 @@ jobs:
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
         run: |
           set -euo pipefail
-          python scripts/aplicar_decisiones_tamano.py --turso --apply \
-            --actor "$DECIDED_BY" \
+          case "$FUENTE" in
+            panel) author=(--actor "$DECIDED_BY") ;;
+            claude_sesion) author=(--engine claude_sesion --approved-by "$DECIDED_BY") ;;
+            *) echo "fuente_invalida" >&2; exit 1 ;;
+          esac
+          python scripts/aplicar_decisiones_tamano.py --turso --apply "${author[@]}" \
             --summary run-artifacts/size-decisions/resultado.json
 
       - name: Lanzar refresco de homologación

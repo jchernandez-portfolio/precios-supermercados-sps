@@ -777,6 +777,13 @@ def test_size_decisions_workflow_is_owner_only_and_never_inlines_the_payload() -
             assert "aplicar_decisiones_tamano.py" in str(step["run"])
     raw = path.read_text(encoding="utf-8")
     assert "gh workflow run precios-supermercados-sps-homologation-refresh.yml" in raw
+    # Fuente: lista cerrada; claude_sesion sólo como motor aprobado por el dueño.
+    fuente = workflow["on"]["workflow_dispatch"]["inputs"]["fuente"]
+    assert fuente["type"] == "choice" and fuente["options"] == ["panel", "claude_sesion"]
+    assert job["env"]["FUENTE"] == "${{ inputs.fuente || 'panel' }}"
+    save = next(step for step in base.steps(workflow) if "aplicar_decisiones_tamano.py" in str(step.get("run", "")))
+    assert '--engine claude_sesion --approved-by "$DECIDED_BY"' in save["run"]
+    assert "fuente_invalida" in save["run"] and "claude_auto" not in raw and "gemini_auto" not in raw
 
 
 @pytest.mark.parametrize("secret", ["GEMINI_API_KEY", "ANTHROPIC_API_KEY"])

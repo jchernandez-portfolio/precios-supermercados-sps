@@ -10,7 +10,7 @@
 // en el encabezado Authorization a api.github.com.
 import {
   RETAILER_NAMES, SIZE_DECISIONS_RUNS_URL, SIZE_UNITS, loadSizeQueue, sendSizeDecisions,
-} from "./data.js?v=20261113-1";
+} from "./data.js?v=20261113-2";
 
 const TOKEN_KEY = "super-compras-admin-github-token";
 const UNIT_LABEL = { g: "g", ml: "ml", oz: "oz", lb: "lb", unit: "unidades" };
@@ -102,7 +102,7 @@ export function photoUrls(offer) {
 const sizeText = (value, unit) => `${value} ${UNIT_LABEL[unit] || unit}`;
 
 // Quién leyó la foto (Claude por API o en sesión, Gemini); lecturas viejas sin fuente: "IA".
-const AI_NAME = { claude: "Claude", claude_sesion: "Claude", gemini: "Gemini" };
+const AI_NAME = { claude: "Claude", claude_sesion: "Claude (sesión)", gemini: "Gemini" };
 const aiName = (source) => (Object.hasOwn(AI_NAME, source) ? AI_NAME[source] : "IA");
 
 // Lo que la IA leyó en la foto de una oferta: verde si coincide con su título, alerta si no.
