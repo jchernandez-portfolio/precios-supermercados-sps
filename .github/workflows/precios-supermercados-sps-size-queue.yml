@@ -146,7 +146,11 @@ jobs:
           for name in cola.json ia-tamanos.json; do
             if [ -L "$repository/$name" ]; then echo "cola_symlink_boundary_invalid:$name" >&2; exit 1; fi
           done
-          cp /tmp/cola/cola.json "$repository/cola.json"
+          # Sólo se publica si cambian los códigos o el resumen de la IA (no sólo la fecha).
+          if python source/precios-supermercados-sps/scripts/comparar_cola.py \
+              --anterior "$repository/cola.json" --nueva /tmp/cola/cola.json; then
+            cp /tmp/cola/cola.json "$repository/cola.json"
+          fi
           if [ -f /tmp/cola/ia-tamanos.json ]; then cp /tmp/cola/ia-tamanos.json "$repository/ia-tamanos.json"; fi
           git -C "$repository" config user.name "github-actions[bot]"
           git -C "$repository" config user.email "41898282+github-actions[bot]@users.noreply.github.com"

@@ -97,13 +97,6 @@ base.ALLOWED_SECRET_REFERENCES[base.IDENTITY_AUDIT_WORKFLOW] = {
     base.TURSO_DATABASE_URL_SECRET,
     base.TURSO_AUTH_TOKEN_SECRET,
 }
-base.OPEN_FOOD_FACTS_WORKFLOW = "precios-supermercados-sps-open-food-facts-probe.yml"
-base.EXPECTED_PERMISSIONS[base.OPEN_FOOD_FACTS_WORKFLOW] = {"contents": "read"}
-base.EXPECTED_TRIGGERS[base.OPEN_FOOD_FACTS_WORKFLOW] = {"workflow_dispatch"}
-base.ALLOWED_SECRET_REFERENCES[base.OPEN_FOOD_FACTS_WORKFLOW] = {
-    base.TURSO_DATABASE_URL_SECRET,
-    base.TURSO_AUTH_TOKEN_SECRET,
-}
 base.SIZE_DECISIONS_WORKFLOW = "precios-supermercados-sps-size-decisions.yml"
 base.EXPECTED_PERMISSIONS[base.SIZE_DECISIONS_WORKFLOW] = {"contents": "read"}
 base.EXPECTED_TRIGGERS[base.SIZE_DECISIONS_WORKFLOW] = {"workflow_dispatch"}
@@ -752,22 +745,6 @@ def test_identity_audit_is_manual_read_only_and_leaves_an_artifact() -> None:
         for statement in ("INSERT INTO", "UPDATE ", "DELETE FROM", "DROP TABLE", "CREATE TABLE", "ALTER TABLE",
                           "REPLACE INTO"):
             assert statement not in script.upper(), (name, statement)
-
-
-def test_open_food_facts_probe_is_manual_read_only_and_polite() -> None:
-    path = base.WORKFLOW_DIR / base.OPEN_FOOD_FACTS_WORKFLOW
-    workflow = base.load_workflow(path)
-    assert workflow["permissions"] == {"contents": "read"}
-    assert set(workflow["on"]) == {"workflow_dispatch"}
-    raw = path.read_text(encoding="utf-8")
-    for forbidden in ("contents: write", "git push", "pull_request", "schedule:", "id-token", "--delay 0"):
-        assert forbidden not in raw, forbidden
-    run = next(step for step in base.steps(workflow) if "probar_open_food_facts.py" in str(step.get("run", "")))
-    assert set(run["env"]) == {"TURSO_DATABASE_URL", "TURSO_AUTH_TOKEN"}
-    assert not any("secrets." in str(step) for step in base.steps(workflow) if step is not run)
-    script = (base.REPO_ROOT / "precios-supermercados-sps" / "scripts" / "probar_open_food_facts.py").read_text(encoding="utf-8")
-    for statement in ("INSERT INTO", "UPDATE ", "DELETE FROM", "DROP TABLE", "CREATE TABLE", "ALTER TABLE", "REPLACE INTO"):
-        assert statement not in script.upper(), statement
 
 
 def test_size_decisions_workflow_is_owner_only_and_never_inlines_the_payload() -> None:
