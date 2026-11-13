@@ -7,7 +7,7 @@ número son cambios directos. El detalle de cada incidente vive en
 
 ## 2026-11-13
 
-- Motor de identidad v2.9: g ≈ ml (≤ 5 %) en lácteos, jugos y salsas y peso sobre conteo (conteo 1, mismo pack o título con el conteo) en grupos GTIN, con "nunca empeorar"; el tamaño oficial de `size_decisions` compara g con ml en esas categorías.
+- #85 Motor de identidad v2.9: g ≈ ml (≤ 5 %) en lácteos, jugos y salsas y peso sobre conteo (conteo 1, mismo pack o título con el conteo) en grupos GTIN, con "nunca empeorar"; el tamaño oficial de `size_decisions` compara g con ml en esas categorías.
 
 ## 2026-11-12
 
