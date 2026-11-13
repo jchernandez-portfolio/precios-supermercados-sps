@@ -44,6 +44,7 @@ MAX_BRANDS_PER_BUCKET = 24
 MAX_PRODUCT_SEARCH_URL_BYTES = 7000
 PRIMARY_ORDER_BY = "OrderByNameASC"
 RECOVERY_ORDER_BY = "OrderByNameDESC"
+MAX_CATEGORY_BRAND_DISCOVERY = 40
 
 
 def _product_url(
@@ -253,6 +254,121 @@ def catalog_rows_fields(
         "products": priced,
         "unpriced_unavailable": unpriced,
     }
+
+
+def _category_brand_facets_url(category_value: str) -> str:
+    """Árbol de facets limitado a una categoría de segundo nivel."""
+
+    variables = {
+        "query": "supermercado",
+        "fullText": "",
+        "selectedFacets": [
+            dict(core.ROOT_FACET),
+            {"key": "category-2", "value": category_value},
+        ],
+        "from": 0,
+        "to": 0,
+    }
+    return core._params(
+        core.CATEGORY_TREE_OPERATION, core.CATEGORY_TREE_QUERY, variables
+    )
+
+
+def _facet_values(normalized: Mapping[str, Any], key: str) -> list[Mapping[str, Any]]:
+    facets = normalized.get("facets")
+    if not isinstance(facets, Sequence) or isinstance(facets, (str, bytes)):
+        return []
+    found: list[Mapping[str, Any]] = []
+    for facet in facets:
+        values = facet.get("values") if isinstance(facet, Mapping) else None
+        if not isinstance(values, Sequence) or isinstance(values, (str, bytes)):
+            continue
+        for item in values:
+            if (
+                isinstance(item, Mapping)
+                and str(item.get("key") or "").strip().lower() == key
+                and isinstance(item.get("value"), str)
+                and str(item.get("value")).strip()
+                and isinstance(item.get("quantity"), int)
+                and not isinstance(item.get("quantity"), bool)
+                and int(item.get("quantity")) > 0
+            ):
+                found.append(item)
+    return found
+
+
+def _complete_brand_values(
+    *,
+    context: Any,
+    normalized: Mapping[str, Any],
+    brand_values: Sequence[Mapping[str, Any]],
+    root_total: int,
+    diagnostic: dict[str, Any],
+) -> list[Mapping[str, Any]]:
+    """Completa marcas cuando VTEX recorta la lista global de facets ``brand``.
+
+    La lista global de marcas tiene un tope (observado en 1,498 valores): las
+    últimas marcas en orden alfabético desaparecen y sus productos no caen en
+    ningún bucket. Si la suma global de marcas no cubre el total raíz, se piden
+    las marcas por cada ``category-2`` (pocas peticiones) y se agregan las que
+    falten. La cobertura exacta del catálogo sigue siendo obligatoria después;
+    esto sólo amplía el plan de particiones, nunca relaja el gate.
+    """
+
+    values = list(brand_values)
+    global_sum = sum(int(item["quantity"]) for item in values)
+    diagnostic["brand_facet_global_values"] = len(values)
+    diagnostic["brand_facet_global_sum"] = global_sum
+    if global_sum >= root_total:
+        return values
+
+    categories = _facet_values(normalized, "category-2")
+    if not categories:
+        return values
+    if len(categories) > MAX_CATEGORY_BRAND_DISCOVERY:
+        raise full.FullCatalogError(
+            "category_brand_discovery_too_wide", diagnostic=diagnostic
+        )
+
+    known = {str(item["value"]).strip() for item in values}
+    missing: dict[str, int] = {}
+    diagnostic["brand_facet_category_requests"] = 0
+    for category in categories:
+        _ensure_request_budget(diagnostic)
+        response = context.request.get(
+            _category_brand_facets_url(str(category["value"]).strip()),
+            timeout=core.FACET_REQUEST_TIMEOUT_MS,
+            fail_on_status_code=False,
+        )
+        payload = core._read_json_response(response, diagnostic, kind="brand_facets")
+        diagnostic["product_requests_completed"] += 1
+        diagnostic["brand_facet_category_requests"] += 1
+        data = payload.get("data") if isinstance(payload, Mapping) else None
+        if not isinstance(data, Mapping):
+            raise full.FullCatalogError("brand_facets_data_missing", diagnostic=diagnostic)
+        try:
+            category_tree = core.LaColoniaFacetDiscoveryAdapter._normalize_tree(data)
+        except Exception as exc:
+            raise full.FullCatalogError(
+                "category_brand_facets_not_usable", diagnostic=diagnostic
+            ) from exc
+        if category_tree.get("sampling") is not False:
+            raise full.FullCatalogError(
+                "brand_facets_sampling_detected", diagnostic=diagnostic
+            )
+        for item in _facet_values(category_tree, "brand"):
+            value = str(item["value"]).strip()
+            if value in known:
+                continue
+            missing[value] = missing.get(value, 0) + int(item["quantity"])
+
+    diagnostic["brand_values_recovered_from_categories"] = len(missing)
+    diagnostic["brand_products_recovered_estimate"] = sum(missing.values())
+    values.extend(
+        {"key": "brand", "value": value, "quantity": quantity}
+        for value, quantity in sorted(missing.items())
+    )
+    return values
 
 
 def _ensure_request_budget(diagnostic: dict[str, Any]) -> None:
@@ -485,6 +601,17 @@ def _run_catalog(*, page_size: int, delay_seconds: float) -> dict[str, Any]:
                 if normalized.get("sampling") is not False:
                     raise ValueError("brand_facets_sampling_detected")
                 brand_values = brand._brand_values(normalized)
+            except Exception as exc:
+                diagnostic["frontier_error"] = str(exc)[:120]
+                raise full.FullCatalogError("brand_buckets_not_usable", diagnostic=diagnostic) from exc
+            brand_values = _complete_brand_values(
+                context=context,
+                normalized=normalized,
+                brand_values=brand_values,
+                root_total=root_total,
+                diagnostic=diagnostic,
+            )
+            try:
                 partitions = _build_brand_buckets(
                     brand_values,
                     page_size=page_size,
