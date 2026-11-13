@@ -384,3 +384,5 @@ dialog.scanner::backdrop { background: rgba(16, 32, 26, .7); }
 .rv-status a { color: var(--green); font-weight: 600; text-decoration: underline; }
 @media (min-width: 760px) { .rv-row { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 14px 20px; } }
 @media (min-width: 1024px) { .rv-bar { bottom: 0; } }
+.notice { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding: 10px 12px; margin: 8px 0 12px; border-radius: 10px; background: #fff4e5; }
+button.link { background: none; border: 0; padding: 0; color: inherit; font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }

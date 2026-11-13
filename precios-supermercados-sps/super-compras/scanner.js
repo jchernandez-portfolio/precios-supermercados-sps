@@ -3,9 +3,9 @@
 // la pestaña. Usa BarcodeDetector del navegador (Chrome/Android) y, donde no existe
 // (iPhone/Safari, Firefox), el lector EAN/UPC de vendor/ servido desde este mismo
 // sitio (sin red, sin eval, sin WebAssembly). Siempre se puede escribir el código.
-import { BARCODE_FORMATS, barcodeCandidates } from "./data.js?v=20261113-5";
+import { BARCODE_FORMATS, barcodeCandidates } from "./data.js?v=20261113-6";
 
-const LIBRARY = "./vendor/zxing-upcean.js?v=20261113-5";
+const LIBRARY = "./vendor/zxing-upcean.js?v=20261113-6";
 // Recorte del cuadro que se analiza (el lector propio corre en el hilo principal).
 const MAX_FRAME_WIDTH = 800;
 
