@@ -54,7 +54,7 @@ python scripts/versionar_super_compras.py --auto   # o --check
   workflow nuevo/cambiado se registra (permisos, triggers, secretos permitidos); un
   secreto sólo en el paso que lo usa.
 - **Versión de la app**: vive en `index.html`, `app.js`, `data.js`, `sw.js`,
-  `illustration.js`, `admin.js`; cambiarla siempre con el script, nunca a mano.
+  `illustration.js`, `admin.js`, `scanner.js`; cambiarla siempre con el script, nunca a mano.
 - **Frontend** (`super-compras/`): vanilla JS, sin `innerHTML`, `fetch` sólo en
   `data.js` y `sw.js`; CSP en `index.html` (no añadir orígenes sin necesidad).
 - Turso: leer sólo el alcance necesario, escribir sólo deltas (ver `AGENTS.md`).
