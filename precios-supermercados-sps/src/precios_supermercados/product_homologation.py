@@ -192,6 +192,10 @@ class ExactGtinGroup:
     # Onzas sin convertir del grupo comparable y su lectura confirmada por los
     # compañeros: ``(source_record_id, "fluid" | "mass")``.
     ounce_readings: tuple[tuple[str, str], ...] = ()
+    # Presentación estándar (v2.9) de las ofertas que unieron las reglas de tamaño
+    # del grupo comparable: ml leído como g (g ≈ ml) o conteo con el peso del
+    # grupo (peso sobre conteo): ``(source_record_id, firma)``.
+    size_standards: tuple[tuple[str, PresentationSignature], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

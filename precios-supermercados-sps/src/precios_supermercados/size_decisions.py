@@ -230,12 +230,28 @@ def _readings(signature: PresentationSignature) -> list[tuple[PresentationSignat
     return [(signature, None), (ounces_as_volume(signature), "fluid"), (ounces_as_mass(signature), "mass")]
 
 
-def match_official(official: PresentationSignature, presentation: PresentationSignature | None) -> tuple[bool, str | None]:
+def _mass_volume_close(left: PresentationSignature, right: PresentationSignature, tolerance: Decimal) -> bool:
+    """g contra ml (motor v2.9, lácteos/jugos/salsas): mismo número de unidades ± ``tolerance``."""
+    if {left.dimension, right.dimension} != {"mass_g", "volume_ml"}:
+        return False
+    larger = max(left.total_base, right.total_base)
+    return larger > 0 and abs(left.total_base - right.total_base) / larger <= tolerance
+
+
+def match_official(
+    official: PresentationSignature,
+    presentation: PresentationSignature | None,
+    *,
+    mass_volume_tolerance: Decimal | None = None,
+) -> tuple[bool, str | None]:
     """¿La presentación de una oferta coincide con el tamaño oficial? Y, si era onza, en qué lectura.
 
     Compara el contenido total (un paquete de 3 × 100 g coincide con 300 g) con la
     tolerancia imperial (2 % o 1.5 unidades). Una oferta sin presentación no
-    contradice al oficial: se queda en el grupo.
+    contradice al oficial: se queda en el grupo. Con ``mass_volume_tolerance``
+    (el motor la pasa sólo en grupos de lácteos, jugos y salsas: regla g ≈ ml de
+    v2.9, 5 %) un oficial en g coincide con una oferta en ml y viceversa; las
+    onzas no entran en esa equivalencia.
     """
     if presentation is None:
         return True, None
@@ -245,6 +261,8 @@ def match_official(official: PresentationSignature, presentation: PresentationSi
                 return True, reading
             if mine.dimension == theirs.dimension == "count" and mine.total_base == theirs.total_base:
                 return True, None
+    if mass_volume_tolerance is not None and _mass_volume_close(presentation, official, mass_volume_tolerance):
+        return True, None
     return False, None
 
 
