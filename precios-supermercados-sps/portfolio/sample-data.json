@@ -1,7 +1,7 @@
 {
   "comparison_policy": "fail_closed_strong_identity_and_commercial_consistency",
   "currency": "HNL",
-  "published_at_utc": "2026-11-12T20:01:19Z",
+  "published_at_utc": "2026-11-13T11:54:59Z",
   "row_count": 10,
   "rows": [
     {
@@ -135,6 +135,39 @@
       ],
       "savings_vs_highest": "52.95",
       "savings_vs_highest_pct": "10.85"
+    },
+    {
+      "best_price": "173.50",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "07441001609541",
+      "canonical_product_id": "prod_gtin_07441001609541",
+      "highest_price": "207.00",
+      "offers": [
+        {
+          "current_price": "207.00",
+          "is_best_price": false,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Dos Pinos",
+          "source_category": "Alimentos",
+          "source_name": "Helado Dos Pinos Sabor Vainilla Y Caramelo 1028 Gr",
+          "source_presentation": "1028 Gr",
+          "source_record_id": "la_colonia:664",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "173.50",
+          "is_best_price": true,
+          "location_id": "walmart_sps",
+          "source_brand": "DOS PINOS",
+          "source_category": "Alimentos",
+          "source_name": "Helado Dos Pinos Sabor Vainilla Caramelo - 1028 g",
+          "source_presentation": null,
+          "source_record_id": "walmart:18799",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "33.50",
+      "savings_vs_highest_pct": "16.18"
     },
     {
       "best_price": "125.90",
@@ -300,39 +333,6 @@
       ],
       "savings_vs_highest": "20.65",
       "savings_vs_highest_pct": "26.09"
-    },
-    {
-      "best_price": "48.10",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "00099176120834",
-      "canonical_product_id": "prod_gtin_00099176120834",
-      "highest_price": "67.95",
-      "offers": [
-        {
-          "current_price": "67.95",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Ajax",
-          "source_category": "Limpieza",
-          "source_name": "Limpiador Multiusos Ajax Triclorín con Cloro en Polvo 600 g",
-          "source_presentation": "600 g",
-          "source_record_id": "la_colonia:8062",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "48.10",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "AJAX",
-          "source_category": "Limpieza",
-          "source_name": "Limpiador en Polvo Multiusos Ajax Triclorín con Cloro - 600 g",
-          "source_presentation": null,
-          "source_record_id": "walmart:22987",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "19.85",
-      "savings_vs_highest_pct": "29.21"
     }
   ],
   "schema": "precios-sps-safe-portfolio-sample/v1",
@@ -347,8 +347,8 @@
     }
   ],
   "selection_rule": "highest_absolute_savings_within_safe_common_comparable_universe",
-  "source_as_of": "2026-11-12T19:57:04.859075Z",
+  "source_as_of": "2026-11-13T11:48:37.015977Z",
   "source_head_sha": "662b61af6feacc2ee67e020bbaa868c2a44d9870",
   "source_schema": "rpi-consumer-mart/v2",
-  "source_workflow_run_id": 43295319161
+  "source_workflow_run_id": 43419951873
 }
