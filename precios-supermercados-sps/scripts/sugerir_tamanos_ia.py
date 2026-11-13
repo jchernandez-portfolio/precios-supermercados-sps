@@ -1,28 +1,32 @@
 #!/usr/bin/env python3
 """IA de visión para la cola de revisión de tamaños: lee cada foto y resuelve sola lo claro.
 
-Para cada código en conflicto manda a Gemini (Flash vigente) las fotos que ya
-tenemos en el bucket R2 (``offer["foto"]``, las mismas que ve el panel), cada una
-rotulada con su súper, y pide leer el "Peso neto" / "Contenido neto" de cada foto.
-Al modelo no se le dan los títulos ni los tamaños publicados (para que no los
-repita): la comparación foto contra título la hace este script. Con esas lecturas:
+Para cada código en conflicto manda al proveedor de visión las fotos que ya tenemos
+en el bucket R2 (``offer["foto"]``, las mismas que ve el panel), cada una rotulada con
+su súper, y pide leer el "Peso neto" / "Contenido neto" de cada foto. Al modelo no se
+le dan los títulos ni los tamaños publicados (para que no los repita): la comparación
+foto contra título la hace este script. Con esas lecturas:
 
 - **auto**: todas las lecturas legibles dicen lo mismo y ese tamaño es el que
   publica la mayoría (más de la mitad) de las ofertas → decisión automática
-  (``engine:gemini_auto``), el código sale de la cola. Sólo con un modelo Flash
-  completo (no Lite) y nunca sobre una decisión humana.
+  (``engine:claude_auto`` o ``engine:gemini_auto`` según quién leyó), el código sale
+  de la cola. Nunca con Gemini Flash-Lite (sólo sugiere) ni sobre una decisión humana.
 - **conflicto**: las fotos dicen tamaños distintos, o lo leído coincide sólo con
   una minoría (p. ej. Mazola 1 kg contra 908 g) → revisión manual.
 - **discrepancia**: lo leído no coincide con ningún título → revisión manual.
 - **no_legible** / **sin_foto** → revisión manual.
 
-Cada oferta lleva su propia lectura (``offer["ia"]``) para que el panel muestre
-"🤖 IA leyó: 1 kg" al lado de la foto, en verde si coincide con su título y en
-alerta si no. Las respuestas se guardan en ``ia-tamanos.json`` por código + fotos;
-sólo se consulta lo nuevo. Una consulta a la vez con pausa; ante 5xx reintenta y
-cambia de modelo; ante 429 espera un minuto, reintenta y, si sigue, cambia a
-Flash-Lite (sólo sugiere, no resuelve solo) o se detiene y guarda lo avanzado.
-La llave llega por ``GEMINI_API_KEY`` y sólo viaja en el encabezado ``x-goog-api-key``.
+Proveedores (misma salida por foto: legible, mismo producto, valor, unidad, texto):
+**Claude** (Messages API, si existe ``ANTHROPIC_API_KEY``) primero y **Gemini**
+(``GEMINI_API_KEY``) de respaldo. Si Claude falla (sin crédito, llave inválida, 429,
+529/5xx tras reintentos, modelo no disponible o tope de consultas), la corrida sigue
+con Gemini y anota el motivo. Sin ninguna llave sólo se aplica lo guardado.
+
+Cada oferta lleva su propia lectura (``offer["ia"]``, con ``fuente``) para que el panel
+muestre "🤖 Claude leyó: 1 kg" al lado de la foto. Las respuestas se guardan en
+``ia-tamanos.json`` por código + fotos (con proveedor y modelo); sólo se consulta lo
+nuevo. Una consulta a la vez con pausa. Las llaves sólo viajan en encabezados
+(``x-api-key`` / ``x-goog-api-key``), nunca en URLs ni en logs.
 """
 from __future__ import annotations
 
@@ -52,6 +56,14 @@ PROMPT_VERSION = 2
 CACHE_FILE = "ia-tamanos.json"
 AUTO_FILE = "auto-decisiones.json"
 ENGINE_ACTOR = "gemini_auto"
+ENGINE_BY_PROVIDER = {"claude": "claude_auto", "gemini": "gemini_auto"}
+PROVIDER_LABEL = {"claude": "Claude", "gemini": "Gemini"}
+CLAUDE_API = "https://api.anthropic.com/v1/"
+CLAUDE_VERSION = "2026-10-21"
+CLAUDE_DEFAULT_MODEL = "claude-haiku-5-5"
+CLAUDE_DEFAULT_MAX_QUERIES = 200
+CLAUDE_MAX_TOKENS = 2000
+CLAUDE_QUOTA_WAIT_MAX = 60
 PHOTO_BASE = "https://pub-0dcb2204775c484dbe6681e659eee236.r2.dev/fotos/v2/"
 _PHOTO_NAME = re.compile(r"[0-9a-f]{24}-[0-9a-f]{6,64}")
 API_BASE = "https://generativelanguage.googleapis.com/v1beta/"
@@ -103,6 +115,29 @@ RESPONSE_SCHEMA = {
     },
     "required": ["readings"],
 }
+CLAUDE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "readings": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "photo": {"type": "integer"},
+                    "legible": {"type": "boolean"},
+                    "same_product": {"type": "boolean"},
+                    "value": {"type": ["number", "null"]},
+                    "unit": {"type": ["string", "null"], "enum": [*UNITS_FROM_MODEL, None]},
+                    "label_text": {"type": ["string", "null"]},
+                },
+                "required": ["photo", "legible", "same_product", "value", "unit", "label_text"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["readings"],
+    "additionalProperties": False,
+}
 STORE_NAMES = {"la_colonia": "La Colonia", "colonial": "Colonial", "walmart": "Walmart", "pricesmart": "PriceSmart",
                "comisariato_los_andes": "Los Andes", "paiz": "Paiz"}
 
@@ -117,6 +152,14 @@ class QuotaExceeded(SuggestionError):
 
 class TemporarilyUnavailable(SuggestionError):
     """La API siguió sin responder (5xx) después de los reintentos."""
+
+
+class ModelUnavailable(SuggestionError):
+    """El modelo pedido ya no existe o no se ofrece a esta cuenta (404/400): probar el siguiente."""
+
+
+class ProviderFailed(SuggestionError):
+    """Claude no puede seguir en esta corrida (crédito, llave, 429, 529, modelo o tope): pasar a Gemini."""
 
 
 # ------------------------------------------------------------------ fotos
@@ -278,10 +321,16 @@ def is_lite(model: str | None) -> bool:
     return bool(model) and "lite" in str(model)
 
 
+_MODEL_GONE = re.compile(r"no longer available|not found|is not supported|not available|deprecated", re.I)
+
+
 class Gemini:
+    name = "gemini"
+
     def __init__(self, key: str, *, opener: Callable = urllib.request.urlopen,
                  sleep: Callable[[float], None] = time.sleep) -> None:
         self.key = key
+        self.usage = {"entrada": 0, "salida": 0}
         self.opener = opener
         self.sleep = sleep
         self.model: str | None = None
@@ -309,6 +358,8 @@ class Gemini:
                     self.retries += 1
                     self.sleep(QUOTA_WAIT)
                     continue
+                if error.code == 404 or (error.code == 400 and _MODEL_GONE.search(self.last_error)):
+                    raise ModelUnavailable(f"gemini_http_{error.code}") from error
                 if error.code not in TRANSIENT_CODES:
                     raise SuggestionError(f"gemini_http_{error.code}") from error
                 if attempt == len(RETRY_WAITS):
@@ -351,14 +402,210 @@ class Gemini:
             try:
                 answer = self._request(f"{API_BASE}models/{self.pick_model()}:generateContent", body)
                 break
-            except (TemporarilyUnavailable, QuotaExceeded):
+            except (TemporarilyUnavailable, QuotaExceeded, ModelUnavailable):
                 if not self._next_model():
                     raise
+        usage = answer.get("usageMetadata") if isinstance(answer, Mapping) else None
+        if isinstance(usage, Mapping):
+            self.usage["entrada"] += _int(usage.get("promptTokenCount"))
+            self.usage["salida"] += _int(usage.get("candidatesTokenCount"))
         try:
             return json.loads(answer["candidates"][0]["content"]["parts"][0]["text"])
         except (KeyError, IndexError, TypeError, ValueError):
             return None
 
+
+
+def _int(value: object) -> int:
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else 0
+
+
+class Claude:
+    """Claude por la Messages API (raw HTTP como Gemini): imágenes base64 y JSON estricto.
+
+    Cualquier falla que impida seguir (crédito, llave, 429 tras esperar, 529/5xx tras
+    reintentos, modelo no disponible, tope de consultas) se convierte en
+    ``ProviderFailed`` para que la cadena pase a Gemini.
+    """
+
+    name = "claude"
+
+    def __init__(self, key: str, *, model: str = CLAUDE_DEFAULT_MODEL, max_queries: int = CLAUDE_DEFAULT_MAX_QUERIES,
+                 opener: Callable = urllib.request.urlopen, sleep: Callable[[float], None] = time.sleep) -> None:
+        self.key = key
+        self.preferred = model
+        self.max_queries = max_queries
+        self.opener = opener
+        self.sleep = sleep
+        self.model: str | None = None
+        self.queries = 0
+        self.retries = 0
+        self.last_error: str | None = None
+        self.usage = {"entrada": 0, "salida": 0}
+
+    def _request(self, path: str, body: Mapping[str, object] | None = None) -> object:
+        data = None if body is None else json.dumps(body).encode("utf-8")
+        attempt = 0
+        quota_waited = False
+        while True:
+            request = urllib.request.Request(CLAUDE_API + path, data=data, method="GET" if body is None else "POST",
+                                             headers={"x-api-key": self.key, "anthropic-version": CLAUDE_VERSION,
+                                                      "Content-Type": "application/json", "User-Agent": USER_AGENT})
+            try:
+                with self.opener(request, timeout=120) as response:
+                    return json.loads(response.read().decode("utf-8"))
+            except urllib.error.HTTPError as error:
+                self.last_error = _error_message(error)
+                code = error.code
+                if code == 429:
+                    if quota_waited:
+                        raise ProviderFailed("claude_limite_429") from error
+                    quota_waited = True
+                    self.retries += 1
+                    self.sleep(_retry_after(error))
+                    continue
+                if code == 402 or (code == 400 and "credit balance" in self.last_error.lower()):
+                    raise ProviderFailed("claude_sin_credito") from error
+                if code in (401, 403):
+                    raise ProviderFailed(f"claude_llave_invalida_{code}") from error
+                if code == 404:
+                    raise ProviderFailed("claude_modelo_no_disponible") from error
+                if code != 529 and code not in TRANSIENT_CODES:
+                    raise ProviderFailed(f"claude_http_{code}") from error
+                if attempt == len(RETRY_WAITS):
+                    raise ProviderFailed("claude_saturado_529" if code == 529 else f"claude_http_{code}") from error
+            except (urllib.error.URLError, TimeoutError) as error:
+                if attempt == len(RETRY_WAITS):
+                    raise ProviderFailed("claude_sin_conexion") from error
+            except ValueError as error:
+                raise ProviderFailed("claude_respuesta_invalida") from error
+            self.retries += 1
+            self.sleep(RETRY_WAITS[attempt])
+            attempt += 1
+
+    def pick_model(self) -> str:
+        """El modelo configurado si la cuenta lo ofrece; si no, el Haiku más nuevo con visión."""
+        if self.model is None:
+            listing = self._request("models?limit=1000")
+            models = [item for item in (listing.get("data") or ()) if isinstance(item, Mapping)] \
+                if isinstance(listing, Mapping) else []
+            vision = [str(item.get("id")) for item in models if _supports_images(item)]
+            if self.preferred in vision:
+                self.model = self.preferred
+            else:
+                cheap = [model for model in vision if "haiku" in model]
+                if not cheap:
+                    raise ProviderFailed("claude_modelo_no_disponible")
+                self.model = cheap[0]  # la API lista primero lo más nuevo
+        return self.model
+
+    def read_labels(self, name: str, photos: str, images: Sequence[bytes]) -> object:
+        if self.queries >= self.max_queries:
+            raise ProviderFailed("claude_tope_consultas")
+        prompt = PROMPT.format(name=name.replace('"', "'")[:120], photos=photos)
+        content: list[dict[str, object]] = [{"type": "text", "text": prompt}]
+        for number, image in enumerate(images, 1):
+            content.append({"type": "text", "text": f"Foto {number}:"})
+            content.append({"type": "image", "source": {"type": "base64", "media_type": "image/webp",
+                                                        "data": base64.b64encode(image).decode("ascii")}})
+        body = {
+            "model": self.pick_model(),
+            "max_tokens": CLAUDE_MAX_TOKENS,
+            "output_config": {"effort": "low", "format": {"type": "json_schema", "schema": CLAUDE_SCHEMA}},
+            "messages": [{"role": "user", "content": content}],
+        }
+        self.queries += 1
+        answer = self._request("messages", body)
+        if not isinstance(answer, Mapping):
+            return None
+        usage = answer.get("usage")
+        if isinstance(usage, Mapping):
+            self.usage["entrada"] += _int(usage.get("input_tokens"))
+            self.usage["salida"] += _int(usage.get("output_tokens"))
+        if answer.get("stop_reason") != "end_turn":
+            return None  # refusal / max_tokens: la foto queda sin lectura
+        text = "".join(str(block.get("text") or "") for block in answer.get("content") or ()
+                       if isinstance(block, Mapping) and block.get("type") == "text")
+        try:
+            return json.loads(text)
+        except ValueError:
+            return None
+
+
+def _supports_images(model: Mapping[str, object]) -> bool:
+    capabilities = model.get("capabilities")
+    if not isinstance(capabilities, Mapping) or "image_input" not in capabilities:
+        return True  # listado sin capacidades: se asume visión (todos los Claude vigentes la tienen)
+    image = capabilities.get("image_input")
+    return isinstance(image, Mapping) and image.get("supported") is True
+
+
+def _retry_after(error: urllib.error.HTTPError) -> float:
+    try:
+        value = float(error.headers.get("retry-after") or QUOTA_WAIT)
+    except (TypeError, ValueError, AttributeError):
+        value = QUOTA_WAIT
+    return min(max(value, 1.0), CLAUDE_QUOTA_WAIT_MAX)
+
+
+class VisionChain:
+    """Claude primero y Gemini de respaldo: si un proveedor no puede seguir, el resto de la
+    corrida usa el siguiente y se anota el motivo."""
+
+    def __init__(self, providers: Sequence[object]) -> None:
+        if not providers:
+            raise ValueError("sin_proveedores")
+        self.providers = list(providers)
+        self.index = 0
+        self.switches: list[dict[str, str]] = []
+        self.used: str | None = None
+        self.used_model: str | None = None
+        self.calls = {getattr(provider, "name", "ia"): 0 for provider in self.providers}
+
+    @property
+    def name(self) -> str:
+        return self.used or getattr(self.providers[self.index], "name", "ia")
+
+    @property
+    def model(self) -> str | None:
+        return self.used_model if self.used else getattr(self.providers[self.index], "model", None)
+
+    @property
+    def retries(self) -> int:
+        return sum(int(getattr(provider, "retries", 0)) for provider in self.providers)
+
+    @property
+    def last_error(self) -> str | None:
+        return getattr(self.providers[self.index], "last_error", None) or next(
+            (getattr(provider, "last_error", None) for provider in reversed(self.providers[: self.index])
+             if getattr(provider, "last_error", None)), None)
+
+    def read_labels(self, name: str, photos: str, images: Sequence[bytes]) -> object:
+        while True:
+            provider = self.providers[self.index]
+            try:
+                answer = provider.read_labels(name, photos, images)
+            except ProviderFailed as error:
+                if self.index + 1 >= len(self.providers):
+                    raise SuggestionError(str(error)) from error
+                self.index += 1
+                following = getattr(self.providers[self.index], "name", "ia")
+                self.switches.append({"de": getattr(provider, "name", "ia"), "a": following, "motivo": str(error)})
+                continue
+            self.used = getattr(provider, "name", "ia")
+            self.used_model = getattr(provider, "model", None)
+            self.calls[self.used] = self.calls.get(self.used, 0) + 1
+            return answer
+
+    def report(self) -> dict[str, object]:
+        return {
+            "proveedor": self.name,
+            "consultas_por_proveedor": dict(self.calls),
+            "modelos": {getattr(p, "name", "ia"): getattr(p, "model", None) for p in self.providers},
+            "tokens": {getattr(p, "name", "ia"): dict(getattr(p, "usage", {})) for p in self.providers},
+            "cambio_de_proveedor": self.switches[-1]["motivo"] if self.switches else None,
+            "cambios": list(self.switches),
+        }
 
 def _error_message(error: urllib.error.HTTPError) -> str:
     """Mensaje corto del error de la API (sin encabezados: la llave nunca aparece)."""
@@ -384,9 +631,20 @@ def load_cache(path: Path) -> dict[str, dict[str, object]]:
     return {str(key): dict(value) for key, value in entries.items() if isinstance(value, Mapping)} if isinstance(entries, Mapping) else {}
 
 
+def entry_provider(entry: Mapping[str, object]) -> str:
+    """Quién leyó la entrada del caché (las anteriores a Claude son de Gemini)."""
+    provider = entry.get("provider")
+    return provider if provider in ENGINE_BY_PROVIDER else "gemini"
+
+
+def auto_engine(item: Mapping[str, object]) -> str:
+    return ENGINE_BY_PROVIDER.get(str(item["ia"].get("fuente")), ENGINE_ACTOR)
+
+
 def auto_decision(item: Mapping[str, object]) -> dict[str, object]:
     ia = item["ia"]
-    note = f"Gemini: {ia.get('text')}" if ia.get("text") else "Gemini: tamaño de la mayoría confirmado en la foto"
+    who = PROVIDER_LABEL.get(str(ia.get("fuente")), "Gemini")
+    note = f"{who}: {ia.get('text')}" if ia.get("text") else f"{who}: tamaño de la mayoría confirmado en la foto"
     return {"gtin": item["gtin"], "decision": "size", "value": ia["value"], "unit": ia["unit"], "note": note[:200]}
 
 
@@ -420,7 +678,8 @@ def annotate(queue: dict[str, object], cache: dict[str, dict[str, object]], *,
                 raw = client.read_labels(str(item.get("name") or ""), photo_lines(item, names), images)
                 stats["consultas"] += 1
                 unavailable_in_a_row = 0
-                entry = {"key": key, "raw": raw if isinstance(raw, Mapping) else None, "model": client.model, "at": now}
+                entry = {"key": key, "raw": raw if isinstance(raw, Mapping) else None,
+                         "provider": getattr(client, "name", "gemini"), "model": client.model, "at": now}
                 cache[gtin] = entry
             except QuotaExceeded:
                 stop = "cuota_agotada"
@@ -438,7 +697,12 @@ def annotate(queue: dict[str, object], cache: dict[str, dict[str, object]], *,
             remaining.append(item)
             continue
         readings = readings_by_photo(entry.get("raw"), names)
+        source = entry_provider(entry)
         item["ia"] = resolve_item(item, readings, auto_allowed=not is_lite(entry.get("model")))
+        item["ia"]["fuente"] = source
+        for offer in item.get("offers") or ():
+            if isinstance(offer.get("ia"), dict):
+                offer["ia"]["fuente"] = source
         stats[str(item["ia"]["status"])] += 1
         (resolved if item["ia"]["status"] == "auto" else remaining).append(item)
     if stop is None and clock() >= deadline:
@@ -447,6 +711,9 @@ def annotate(queue: dict[str, object], cache: dict[str, dict[str, object]], *,
     summary = {**stats, "detenido_por": stop, "modelo": client.model if client else None,
                "reintentos": client.retries if client else 0,
                "ultimo_error_api": client.last_error if client else None}
+    report = getattr(client, "report", None)
+    if callable(report):
+        summary.update(report())
     return summary, resolved
 
 
@@ -487,15 +754,28 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--auto-out", type=Path, required=True, help="decisiones automáticas para guardar")
     parser.add_argument("--queue-with-auto", type=Path, required=True,
                         help="cola con lo automático todavía adentro (si no se pudo guardar)")
+    parser.add_argument("--auto-out-claude", type=Path,
+                        help="decisiones automáticas leídas por Claude (por defecto <auto-out>-claude.json)")
+    parser.add_argument("--claude-model", default=os.environ.get("CLAUDE_MODEL", "").strip() or CLAUDE_DEFAULT_MODEL)
+    parser.add_argument("--claude-max", type=int, default=CLAUDE_DEFAULT_MAX_QUERIES,
+                        help="tope de consultas a Claude por corrida")
     parser.add_argument("--minutes", type=float, default=DEFAULT_MINUTES)
     parser.add_argument("--delay", type=float, default=DEFAULT_DELAY)
     args = parser.parse_args(argv)
-    if args.delay < 1 or not 0 <= args.minutes <= 150:
+    if args.delay < 1 or not 0 <= args.minutes <= 150 or not 0 <= args.claude_max <= 2000 \
+            or not re.fullmatch(r"claude-[a-z0-9-]{1,60}", args.claude_model):
         raise SystemExit("parametros_invalidos")
+    auto_out_claude = args.auto_out_claude or args.auto_out.with_name(f"{args.auto_out.stem}-claude.json")
     queue = json.loads(args.queue.read_text(encoding="utf-8"))
     cache = load_cache(args.cache_in) if args.cache_in else {}
-    key = os.environ.get("GEMINI_API_KEY", "").strip()
-    client = Gemini(key) if key else None
+    providers: list[object] = []
+    claude_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if claude_key and args.claude_max > 0:
+        providers.append(Claude(claude_key, model=args.claude_model, max_queries=args.claude_max))
+    gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if gemini_key:
+        providers.append(Gemini(gemini_key))
+    client = VisionChain(providers) if providers else None
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     summary, resolved = annotate(queue, cache, client=client, fetch_image=_fetch_image,
                                  minutes=args.minutes, delay=args.delay, now=now)
@@ -512,7 +792,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     queue["auto_resueltas"] = history
     _write(args.queue_with_auto, with_auto)
     _write(args.queue, queue)
-    _write(args.auto_out, {"schema": PAYLOAD_SCHEMA, "decisions": [auto_decision(item) for item in resolved]})
+    for path, engine in ((args.auto_out, "gemini_auto"), (auto_out_claude, "claude_auto")):
+        decisions = [auto_decision(item) for item in resolved if auto_engine(item) == engine]
+        _write(path, {"schema": PAYLOAD_SCHEMA, "decisions": decisions})
     _write(args.cache_out, {"schema": CACHE_SCHEMA, "entries": dict(sorted(cache.items()))})
     print(json.dumps(summary, ensure_ascii=False))
     return 0

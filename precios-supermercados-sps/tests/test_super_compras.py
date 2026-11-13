@@ -681,6 +681,13 @@ out.readings = [
   offerReading({ ia: { status: 'leido', value: '908', unit: 'g', coincide: true } }),
   offerReading({ ia: { status: 'no_legible', reason: 'ilegible' } }),
   offerReading({}),
+  offerReading({ ia: { status: 'leido', value: '240', unit: 'g', coincide: true, fuente: 'claude' } }),
+  offerReading({ ia: { status: 'leido', value: '240', unit: 'g', coincide: false, fuente: 'gemini' } }),
+  offerReading({ ia: { status: 'leido', value: '240', unit: 'g', coincide: true, fuente: '__proto__' } }),
+];
+out.sources = [
+  aiSuggestion({ ia: { status: 'auto', value: '116', unit: 'g', fuente: 'claude' } }).label,
+  aiSuggestion({ ia: { status: 'sugerencia', value: '116', unit: 'g', fuente: 'gemini' } }).label,
 ];
 out.codes = ['00049733830119', '07411000204139', '17411000204136', ''].map((g) => searchVariants(g).map((v) => v.label + ':' + v.code));
 out.own = [storeCode({ code: ' 0049733830119 ' }), storeCode({ code: '12' }), storeCode({})];
@@ -730,10 +737,13 @@ console.log(JSON.stringify(out));
     assert result["photos"][0] == {"thumb": f"{r2}320/aa/{'a' * 24}-1111111111.webp",
                                    "full": f"{r2}800/aa/{'a' * 24}-1111111111.webp"}
     assert result["photos"][1] is None and result["photos"][2] is None
-    alert, ok, unreadable, nothing = result["readings"]
+    alert, ok, unreadable, nothing, by_claude, by_gemini, odd = result["readings"]
     assert alert["kind"] == "alert" and alert["label"] == "🤖 IA leyó: 1000 g ⚠"
     assert ok["kind"] == "ok" and ok["label"] == "🤖 IA leyó: 908 g ✓"
     assert unreadable["label"] == "🤖 No legible" and nothing is None
+    assert by_claude["label"] == "🤖 Claude leyó: 240 g ✓" and by_gemini["label"] == "🤖 Gemini leyó: 240 g ⚠"
+    assert odd["label"] == "🤖 IA leyó: 240 g ✓"  # fuente desconocida: nunca se usa como clave de objeto
+    assert result["sources"] == ["🤖 Resuelto por Claude: 116 g", "🤖 Sugerencia de Gemini: 116 g"]
     assert result["options"] == [
         {"value": "150", "unit": "g", "stores": ["Walmart", "Paiz"]},
         {"value": "150", "unit": "ml", "stores": ["Colonial"]},

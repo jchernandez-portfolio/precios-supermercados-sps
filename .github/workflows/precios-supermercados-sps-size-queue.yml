@@ -4,11 +4,13 @@ name: Precios SPS - Cola de revisión de tamaños
 # en conflicto (sólo SELECT en Turso) y publica `cola.json` en la rama pública
 # `revision-tamanos`, que lee el panel #/admin/revision. Sólo contiene datos ya
 # públicos (cadena, nombre y tamaño publicados). Omite los GTIN ya decididos.
-# IA: Gemini lee el contenido neto en la foto de cada oferta (las mismas fotos del
-# panel; sólo lo nuevo; lo leído se guarda en `ia-tamanos.json`). Si todas las fotos
-# confirman el tamaño de la mayoría, la decisión se guarda sola (engine:gemini_auto,
-# nunca sobre una humana) y el código sale de la cola. La llave GEMINI_API_KEY sólo
-# entra al paso de lectura; los secretos de Turso, sólo a los pasos de Turso.
+# IA: Claude (si existe ANTHROPIC_API_KEY) y, de respaldo, Gemini leen el contenido
+# neto en la foto de cada oferta (las mismas fotos del panel; sólo lo nuevo; lo leído
+# se guarda en `ia-tamanos.json` con proveedor y modelo). Si Claude falla (crédito,
+# llave, 429, 529) la corrida sigue con Gemini. Si todas las fotos confirman el tamaño
+# de la mayoría, la decisión se guarda sola (engine:claude_auto o engine:gemini_auto,
+# nunca sobre una humana) y el código sale de la cola. Las llaves de IA sólo entran
+# al paso de lectura; los secretos de Turso, sólo a los pasos de Turso.
 on:
   workflow_run:
     workflows:
@@ -18,9 +20,14 @@ on:
   workflow_dispatch:
     inputs:
       ia_minutos:
-        description: "Minutos máximos de consultas a Gemini (0 = sólo aplicar lo guardado)"
+        description: "Minutos máximos de consultas a la IA (0 = sólo aplicar lo guardado)"
         required: false
         default: "25"
+        type: string
+      claude_max:
+        description: "Tope de consultas a Claude por corrida (0 = sólo Gemini)"
+        required: false
+        default: "200"
         type: string
 
 permissions:
@@ -73,23 +80,28 @@ jobs:
           rm -rf /tmp/cola
           python source/precios-supermercados-sps/scripts/exportar_cola_tamanos.py --output-dir /tmp/cola
 
-      - name: Sugerencias de tamaño con IA (Gemini)
+      - name: Sugerencias de tamaño con IA (Claude, respaldo Gemini)
         continue-on-error: true
         env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           IA_MINUTOS: ${{ inputs.ia_minutos || '25' }}
+          CLAUDE_MAX: ${{ inputs.claude_max || '200' }}
         run: |
           set -euo pipefail
           case "$IA_MINUTOS" in (''|*[!0-9]*) echo "ia_minutos_invalido" >&2; exit 1;; esac
+          case "$CLAUDE_MAX" in (''|*[!0-9]*) echo "claude_max_invalido" >&2; exit 1;; esac
           if [ "$IA_MINUTOS" -gt 120 ]; then IA_MINUTOS=120; fi
+          if [ "$CLAUDE_MAX" -gt 2000 ]; then CLAUDE_MAX=2000; fi
           if [ -L cola/ia-tamanos.json ]; then echo "ia_cache_symlink_invalid" >&2; exit 1; fi
           cp /tmp/cola/cola.json /tmp/cola/cola-sin-ia.json
           if ! python source/precios-supermercados-sps/scripts/sugerir_tamanos_ia.py \
               --queue /tmp/cola/cola.json --cache-in cola/ia-tamanos.json \
-              --cache-out /tmp/cola/ia-tamanos.json --minutes "$IA_MINUTOS" \
-              --auto-out /tmp/cola/auto-decisiones.json --queue-with-auto /tmp/cola/cola-con-auto.json; then
+              --cache-out /tmp/cola/ia-tamanos.json --minutes "$IA_MINUTOS" --claude-max "$CLAUDE_MAX" \
+              --auto-out /tmp/cola/auto-decisiones.json --auto-out-claude /tmp/cola/auto-decisiones-claude.json \
+              --queue-with-auto /tmp/cola/cola-con-auto.json; then
             cp /tmp/cola/cola-sin-ia.json /tmp/cola/cola.json
-            rm -f /tmp/cola/auto-decisiones.json
+            rm -f /tmp/cola/auto-decisiones.json /tmp/cola/auto-decisiones-claude.json
             exit 1
           fi
 
@@ -99,11 +111,19 @@ jobs:
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
         run: |
           set -euo pipefail
-          if [ ! -s /tmp/cola/auto-decisiones.json ]; then echo "sin_decisiones_automaticas"; exit 0; fi
-          # Si no se pudieron guardar, se publica la cola con esos códigos todavía adentro.
-          if ! python source/precios-supermercados-sps/scripts/aplicar_decisiones_tamano.py --turso --apply \
-              --engine gemini_auto --payload-file /tmp/cola/auto-decisiones.json \
-              --summary /tmp/cola/auto-resultado.json; then
+          # Cada archivo se guarda con el motor de quien leyó. Si alguno no se pudo
+          # guardar, se publica la cola con esos códigos todavía adentro.
+          saved_all=true
+          for pair in "gemini_auto:auto-decisiones.json" "claude_auto:auto-decisiones-claude.json"; do
+            engine="${pair%%:*}"; file="/tmp/cola/${pair#*:}"
+            if [ ! -s "$file" ]; then echo "sin_decisiones_automaticas:$engine"; continue; fi
+            if ! python source/precios-supermercados-sps/scripts/aplicar_decisiones_tamano.py --turso --apply \
+                --engine "$engine" --payload-file "$file" \
+                --summary "/tmp/cola/auto-resultado-$engine.json"; then
+              saved_all=false
+            fi
+          done
+          if [ "$saved_all" != true ]; then
             cp /tmp/cola/cola-con-auto.json /tmp/cola/cola.json
             echo "decisiones_automaticas_no_guardadas" >&2
           fi

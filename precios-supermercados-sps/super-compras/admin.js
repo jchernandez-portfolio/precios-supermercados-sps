@@ -10,7 +10,7 @@
 // en el encabezado Authorization a api.github.com.
 import {
   RETAILER_NAMES, SIZE_DECISIONS_RUNS_URL, SIZE_UNITS, loadSizeQueue, sendSizeDecisions,
-} from "./data.js?v=20261112-5";
+} from "./data.js?v=20261113-1";
 
 const TOKEN_KEY = "super-compras-admin-github-token";
 const UNIT_LABEL = { g: "g", ml: "ml", oz: "oz", lb: "lb", unit: "unidades" };
@@ -101,6 +101,10 @@ export function photoUrls(offer) {
 
 const sizeText = (value, unit) => `${value} ${UNIT_LABEL[unit] || unit}`;
 
+// Quién leyó la foto (Claude por API o en sesión, Gemini); lecturas viejas sin fuente: "IA".
+const AI_NAME = { claude: "Claude", claude_sesion: "Claude", gemini: "Gemini" };
+const aiName = (source) => (Object.hasOwn(AI_NAME, source) ? AI_NAME[source] : "IA");
+
 // Lo que la IA leyó en la foto de una oferta: verde si coincide con su título, alerta si no.
 export function offerReading(offer) {
   const ia = offer?.ia;
@@ -108,7 +112,7 @@ export function offerReading(offer) {
   if (ia.status === "leido" && Number(ia.value) > 0 && SIZE_UNITS.includes(ia.unit)) {
     return {
       kind: ia.coincide ? "ok" : "alert",
-      label: `🤖 IA leyó: ${sizeText(ia.value, ia.unit)}${ia.coincide ? " ✓" : " ⚠"}`,
+      label: `🤖 ${aiName(ia.fuente)} leyó: ${sizeText(ia.value, ia.unit)}${ia.coincide ? " ✓" : " ⚠"}`,
       title: [ia.text ? `Texto en la foto: ${ia.text}` : "", ia.coincide ? "Coincide con el título." : "No coincide con el título de este súper."]
         .filter(Boolean).join(" · "),
     };
@@ -123,8 +127,10 @@ export function aiSuggestion(item) {
   const valid = Number(ai.value) > 0 && SIZE_UNITS.includes(ai.unit);
   const text = typeof ai.text === "string" ? ai.text : "";
   if (valid && ["auto", "sugerencia", "conflicto", "discrepancia"].includes(ai.status)) {
+    const name = aiName(ai.fuente);
     const labels = {
-      auto: "🤖 Resuelto por IA", sugerencia: "🤖 Sugerencia", conflicto: "🤖 IA leyó (conflicto)", discrepancia: "🤖 IA leyó (no coincide con ningún título)",
+      auto: `🤖 Resuelto por ${name}`, sugerencia: name === "IA" ? "🤖 Sugerencia" : `🤖 Sugerencia de ${name}`,
+      conflicto: `🤖 ${name} leyó (conflicto)`, discrepancia: `🤖 ${name} leyó (no coincide con ningún título)`,
     };
     return {
       kind: "suggest", status: ai.status, value: String(ai.value), unit: ai.unit, text,

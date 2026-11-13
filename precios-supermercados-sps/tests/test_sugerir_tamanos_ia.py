@@ -283,3 +283,206 @@ def test_cache_file_is_read_defensively(tmp_path: Path) -> None:
     assert ia.load_cache(path) == {}  # versión anterior del prompt: se vuelve a leer
     path.write_text(json.dumps({"schema": ia.CACHE_SCHEMA, "entries": {"0001": {"key": "k"}, "x": 3}}))
     assert ia.load_cache(path) == {"0001": {"key": "k"}}
+
+
+# ----------------------------------------------------- Gemini: modelo retirado
+
+
+def test_gemini_model_no_longer_available_moves_to_the_next_candidate() -> None:
+    used: list[str] = []
+
+    def opener(request, timeout):
+        if request.full_url.endswith("models?pageSize=1000"):
+            return models_response("gemini-2.5-flash", "gemini-2.0-flash")
+        model = request.full_url.rsplit("/", 1)[-1].split(":")[0]
+        used.append(model)
+        if model == "gemini-2.5-flash":
+            raise http_error(request, 404, "models/gemini-2.5-flash is no longer available to new users")
+        return Response(json.dumps({"candidates": [{"content": {"parts": [{"text": "{\"readings\": []}"}]}}],
+                                    "usageMetadata": {"promptTokenCount": 900, "candidatesTokenCount": 40}}).encode())
+
+    client = ia.Gemini("k", opener=opener, sleep=lambda _: pytest.fail("un 404 no se reintenta"))
+    assert client.read_labels("x", "Foto 1 = Paiz", [b"img"]) == {"readings": []}
+    assert used == ["gemini-2.5-flash", "gemini-2.0-flash"] and client.model == "gemini-2.0-flash"
+    assert client.usage == {"entrada": 900, "salida": 40}
+
+
+# ------------------------------------------------------------------- Claude
+
+
+def claude_models(*ids: str, vision: bool = True) -> Response:
+    return Response(json.dumps({"data": [
+        {"id": model, "capabilities": {"image_input": {"supported": vision}}} for model in ids]}).encode())
+
+
+def claude_answer(readings: list[dict], stop: str = "end_turn") -> Response:
+    return Response(json.dumps({"stop_reason": stop, "usage": {"input_tokens": 1500, "output_tokens": 60},
+                                "content": [{"type": "text", "text": json.dumps({"readings": readings})}]}).encode())
+
+
+def claude_opener(fail: dict[int, object] | None = None, models=("claude-haiku-5-5",)):
+    """Responde el listado y, en cada mensaje, el error de ``fail[n]`` o una lectura de 240 g."""
+    calls: list[object] = []
+
+    def opener(request, timeout):
+        calls.append(request)
+        if request.full_url.endswith("models?limit=1000"):
+            return claude_models(*models)
+        number = sum(1 for call in calls if call.full_url.endswith("/messages"))
+        error = (fail or {}).get(number)
+        if error is not None:
+            raise http_error(request, *error) if isinstance(error, tuple) else error
+        return claude_answer([reading(1, 240, text="PESO NETO 240 g")])
+
+    return opener, calls
+
+
+def test_claude_sends_the_key_only_in_headers_images_as_webp_and_a_strict_schema() -> None:
+    opener, calls = claude_opener()
+    client = ia.Claude("sk-ant-prueba", opener=opener)
+    answer = client.read_labels('Maíz "El Migo"', "Foto 1 = Paiz", [b"RIFF0000WEBP"])
+    assert answer["readings"][0]["value"] == 240
+    for request in calls:
+        assert "sk-ant-prueba" not in request.full_url
+        assert request.get_header("X-api-key") == "sk-ant-prueba"
+        assert request.get_header("Anthropic-version") == ia.CLAUDE_VERSION
+    body = json.loads(calls[-1].data)
+    assert "sk-ant-prueba" not in calls[-1].data.decode()
+    assert body["model"] == "claude-haiku-5-5"
+    assert body["output_config"]["format"] == {"type": "json_schema", "schema": ia.CLAUDE_SCHEMA}
+    content = body["messages"][0]["content"]
+    assert "Maíz 'El Migo'" in content[0]["text"] and content[1] == {"type": "text", "text": "Foto 1:"}
+    assert content[2]["source"]["media_type"] == "image/webp" and content[2]["source"]["type"] == "base64"
+    assert client.usage == {"entrada": 1500, "salida": 60} and client.queries == 1
+
+
+def test_claude_picks_the_newest_haiku_when_the_configured_model_is_missing() -> None:
+    opener, _ = claude_opener(models=("claude-opus-5-5", "claude-haiku-6", "claude-haiku-5-5"))
+    assert ia.Claude("k", model="claude-haiku-9", opener=opener).pick_model() == "claude-haiku-6"
+    opener, _ = claude_opener(models=("claude-haiku-5-5",))
+    with pytest.raises(ia.ProviderFailed, match="claude_modelo_no_disponible"):
+        ia.Claude("k", opener=lambda r, timeout: claude_models("claude-haiku-5-5", vision=False)).pick_model()
+
+
+def test_claude_refusal_or_bad_json_leaves_the_photo_unread() -> None:
+    def opener(request, timeout):
+        if request.full_url.endswith("models?limit=1000"):
+            return claude_models("claude-haiku-5-5")
+        return claude_answer([], stop="refusal")
+
+    assert ia.Claude("k", opener=opener).read_labels("x", "Foto 1 = Paiz", [b"img"]) is None
+
+
+@pytest.mark.parametrize(
+    ("error", "reason"),
+    [
+        ((400, "Your credit balance is too low to access the Anthropic API."), "claude_sin_credito"),
+        ((402, "billing"), "claude_sin_credito"),
+        ((401, "invalid x-api-key"), "claude_llave_invalida_401"),
+        ((404, "model: claude-haiku-5-5"), "claude_modelo_no_disponible"),
+    ],
+)
+def test_claude_fatal_errors_fail_fast_without_retries(error: tuple, reason: str) -> None:
+    opener, _ = claude_opener({1: error})
+    client = ia.Claude("k", opener=opener, sleep=lambda _: pytest.fail("no se reintenta"))
+    with pytest.raises(ia.ProviderFailed, match=reason):
+        client.read_labels("x", "Foto 1 = Paiz", [b"img"])
+    assert "k" not in (client.last_error or "").split()
+
+
+def test_claude_overloaded_529_is_retried_with_waits_before_giving_up() -> None:
+    waits: list[float] = []
+    opener, calls = claude_opener({1: (529, "Overloaded"), 2: (529, "Overloaded")})
+    client = ia.Claude("k", opener=opener, sleep=waits.append)
+    assert client.read_labels("x", "Foto 1 = Paiz", [b"img"])["readings"][0]["value"] == 240
+    assert waits == [15, 45] and client.retries == 2
+    opener, _ = claude_opener({n: (529, "Overloaded") for n in range(1, 4)})
+    with pytest.raises(ia.ProviderFailed, match="claude_saturado_529"):
+        ia.Claude("k", opener=opener, sleep=lambda _: None).read_labels("x", "Foto 1 = Paiz", [b"img"])
+
+
+def test_claude_429_waits_once_then_gives_up() -> None:
+    waits: list[float] = []
+    opener, _ = claude_opener({1: (429, "rate"), 2: (429, "rate")})
+    with pytest.raises(ia.ProviderFailed, match="claude_limite_429"):
+        ia.Claude("k", opener=opener, sleep=waits.append).read_labels("x", "Foto 1 = Paiz", [b"img"])
+    assert waits == [60]
+
+
+def test_claude_query_cap_stops_before_spending() -> None:
+    opener, calls = claude_opener()
+    client = ia.Claude("k", max_queries=2, opener=opener)
+    client.read_labels("x", "Foto 1 = Paiz", [b"img"])
+    client.read_labels("x", "Foto 1 = Paiz", [b"img"])
+    with pytest.raises(ia.ProviderFailed, match="claude_tope_consultas"):
+        client.read_labels("x", "Foto 1 = Paiz", [b"img"])
+    assert sum(1 for call in calls if call.full_url.endswith("/messages")) == 2
+
+
+# ------------------------------------------------------------------- cadena
+
+
+class FakeProvider(FakeClient):
+    def __init__(self, name: str, answers: list[object], model: str) -> None:
+        super().__init__(answers, model=model)
+        self.name = name
+        self.usage = {"entrada": 0, "salida": 0}
+
+
+@pytest.mark.parametrize("reason", ["claude_sin_credito", "claude_llave_invalida_401", "claude_saturado_529"])
+def test_chain_switches_to_gemini_for_the_rest_of_the_run(reason: str) -> None:
+    good = {"readings": [reading(1, 116), reading(2, 116)]}
+    claude = FakeProvider("claude", [ia.ProviderFailed(reason)], "claude-haiku-5-5")
+    gemini = FakeProvider("gemini", [good, good], "gemini-3.5-flash")
+    chain = ia.VisionChain([claude, gemini])
+    cache: dict = {}
+    items = [goya(), {**goya(), "gtin": "00041331019999"}]
+    stats, resolved = ia.annotate(queue(*items), cache, client=chain, fetch_image=lambda url: b"", minutes=5,
+                                  delay=0, sleep=lambda _: None, now="T")
+    assert len(claude.calls) == 1 and len(gemini.calls) == 2  # Claude no se vuelve a intentar
+    assert stats["cambio_de_proveedor"] == reason and stats["consultas_por_proveedor"] == {"claude": 0, "gemini": 2}
+    assert {entry["provider"] for entry in cache.values()} == {"gemini"}
+    assert [ia.auto_engine(item) for item in resolved] == ["gemini_auto", "gemini_auto"]
+
+
+def test_claude_readings_resolve_as_claude_auto_and_are_labelled_in_the_queue() -> None:
+    claude = FakeProvider("claude", [{"readings": [reading(1, 116, text="Peso neto 116 g"), reading(2, 116)]},
+                                     {"readings": [reading(1, 1000), reading(2, 1000)]}], "claude-haiku-5-5")
+    chain = ia.VisionChain([claude, FakeProvider("gemini", [], "gemini-3.5-flash")])
+    cache: dict = {}
+    document = queue(goya(), mazola())
+    stats, resolved = ia.annotate(document, cache, client=chain, fetch_image=lambda url: b"", minutes=5, delay=0,
+                                  sleep=lambda _: None, now="T")
+    assert [ia.auto_engine(item) for item in resolved] == ["claude_auto"]
+    assert ia.auto_decision(resolved[0])["note"] == "Claude: Peso neto 116 g"
+    assert document["items"][0]["ia"]["fuente"] == "claude"
+    assert all(offer["ia"]["fuente"] == "claude" for offer in document["items"][0]["offers"])
+    assert cache["00041331013734"]["provider"] == "claude" and stats["proveedor"] == "claude"
+    assert stats["tokens"]["claude"] == {"entrada": 0, "salida": 0}
+
+
+def test_chain_with_only_claude_stops_the_run_when_claude_fails() -> None:
+    chain = ia.VisionChain([FakeProvider("claude", [ia.ProviderFailed("claude_sin_credito")], "claude-haiku-5-5")])
+    stats, _ = ia.annotate(queue(goya(), mazola()), {}, client=chain, fetch_image=lambda url: b"", minutes=5,
+                           delay=0, sleep=lambda _: None)
+    assert stats["detenido_por"] == "claude_sin_credito" and stats["pendiente"] == 2
+
+
+def test_old_cache_entries_count_as_gemini_and_main_splits_files_by_engine(tmp_path: Path, monkeypatch) -> None:
+    assert ia.entry_provider({"model": "gemini-3.5-flash"}) == "gemini"
+    names = ia.item_photos(goya())
+    cache = {"00041331013734": {"key": ia.cache_key(names), "provider": "claude", "model": "claude-haiku-5-5",
+                                "raw": {"readings": [reading(1, 116), reading(2, 116)]}},
+             "00750894620685": {"key": ia.cache_key(ia.item_photos(mazola())), "model": "gemini-3.5-flash",
+                                "raw": {"readings": [reading(1, 1000), reading(2, 1000)]}}}
+    (tmp_path / "cola.json").write_text(json.dumps(queue(goya(), {**mazola(), "offers": mazola()["offers"][2:]})))
+    (tmp_path / "cache.json").write_text(json.dumps({"schema": ia.CACHE_SCHEMA, "entries": cache}))
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    ia.main(["--queue", str(tmp_path / "cola.json"), "--cache-in", str(tmp_path / "cache.json"),
+             "--cache-out", str(tmp_path / "out.json"), "--auto-out", str(tmp_path / "auto.json"),
+             "--queue-with-auto", str(tmp_path / "con-auto.json"), "--minutes", "0"])
+    claude = json.loads((tmp_path / "auto-claude.json").read_text())["decisions"]
+    gemini = json.loads((tmp_path / "auto.json").read_text())["decisions"]
+    assert [d["gtin"] for d in claude] == ["00041331013734"]
+    assert all(d["gtin"] != "00041331013734" for d in gemini)

@@ -37,7 +37,7 @@ _POUND_TO_GRAMS = Decimal("453.59237")
 _DIMENSION = {"g": "mass_g", "ml": "volume_ml", "oz": "ounce", "unit": "count"}
 _ACTOR = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})")
 # Decisiones automáticas: sólo los motores de esta lista (nunca llegan por el panel).
-ENGINE_ACTORS = frozenset({"gemini_auto"})
+ENGINE_ACTORS = frozenset({"gemini_auto", "claude_auto"})
 _RELATIVE_TOLERANCE = Decimal("0.02")
 _ABSOLUTE_TOLERANCE = Decimal("1.5")
 

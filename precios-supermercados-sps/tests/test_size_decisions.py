@@ -340,3 +340,18 @@ def test_queue_offers_carry_their_card_photo_and_who_it_came_from() -> None:
     assert cola.attach_photos(items, photos) == 1
     assert items[0]["offers"][0]["foto_de"] == "comisariato_los_andes" and "foto" not in items[0]["offers"][1]
     assert cola.photo_url(f"{key_b}-2222222222", 320).endswith(f"/320/bb/{key_b}-2222222222.webp")
+
+
+def test_claude_engine_also_never_replaces_a_human_decision() -> None:
+    connection = database()
+    store = SQLiteMasterStore(connection)
+    aplicar.apply_size_decisions(store, payload({"gtin": CHOLULA, "decision": "size", "value": "5", "unit": "oz"}),
+                                 actor="Jchernand3z19", apply=True, now=NOW)
+    engine = json.dumps({"schema": "rpi-size-decisions/v1", "decisions": [
+        {"gtin": CHOLULA, "decision": "size", "value": "150", "unit": "g", "note": "Claude: 150 g"},
+        {"gtin": MCCORMICK, "decision": "size", "value": "180", "unit": "ml", "note": "Claude: 180 ml"},
+    ]})
+    result = aplicar.apply_engine_decisions(store, engine, engine="claude_auto", apply=True, now=NOW)
+    assert result["skipped_human"] == [CHOLULA]
+    rows = dict(connection.execute("SELECT canonical_gtin, decided_by FROM size_decisions").fetchall())
+    assert rows == {CHOLULA: "human:Jchernand3z19", MCCORMICK: "engine:claude_auto"}
