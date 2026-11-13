@@ -193,3 +193,95 @@ def test_ounce_basis_uses_real_conversions() -> None:
     assert rules.ounce_basis(sig("ounce", "8"), sig("mass_g", "241")) is None  # 226.8 g: 6 % de diferencia
     assert rules.ounce_basis(sig("ounce", "16", 2), sig("volume_ml", "473")) is None  # distinto paquete
     assert rules.ounce_basis(sig("mass_g", "100"), sig("volume_ml", "100")) is None  # sin onzas no aplica
+
+
+# ------------------------------------------------- decisiones de tamaño
+
+MCCORMICK = "07411000204139"
+CHOLULA = "00049733830119"
+DECIDED_PRODUCTS = [
+    # Cholula: 150 ml + 5 oz contra 150 g + 150 g → hoy Walmart y Paiz comparan (atípico).
+    (3, "colonial", "CHOLULA Hot Chipotle 150 mL", "Cholula", None, "Salsas", "0049733830119"),
+    (4, "comisariato_los_andes", "Cholula hot sauce chipotle 5 oz", "Cholula", "UN", "Salsas", "0049733830119"),
+    (5, "walmart", "Salsa Cholula picante chipotle - 150 g", "Cholula", None, "Salsas", "0049733830119"),
+    (6, "paiz", "Salsa Cholula picante chipotle - 150 g", "Cholula", "150 g", "Salsas", "0049733830119"),
+    # McCormick: 180 ml ×2 contra 180 g ×2 → hoy empate bloqueado.
+    (11, "colonial", "McCORMICK Caesar 180ml", "McCormick", None, "Aderezos", "7411000204139"),
+    (12, "la_colonia", "Aderezo Mccormick Caesar 180 Ml", "McCormick", None, "Aderezos", "7411000204139"),
+    (13, "paiz", "Aderezo Mccormick Caesar Dp - 180 g", "McCormick", "180 g", "Aderezos", "7411000204139"),
+    (14, "walmart", "Aderezo Mccormick Caesar Dp - 180 g", "McCormick", None, "Aderezos", "7411000204139"),
+]
+DECISION_ROWS = [
+    # Una persona: Cholula pesa 150 g (Colonial en ml y Los Andes en 5 oz quedan aislados).
+    (CHOLULA, "size", "150", "g", "150", "g", None, "human:Jchernand3z19", "2026-11-12T10:00:00Z"),
+    # La IA: McCormick son 180 ml (las ofertas en g quedan aisladas).
+    (MCCORMICK, "size", "180", "ml", "180", "ml", "Cont. neto 180 ml", "engine:gemini_auto", "2026-11-12T11:00:00Z"),
+]
+
+
+def decided_database(path: Path, *, with_table: bool) -> Backend:
+    """Base con perfiles guardados como los deja producción (refresco con decisiones)."""
+    from precios_supermercados.product_homologation_persistence import (
+        build_homologation_rows,
+        records_from_product_rows,
+    )
+    from precios_supermercados.size_decisions import TABLE_SQL, decision_from_row, index_decisions
+
+    production = index_decisions(decision_from_row(row) for row in DECISION_ROWS)
+    rows = build_homologation_rows(records_from_product_rows(DECIDED_PRODUCTS), updated_at_utc="2026-11-13T00:00:00Z",
+                                   size_decisions=production)
+    backend = database(path, {row.product_id: row.comparison_status for row in rows}, DECIDED_PRODUCTS)
+    if with_table:
+        backend.connection.execute(TABLE_SQL)
+        backend.connection.executemany("INSERT INTO size_decisions VALUES (?,?,?,?,?,?,?,?,?)", DECISION_ROWS)
+        backend.connection.commit()
+    return backend
+
+
+def test_measure_applies_size_decisions_like_production(tmp_path: Path) -> None:
+    backend = decided_database(tmp_path / "db.sqlite", with_table=True)
+    summary, _ = rules.measure(backend, catalog().__getitem__, BASE)
+    # Con las decisiones el recálculo coincide con los perfiles guardados.
+    assert summary["verificacion_contra_perfiles_guardados"] == {"coincide": 8}
+    assert summary["decisiones_de_tamano"] == {
+        "tabla_size_decisions": "presente",
+        "decisiones_leidas": 2,
+        "por_tipo": {"size": 2},
+        "por_autor": {"engine:gemini_auto": 1, "human": 1},
+        "aplicadas_a_grupos_en_2_o_mas_cadenas": 2,
+        "grupos_decididos_listos": 2,
+        "grupos_decididos_en_revision": 0,
+        "decisiones_sin_grupo_vigente": 0,
+    }
+    assert "Jchernand3z19" not in json.dumps(summary, ensure_ascii=False)  # sin cuentas en el artifact
+    assert summary["grupos_gtin_en_2_o_mas_cadenas"]["bloqueados_review_required"] == 0
+    reasons = summary["motivos"]["human_size_decision_mismatch"]
+    assert reasons["ofertas_excluidas_por_este_motivo"] == 4  # 2 de Cholula + 2 de McCormick
+    # Sólo SELECT, también sobre size_decisions.
+    assert any("FROM size_decisions" in sql for sql in backend.sql)
+    assert all(sql.lstrip().upper().startswith("SELECT") for sql in backend.sql)
+
+
+def test_measure_without_decisions_table_reports_false_differences(tmp_path: Path) -> None:
+    backend = decided_database(tmp_path / "db.sqlite", with_table=False)
+    summary, _ = rules.measure(backend, catalog().__getitem__, BASE)
+    assert summary["decisiones_de_tamano"]["tabla_size_decisions"] == "ausente"
+    assert summary["decisiones_de_tamano"]["decisiones_leidas"] == 0
+    # Sin la tabla el motor resuelve sin decisiones: los GTIN decididos ya no coinciden.
+    assert summary["verificacion_contra_perfiles_guardados"] != {"coincide": 8}
+    assert not any("FROM size_decisions" in sql for sql in backend.sql)
+
+
+def test_resolve_groups_keeps_the_decision_with_and_without_the_ounce_rule() -> None:
+    from precios_supermercados.product_homologation_persistence import records_from_product_rows
+    from precios_supermercados.size_decisions import decision_from_row, index_decisions
+
+    profiles = rules.build_profiles([record for _, record in records_from_product_rows(DECIDED_PRODUCTS)])
+    decided = index_decisions(decision_from_row(row) for row in DECISION_ROWS)
+    for ounce_rule in (True, False):
+        groups = {group["gtin"]: group for group in rules.resolve_groups(profiles, ounce_rule=ounce_rule,
+                                                                         size_decisions=decided)}
+        assert groups[MCCORMICK]["status"] == "ready" and groups[MCCORMICK]["decision"] is decided[MCCORMICK]
+        assert {m.record.supermarket_id for m in groups[MCCORMICK]["remaining"]} == {"colonial", "la_colonia"}
+    plain = {group["gtin"]: group for group in rules.resolve_groups(profiles)}
+    assert plain[MCCORMICK]["status"] == "review_required" and plain[MCCORMICK]["decision"] is None

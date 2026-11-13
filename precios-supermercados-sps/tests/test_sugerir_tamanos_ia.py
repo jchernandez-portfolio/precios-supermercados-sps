@@ -320,7 +320,7 @@ def claude_answer(readings: list[dict], stop: str = "end_turn") -> Response:
                                 "content": [{"type": "text", "text": json.dumps({"readings": readings})}]}).encode())
 
 
-def claude_opener(fail: dict[int, object] | None = None, models=("claude-haiku-5-5",)):
+def claude_opener(fail: dict[int, object] | None = None, models=("claude-sonnet-5-5", "claude-haiku-5-5")):
     """Responde el listado y, en cada mensaje, el error de ``fail[n]`` o una lectura de 240 g."""
     calls: list[object] = []
 
@@ -348,7 +348,7 @@ def test_claude_sends_the_key_only_in_headers_images_as_webp_and_a_strict_schema
         assert request.get_header("Anthropic-version") == ia.CLAUDE_VERSION
     body = json.loads(calls[-1].data)
     assert "sk-ant-prueba" not in calls[-1].data.decode()
-    assert body["model"] == "claude-haiku-5-5"
+    assert body["model"] == "claude-sonnet-5-5"  # por defecto: mejor lectura de etiquetas
     assert body["output_config"]["format"] == {"type": "json_schema", "schema": ia.CLAUDE_SCHEMA}
     content = body["messages"][0]["content"]
     assert "Maíz 'El Migo'" in content[0]["text"] and content[1] == {"type": "text", "text": "Foto 1:"}
@@ -356,9 +356,13 @@ def test_claude_sends_the_key_only_in_headers_images_as_webp_and_a_strict_schema
     assert client.usage == {"entrada": 1500, "salida": 60} and client.queries == 1
 
 
-def test_claude_picks_the_newest_haiku_when_the_configured_model_is_missing() -> None:
+def test_claude_falls_back_to_the_newest_sonnet_then_haiku_when_the_model_is_missing() -> None:
     opener, _ = claude_opener(models=("claude-opus-5-5", "claude-haiku-6", "claude-haiku-5-5"))
-    assert ia.Claude("k", model="claude-haiku-9", opener=opener).pick_model() == "claude-haiku-6"
+    assert ia.Claude("k", model="claude-sonnet-9", opener=opener).pick_model() == "claude-haiku-6"
+    opener, _ = claude_opener(models=("claude-haiku-6", "claude-sonnet-6", "claude-sonnet-5-5"))
+    assert ia.Claude("k", model="claude-sonnet-9", opener=opener).pick_model() == "claude-sonnet-6"
+    opener, _ = claude_opener(models=("claude-sonnet-5-5", "claude-haiku-5-5"))
+    assert ia.Claude("k", model="claude-haiku-5-5", opener=opener).pick_model() == "claude-haiku-5-5"
     opener, _ = claude_opener(models=("claude-haiku-5-5",))
     with pytest.raises(ia.ProviderFailed, match="claude_modelo_no_disponible"):
         ia.Claude("k", opener=lambda r, timeout: claude_models("claude-haiku-5-5", vision=False)).pick_model()
@@ -367,7 +371,7 @@ def test_claude_picks_the_newest_haiku_when_the_configured_model_is_missing() ->
 def test_claude_refusal_or_bad_json_leaves_the_photo_unread() -> None:
     def opener(request, timeout):
         if request.full_url.endswith("models?limit=1000"):
-            return claude_models("claude-haiku-5-5")
+            return claude_models("claude-sonnet-5-5")
         return claude_answer([], stop="refusal")
 
     assert ia.Claude("k", opener=opener).read_labels("x", "Foto 1 = Paiz", [b"img"]) is None
