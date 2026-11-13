@@ -731,7 +731,14 @@ def test_identity_audit_is_manual_read_only_and_leaves_an_artifact() -> None:
     assert "actions/upload-artifact@" in raw and "identidad-productos-${{ github.run_id }}" in raw
     for forbidden in ("contents: write", "git push", "--apply", "pull_request", "schedule:", "id-token"):
         assert forbidden not in raw, forbidden
-    assert "python scripts/medir_reglas_identidad.py --output-dir run-artifacts/identidad/reglas" in raw
+    assert "python scripts/medir_reglas_identidad.py --output-dir run-artifacts/identidad/reglas --pr-b" in raw
+    # El PR B se mide en el mismo paso (sin otra lectura de Turso) y nunca cambia el motor.
+    assert "medir_pr_b.py" not in raw and "inputs." not in raw
+    pr_b = (base.REPO_ROOT / "precios-supermercados-sps" / "scripts" / "medir_pr_b.py").read_text(encoding="utf-8")
+    for statement in ("INSERT INTO", "UPDATE ", "DELETE FROM", "DROP TABLE", "CREATE TABLE", "ALTER TABLE",
+                      "REPLACE INTO", "TURSO"):
+        assert statement not in pr_b.upper(), statement
+    assert ".query(" not in pr_b  # no consulta la base: recibe los grupos ya leídos
     # Las llaves de Turso sólo existen en los dos pasos de sólo lectura.
     names = ("auditar_identidad_productos.py", "medir_reglas_identidad.py")
     readers = [step for step in base.steps(workflow) if any(name in str(step.get("run", "")) for name in names)]
