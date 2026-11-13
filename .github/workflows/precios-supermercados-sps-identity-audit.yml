@@ -6,7 +6,10 @@ name: Precios SPS - Auditoría de identidad de producto
 # producto maestro; además vuelca el esquema real de Turso y una muestra de 100
 # productos (maíz, margarina, café, conflictos). El paso 0 mide motivos de
 # bloqueo de los grupos GTIN y simula unir sucursales (TGU) y aislar ofertas con
-# conflicto de tamaño. Los scripts sólo ejecutan SELECT y PRAGMA table_info
+# conflicto de tamaño (con las decisiones de size_decisions, como producción) y
+# mide el "PR B" (g ≈ ml y peso sobre conteo, variantes simuladas sobre el motor
+# vigente sin cambiarlo: medicion-pr-b.json y pr-b-grupos.csv en reglas/).
+# Los scripts sólo ejecutan SELECT y PRAGMA table_info
 # (cualquier otra sentencia se rechaza); no escriben en el repositorio: dejan un
 # artifact.
 
@@ -59,14 +62,14 @@ jobs:
           set -euo pipefail
           python scripts/auditar_identidad_productos.py --output-dir run-artifacts/identidad
 
-      - name: Medir reglas de identidad (paso 0, sólo lectura)
+      - name: Medir reglas de identidad y PR B (paso 0, sólo lectura)
         shell: bash
         env:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
         run: |
           set -euo pipefail
-          python scripts/medir_reglas_identidad.py --output-dir run-artifacts/identidad/reglas
+          python scripts/medir_reglas_identidad.py --output-dir run-artifacts/identidad/reglas --pr-b
 
       - name: Guardar resumen, esquema y muestra
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
