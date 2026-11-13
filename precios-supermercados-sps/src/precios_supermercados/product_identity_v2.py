@@ -52,7 +52,10 @@ from .size_decisions import SizeDecision, match_official
 
 # v2.8 (2026-11-12): regla de onzas en grupos GTIN (con "nunca empeorar") y la
 # onza sin convertir de esos grupos pasa a g/ml para tener precio por unidad.
-IDENTITY_NORMALIZATION_VERSION = "product-homologation-v2.8"
+# v2.9 (2026-11-13): reglas de tamaño del PR B en grupos GTIN (con "nunca
+# empeorar"): g ≈ ml en lácteos, jugos y salsas (≤ 5 %, estándar gramos) y peso
+# sobre conteo (conteo 1, mismo pack o el título con peso menciona el conteo).
+IDENTITY_NORMALIZATION_VERSION = "product-homologation-v2.9"
 
 _GENERIC_BRANDS = frozenset(
     {
@@ -1778,10 +1781,124 @@ def ounce_reading(left: PresentationSignature | None, right: PresentationSignatu
     return None
 
 
-def _gtin_pair_conflicts(left: ProductProfile, right: ProductProfile, *, ounce_rule: bool = False) -> set[str]:
+# --- Reglas de tamaño del PR B (v2.9) en grupos GTIN -------------------------
+# Medidas en producción con ``scripts/medir_pr_b.py`` (variante elegida por el
+# dueño: "A5 + B media"). Sólo quitan el conflicto de tamaño entre dos ofertas
+# con el mismo código; todo lo demás (tipo, sabor, colisiones, multipack ambiguo,
+# decisiones de ``size_decisions``) sigue igual, y ``resolve_gtin_group`` aplica
+# "nunca empeorar".
+#
+# A · g ≈ ml: en lácteos, jugos y salsas (categoría del súper o del árbol con una
+#     de estas palabras) g y ml con el mismo pack valen lo mismo si difieren ≤ 5 %.
+#     Estándar del grupo: gramos.
+# B · peso sobre conteo ("media"): una oferta que sólo publica un conteo no
+#     contradice a otra con peso/volumen si el conteo es 1, es el mismo pack o el
+#     título de la oferta con peso menciona ese conteo ("Té 50 bolsas 100 g"). El
+#     peso es el tamaño y el conteo va a ``pack_count``. Un "10 Pack" sin respaldo
+#     contra "177 ml" sigue siendo conflicto (paquete contra unidad suelta).
+GML_KEYWORDS = ("yogurt", "leche", "queso", "crema", "jugo", "nectar", "salsa", "aderezo", "mayonesa", "ketchup")
+GML_TOLERANCE = Decimal("0.05")
+WEIGHT_DIMENSIONS = frozenset({"mass_g", "volume_ml", "ounce"})
+COUNT_RISKY_KIND = "conteo_sin_respaldo"
+# Tipos de par conteo/peso que la regla B ("media") acepta.
+COUNT_ACCEPTED_KINDS = frozenset({"conteo_1", "mismo_pack", "titulo_menciona_conteo"})
+_SIZE_CONFLICT = "cross_source_presentation_conflict"
+_COUNT_WORDS = (
+    "unidades", "unidad", "unids", "unid", "und", "uds", "ud", "un", "u", "bolsas", "bolsitas", "bolsa", "sobres",
+    "sobre", "saquitos", "piezas", "pieza", "pzas", "pza", "pzs", "pz", "rollos", "tabletas", "capsulas", "ct",
+    "count", "pack", "pk", "paquetes", "latas", "botellas", "barras", "cajitas", "cajas", "toallitas", "toallas",
+    "panales", "porciones", "rebanadas", "tortillas", "filtros",
+)
+_COUNT_WORDS_RE = "|".join(_COUNT_WORDS)
+
+
+def gml_keyword(profile: ProductProfile) -> str | None:
+    """Primera palabra clave de lácteos/jugos/salsas en la categoría del súper o del árbol."""
+    texts = (profile.record.source_category, profile.taxonomy.category, profile.taxonomy.subcategory,
+             profile.taxonomy.product_type)
+    folded = " ".join(fold_text(text) or "" for text in texts)
+    return next((keyword for keyword in GML_KEYWORDS if keyword in folded), None)
+
+
+def gml_kind(
+    left: ProductProfile,
+    right: ProductProfile,
+    tolerance: Decimal = GML_TOLERANCE,
+    all_categories: bool = False,
+) -> str | None:
+    """``g_ml`` si una oferta en g y otra en ml (mismo pack) difieren ≤ ``tolerance``."""
+    p, q = left.presentation, right.presentation
+    if p is None or q is None or {p.dimension, q.dimension} != {"mass_g", "volume_ml"}:
+        return None
+    if p.pack_count != q.pack_count:
+        return None
+    larger = max(p.total_base, q.total_base)
+    if larger <= 0 or abs(p.total_base - q.total_base) / larger > tolerance:
+        return None
+    if all_categories or gml_keyword(left) or gml_keyword(right):
+        return "g_ml"
+    return None
+
+
+def _plain(text: str | None) -> str:
+    decomposed = unicodedata.normalize("NFKD", text or "")
+    return "".join(char for char in decomposed if not unicodedata.combining(char)).lower()
+
+
+def mentions_count(title: str | None, count: int) -> bool:
+    """¿El título dice ese conteo? "Té 50 bolsas 100 g", "Leche 200 ml x 6", "Pack de 6"."""
+    text = _plain(title)
+    number = re.escape(str(count))
+    after = rf"(?<![\d.,]){number}\s*-?\s*(?:{_COUNT_WORDS_RE})(?![a-z])"
+    before = rf"(?<![a-z])(?:pack|paquete|caja|x)\s*(?:de\s*)?{number}(?![\d.,])(?!\s*(?:g|gr|grs|ml|kg|l|lt|oz)\b)"
+    return bool(re.search(after, text) or re.search(before, text))
+
+
+def count_kind(left: ProductProfile, right: ProductProfile) -> str | None:
+    """Tipo de par conteo contra peso/volumen (``None`` si no es ese par)."""
+    for counted, weighed in ((left, right), (right, left)):
+        c, w = counted.presentation, weighed.presentation
+        if c is None or w is None or c.dimension != "count" or w.dimension not in WEIGHT_DIMENSIONS:
+            continue
+        if c.total_base != c.total_base.to_integral_value():
+            return None
+        units = int(c.total_base)
+        if units == 1:
+            return "conteo_1"
+        if w.pack_count > 1 and units == w.pack_count:
+            return "mismo_pack"
+        if mentions_count(weighed.record.source_name, units):
+            return "titulo_menciona_conteo"
+        return COUNT_RISKY_KIND
+    return None
+
+
+def size_rule_kind(left: ProductProfile, right: ProductProfile) -> str | None:
+    """Regla v2.9 que explica el desacuerdo de tamaño entre dos ofertas (o ``None``)."""
+    kind = gml_kind(left, right)
+    if kind:
+        return kind
+    kind = count_kind(left, right)
+    return kind if kind in COUNT_ACCEPTED_KINDS else None
+
+
+def _size_rules_may_apply(members: Iterable[ProductProfile]) -> bool:
+    dimensions = {member.presentation.dimension for member in members if member.presentation is not None}
+    return {"mass_g", "volume_ml"} <= dimensions or ("count" in dimensions and bool(dimensions & WEIGHT_DIMENSIONS))
+
+
+def _gtin_pair_conflicts(
+    left: ProductProfile,
+    right: ProductProfile,
+    *,
+    ounce_rule: bool = False,
+    size_rules: bool = False,
+) -> set[str]:
     """Conflictos materiales entre dos miembros de cadenas distintas con igual GTIN.
 
-    Con ``ounce_rule`` el desacuerdo de tamaño que la onza explica no es conflicto.
+    Con ``ounce_rule`` el desacuerdo de tamaño que la onza explica no es conflicto;
+    con ``size_rules``, tampoco el que explican las reglas v2.9 (g ≈ ml, peso
+    sobre conteo).
     """
 
     reasons: set[str] = set(one_sided_variant_conflicts(left, right))
@@ -1806,6 +1923,8 @@ def _gtin_pair_conflicts(left: ProductProfile, right: ProductProfile, *, ounce_r
         left.presentation, right.presentation
     ):
         reasons.discard("cross_source_presentation_conflict")
+    if size_rules and _SIZE_CONFLICT in reasons and size_rule_kind(left, right):
+        reasons.discard(_SIZE_CONFLICT)
     return reasons
 
 
@@ -2003,6 +2122,7 @@ def _resolve_gtin_members(
     *,
     ounce_rule: bool = False,
     size_decided: bool = False,
+    size_rules: bool = False,
 ) -> tuple[list[ProductProfile], dict[str, set[str]], set[str]]:
     """Separa miembros comparables de los que tienen un conflicto atribuible.
 
@@ -2050,7 +2170,7 @@ def _resolve_gtin_members(
         pair_reasons: dict[str, set[str]] = defaultdict(set)
         for index, left in enumerate(remaining):
             for right in remaining[index + 1 :]:
-                reasons = _gtin_pair_conflicts(left, right, ounce_rule=ounce_rule)
+                reasons = _gtin_pair_conflicts(left, right, ounce_rule=ounce_rule, size_rules=size_rules)
                 if size_decided:
                     # El tamaño lo fijó una persona: se compara contra él más abajo.
                     reasons.discard("cross_source_presentation_conflict")
@@ -2082,13 +2202,17 @@ def _resolve_with_decision(
     gtin: str,
     members: list[ProductProfile],
     decision: SizeDecision,
+    *,
+    size_rules: bool = True,
 ) -> tuple[tuple[list[ProductProfile], dict[str, set[str]], set[str]], dict[str, str]]:
     """Grupo con decisión humana (``size_decisions``).
 
     ``different_products``: código reutilizado, nadie se agrupa. ``size``: los demás
     bloqueos (tipo, sabor, código derivado de SKU, multipack ambiguo...) siguen
     igual; el tamaño ya no se discute entre cadenas sino contra el oficial: las
-    ofertas que coinciden forman el grupo y las demás quedan aisladas.
+    ofertas que coinciden forman el grupo y las demás quedan aisladas. Las reglas
+    de tamaño v2.9 no deciden nada aquí; sólo, en lácteos/jugos/salsas, un oficial
+    en g coincide con una oferta en ml (y viceversa) con la tolerancia de g ≈ ml.
     """
     if decision.decision == "different_products":
         excluded = {member.record.source_record_id: {"human_different_products"} for member in members}
@@ -2096,10 +2220,11 @@ def _resolve_with_decision(
     remaining, excluded, _ = _resolve_gtin_members(gtin, members, size_decided=True)
     official = decision.official
     assert official is not None
+    mass_volume = GML_TOLERANCE if size_rules and any(gml_keyword(member) for member in members) else None
     kept: list[ProductProfile] = []
     readings: dict[str, str] = {}
     for member in remaining:
-        matches, reading = match_official(official, member.presentation)
+        matches, reading = match_official(official, member.presentation, mass_volume_tolerance=mass_volume)
         source_id = member.record.source_record_id
         if not matches:
             excluded.setdefault(source_id, set()).add("human_size_decision_mismatch")
@@ -2120,27 +2245,17 @@ def _resolve_with_decision(
     return (kept, excluded, set()), readings
 
 
-def resolve_gtin_group(
+def _resolve_ounces(
     gtin: str,
     members: list[ProductProfile],
-    decision: SizeDecision | None = None,
+    *,
+    size_rules: bool,
 ) -> tuple[tuple[list[ProductProfile], dict[str, set[str]], set[str]], dict[str, str]]:
-    """Resolución vigente de un grupo GTIN: regla de onzas con "nunca empeorar".
-
-    Si el grupo tiene alguna onza sin convertir se resuelve con y sin la regla; se
-    queda la de la regla salvo que deje menos cadenas comparables que hoy (p. ej.
-    Cholula: 150 ml + 5 oz contra 150 g + 150 g es un empate que hoy se "gana" sólo
-    porque la onza chocaba con todos). Devuelve además, para el grupo comparable,
-    la lectura de cada onza (``fluid``/``mass``) que confirman sus compañeros.
-
-    Una decisión humana de ``size_decisions`` manda sobre ambas resoluciones.
-    """
-    if decision is not None:
-        return _resolve_with_decision(gtin, members, decision)
-    current = _resolve_gtin_members(gtin, members)
+    """Regla de onzas (v2.8) con "nunca empeorar", con o sin las reglas de tamaño v2.9."""
+    current = _resolve_gtin_members(gtin, members, size_rules=size_rules)
     if not any(member.presentation is not None and member.presentation.dimension == "ounce" for member in members):
         return current, {}
-    with_rule = _resolve_gtin_members(gtin, members, ounce_rule=True)
+    with_rule = _resolve_gtin_members(gtin, members, ounce_rule=True, size_rules=size_rules)
     if _chains(with_rule[0]) < _chains(current[0]):
         return current, {}
     remaining = with_rule[0]
@@ -2158,6 +2273,108 @@ def resolve_gtin_group(
         if len(found) == 1:
             readings[member.record.source_record_id] = next(iter(found))
     return with_rule, readings
+
+
+def size_rules_worsen(before: Iterable[ProductProfile], after: Iterable[ProductProfile]) -> str | None:
+    """"Nunca empeorar" de las reglas v2.9: ``menos_cadenas`` (incluye bloquearse),
+    ``pierde_ofertas`` o ``None``. Un grupo hoy bloqueado no puede empeorar."""
+    before, after = list(before), list(after)
+    if _chains(before) < 2:
+        return None
+    if _chains(after) < max(2, _chains(before)):
+        return "menos_cadenas"
+    if not {m.record.source_record_id for m in before} <= {m.record.source_record_id for m in after}:
+        return "pierde_ofertas"
+    return None
+
+
+def resolve_gtin_group(
+    gtin: str,
+    members: list[ProductProfile],
+    decision: SizeDecision | None = None,
+    *,
+    size_rules: bool = True,
+) -> tuple[tuple[list[ProductProfile], dict[str, set[str]], set[str]], dict[str, str]]:
+    """Resolución vigente de un grupo GTIN (v2.9).
+
+    1. Regla de onzas (v2.8): si el grupo tiene alguna onza sin convertir se
+       resuelve con y sin la regla; se queda la de la regla salvo que deje menos
+       cadenas comparables (p. ej. un empate 2 contra 2 que hoy se "gana" sólo
+       porque la onza chocaba con todos). Devuelve además, para el grupo
+       comparable, la lectura de cada onza (``fluid``/``mass``).
+    2. Reglas de tamaño v2.9 (g ≈ ml y peso sobre conteo) con "nunca empeorar":
+       si con ellas un grupo comparable queda con menos cadenas, se bloquea o
+       pierde alguna oferta, se conserva la resolución v2.8.
+
+    Una decisión de ``size_decisions`` (humana o de IA) manda sobre ambas.
+    ``size_rules=False`` reproduce el motor v2.8 (sólo para mediciones).
+    """
+    if decision is not None:
+        return _resolve_with_decision(gtin, members, decision, size_rules=size_rules)
+    before = _resolve_ounces(gtin, members, size_rules=False)
+    if not size_rules or not _size_rules_may_apply(members):
+        return before
+    after = _resolve_ounces(gtin, members, size_rules=True)
+    if size_rules_worsen(before[0][0], after[0][0]):
+        return before
+    return after
+
+
+def standard_presentations(
+    remaining: Iterable[ProductProfile],
+    readings: dict[str, str],
+) -> dict[str, PresentationSignature]:
+    """Presentación estándar de las ofertas que las reglas v2.9 unieron a su grupo.
+
+    - g ≈ ml: la oferta en ml pasa a gramos (mismo número), el estándar del grupo.
+    - peso sobre conteo: la oferta con sólo conteo toma el peso/volumen de sus
+      compañeros (si todos dicen lo mismo) y el conteo va a ``pack_count``.
+    Las onzas se leen con ``readings`` (``fluid``/``mass``) antes de comparar.
+    """
+    members = list(remaining)
+    base: dict[str, PresentationSignature | None] = {
+        m.record.source_record_id: converted_ounce(m.presentation, readings.get(m.record.source_record_id))
+        for m in members
+    }
+    result: dict[str, PresentationSignature] = {}
+    for member in members:
+        value = member.presentation
+        if value is None or value.dimension != "volume_ml":
+            continue
+        if any(
+            other.record.supermarket_id != member.record.supermarket_id and gml_kind(member, other)
+            for other in members
+        ):
+            result[member.record.source_record_id] = PresentationSignature(
+                dimension="mass_g",
+                total_base=value.total_base,
+                pack_count=value.pack_count,
+                unit_amount_base=value.unit_amount_base,
+            )
+    weights = {source_id: result.get(source_id, value) for source_id, value in base.items()}
+    for member in members:
+        value = member.presentation
+        if value is None or value.dimension != "count":
+            continue
+        partners = [
+            other for other in members
+            if other.record.supermarket_id != member.record.supermarket_id
+            and count_kind(member, other) in COUNT_ACCEPTED_KINDS
+        ]
+        targets = {
+            (target.dimension, target.total_base, target.pack_count)
+            for target in (weights[other.record.source_record_id] for other in partners)
+            if target is not None and target.dimension in {"mass_g", "volume_ml"}
+        }
+        if len(targets) != 1:
+            continue
+        dimension, total, partner_pack = next(iter(targets))
+        units = int(value.total_base)
+        pack = units if units > 1 else partner_pack
+        result[member.record.source_record_id] = PresentationSignature(
+            dimension=dimension, total_base=total, pack_count=pack, unit_amount_base=total / pack,
+        )
+    return result
 
 
 def converted_ounce(signature: PresentationSignature | None, reading: str | None) -> PresentationSignature | None:
@@ -2198,6 +2415,7 @@ def _exact_groups(
                         for source_id, reasons in sorted(excluded.items())
                     ),
                     ounce_readings=tuple(sorted(readings.items())),
+                    size_standards=tuple(sorted(standard_presentations(remaining, readings).items())),
                 )
             )
             continue

@@ -22,7 +22,10 @@ que el estado recalculado coincide con el guardado en
 de la auditoría de identidad); deja ``medicion-reglas.json`` y
 ``grupos-reglas.csv`` en ``--output-dir``. Con ``--pr-b`` mide además, sobre los
 mismos grupos, las reglas candidatas del PR B (``medir_pr_b.py``: g ≈ ml y peso
-sobre conteo) y deja ``medicion-pr-b.json`` y ``pr-b-grupos.csv``.
+sobre conteo) y deja ``medicion-pr-b.json`` y ``pr-b-grupos.csv``. Desde el motor
+v2.9 la variante elegida ya está aplicada: el PR B y la regla de onzas se miden
+contra la base sin las reglas v2.9 (``size_rules=False``) y el PR B verifica que
+el motor coincide con su simulación (``motor_vigente.ya_aplicada``).
 """
 from __future__ import annotations
 
@@ -170,11 +173,13 @@ def build_profiles(records: Sequence[object]) -> tuple[ProductProfile, ...]:
 
 
 def resolve_groups(profiles: Sequence[ProductProfile], *, ounce_rule: bool = True,
-                   size_decisions: Mapping[str, SizeDecision] | None = None) -> list[dict[str, object]]:
+                   size_decisions: Mapping[str, SizeDecision] | None = None,
+                   size_rules: bool = True) -> list[dict[str, object]]:
     """Grupos GTIN en ≥ 2 cadenas con la resolución de producción, miembro a miembro.
 
     Una decisión de ``size_decisions`` manda sobre la resolución (con o sin la
-    regla de onzas), igual que en ``_exact_groups``.
+    regla de onzas), igual que en ``_exact_groups``. ``size_rules=False``: sin las
+    reglas de tamaño v2.9 (base v2.8, para medir).
     """
     by_gtin: dict[str, list[ProductProfile]] = defaultdict(list)
     for profile in profiles:
@@ -186,7 +191,8 @@ def resolve_groups(profiles: Sequence[ProductProfile], *, ounce_rule: bool = Tru
             continue
         decision = (size_decisions or {}).get(gtin)
         if ounce_rule or decision is not None:  # vigente: regla de onzas con "nunca empeorar" o decisión
-            (remaining, excluded, group_reasons), _ = resolve_gtin_group(gtin, list(members), decision)
+            (remaining, excluded, group_reasons), _ = resolve_gtin_group(
+                gtin, list(members), decision, size_rules=size_rules)
         else:  # como era antes de la regla de onzas
             remaining, excluded, group_reasons = _resolve_gtin_members(gtin, list(members))
         ready = len({member.record.supermarket_id for member in remaining}) >= 2
@@ -470,9 +476,12 @@ def measure(db, fetch: Callable[[str], object], base: str = CATALOG_BASE, *,
             "ofertas_que_vuelven_a_su_tarjeta": rejoined_offers,
         }
 
-    # Efecto de la regla de onzas: resolución sin la regla contra la vigente.
+    # Efecto de la regla de onzas: resolución sin la regla contra la v2.8 (sin las
+    # reglas de tamaño v2.9, que mide el PR B), para no mezclar efectos.
+    base_groups = resolve_groups(profiles, size_decisions=decisions, size_rules=False)
     ounce_summary, ounce_lines, ounce_sets = simulate_ounce_rule(
-        resolve_groups(profiles, ounce_rule=False, size_decisions=decisions), groups, product_of)
+        resolve_groups(profiles, ounce_rule=False, size_decisions=decisions, size_rules=False),
+        base_groups, product_of)
     merge_sets["paso_1_y_regla_de_onzas"] = ounce_sets
 
     rows_by_city = load_cities(fetch, base)
@@ -498,8 +507,9 @@ def measure(db, fetch: Callable[[str], object], base: str = CATALOG_BASE, *,
         "_lineas_onzas": ounce_lines,
     }
     if pr_b:  # medición del PR B sobre los mismos grupos (sin otra lectura de Turso)
-        result = measure_pr_b(groups, product_of)
+        result = measure_pr_b(base_groups, product_of, current=groups)
         summary["medicion_pr_b_resumen"] = result["resumen"]
+        summary["medicion_pr_b_motor_vigente"] = result["motor_vigente"]
         summary["_pr_b"] = result
     return summary, lines
 

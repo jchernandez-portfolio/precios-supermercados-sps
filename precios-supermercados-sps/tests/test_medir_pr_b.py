@@ -1,4 +1,8 @@
-"""Medición del PR B (sólo lectura): g ≈ ml y peso sobre conteo con el motor real."""
+"""Medición del PR B (sólo lectura): g ≈ ml y peso sobre conteo con el motor real.
+
+Desde v2.9 la variante "A5 + B media" está en el motor: la medición usa como base
+el motor con esas reglas apagadas y verifica que el motor vigente coincide.
+"""
 from __future__ import annotations
 
 import csv
@@ -81,17 +85,19 @@ PRODUCTS = [
 DECISIONS = [(C["decidido"], "different_products", None, None, None, None, None, "human:dueno", "2026-11-12T10:00:00Z")]
 
 
-def groups_and_products():
+def groups_and_products(*, size_rules: bool = False):
     products = records_from_product_rows(PRODUCTS)
     decided = index_decisions(decision_from_row(row) for row in DECISIONS)
-    groups = rules.resolve_groups(rules.build_profiles([record for _, record in products]), size_decisions=decided)
+    groups = rules.resolve_groups(rules.build_profiles([record for _, record in products]), size_decisions=decided,
+                                  size_rules=size_rules)
     return groups, {record.source_record_id: product_id for product_id, record in products}
 
 
 @pytest.fixture(scope="module")
 def result() -> dict[str, object]:
     groups, product_of = groups_and_products()
-    return pr_b.measure_pr_b(groups, product_of)
+    current, _ = groups_and_products(size_rules=True)
+    return pr_b.measure_pr_b(groups, product_of, current=current)
 
 
 def changed(result, variant: str) -> dict[str, tuple[str, bool]]:
@@ -160,6 +166,17 @@ def test_decided_groups_are_left_to_the_decision(result) -> None:
     assert all(C["decidido"] not in changed(result, name) for name in result["variantes"])
 
 
+def test_engine_v2_9_already_applies_a5_plus_b_media(result) -> None:
+    engine = result["motor_vigente"]
+    assert engine["version"] == "product-homologation-v2.9" and engine["variante_aplicada"] == "A5_mas_B_media"
+    assert engine["ya_aplicada"] is True and engine["grupos_distintos_de_la_simulacion"] == 0
+    assert engine["grupos_comparados"] == 12 and engine["grupos_decididos_que_pierden_ofertas"] == 0
+    # Contra el motor vigente (que ya incluye A5 + B media) la variante no mejora nada más.
+    current, product_of = groups_and_products(size_rules=True)
+    again = pr_b.measure_pr_b(current, product_of, variants=[v for v in pr_b.VARIANTS if v.name == "A5_mas_B_media"])
+    assert again["resumen"]["A5_mas_B_media"]["grupos_que_mejoran"] == 0
+
+
 def test_engine_is_restored_after_each_variant() -> None:
     original = identity._gtin_pair_conflicts
     with pr_b.engine_variant(pr_b.VARIANTS[0]):
@@ -212,6 +229,8 @@ def test_measure_with_pr_b_writes_its_outputs_read_only(tmp_path: Path) -> None:
     backend = Backend()
     summary, lines = rules.measure(backend, catalog.__getitem__, base, pr_b=True)
     assert summary["medicion_pr_b_resumen"]["B_conteo_amplia"]["riesgosos"] == 3
+    assert summary["medicion_pr_b_resumen"]["A5_mas_B_media"]["grupos_que_mejoran"] == 7
+    assert summary["medicion_pr_b_motor_vigente"]["ya_aplicada"] is True
     assert all(sql.lstrip().upper().startswith("SELECT") for sql in backend.sql)
     rules.write_outputs(tmp_path / "out", summary, lines)
     written = json.loads((tmp_path / "out" / "medicion-pr-b.json").read_text(encoding="utf-8"))

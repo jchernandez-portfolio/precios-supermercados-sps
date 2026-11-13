@@ -1,13 +1,19 @@
 """Medición del "PR B" (sólo lectura; NO cambia el motor): g ≈ ml y peso sobre conteo.
 
-Igual que la medición de la regla de onzas, corre la resolución REAL de los
-grupos GTIN (``resolve_gtin_group`` del motor v2.8, con las decisiones de
-``size_decisions``) y compara grupo por grupo la resolución vigente contra la
-de cada variante candidata. Las variantes se simulan sobre los datos sin tocar
-el motor: mientras se resuelve un grupo, el conflicto de tamaño entre dos
-ofertas (``cross_source_presentation_conflict``) se descarta si la regla
-candidata lo explica; todo lo demás (tipo, sabor, colisiones, multipack
-ambiguo, decisiones humanas...) sigue igual.
+Desde el motor v2.9 la variante elegida por el dueño ("A5 + B media") YA ESTÁ
+APLICADA en ``product_identity_v2`` y sus reglas viven allí (``gml_kind``,
+``count_kind``, ``mentions_count``): este script las reutiliza. La base de la
+medición es el motor con las reglas del PR B apagadas (``size_rules=False`` =
+resolución v2.8, con las decisiones de ``size_decisions``), así las cifras siguen
+siendo comparables con la medición original (#80). Con ``current`` (la
+resolución vigente v2.9) se verifica además que el motor coincide grupo por
+grupo con la simulación de "A5 + B media" (``motor_vigente.ya_aplicada``).
+
+Las variantes se simulan sobre los datos sin tocar el motor: mientras se
+resuelve un grupo, el conflicto de tamaño entre dos ofertas
+(``cross_source_presentation_conflict``) se descarta si la regla candidata lo
+explica; todo lo demás (tipo, sabor, colisiones, multipack ambiguo, decisiones
+humanas...) sigue igual.
 
 Reglas candidatas:
 
@@ -28,8 +34,6 @@ cadenas, se bloquea o pierde alguna oferta, se conserva la resolución vigente
 """
 from __future__ import annotations
 
-import re
-import unicodedata
 from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
@@ -37,20 +41,30 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from precios_supermercados import product_identity_v2 as identity
-from precios_supermercados.product_homologation import ProductProfile, fold_text
+from precios_supermercados.product_homologation import ProductProfile
+from precios_supermercados.product_identity_v2 import (  # reglas del motor v2.9 (misma implementación)
+    COUNT_ACCEPTED_KINDS,
+    COUNT_RISKY_KIND,
+    GML_KEYWORDS,
+    IDENTITY_NORMALIZATION_VERSION,
+    WEIGHT_DIMENSIONS,
+    count_kind,
+    gml_keyword,
+    gml_kind,
+    mentions_count,
+)
 
 SCHEMA = "rpi-medicion-pr-b/v1"
 SIZE_CONFLICT = "cross_source_presentation_conflict"
-GML_KEYWORDS = ("yogurt", "leche", "queso", "crema", "jugo", "nectar", "salsa", "aderezo", "mayonesa", "ketchup")
-WEIGHT_DIMENSIONS = frozenset({"mass_g", "volume_ml", "ounce"})
+APPLIED_VARIANT = "A5_mas_B_media"  # la que aplica el motor desde v2.9
 # Qué tipos de conteo acepta cada variante de B. ``conteo_sin_respaldo`` con más de
 # una unidad es el caso riesgoso: paquete contra unidad suelta (Caprisun 10 vs 177 ml).
 COUNT_KINDS = {
     "segura": frozenset({"conteo_1", "mismo_pack"}),
-    "media": frozenset({"conteo_1", "mismo_pack", "titulo_menciona_conteo"}),
+    "media": COUNT_ACCEPTED_KINDS,
     "amplia": frozenset({"conteo_1", "mismo_pack", "titulo_menciona_conteo", "conteo_sin_respaldo"}),
 }
-RISKY_KIND = "conteo_sin_respaldo"
+RISKY_KIND = COUNT_RISKY_KIND
 MAX_EXAMPLES = 10
 MAX_RISKY_EXAMPLES = 5
 OWNER_REFERENCE = {  # aproximada, del dueño: grupos que mejoran
@@ -63,13 +77,9 @@ CSV_COLUMNS = (
     "variante", "gtin", "cambio", "reglas", "riesgo", "supermercado", "product_id", "nombre", "categoria",
     "presentacion", "presentacion_estandar", "rol_antes", "rol_con_variante",
 )
-_COUNT_WORDS = (
-    "unidades", "unidad", "unids", "unid", "und", "uds", "ud", "un", "u", "bolsas", "bolsitas", "bolsa", "sobres",
-    "sobre", "saquitos", "piezas", "pieza", "pzas", "pza", "pzs", "pz", "rollos", "tabletas", "capsulas", "ct",
-    "count", "pack", "pk", "paquetes", "latas", "botellas", "barras", "cajitas", "cajas", "toallitas", "toallas",
-    "panales", "porciones", "rebanadas", "tortillas", "filtros",
-)
-_COUNT_WORDS_RE = "|".join(_COUNT_WORDS)
+# Reglas reexportadas del motor (las usan las pruebas y la auditoría de la medición).
+__all__ = ("GML_KEYWORDS", "WEIGHT_DIMENSIONS", "count_kind", "gml_keyword", "gml_kind", "measure_pr_b",
+           "mentions_count")
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,62 +107,6 @@ VARIANTS = (
 
 # ---------------------------------------------------------------- reglas
 
-def gml_keyword(profile: ProductProfile) -> str | None:
-    """Primera palabra clave de lácteos/jugos/salsas en la categoría del súper o del árbol."""
-    texts = (profile.record.source_category, profile.taxonomy.category, profile.taxonomy.subcategory,
-             profile.taxonomy.product_type)
-    folded = " ".join(fold_text(text) or "" for text in texts)
-    return next((keyword for keyword in GML_KEYWORDS if keyword in folded), None)
-
-
-def gml_kind(left: ProductProfile, right: ProductProfile, tolerance: Decimal, all_categories: bool) -> str | None:
-    """``g_ml`` si una oferta en g y otra en ml (mismo pack) difieren ≤ ``tolerance``."""
-    p, q = left.presentation, right.presentation
-    if p is None or q is None or {p.dimension, q.dimension} != {"mass_g", "volume_ml"}:
-        return None
-    if p.pack_count != q.pack_count:
-        return None
-    larger = max(p.total_base, q.total_base)
-    if larger <= 0 or abs(p.total_base - q.total_base) / larger > tolerance:
-        return None
-    if all_categories or gml_keyword(left) or gml_keyword(right):
-        return "g_ml"
-    return None
-
-
-def _plain(text: str | None) -> str:
-    decomposed = unicodedata.normalize("NFKD", text or "")
-    return "".join(char for char in decomposed if not unicodedata.combining(char)).lower()
-
-
-def mentions_count(title: str | None, count: int) -> bool:
-    """¿El título dice ese conteo? "Té 50 bolsas 100 g", "Leche 200 ml x 6", "Pack de 6"."""
-    text = _plain(title)
-    number = re.escape(str(count))
-    after = rf"(?<![\d.,]){number}\s*-?\s*(?:{_COUNT_WORDS_RE})(?![a-z])"
-    before = rf"(?<![a-z])(?:pack|paquete|caja|x)\s*(?:de\s*)?{number}(?![\d.,])(?!\s*(?:g|gr|grs|ml|kg|l|lt|oz)\b)"
-    return bool(re.search(after, text) or re.search(before, text))
-
-
-def count_kind(left: ProductProfile, right: ProductProfile) -> str | None:
-    """Tipo de par conteo contra peso/volumen (``None`` si no es ese par)."""
-    for counted, weighed in ((left, right), (right, left)):
-        c, w = counted.presentation, weighed.presentation
-        if c is None or w is None or c.dimension != "count" or w.dimension not in WEIGHT_DIMENSIONS:
-            continue
-        if c.total_base != c.total_base.to_integral_value():
-            return None
-        units = int(c.total_base)
-        if units == 1:
-            return "conteo_1"
-        if w.pack_count > 1 and units == w.pack_count:
-            return "mismo_pack"
-        if mentions_count(weighed.record.source_name, units):
-            return "titulo_menciona_conteo"
-        return RISKY_KIND
-    return None
-
-
 def explain(variant: Variant, left: ProductProfile, right: ProductProfile) -> str | None:
     """Regla de la variante que explica el desacuerdo de tamaño entre dos ofertas."""
     if variant.gml_tolerance is not None:
@@ -168,11 +122,15 @@ def explain(variant: Variant, left: ProductProfile, right: ProductProfile) -> st
 
 @contextmanager
 def engine_variant(variant: Variant) -> Iterator[None]:
-    """El motor real, con el conflicto de tamaño que la variante explica descartado."""
+    """El motor real, con el conflicto de tamaño que la variante explica descartado.
+
+    Se usa con ``resolve_gtin_group(..., size_rules=False)``: base v2.8 + variante.
+    """
     original = identity._gtin_pair_conflicts
 
-    def pair(left: ProductProfile, right: ProductProfile, *, ounce_rule: bool = False) -> set[str]:
-        reasons = original(left, right, ounce_rule=ounce_rule)
+    def pair(left: ProductProfile, right: ProductProfile, *, ounce_rule: bool = False,
+             size_rules: bool = False) -> set[str]:
+        reasons = original(left, right, ounce_rule=ounce_rule, size_rules=size_rules)
         if SIZE_CONFLICT in reasons and explain(variant, left, right):
             reasons.discard(SIZE_CONFLICT)
         return reasons
@@ -259,6 +217,17 @@ def classify(baseline: Mapping[str, object], remaining: Sequence[ProductProfile]
     return "listo_recupera_otras"
 
 
+def simulate_group(variant: Variant, group: Mapping[str, object]) -> tuple[list[ProductProfile], Mapping[str, Iterable[str]], str | None]:
+    """Resolución de un grupo (sin decisión) con la variante y "nunca empeorar" contra la base."""
+    with engine_variant(variant):
+        (remaining, excluded, _), _ = identity.resolve_gtin_group(
+            str(group["gtin"]), list(group["members"]), size_rules=False)
+    reason = worsening(group, remaining)
+    if reason:
+        return list(group["remaining"]), group["excluded"], reason
+    return remaining, excluded, None
+
+
 def measure_variant(variant: Variant, groups: Sequence[Mapping[str, object]],
                     product_of: Mapping[str, int]) -> tuple[dict[str, object], list[dict[str, object]]]:
     changes: Counter = Counter()
@@ -273,12 +242,9 @@ def measure_variant(variant: Variant, groups: Sequence[Mapping[str, object]],
             decided += 1  # la decisión humana/IA manda: la variante no aplica
             continue
         gtin = str(group["gtin"])
-        with engine_variant(variant):
-            (remaining, excluded, _), _ = identity.resolve_gtin_group(gtin, list(group["members"]))
-        reason = worsening(group, remaining)
+        remaining, excluded, reason = simulate_group(variant, group)
         if reason:
             guard[reason] += 1
-            remaining, excluded = list(group["remaining"]), group["excluded"]
         if worsening(group, remaining):
             worse_after_guard += 1
         change = classify(group, remaining, excluded)
@@ -352,19 +318,63 @@ def pick_examples(examples: Sequence[Mapping[str, object]]) -> list[Mapping[str,
     return chosen[:MAX_EXAMPLES]
 
 
+def check_engine(groups: Sequence[Mapping[str, object]],
+                 current: Sequence[Mapping[str, object]]) -> dict[str, object]:
+    """¿El motor vigente (v2.9) da, grupo por grupo, lo mismo que la simulación de "A5 + B media"?
+
+    Los grupos con decisión no se simulan (manda la decisión); se cuenta aparte
+    cuántos cambian entre la base y el motor vigente (``match_official`` acepta
+    g ≈ ml en lácteos, jugos y salsas), sólo pueden ganar ofertas.
+    """
+    variant = next(item for item in VARIANTS if item.name == APPLIED_VARIANT)
+    now = {str(group["gtin"]): group for group in current}
+    different: list[str] = []
+    decided_changed = decided_lost = compared = 0
+    for group in groups:
+        gtin = str(group["gtin"])
+        engine_ids = _ids(now[gtin]["remaining"]) if gtin in now else set()
+        if group.get("decision") is not None:
+            if engine_ids != _ids(group["remaining"]):
+                decided_changed += 1
+                decided_lost += not _ids(group["remaining"]) <= engine_ids
+            continue
+        compared += 1
+        remaining, _, _ = simulate_group(variant, group)
+        if _ids(remaining) != engine_ids:
+            different.append(gtin)
+    return {
+        "version": IDENTITY_NORMALIZATION_VERSION,
+        "variante_aplicada": APPLIED_VARIANT,
+        "ya_aplicada": not different,
+        "grupos_comparados": compared,
+        "grupos_distintos_de_la_simulacion": len(different),
+        "ejemplos_distintos": different[:MAX_EXAMPLES],
+        "grupos_decididos_que_cambian_por_g_ml": decided_changed,
+        "grupos_decididos_que_pierden_ofertas": decided_lost,
+    }
+
+
 def measure_pr_b(groups: Sequence[Mapping[str, object]], product_of: Mapping[str, int],
-                 variants: Sequence[Variant] = VARIANTS) -> dict[str, object]:
-    """Todas las variantes sobre los grupos GTIN vigentes (≥ 2 cadenas, con decisiones)."""
+                 variants: Sequence[Variant] = VARIANTS,
+                 current: Sequence[Mapping[str, object]] | None = None) -> dict[str, object]:
+    """Todas las variantes sobre los grupos GTIN base (motor sin el PR B, ≥ 2 cadenas, con decisiones).
+
+    ``groups`` es la base (``resolve_gtin_group(..., size_rules=False)``); con
+    ``current`` (resolución vigente v2.9) se agrega ``motor_vigente``.
+    """
     results: dict[str, object] = {}
     lines: list[dict[str, object]] = []
     for variant in variants:
         summary, variant_lines = measure_variant(variant, groups, product_of)
         results[variant.name] = summary
         lines.extend(variant_lines)
+    engine = check_engine(groups, current) if current is not None else None
     return {
         "schema": SCHEMA,
-        "motor": "product_identity_v2 vigente, sin cambios (variantes simuladas al resolver cada grupo)",
-        "base": "resolución vigente con regla de onzas y decisiones de size_decisions",
+        "motor": f"{IDENTITY_NORMALIZATION_VERSION} con las reglas del PR B apagadas (base v2.8); "
+                 "variantes simuladas al resolver cada grupo",
+        "base": "resolución v2.8 (regla de onzas) con las decisiones de size_decisions",
+        "motor_vigente": engine,
         "grupos_evaluados": len(groups),
         "resumen": {name: {"grupos_que_mejoran": result["grupos_que_mejoran"],
                            "grupos_desbloqueados": result["grupos_desbloqueados"],

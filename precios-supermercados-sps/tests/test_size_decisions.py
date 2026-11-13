@@ -127,6 +127,24 @@ def test_official_match_uses_total_size_tolerance_and_ounce_readings() -> None:
     assert match_official(sig("mass_g", "150"), None) == (True, None)
 
 
+def test_official_match_accepts_g_ml_only_with_the_v2_9_tolerance() -> None:
+    five = Decimal("0.05")
+    # Sin la tolerancia (fuera de lácteos/jugos/salsas) g y ml nunca coinciden.
+    assert match_official(sig("mass_g", "150"), sig("volume_ml", "150"))[0] is False
+    # Con ella: oficial en g contra oferta en ml y viceversa, ≤ 5 %.
+    assert match_official(sig("mass_g", "150"), sig("volume_ml", "150"), mass_volume_tolerance=five) == (True, None)
+    assert match_official(sig("volume_ml", "400"), sig("mass_g", "382.72"), mass_volume_tolerance=five)[0]
+    assert match_official(sig("volume_ml", "1000"), sig("mass_g", "940"), mass_volume_tolerance=five)[0] is False  # 6 %
+    # Contenido total: 3 × 100 ml contra 300 g.
+    pack = PresentationSignature("volume_ml", Decimal("300"), 3, Decimal("100"))
+    assert match_official(sig("mass_g", "300"), pack, mass_volume_tolerance=five)[0]
+    # Las onzas no entran en g ≈ ml: 5 oz (147.9 ml) no coincide con 150 g.
+    assert match_official(sig("ounce", "5"), sig("mass_g", "150"), mass_volume_tolerance=five)[0] is False
+    assert match_official(sig("mass_g", "150"), sig("ounce", "5"), mass_volume_tolerance=five)[0] is False
+    # Ni con unidades.
+    assert match_official(sig("count", "6"), sig("mass_g", "6"), mass_volume_tolerance=five)[0] is False
+
+
 def test_stored_rows_round_trip_to_master_attributes() -> None:
     decision = decisions({"gtin": CHOLULA, "decision": "size", "value": "5", "unit": "oz"})[CHOLULA]
     row = (CHOLULA, "size", "5", "oz", "5", "oz", None, "human:Jchernand3z19", NOW)
@@ -142,8 +160,11 @@ def test_stored_rows_round_trip_to_master_attributes() -> None:
 
 def test_engine_groups_offers_matching_the_official_size_and_isolates_the_rest() -> None:
     before = statuses()
-    assert before[3].comparison_status == before[4].comparison_status == "review_required"
-    assert before[11].comparison_status == "review_required"  # empate 180 ml contra 180 g
+    # v2.9 sin decisiones: g ≈ ml en salsas y aderezos (Colonial 150 ml con los 150 g; McCormick
+    # 180 ml ×2 con 180 g ×2); la onza de Los Andes (141.7 g) sigue fuera.
+    assert before[3].comparison_status == before[5].comparison_status == "ready"
+    assert before[4].comparison_status == "review_required"
+    assert before[11].comparison_status == before[13].comparison_status == "ready"
 
     after = statuses(decisions(
         {"gtin": CHOLULA, "decision": "size", "value": "5", "unit": "oz"},
@@ -152,12 +173,27 @@ def test_engine_groups_offers_matching_the_official_size_and_isolates_the_rest()
     assert after[3].comparison_status == after[4].comparison_status == "ready"
     assert after[5].comparison_status == after[6].comparison_status == "review_required"
     assert "human_size_decision_mismatch" in after[5].conflict_reasons_json
-    assert after[11].comparison_status == after[12].comparison_status == "ready"
-    assert after[13].comparison_status == after[14].comparison_status == "review_required"
+    # Oficial 180 ml: desde v2.9 las ofertas en 180 g de aderezo coinciden (g ≈ ml).
+    assert {after[pid].comparison_status for pid in (11, 12, 13, 14)} == {"ready"}
     # La onza del grupo se lee como líquido (precio por unidad comparable).
     assert after[4].presentation_dimension == "volume_ml"
     # La decisión cambia la huella: el refresco reescribe esos perfiles.
     assert after[3].profile_hash != before[3].profile_hash
+
+
+def test_decision_outside_g_ml_categories_keeps_isolating_the_other_unit() -> None:
+    rows = [
+        (31, "walmart", "Shampoo Sedal Rizos - 400 ml", "Sedal", None, "Cuidado personal", "7501056330217"),
+        (32, "paiz", "Shampoo Sedal Rizos - 400 ml", "Sedal", "400 ml", "Cuidado capilar", "7501056330217"),
+        (33, "la_colonia", "Shampoo Sedal Rizos 400 g", "Sedal", "400 g", "Cuidado capilar", "7501056330217"),
+    ]
+    gtin = "07501056330217"
+    decided = index_decisions(parse_payload(payload({"gtin": gtin, "decision": "size", "value": "400", "unit": "g"}),
+                                            decided_by="Jchernand3z19", decided_at_utc=NOW))
+    out = {row.product_id: row for row in build_homologation_rows(
+        records_from_product_rows(rows), updated_at_utc=NOW, size_decisions=decided)}
+    assert out[33].comparison_status == "review_required"  # sólo una cadena en 400 g: no hay grupo
+    assert "human_size_decision_mismatch" in out[31].conflict_reasons_json  # shampoo: g ≠ ml
 
 
 def test_different_products_never_groups_the_gtin() -> None:
@@ -247,19 +283,28 @@ def test_apply_cli_reads_payload_from_environment(tmp_path: Path, monkeypatch: p
 # --------------------------------------------------------------------- cola
 
 
+SEDAL = "07501056330217"
+SHAMPOO_ROWS = [  # fuera de lácteos/jugos/salsas: 400 ml contra 400 g sigue siendo un empate
+    (31, "walmart", "Shampoo Sedal Rizos - 400 ml", "Sedal", None, "Cuidado personal", "7501056330217"),
+    (32, "paiz", "Shampoo Sedal Rizos - 400 g", "Sedal", "400 g", "Cuidado capilar", "7501056330217"),
+]
+
+
 def test_queue_lists_ties_and_outliers_and_skips_decided_gtins() -> None:
-    groups = resolve_groups(build_profiles([record for _, record in records_from_product_rows(ROWS)]))
+    rows = ROWS + SHAMPOO_ROWS
+    groups = resolve_groups(build_profiles([record for _, record in records_from_product_rows(rows)]))
     items = cola.queue_items(groups, skip=set())
     by_gtin = {item["gtin"]: item for item in items}
-    assert by_gtin[MCCORMICK]["kind"] == "empate"
-    assert by_gtin[CHOLULA]["kind"] == "atipico"  # hoy Walmart y Paiz comparan; Colonial y Los Andes fuera
+    assert by_gtin[SEDAL]["kind"] == "empate"
+    assert MCCORMICK not in by_gtin  # v2.9: 180 ml ≈ 180 g en aderezos, ya comparable sin revisión
+    assert by_gtin[CHOLULA]["kind"] == "atipico"  # v2.9: Colonial, Walmart y Paiz comparan; Los Andes fuera
     cholula = {offer["store"]: offer for offer in by_gtin[CHOLULA]["offers"]}
-    assert cholula["colonial"]["excluded"] is True and cholula["walmart"]["excluded"] is False
+    assert cholula["colonial"]["excluded"] is False and cholula["comisariato_los_andes"]["excluded"] is True
     assert (cholula["comisariato_los_andes"]["value"], cholula["comisariato_los_andes"]["unit"]) == ("5", "oz")
     assert cholula["paiz"]["size"] == "150 g"
     assert cholula["paiz"]["code"] == "0049733830119"  # forma publicada por el súper
     assert cholula["paiz"]["ref"] == "paiz:6"  # para hallar la foto de su tarjeta
-    assert [item["gtin"] for item in cola.queue_items(groups, skip={MCCORMICK})] == [CHOLULA]
+    assert [item["gtin"] for item in cola.queue_items(groups, skip={SEDAL})] == [CHOLULA]
 
 
 def test_queue_sizes_are_rounded_to_two_decimals() -> None:

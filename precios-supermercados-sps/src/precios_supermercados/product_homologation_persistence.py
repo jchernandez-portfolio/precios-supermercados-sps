@@ -209,8 +209,10 @@ def build_homologation_rows(
     profile_by_source = {profile.record.source_record_id: profile for profile in result.profiles}
     group_by_source: dict[str, tuple[str, tuple[str, ...]]] = {}
     ounce_readings: dict[str, str] = {}
+    size_standards: dict[str, object] = {}
     for group in result.exact_gtin_groups:
         ounce_readings.update(group.ounce_readings)
+        size_standards.update(group.size_standards)
         for source_record_id in group.source_record_ids:
             group_by_source[source_record_id] = (
                 group.comparison_status,
@@ -243,6 +245,13 @@ def build_homologation_rows(
             # La onza que su grupo GTIN confirma como líquido o peso pasa a ml/g:
             # así tiene precio por unidad y vota bien el contenido neto del maestro.
             presentation = converted_ounce(presentation, reading)
+            canonical_presentation = canonical_presentation_from_signature(
+                canonical_presentation.raw_presentation, presentation, canonical_presentation.status
+            )
+        elif record.source_record_id in size_standards:
+            # v2.9: la oferta que unió g ≈ ml (ml → g) o peso sobre conteo (el peso
+            # del grupo, el conteo en pack_count) toma el estándar del grupo.
+            presentation = size_standards[record.source_record_id]
             canonical_presentation = canonical_presentation_from_signature(
                 canonical_presentation.raw_presentation, presentation, canonical_presentation.status
             )

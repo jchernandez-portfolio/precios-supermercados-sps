@@ -200,21 +200,22 @@ def test_ounce_basis_uses_real_conversions() -> None:
 MCCORMICK = "07411000204139"
 CHOLULA = "00049733830119"
 DECIDED_PRODUCTS = [
-    # Cholula: 150 ml + 5 oz contra 150 g + 150 g → hoy Walmart y Paiz comparan (atípico).
+    # Cholula: 150 ml + 5 oz contra 150 g + 150 g → con v2.9 (g ≈ ml en salsas) comparan
+    # Colonial, Walmart y Paiz; Los Andes (5 oz = 141.7 g) queda fuera.
     (3, "colonial", "CHOLULA Hot Chipotle 150 mL", "Cholula", None, "Salsas", "0049733830119"),
     (4, "comisariato_los_andes", "Cholula hot sauce chipotle 5 oz", "Cholula", "UN", "Salsas", "0049733830119"),
     (5, "walmart", "Salsa Cholula picante chipotle - 150 g", "Cholula", None, "Salsas", "0049733830119"),
     (6, "paiz", "Salsa Cholula picante chipotle - 150 g", "Cholula", "150 g", "Salsas", "0049733830119"),
-    # McCormick: 180 ml ×2 contra 180 g ×2 → hoy empate bloqueado.
+    # McCormick: 180 ml ×2 contra 180 g ×2 → empate bloqueado en v2.8; listo en v2.9 (aderezos).
     (11, "colonial", "McCORMICK Caesar 180ml", "McCormick", None, "Aderezos", "7411000204139"),
     (12, "la_colonia", "Aderezo Mccormick Caesar 180 Ml", "McCormick", None, "Aderezos", "7411000204139"),
     (13, "paiz", "Aderezo Mccormick Caesar Dp - 180 g", "McCormick", "180 g", "Aderezos", "7411000204139"),
     (14, "walmart", "Aderezo Mccormick Caesar Dp - 180 g", "McCormick", None, "Aderezos", "7411000204139"),
 ]
 DECISION_ROWS = [
-    # Una persona: Cholula pesa 150 g (Colonial en ml y Los Andes en 5 oz quedan aislados).
-    (CHOLULA, "size", "150", "g", "150", "g", None, "human:Jchernand3z19", "2026-11-12T10:00:00Z"),
-    # La IA: McCormick son 180 ml (las ofertas en g quedan aisladas).
+    # Una persona: Cholula son 5 fl oz (las ofertas en g quedan aisladas: la onza no entra en g ≈ ml).
+    (CHOLULA, "size", "5", "oz", "5", "oz", None, "human:Jchernand3z19", "2026-11-12T10:00:00Z"),
+    # La IA: McCormick son 180 ml; desde v2.9 las ofertas en 180 g coinciden (g ≈ ml en aderezos).
     (MCCORMICK, "size", "180", "ml", "180", "ml", "Cont. neto 180 ml", "engine:gemini_auto", "2026-11-12T11:00:00Z"),
 ]
 
@@ -256,7 +257,7 @@ def test_measure_applies_size_decisions_like_production(tmp_path: Path) -> None:
     assert "Jchernand3z19" not in json.dumps(summary, ensure_ascii=False)  # sin cuentas en el artifact
     assert summary["grupos_gtin_en_2_o_mas_cadenas"]["bloqueados_review_required"] == 0
     reasons = summary["motivos"]["human_size_decision_mismatch"]
-    assert reasons["ofertas_excluidas_por_este_motivo"] == 4  # 2 de Cholula + 2 de McCormick
+    assert reasons["ofertas_excluidas_por_este_motivo"] == 2  # las 2 de Cholula en g; McCormick ya no aísla
     # Sólo SELECT, también sobre size_decisions.
     assert any("FROM size_decisions" in sql for sql in backend.sql)
     assert all(sql.lstrip().upper().startswith("SELECT") for sql in backend.sql)
@@ -282,6 +283,13 @@ def test_resolve_groups_keeps_the_decision_with_and_without_the_ounce_rule() -> 
         groups = {group["gtin"]: group for group in rules.resolve_groups(profiles, ounce_rule=ounce_rule,
                                                                          size_decisions=decided)}
         assert groups[MCCORMICK]["status"] == "ready" and groups[MCCORMICK]["decision"] is decided[MCCORMICK]
-        assert {m.record.supermarket_id for m in groups[MCCORMICK]["remaining"]} == {"colonial", "la_colonia"}
+        # v2.9: el oficial 180 ml coincide con las ofertas en 180 g (g ≈ ml en aderezos).
+        assert {m.record.supermarket_id for m in groups[MCCORMICK]["remaining"]} == {
+            "colonial", "la_colonia", "paiz", "walmart"}
+        base = {group["gtin"]: group for group in rules.resolve_groups(
+            profiles, ounce_rule=ounce_rule, size_decisions=decided, size_rules=False)}
+        assert {m.record.supermarket_id for m in base[MCCORMICK]["remaining"]} == {"colonial", "la_colonia"}
     plain = {group["gtin"]: group for group in rules.resolve_groups(profiles)}
-    assert plain[MCCORMICK]["status"] == "review_required" and plain[MCCORMICK]["decision"] is None
+    assert plain[MCCORMICK]["status"] == "ready" and plain[MCCORMICK]["decision"] is None  # regla g ≈ ml
+    v2_8 = {group["gtin"]: group for group in rules.resolve_groups(profiles, size_rules=False)}
+    assert v2_8[MCCORMICK]["status"] == "review_required"

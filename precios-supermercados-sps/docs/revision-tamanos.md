@@ -13,12 +13,23 @@ súper y fija el **tamaño oficial**; el motor aplica la regla en cada refresco:
 | `super-compras/admin.js` (`#/admin/revision`) | Lista la cola; GTIN-14 visible con "Copiar"; por oferta, el código tal como lo publica el súper (con "Copiar") y búsquedas de 14, 13 y 12 dígitos (★ = la forma que usa ese súper; probado: Walmart busca con 13 y Colonial con 12), botones rápidos con los tamaños publicados, tamaño a mano (g, ml, oz, lb, unidades), "No es el mismo producto" y nota. "Guardar y resolver" llama a la API de GitHub con la llave del dueño. |
 | `precios-supermercados-sps-size-decisions.yml` | `workflow_dispatch` con el JSON del panel (`rpi-size-decisions/v1`). Sólo `main` y sólo la cuenta del dueño. El JSON pasa por variable de entorno. Guarda y lanza el refresco de homologación. |
 | `scripts/aplicar_decisiones_tamano.py` | Valida (falla cerrado), exige que el GTIN exista en los perfiles y, en un lote atómico: `size_decisions`, `human_attributes_json` del maestro (`net_content_value`/`net_content_unit`, `source: size_decisions`) y `master_sync_dirty`. |
-| `src/precios_supermercados/size_decisions.py` | Contrato, unidades (lb → g; la onza queda como onza) y comparación con el oficial (contenido total, 2 % o 1.5 unidades, onza líquida o de peso). |
+| `src/precios_supermercados/size_decisions.py` | Contrato, unidades (lb → g; la onza queda como onza) y comparación con el oficial (contenido total, 2 % o 1.5 unidades, onza líquida o de peso). Desde el motor v2.9, en grupos de lácteos, jugos y salsas (alguna oferta con categoría `yogurt`, `leche`, `queso`, `crema`, `jugo`, `nectar`, `salsa`, `aderezo`, `mayonesa` o `ketchup`) un oficial en g coincide con una oferta en ml y viceversa si difieren ≤ 5 % (`mass_volume_tolerance`); las onzas y las unidades no entran en esa equivalencia. |
 | `product_identity_v2.resolve_gtin_group(..., decision)` | Con decisión de tamaño: ofertas distintas → `human_size_decision_mismatch`; con "no es el mismo producto" → `human_different_products` (el GTIN no se agrupa). |
 | `precios-supermercados-sps-size-queue.yml` + `scripts/exportar_cola_tamanos.py` | Tras cada refresco recalcula los grupos (sólo SELECT) y publica `cola.json` en la rama pública `revision-tamanos`: `empate` (grupo bloqueado) y `atipico` (una cadena fuera). Omite los GTIN ya decididos. |
 | `scripts/sugerir_tamanos_ia.py` (paso del workflow de la cola) | **Claude** (API, `ANTHROPIC_API_KEY`, modelo económico configurable, tope `claude_max` consultas por corrida) y de respaldo **Gemini** (`GEMINI_API_KEY`) leen el contenido neto en la foto de **cada oferta** (las mismas fotos R2 que muestra el panel; al modelo no se le dan títulos ni tamaños). Si todas las fotos legibles dicen lo mismo y ese tamaño es el de **más de la mitad** de las ofertas, se guarda sola la decisión (`engine:claude_auto` o `engine:gemini_auto` según quién leyó; nunca con Flash-Lite ni sobre una humana) y el código sale de la cola. A revisión manual: ilegible, fotos que no coinciden entre sí, lectura que coincide sólo con una minoría (Mazola 1 kg vs 908 g) o con ningún título. Cada oferta muestra "🤖 Claude leyó: X" / "🤖 Gemini leyó: X" (✓ coincide con su título, ⚠ no). Lo resuelto por la IA queda en la pestaña "Resueltos por IA" para auditarlo: una decisión humana reemplaza la de la IA. Si Claude falla (sin crédito, llave inválida, 429, 529/5xx tras reintentos, modelo no disponible o tope), el resto de la corrida usa Gemini y `cola.json → ia` anota el motivo, consultas y tokens por proveedor. Gemini: un 404/400 de modelo retirado pasa al siguiente candidato; ante 5xx reintenta y cambia de Flash; ante 429 espera 60 s, reintenta y pasa a Flash-Lite (sólo sugiere). |
 
 Cambiar de opinión: se envía otra decisión del mismo GTIN; reemplaza la anterior.
+
+### Motor v2.9 y la cola
+
+Las reglas g ≈ ml (lácteos, jugos y salsas, ≤ 5 %) y peso sobre conteo (conteo 1,
+mismo pack o título con el conteo) resuelven solas parte de los empates y
+atípicos, que salen de la cola (p. ej. McCormick 180 ml ×2 contra 180 g ×2). Las
+decisiones guardadas siguen mandando: las reglas no corren en un GTIN decidido,
+pero el oficial ya compara g con ml en esas categorías, así que un grupo decidido
+puede **ganar** ofertas (un oficial "180 ml" acepta ahora las de "180 g"; nunca
+pierde ninguna). La medición `medir_reglas_identidad.py --pr-b` lo cuenta en
+`motor_vigente.grupos_decididos_que_cambian_por_g_ml`.
 
 ## Llave de GitHub
 
