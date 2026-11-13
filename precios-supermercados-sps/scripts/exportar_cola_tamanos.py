@@ -67,7 +67,7 @@ def source_code(profile: ProductProfile) -> str | None:
 
 
 def decided_gtins(db: ReadOnly) -> dict[str, str]:
-    """GTIN ya decidido → quién lo decidió (``human:<cuenta>`` o ``engine:gemini_auto``)."""
+    """GTIN ya decidido → quién lo decidió (``human:<cuenta>`` o ``engine:gemini_auto`` / ``engine:claude_auto``)."""
     present = db.query("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (DECISIONS_TABLE,))
     if not present:
         return {}

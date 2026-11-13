@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import pytest
 import yaml
 
 BASE_PATH = Path(__file__).with_name("_workflow_security_audit_base.py")
@@ -117,6 +118,7 @@ base.EXPECTED_TRIGGERS[base.SIZE_QUEUE_WORKFLOW] = {"workflow_run", "workflow_di
 base.ALLOWED_SECRET_REFERENCES[base.SIZE_QUEUE_WORKFLOW] = {
     base.TURSO_DATABASE_URL_SECRET,
     base.TURSO_AUTH_TOKEN_SECRET,
+    "ANTHROPIC_API_KEY",
     "GEMINI_API_KEY",
 }
 SIZE_QUEUE_CHECKOUTS = [
@@ -777,15 +779,18 @@ def test_size_decisions_workflow_is_owner_only_and_never_inlines_the_payload() -
     assert "gh workflow run precios-supermercados-sps-homologation-refresh.yml" in raw
 
 
-def test_size_queue_gives_the_gemini_key_only_to_the_suggestion_step() -> None:
+@pytest.mark.parametrize("secret", ["GEMINI_API_KEY", "ANTHROPIC_API_KEY"])
+def test_size_queue_gives_the_ai_keys_only_to_the_suggestion_step(secret: str) -> None:
     path = base.WORKFLOW_DIR / base.SIZE_QUEUE_WORKFLOW
     workflow = base.load_workflow(path)
-    with_key = [step for step in base.steps(workflow) if "GEMINI_API_KEY" in str(step.get("env", {}))]
-    assert [step["name"] for step in with_key] == ["Sugerencias de tamaño con IA (Gemini)"]
+    with_key = [step for step in base.steps(workflow) if secret in str(step.get("env", {}))]
+    assert [step["name"] for step in with_key] == ["Sugerencias de tamaño con IA (Claude, respaldo Gemini)"]
     step = with_key[0]
+    assert step["env"][secret] == f"${{{{ secrets.{secret} }}}}"
     assert "sugerir_tamanos_ia.py" in step["run"] and "inputs." not in step["run"]
     assert step["continue-on-error"] == "true"  # sin IA la cola se publica igual
-    assert "secrets.GEMINI_API_KEY" not in path.read_text(encoding="utf-8").split("Sugerencias de tamaño")[0]
+    assert f"secrets.{secret}" not in path.read_text(encoding="utf-8").split("Sugerencias de tamaño")[0]
+    assert "TURSO" not in str(step.get("env", {}))
 
 
 def test_size_queue_saves_ai_decisions_only_as_the_engine() -> None:
@@ -794,5 +799,6 @@ def test_size_queue_saves_ai_decisions_only_as_the_engine() -> None:
     with_turso = {step["name"]: step for step in base.steps(workflow) if "TURSO_AUTH_TOKEN" in str(step.get("env", {}))}
     assert set(with_turso) == {"Calcular cola (sólo lectura)", "Guardar decisiones automáticas de la IA"}
     save = with_turso["Guardar decisiones automáticas de la IA"]
-    assert "--engine gemini_auto" in save["run"] and "--actor" not in save["run"] and "inputs." not in save["run"]
-    assert "GEMINI_API_KEY" not in str(save.get("env", {}))
+    assert "gemini_auto:" in save["run"] and "claude_auto:" in save["run"] and '--engine "$engine"' in save["run"]
+    assert "--actor" not in save["run"] and "inputs." not in save["run"]
+    assert "GEMINI_API_KEY" not in str(save.get("env", {})) and "ANTHROPIC_API_KEY" not in str(save.get("env", {}))
