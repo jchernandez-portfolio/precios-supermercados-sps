@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sqlite3
 import sys
 from collections.abc import Sequence
@@ -43,7 +44,11 @@ from precios_supermercados.product_master import (  # noqa: E402
     gtin_master_id,
 )
 from precios_supermercados.size_decisions import (  # noqa: E402
+    APPROVED_ENGINES,
     ENGINE_ACTORS,
+    MAX_DECISIONS,
+    MAX_NOTE_CHARS,
+    MAX_PAYLOAD_CHARS,
     TABLE_NAME,
     TABLE_SQL,
     SizeDecision,
@@ -203,18 +208,36 @@ def apply_size_decisions(
 
 
 def apply_engine_decisions(
-    store: MasterStore, payload: str, *, engine: str, apply: bool = False, now: str | None = None
+    store: MasterStore, payload: str, *, engine: str, apply: bool = False, now: str | None = None,
+    approved_by: str | None = None,
 ) -> dict[str, object]:
     """Decisiones de un motor (p. ej. la IA): en lotes de 300, sin tocar las humanas.
 
     A diferencia del panel, un código que ya no está en los perfiles o que ya tiene
     decisión humana se omite (se informa) en vez de rechazar todo el envío.
+
+    ``claude_sesion`` (Claude en una sesión de Claude Code) exige ``approved_by``: la
+    cuenta que aprobó la tanda queda en la nota de cada decisión, y el envío respeta
+    los mismos límites que el panel (300 decisiones, 60,000 caracteres).
     """
     now = now or _utc_now()
-    document = json.loads(payload or "{}")
+    if (engine in APPROVED_ENGINES) != bool(approved_by):
+        raise SizeDecisionError("size_decisions_approval_invalid")
+    if approved_by and not _ACTOR_NAME.fullmatch(approved_by):
+        raise SizeDecisionError("size_decisions_actor_invalid")
+    if approved_by and len(payload or "") > MAX_PAYLOAD_CHARS:
+        raise SizeDecisionError("size_decisions_too_large")
+    try:
+        document = json.loads(payload or "{}")
+    except ValueError as error:
+        raise SizeDecisionError("size_decisions_json_invalid") from error
     items = document.get("decisions") if isinstance(document, dict) else None
     if not isinstance(items, list):
         raise SizeDecisionError("size_decisions_schema_invalid")
+    if approved_by:
+        if len(items) > MAX_DECISIONS:
+            raise SizeDecisionError("size_decisions_too_many")
+        items = [_with_approval(item, approved_by) for item in items]
     result: dict[str, object] = {"decisions": 0, "skipped_human": [], "skipped_unknown": [], "written": False,
                                  "dry_run": not apply, "batches": 0}
     for start in range(0, len(items), ENGINE_CHUNK):
@@ -239,6 +262,17 @@ def apply_engine_decisions(
     return result
 
 
+_ACTOR_NAME = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})")
+
+
+def _with_approval(item: object, approved_by: str) -> object:
+    if not isinstance(item, dict):
+        return item  # parse_payload lo rechaza
+    suffix = f" · aprobado por {approved_by}"
+    note = " ".join(str(item.get("note") or "Claude (sesión)").split())
+    return {**item, "note": note[: MAX_NOTE_CHARS - len(suffix)] + suffix}
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     target = parser.add_mutually_exclusive_group(required=True)
@@ -248,6 +282,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     author = parser.add_mutually_exclusive_group(required=True)
     author.add_argument("--actor", help="cuenta de GitHub que envió las decisiones (panel)")
     author.add_argument("--engine", choices=sorted(ENGINE_ACTORS), help="motor automático (p. ej. gemini_auto)")
+    parser.add_argument("--approved-by", help="cuenta que aprobó una tanda de Claude en sesión (claude_sesion)")
     parser.add_argument("--summary", type=Path, help="escribe el resultado en este archivo JSON")
     parser.add_argument("--apply", action="store_true", help="escribe (por defecto dry-run)")
     args = parser.parse_args(argv)
@@ -281,7 +316,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def _run(store: MasterStore, payload: str, args: argparse.Namespace) -> dict[str, object]:
     if args.engine:
-        return apply_engine_decisions(store, payload, engine=args.engine, apply=args.apply)
+        return apply_engine_decisions(store, payload, engine=args.engine, apply=args.apply,
+                                      approved_by=args.approved_by)
+    if args.approved_by:
+        raise SizeDecisionError("size_decisions_approval_invalid")
     return apply_size_decisions(store, payload, actor=args.actor, apply=args.apply)
 
 

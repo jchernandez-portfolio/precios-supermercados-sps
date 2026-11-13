@@ -355,3 +355,65 @@ def test_claude_engine_also_never_replaces_a_human_decision() -> None:
     assert result["skipped_human"] == [CHOLULA]
     rows = dict(connection.execute("SELECT canonical_gtin, decided_by FROM size_decisions").fetchall())
     assert rows == {CHOLULA: "human:Jchernand3z19", MCCORMICK: "engine:claude_auto"}
+
+
+def test_claude_session_needs_approval_and_leaves_it_in_the_note() -> None:
+    connection = database()
+    store = SQLiteMasterStore(connection)
+    aplicar.apply_size_decisions(store, payload({"gtin": CHOLULA, "decision": "size", "value": "5", "unit": "oz"}),
+                                 actor="Jchernand3z19", apply=True, now=NOW)
+    text = json.dumps({"schema": "rpi-size-decisions/v1", "decisions": [
+        {"gtin": MCCORMICK, "decision": "size", "value": "180", "unit": "ml", "note": "La Colonia 180 ml · Walmart 180 ml"},
+        {"gtin": CHOLULA, "decision": "size", "value": "150", "unit": "g"},
+    ]})
+    with pytest.raises(SizeDecisionError, match="approval_invalid"):
+        aplicar.apply_engine_decisions(store, text, engine="claude_sesion", apply=True, now=NOW)
+    with pytest.raises(SizeDecisionError, match="approval_invalid"):
+        aplicar.apply_engine_decisions(store, text, engine="claude_auto", apply=True, now=NOW, approved_by="Jchernand3z19")
+    with pytest.raises(SizeDecisionError, match="actor_invalid"):
+        aplicar.apply_engine_decisions(store, text, engine="claude_sesion", apply=True, now=NOW, approved_by="a b")
+    result = aplicar.apply_engine_decisions(store, text, engine="claude_sesion", apply=True, now=NOW,
+                                            approved_by="Jchernand3z19")
+    assert result["skipped_human"] == [CHOLULA]  # una decisión humana nunca se reemplaza
+    row = connection.execute("SELECT decided_by, note FROM size_decisions WHERE canonical_gtin=?", (MCCORMICK,)).fetchone()
+    assert row == ("engine:claude_sesion", "La Colonia 180 ml · Walmart 180 ml · aprobado por Jchernand3z19")
+
+
+def test_claude_session_respects_the_panel_limits() -> None:
+    store = SQLiteMasterStore(database())
+    many = json.dumps({"schema": "rpi-size-decisions/v1", "decisions": [
+        {"gtin": f"{n:014d}", "decision": "different_products"} for n in range(1, 302)]})
+    with pytest.raises(SizeDecisionError, match="too_many"):
+        aplicar.apply_engine_decisions(store, many, engine="claude_sesion", now=NOW, approved_by="Jchernand3z19")
+    with pytest.raises(SizeDecisionError, match="too_large"):
+        aplicar.apply_engine_decisions(store, "x" * 60_001, engine="claude_sesion", now=NOW, approved_by="Jchernand3z19")
+
+
+def test_engine_items_publish_ai_decisions_with_their_offers_for_the_ai_tab() -> None:
+    groups = resolve_groups(build_profiles([record for _, record in records_from_product_rows(ROWS)]))
+    rows = {
+        MCCORMICK: {"decision": "size", "value": "180", "unit": "ml", "note": "Claude (sesión): 180 ml · aprobado por X",
+                    "by": "engine:claude_sesion", "at": "2026-11-13T10:00:00Z"},
+        CHOLULA: {"decision": "size", "value": "5", "unit": "oz", "note": "x", "by": "human:Jchernand3z19", "at": "T"},
+    }
+    items = cola.engine_items(groups, rows)
+    assert [item["gtin"] for item in items] == [MCCORMICK]  # las humanas no son de la IA
+    assert items[0]["ia"] == {"status": "auto", "fuente": "claude_sesion", "value": "180", "unit": "ml",
+                              "text": "Claude (sesión): 180 ml · aprobado por X"}
+    assert items[0]["offers"] and items[0]["kind"] == "resuelto_ia"
+
+
+def test_engine_rows_reads_only_engine_decisions() -> None:
+    connection = database()
+    store = SQLiteMasterStore(connection)
+    aplicar.apply_size_decisions(store, payload({"gtin": CHOLULA, "decision": "size", "value": "5", "unit": "oz"}),
+                                 actor="Jchernand3z19", apply=True, now=NOW)
+    aplicar.apply_engine_decisions(store, payload({"gtin": MCCORMICK, "decision": "different_products"}),
+                                   engine="claude_auto", apply=True, now=NOW)
+
+    class Reader:
+        def query(self, sql, params=()):
+            return connection.execute(sql, params).fetchall()
+
+    rows = cola.engine_rows(Reader())
+    assert list(rows) == [MCCORMICK] and rows[MCCORMICK]["by"] == "engine:claude_auto"

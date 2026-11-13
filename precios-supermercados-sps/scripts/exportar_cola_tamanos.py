@@ -11,7 +11,7 @@ tamaño oficial:
   tamaño.
 
 Omite los GTIN que ya tienen fila en ``size_decisions`` (y publica cuáles decidió
-la IA, para auditarlos). Cada oferta lleva la foto de su tarjeta en el bucket R2
+la IA, para auditarlos, con sus ofertas en ``resueltas_motor``). Cada oferta lleva la foto de su tarjeta en el bucket R2
 (``foto``: la misma que lee Gemini) y de qué súper vino esa foto. Sólo publica
 datos que ya son públicos en el catálogo.
 """
@@ -74,6 +74,22 @@ def decided_gtins(db: ReadOnly) -> dict[str, str]:
     return {str(gtin): str(by) for gtin, by in db.query(f"SELECT canonical_gtin, decided_by FROM {DECISIONS_TABLE}")}
 
 
+ENGINE_SOURCE = {"engine:claude_sesion": "claude_sesion", "engine:claude_auto": "claude", "engine:gemini_auto": "gemini"}
+
+
+def engine_rows(db: ReadOnly) -> dict[str, dict[str, object]]:
+    """Decisiones de motores de IA (sólo lectura) para mostrarlas en "Resueltos por IA"."""
+    present = db.query("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (DECISIONS_TABLE,))
+    if not present:
+        return {}
+    rows = db.query(
+        f"SELECT canonical_gtin, decision, net_content_value, net_content_unit, note, decided_by, decided_at_utc "
+        f"FROM {DECISIONS_TABLE} WHERE decided_by LIKE 'engine:%'"
+    )
+    return {str(gtin): {"decision": decision, "value": value, "unit": unit, "note": note, "by": by, "at": at}
+            for gtin, decision, value, unit, note, by, at in rows}
+
+
 # --------------------------------------------------------------------- fotos
 
 
@@ -133,6 +149,49 @@ def offer_size(profile: ProductProfile) -> dict[str, object] | None:
     return {"value": total, "unit": unit, "text": text}
 
 
+def group_offers(group: Mapping[str, object], size_excluded: set[str]
+                 ) -> tuple[Sequence[ProductProfile], list[dict[str, object]]]:
+    members: Sequence[ProductProfile] = sorted(
+        group["members"], key=lambda member: (member.record.supermarket_id, member.record.source_record_id)
+    )
+    offers = []
+    for member in members:
+        size = offer_size(member)
+        offers.append({
+            "store": member.record.supermarket_id,
+            "name": member.record.source_name,
+            "code": source_code(member),
+            "ref": member.record.source_record_id,
+            "size": None if size is None else size["text"],
+            "value": None if size is None else size["value"],
+            "unit": None if size is None else size["unit"],
+            "excluded": member.record.source_record_id in size_excluded,
+        })
+    return members, offers
+
+
+def engine_items(groups: Sequence[Mapping[str, object]], rows: Mapping[str, Mapping[str, object]]
+                 ) -> list[dict[str, object]]:
+    """Códigos que resolvió un motor de IA, con sus ofertas, para auditarlos en el panel."""
+    items: list[dict[str, object]] = []
+    for group in groups:
+        gtin = str(group["gtin"])
+        row = rows.get(gtin)
+        source = ENGINE_SOURCE.get(str(row.get("by"))) if row else None
+        if source is None:
+            continue
+        members, offers = group_offers(group, set())
+        title = max(members, key=lambda member: len(member.record.source_name or "")).record.source_name
+        ia: dict[str, object] = {"status": "auto" if row["decision"] == "size" else "otro_producto", "fuente": source,
+                                 "text": str(row.get("note") or "")[:200]}
+        if row["decision"] == "size":
+            ia.update(value=str(row["value"]), unit=str(row["unit"]))
+        items.append({"gtin": gtin, "kind": "resuelto_ia", "name": title, "offers": offers, "ia": ia,
+                      "resuelto_utc": row.get("at")})
+    items.sort(key=lambda item: str(item.get("resuelto_utc") or ""), reverse=True)
+    return items[:MAX_ITEMS]
+
+
 def queue_items(groups: Sequence[Mapping[str, object]], skip: set[str]) -> list[dict[str, object]]:
     items: list[dict[str, object]] = []
     for group in groups:
@@ -147,22 +206,7 @@ def queue_items(groups: Sequence[Mapping[str, object]], skip: set[str]) -> list[
             kind = "atipico"
         else:
             continue
-        members: Sequence[ProductProfile] = sorted(
-            group["members"], key=lambda member: (member.record.supermarket_id, member.record.source_record_id)
-        )
-        offers = []
-        for member in members:
-            size = offer_size(member)
-            offers.append({
-                "store": member.record.supermarket_id,
-                "name": member.record.source_name,
-                "code": source_code(member),
-                "ref": member.record.source_record_id,
-                "size": None if size is None else size["text"],
-                "value": None if size is None else size["value"],
-                "unit": None if size is None else size["unit"],
-                "excluded": member.record.source_record_id in size_excluded,
-            })
+        members, offers = group_offers(group, size_excluded)
         kept = [member for member in members if member.record.source_record_id not in size_excluded]
         title = max((kept or members), key=lambda member: len(member.record.source_name or "")).record.source_name
         items.append({"gtin": gtin, "kind": kind, "name": title, "offers": offers})
@@ -178,10 +222,14 @@ def build_queue(db, fetch: Callable[[str], object] | None = None) -> dict[str, o
         products, _ = apply_source_spec_attributes(products, specs)
     profiles = build_profiles([record for _, record in products])
     decided = decided_gtins(reader)
-    items = queue_items(resolve_groups(profiles), set(decided))
+    groups = resolve_groups(profiles)
+    items = queue_items(groups, set(decided))
+    by_engine = engine_items(groups, engine_rows(reader))
     photos_error = None
     try:  # sin fotos la cola se publica igual
-        attach_photos(items, load_photos(fetch or _fetch_json))
+        photos = load_photos(fetch or _fetch_json)
+        attach_photos(items, photos)
+        attach_photos(by_engine, photos)
     except Exception as error:  # noqa: BLE001
         photos_error = type(error).__name__
     return {
@@ -195,6 +243,7 @@ def build_queue(db, fetch: Callable[[str], object] | None = None) -> dict[str, o
             "atipico": sum(item["kind"] == "atipico" for item in items),
         },
         "items": items,
+        "resueltas_motor": by_engine,
     }
 
 

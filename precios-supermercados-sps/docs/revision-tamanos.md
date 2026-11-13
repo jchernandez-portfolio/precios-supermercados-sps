@@ -32,3 +32,23 @@ nunca salen de GitHub.
 
 1. Crear la rama pública `revision-tamanos` (huérfana, con un README).
 2. Correr a mano "Precios SPS - Cola de revisión de tamaños".
+
+## Modo sesión: Claude Code revisa las fotos (aprobación humana obligatoria)
+
+1. `python scripts/preparar_revision_claude.py --n 25 [--primero <GTIN>]` (sólo lectura): baja la
+   cola pública y arma en `revision-claude/` (ignorada por git) una imagen JPG por código con la foto
+   800 px de cada súper, rotulada con súper, título y tamaño publicado ("foto compartida" si la foto
+   vino de otro súper), más `lote.json`. Salta lo resuelto por la IA y lo ya visto (`vistos.json`).
+2. Claude mira cada imagen y propone tamaño oficial, "no es el mismo producto", "no legible" o "a
+   revisión humana" (fotos contradictorias o empate sin evidencia). Lo muestra en una tabla.
+3. El dueño aprueba, cambia o descarta filas en el chat. Claude escribe `resultados.json`
+   (`aprobado: true` sólo en lo aprobado).
+4. `python scripts/guardar_revision_claude.py --enviar`: arma el envío (máx. 300 decisiones /
+   60,000 caracteres), lo valida y lanza el workflow de decisiones con `fuente=claude_sesion`
+   (lista cerrada `panel | claude_sesion`; el job sólo corre para la cuenta del dueño). Se guarda
+   como `engine:claude_sesion` con "aprobado por <cuenta>" en la nota; nunca reemplaza una decisión
+   humana y una humana posterior la reemplaza. Marca como vistos todos los códigos de la tanda.
+5. La cola publica en `resueltas_motor` los códigos decididos por cualquier motor de IA (con sus
+   ofertas y fotos); la pestaña "Resueltos por IA" los muestra con "🤖 Resuelto por Claude (sesión)"
+   y lo leído por súper en la nota.
+

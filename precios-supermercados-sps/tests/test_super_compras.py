@@ -688,6 +688,7 @@ out.readings = [
 out.sources = [
   aiSuggestion({ ia: { status: 'auto', value: '116', unit: 'g', fuente: 'claude' } }).label,
   aiSuggestion({ ia: { status: 'sugerencia', value: '116', unit: 'g', fuente: 'gemini' } }).label,
+  aiSuggestion({ ia: { status: 'auto', value: '907.18', unit: 'g', fuente: 'claude_sesion' } }).label,
 ];
 out.codes = ['00049733830119', '07411000204139', '17411000204136', ''].map((g) => searchVariants(g).map((v) => v.label + ':' + v.code));
 out.own = [storeCode({ code: ' 0049733830119 ' }), storeCode({ code: '12' }), storeCode({})];
@@ -743,7 +744,8 @@ console.log(JSON.stringify(out));
     assert unreadable["label"] == "🤖 No legible" and nothing is None
     assert by_claude["label"] == "🤖 Claude leyó: 240 g ✓" and by_gemini["label"] == "🤖 Gemini leyó: 240 g ⚠"
     assert odd["label"] == "🤖 IA leyó: 240 g ✓"  # fuente desconocida: nunca se usa como clave de objeto
-    assert result["sources"] == ["🤖 Resuelto por Claude: 116 g", "🤖 Sugerencia de Gemini: 116 g"]
+    assert result["sources"] == ["🤖 Resuelto por Claude: 116 g", "🤖 Sugerencia de Gemini: 116 g",
+                                 "🤖 Resuelto por Claude (sesión): 907.18 g"]
     assert result["options"] == [
         {"value": "150", "unit": "g", "stores": ["Walmart", "Paiz"]},
         {"value": "150", "unit": "ml", "stores": ["Colonial"]},
