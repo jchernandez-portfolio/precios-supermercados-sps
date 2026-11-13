@@ -241,6 +241,32 @@ confirman identidad por sí mismos.
     `engine:attribute-rule-a@1`, evidencia con socio, puntaje y etiquetas); un
     vínculo manual o del registro siempre gana. Código:
     `src/precios_supermercados/matching/attribute_links.py`.
+24. **Tamaño en grupos GTIN: g ≈ ml y peso sobre conteo (v2.9, aprobado
+    2026-11-13, variante "A5 + B media").** Sólo entre ofertas con el mismo GTIN
+    y sólo para el conflicto de tamaño (tipo, sabor, colisiones, multipack
+    ambiguo siguen igual):
+    - *g ≈ ml:* si alguna de las dos ofertas tiene categoría (del súper o del
+      árbol) con `yogurt`, `leche`, `queso`, `crema`, `jugo`, `nectar`,
+      `salsa`, `aderezo`, `mayonesa` o `ketchup`, g y ml con el mismo pack valen
+      lo mismo si difieren ≤ 5 % (leche de coco 400 ml = 382.72 g). Estándar:
+      gramos (la oferta en ml del grupo comparable pasa a g con el mismo número).
+      Las onzas no entran (tienen su regla). Fuera de esas categorías
+      (shampoo 400 ml contra 400 g) sigue siendo conflicto.
+    - *Peso sobre conteo:* una oferta que sólo publica un conteo no contradice a
+      otra con peso/volumen si el conteo es 1, es el mismo pack (6 contra
+      6 × 200 ml) o el título de la oferta con peso menciona ese conteo ("Té 50
+      bolsas 50 g"). El peso es el tamaño y el conteo va a `pack_count`
+      (50 × 1 g). Un "10 Unidades" sin respaldo contra "177 ml" sigue siendo
+      conflicto (paquete contra unidad suelta: Capri Sun, Sula).
+    - *Nunca empeorar:* si con estas reglas un grupo comparable queda con menos
+      cadenas, se bloquea o pierde alguna oferta, se conserva la resolución v2.8.
+    - Una decisión de `size_decisions` (humana o de IA) manda: las reglas no
+      corren en ese grupo. Sólo la comparación con el tamaño oficial
+      (`match_official`) acepta g ≈ ml con la misma condición de categorías y
+      tolerancia (contenido total; las onzas y las unidades no).
+    Código: `gml_kind`, `count_kind`, `size_rule_kind`, `resolve_gtin_group` y
+    `standard_presentations` en `product_identity_v2.py`. Medición:
+    `scripts/medir_pr_b.py` (la base es el motor con `size_rules=False`).
 
 ## Casos iniciales
 

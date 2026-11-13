@@ -12,8 +12,9 @@ ROWS = [
     # Kraft Ranch: 8 oz contra 237 ml → líquido (236.6 ml): listo y con precio por unidad.
     (1, "la_colonia", "Aderezo Kraft Ranch Classic 8 Oz", "Kraft", "8 Oz", "Aderezos", "0021000643592"),
     (2, "walmart", "Aderezo Kraft Ranch - 237 ml", "Kraft", None, "Aderezos", "0021000643592"),
-    # Cholula: 150 ml + 5 oz contra 150 g + 150 g. Con la regla sería un empate 2 contra 2
-    # (todo bloqueado); "nunca empeorar" mantiene la resolución de hoy (Walmart y Paiz listos).
+    # Cholula: 150 ml + 5 oz contra 150 g + 150 g. Con la regla de onzas sola sería un empate 2
+    # contra 2; desde v2.9 (g ≈ ml en salsas) Colonial 150 ml compara con los 150 g y la onza
+    # (141.7 g / 147.9 ml) queda fuera porque choca con los dos gramos.
     (3, "colonial", "CHOLULA Hot Chipotle 150 mL", "Cholula", None, "Salsas", "0049733830119"),
     (4, "comisariato_los_andes", "Cholula hot sauce chipotle 5 oz", "Cholula", "UN", "Salsas", "0049733830119"),
     (5, "walmart", "Salsa Cholula picante chipotle - 150 g", "Cholula", None, "Salsas", "0049733830119"),
@@ -24,6 +25,12 @@ ROWS = [
     # 16.9 oz contra 300 ml: ninguna lectura coincide → sigue bloqueado y sin convertir.
     (9, "comisariato_los_andes", "Lee kum kee salsa soya 16.9 oz", "Lee Kum Kee", "UN", "Salsas", "0078895128895"),
     (10, "walmart", "Salsa Lee Kum Kee Soya 300 ml", "Lee Kum Kee", None, "Salsas", "0078895128895"),
+    # Miel (fuera de lácteos/jugos/salsas: sin g ≈ ml): el mismo empate 150 ml + 5 oz contra 150 g ×2.
+    # "Nunca empeorar" mantiene la resolución de hoy (Walmart y Paiz listos).
+    (11, "colonial", "Miel Billy Bee 150 mL", "Billy Bee", None, "Endulzantes", "0062356510015"),
+    (12, "comisariato_los_andes", "Billy bee honey 5 oz", "Billy Bee", "UN", "Endulzantes", "0062356510015"),
+    (13, "walmart", "Miel Billy Bee - 150 g", "Billy Bee", None, "Endulzantes", "0062356510015"),
+    (14, "paiz", "Miel Billy Bee - 150 g", "Billy Bee", "150 g", "Endulzantes", "0062356510015"),
 ]
 
 
@@ -58,9 +65,17 @@ def test_matching_ounces_make_the_group_comparable_and_convert_the_ounce() -> No
 
 def test_never_worse_keeps_todays_resolution_for_ties() -> None:
     rows = profiles()
-    assert rows[5].comparison_status == rows[6].comparison_status == "ready"
-    assert rows[3].comparison_status == rows[4].comparison_status == "review_required"
-    assert rows[4].presentation_dimension == "ounce"  # no se convierte fuera de un grupo comparable
+    assert rows[13].comparison_status == rows[14].comparison_status == "ready"
+    assert rows[11].comparison_status == rows[12].comparison_status == "review_required"
+    assert rows[12].presentation_dimension == "ounce"  # no se convierte fuera de un grupo comparable
+
+
+def test_cholula_tie_is_resolved_by_g_ml_in_v2_9() -> None:
+    rows = profiles()
+    assert rows[3].comparison_status == rows[5].comparison_status == rows[6].comparison_status == "ready"
+    assert (rows[3].presentation_dimension, rows[3].display_presentation) == ("mass_g", "150 g")  # estándar: g
+    assert rows[3].raw_presentation is None and rows[4].comparison_status == "review_required"
+    assert rows[4].presentation_dimension == "ounce"
 
 
 def test_non_matching_ounces_stay_blocked_and_unconverted() -> None:

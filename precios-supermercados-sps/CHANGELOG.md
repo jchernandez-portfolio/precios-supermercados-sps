@@ -5,6 +5,10 @@ número son cambios directos. El detalle de cada incidente vive en
 [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md) y el de cada error de datos en
 [`docs/calidad/errores-confirmados.csv`](docs/calidad/errores-confirmados.csv).
 
+## 2026-11-13
+
+- #85 Motor de identidad v2.9: g ≈ ml (≤ 5 %) en lácteos, jugos y salsas y peso sobre conteo (conteo 1, mismo pack o título con el conteo) en grupos GTIN, con "nunca empeorar"; el tamaño oficial de `size_decisions` compara g con ml en esas categorías.
+
 ## 2026-11-12
 
 - IA de tamaños: lectura por oferta, auto-resolución cuando la foto confirma el tamaño de la mayoría (engine:gemini_auto), fotos del sistema en el panel y pestaña "Resueltos por IA".

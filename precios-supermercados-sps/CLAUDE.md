@@ -61,8 +61,9 @@ python scripts/versionar_super_compras.py --auto   # o --check
 
 ## Estado (13-nov-2026)
 
-- Motor de identidad v2.8 (`src/precios_supermercados/product_identity_v2.py`), regla de
-  onzas con "nunca empeorar" (#65).
+- Motor de identidad v2.9 (`src/precios_supermercados/product_identity_v2.py`): regla de
+  onzas (v2.8, #65) y reglas del PR B (g ≈ ml en lácteos/jugos/salsas, peso sobre conteo),
+  todas con "nunca empeorar".
 - Panel `#/admin/revision` (`super-compras/admin.js`) → workflow
   `precios-supermercados-sps-size-decisions.yml` → `scripts/aplicar_decisiones_tamano.py`
   → Turso `size_decisions` + `master_products.human_attributes_json` → relanza refresco.
