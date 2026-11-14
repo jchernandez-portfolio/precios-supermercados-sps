@@ -26,6 +26,13 @@ sobre conteo) y deja ``medicion-pr-b.json`` y ``pr-b-grupos.csv``. Desde el moto
 v2.9 la variante elegida ya está aplicada: el PR B y la regla de onzas se miden
 contra la base sin las reglas v2.9 (``size_rules=False``) y el PR B verifica que
 el motor coincide con su simulación (``motor_vigente.ya_aplicada``).
+
+Motor v2.10 ("corrige con evidencia"): lee también ``size_offer_evidence`` (si
+existe) y lista en ``correccion_con_evidencia`` (``medicion-reglas.json``) y en
+``evidencia-grupos.csv`` las fichas decididas que cambian por la evidencia de foto:
+por GTIN, el modo (mayoría, propia, empate), las ofertas corregidas (con lo que
+publica el súper), las contradichas y las que siguen aisladas sin evidencia (y si
+``apply: "all"`` las corregiría).
 """
 from __future__ import annotations
 
@@ -36,6 +43,7 @@ import os
 import sys
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -67,17 +75,26 @@ from precios_supermercados.product_homologation_persistence import (  # noqa: E4
     records_from_product_rows,
 )
 from precios_supermercados.product_identity_v2 import (  # noqa: E402
+    SIZE_EVIDENCE_CONTRADICTED,
     _exact_groups,
     _resolve_gtin_members,
     build_brand_lexicon,
     candidate_presentations_compatible,
+    canonical_presentation_from_signature,
     ounce_reading,
     profile_product_v2,
     resolve_gtin_group,
 )
+from precios_supermercados.size_decisions import (  # noqa: E402
+    EVIDENCE_SELECT_SQL,
+    EVIDENCE_TABLE,
+    SizeDecision,
+    attach_evidence,
+    decision_from_row,
+    index_decisions,
+)
 from precios_supermercados.size_decisions import SELECT_SQL as DECISIONS_SELECT_SQL  # noqa: E402
 from precios_supermercados.size_decisions import TABLE_NAME as DECISIONS_TABLE  # noqa: E402
-from precios_supermercados.size_decisions import SizeDecision, decision_from_row, index_decisions  # noqa: E402
 
 PAGE = 2000
 # Motivos que el paso 3 trataría como "tamaño en conflicto": la oferta sigue en
@@ -95,6 +112,10 @@ ASKED_REASONS = (
 OUNCE_CSV_COLUMNS = (
     "gtin", "cambio", "base_onza", "supermercado", "product_id", "nombre", "presentacion",
     "presentacion_convertida", "rol_antes", "rol_con_regla",
+)
+EVIDENCE_CSV_COLUMNS = (
+    "gtin", "decision", "modo", "supermercado", "product_id", "nombre", "publicado", "rol_sin_evidencia",
+    "rol_con_evidencia", "rol_con_apply_all", "foto",
 )
 CSV_COLUMNS = (
     "gtin", "estado_actual", "estado_simulado", "tamano", "rol", "supermercado", "product_id",
@@ -134,11 +155,15 @@ def fetch_spec_attributes(db: ReadOnly) -> dict[int, tuple[str | None, str | Non
 
 
 def fetch_size_decisions(db: ReadOnly) -> dict[str, SizeDecision] | None:
-    """Decisiones de tamaño (humanas y de IA), como las lee el refresco. Sin tabla: ``None``."""
-    present = db.query("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (DECISIONS_TABLE,))
-    if not present:
+    """Decisiones de tamaño (humanas y de IA) con su evidencia, como las lee el refresco. Sin tabla: ``None``."""
+    present = {str(row[0]) for row in db.query(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name IN (?,?)", (DECISIONS_TABLE, EVIDENCE_TABLE))}
+    if DECISIONS_TABLE not in present:
         return None
-    return index_decisions(decision_from_row(row) for row in db.query(DECISIONS_SELECT_SQL))
+    decisions = index_decisions(decision_from_row(row) for row in db.query(DECISIONS_SELECT_SQL))
+    if EVIDENCE_TABLE not in present:
+        return decisions
+    return attach_evidence(decisions, db.query(EVIDENCE_SELECT_SQL))
 
 
 def decision_author(decision: SizeDecision) -> str:
@@ -386,6 +411,92 @@ def _presentation_text(profile: ProductProfile) -> str | None:
     return f"{value.pack_count}×{total} {value.dimension}" if value.pack_count > 1 else f"{total} {value.dimension}"
 
 
+def _published(profile: ProductProfile) -> str:
+    if profile.presentation is None:
+        return "sin tamaño"
+    shown = canonical_presentation_from_signature(None, profile.presentation, profile.presentation_status)
+    return str(shown.display_presentation)
+
+
+def _role(source_id: str, kept: set[str], excluded: Mapping[str, set[str]], corrected: Mapping[str, object]) -> str:
+    if source_id in corrected:
+        return "corregida"
+    if source_id in kept:
+        return "en_grupo"
+    reasons = excluded.get(source_id, set())
+    if SIZE_EVIDENCE_CONTRADICTED in reasons:
+        return "contradicha"
+    if "human_size_decision_mismatch" in reasons:
+        return "aislada_por_tamano"
+    return "fuera_por_otro_motivo"
+
+
+def evidence_report(profiles: Sequence[ProductProfile], decisions: Mapping[str, SizeDecision],
+                    product_of: Mapping[str, int]) -> tuple[dict[str, object], list[dict[str, object]]]:
+    """Fichas decididas que cambian con la evidencia de foto (v2.10) frente a sólo el título (v2.9)."""
+    by_gtin: dict[str, list[ProductProfile]] = defaultdict(list)
+    for profile in profiles:
+        if profile.canonical_gtin in decisions:
+            by_gtin[profile.canonical_gtin].append(profile)
+    stats: Counter = Counter()
+    cards: list[dict[str, object]] = []
+    lines: list[dict[str, object]] = []
+    for gtin, decision in sorted(decisions.items()):
+        members = by_gtin.get(gtin, [])
+        if decision.decision != "size" or len({m.record.supermarket_id for m in members}) < 2:
+            continue
+        runs = {}
+        for label, variant in (("sin_evidencia", replace(decision, evidence=(), apply="evidence")),
+                               ("con_evidencia", decision), ("con_apply_all", replace(decision, apply="all"))):
+            details: dict[str, object] = {}
+            (kept, excluded, _), _ = resolve_gtin_group(gtin, list(members), variant, details=details)
+            runs[label] = ({m.record.source_record_id for m in kept}, excluded, details)
+        now = runs["con_evidencia"]
+        roles = {label: {m.record.source_record_id: _role(m.record.source_record_id, run[0], run[1],
+                                                           run[2].get("corrections") or {})
+                         for m in members} for label, run in runs.items()}
+        changed = roles["sin_evidencia"] != roles["con_evidencia"]
+        mode = str(now[2].get("mode"))
+        stats["fichas_decididas_en_2_o_mas_cadenas"] += 1
+        stats[f"modo_{mode}"] += 1
+        stats["con_evidencia_guardada"] += bool(decision.evidence)
+        stats["fichas_que_cambian"] += changed
+        stats["fichas_que_cambiarian_con_apply_all"] += roles["sin_evidencia"] != roles["con_apply_all"]
+        stats["ofertas_corregidas"] += sum(role == "corregida" for role in roles["con_evidencia"].values())
+        stats["ofertas_contradichas"] += sum(role == "contradicha" for role in roles["con_evidencia"].values())
+        stats["ofertas_aisladas_sin_evidencia"] += sum(
+            role == "aislada_por_tamano" for role in roles["con_evidencia"].values())
+        photo = {item.supermarket_id: item for item in decision.evidence}
+        official = f"{format(decision.net_content_value, 'f')} {decision.net_content_unit}"
+        offers = []
+        for member in sorted(members, key=lambda m: m.record.source_record_id):
+            source_id, store = member.record.source_record_id, member.record.supermarket_id
+            reading = photo.get(store)
+            row = {
+                "gtin": gtin, "decision": official, "modo": mode, "supermercado": store,
+                "product_id": product_of.get(source_id), "nombre": member.record.source_name,
+                "publicado": _published(member), "rol_sin_evidencia": roles["sin_evidencia"][source_id],
+                "rol_con_evidencia": roles["con_evidencia"][source_id],
+                "rol_con_apply_all": roles["con_apply_all"][source_id],
+                "foto": "" if reading is None else f"{format(reading.value, 'f')} {reading.unit}",
+            }
+            lines.append(row)
+            offers.append({key: row[key] for key in ("supermercado", "publicado", "foto", "rol_sin_evidencia",
+                                                      "rol_con_evidencia", "rol_con_apply_all")})
+        cards.append({
+            "gtin": gtin, "decision": official, "autor": decision_author(decision), "apply": decision.apply,
+            "modo": mode, "cambia": changed, "nunca_empeorar_aplicado": bool(now[2].get("fallback_v2_9")),
+            "fotos_confirman": sorted(now[2].get("confirm") or ()),
+            "fotos_contradicen": sorted(now[2].get("contra") or ()),
+            "ofertas": offers,
+        })
+    summary = dict(sorted(stats.items())) | {
+        "fichas": [card for card in cards if card["cambia"] or card["modo"] == "empate"
+                   or any(o["rol_con_evidencia"] == "aislada_por_tamano" for o in card["ofertas"])],
+    }
+    return summary, lines
+
+
 def measure(db, fetch: Callable[[str], object], base: str = CATALOG_BASE, *,
             pr_b: bool = False) -> tuple[dict[str, object], list[dict[str, object]]]:
     reader = ReadOnly(db)
@@ -484,6 +595,8 @@ def measure(db, fetch: Callable[[str], object], base: str = CATALOG_BASE, *,
         base_groups, product_of)
     merge_sets["paso_1_y_regla_de_onzas"] = ounce_sets
 
+    evidence_summary, evidence_lines = evidence_report(profiles, decisions, product_of)
+
     rows_by_city = load_cities(fetch, base)
     cards = {city: simulate_cards(rows, merge_sets) for city, rows in rows_by_city.items()}
 
@@ -502,9 +615,11 @@ def measure(db, fetch: Callable[[str], object], base: str = CATALOG_BASE, *,
         "combinaciones_de_motivos_en_bloqueados": dict(combos.most_common(15)),
         "simulacion_paso_3": simulation,
         "simulacion_regla_de_onzas": ounce_summary,
+        "correccion_con_evidencia": evidence_summary,
         "tarjetas_por_ciudad": cards,
         "sentencias_ejecutadas": reader.statements,
         "_lineas_onzas": ounce_lines,
+        "_lineas_evidencia": evidence_lines,
     }
     if pr_b:  # medición del PR B sobre los mismos grupos (sin otra lectura de Turso)
         result = measure_pr_b(base_groups, product_of, current=groups)
@@ -538,6 +653,10 @@ def write_outputs(output: Path, summary: Mapping[str, object], lines: Sequence[M
         writer = csv.DictWriter(handle, fieldnames=OUNCE_CSV_COLUMNS)
         writer.writeheader()
         writer.writerows(summary.get("_lineas_onzas") or ())
+    with (output / "evidencia-grupos.csv").open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=EVIDENCE_CSV_COLUMNS)
+        writer.writeheader()
+        writer.writerows(summary.get("_lineas_evidencia") or ())
     with (output / "grupos-reglas.csv").open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=CSV_COLUMNS)
         writer.writeheader()

@@ -31,7 +31,7 @@ from exportar_modelo_analitico import (  # noqa: E402
 )
 from exportar_rpi_marts import _parse_utc, fetch_freshness  # noqa: E402
 from generar_mvp_sqlite_la_colonia import HISTORY_INDEX_NAME  # noqa: E402
-from precios_supermercados import consumer_catalog_display, master_taxonomy  # noqa: E402
+from precios_supermercados import capture_membership, consumer_catalog_display, master_taxonomy  # noqa: E402
 from precios_supermercados.price_analytics import ComparisonScope  # noqa: E402
 from precios_supermercados.price_history_analytics import (  # noqa: E402
     HistoricalPriceObservation,
@@ -40,6 +40,10 @@ from precios_supermercados.price_history_analytics import (  # noqa: E402
 )
 from precios_supermercados.product_homologation_persistence import (  # noqa: E402
     NORMALIZATION_VERSION,
+)
+from precios_supermercados.product_identity_v2 import (  # noqa: E402
+    SIZE_EVIDENCE_CONTRADICTED,
+    display_quantity,
 )
 from precios_supermercados.product_master import (  # noqa: E402
     DEFAULT_POLICY_PATH as MASTER_POLICY_PATH,
@@ -74,12 +78,33 @@ _VISIBLE_OFFERS_SELECT = """SELECT p.product_id,p.supermarket_id,p.name,
                    hp.canonical_product_id,hp.category,hp.product_type,
                    hp.presentation_dimension,hp.presentation_total_base,
                    hp.presentation_status,hp.comparison_status,hp.normalization_version,
+                   hp.normalized_quantity,hp.normalized_unit,hp.normalized_pack_count,hp.canonical_total,
+                   hp.conflict_reasons_json,
                    p.category
             FROM price_history AS h
             JOIN products AS p
               ON p.product_id=h.product_id AND p.supermarket_id=h.supermarket_id
             JOIN product_homologation_profiles AS hp
               ON hp.product_id=p.product_id AND hp.supermarket_id=p.supermarket_id"""
+# Misma lectura (mismas filas) + llave fuente, sólo si existe ``capture_membership``.
+_VISIBLE_OFFERS_SELECT_WITH_KEYS = _VISIBLE_OFFERS_SELECT.replace(
+    "p.category\n            FROM", "p.category,p.source_key_type,p.source_key\n            FROM", 1
+)
+assert _VISIBLE_OFFERS_SELECT_WITH_KEYS != _VISIBLE_OFFERS_SELECT
+# Campos del perfil para la corrección por evidencia (v2.10): lo publicado por el súper
+# y los motivos. Una base sin esas columnas las lee como NULL: salida idéntica.
+_EVIDENCE_COLUMNS = ("normalized_quantity", "normalized_unit", "normalized_pack_count", "canonical_total",
+                     "conflict_reasons_json")
+assert all(f"hp.{name}," in _VISIBLE_OFFERS_SELECT for name in _EVIDENCE_COLUMNS)
+
+
+def _with_present_profile_columns(backend: QueryBackend, select_sql: str) -> str:
+    rows = backend.query("SELECT name FROM pragma_table_info('product_homologation_profiles')")
+    present = {str(row[0]) for row in rows}
+    for name in _EVIDENCE_COLUMNS:
+        if name not in present:
+            select_sql = select_sql.replace(f"hp.{name},", "NULL,", 1)
+    return select_sql
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,6 +142,14 @@ class VisibleOffer:
     # Categoría tal como la publica el supermercado (``products.category``); sólo
     # alimenta la tabla de equivalencias del árbol maestro de categorías.
     source_category: str | None = None
+    # Llave fuente (``source_key_type`` + ``source_key``) para saber si la oferta
+    # salió en la última captura aceptada; sólo se lee si existe la membresía.
+    capture_key: str | None = None
+    # Motor v2.10 ("corrige con evidencia"): lo que publica el súper cuando la
+    # evidencia de foto corrigió su tamaño (``presentation`` ya es el oficial).
+    published_as: str | None = None
+    # Oferta aislada porque su propia foto contradice el tamaño oficial.
+    other_presentation: bool = False
 def _text(value: object) -> str | None:
     if not isinstance(value, str):
         return None
@@ -201,6 +234,63 @@ def _derived_presentation(offer: VisibleOffer) -> str | None:
     else:
         return None
     return f"{_format_decimal(value)} {unit}"
+_PUBLISHED_DIMENSION = {"g": "mass_g", "ml": "volume_ml", "unit": "count", "oz": "ounce"}
+_PUBLISHED_UNIT = {"g": "g", "ml": "ml", "oz": "oz"}
+
+
+def _decimal_or_none(value: object) -> Decimal | None:
+    try:
+        number = Decimal(str(value))
+    except Exception:  # noqa: BLE001 - un texto raro no publica la etiqueta
+        return None
+    return number if number.is_finite() and number > 0 else None
+
+
+def published_size(
+    comparison_status: object,
+    presentation_dimension: object,
+    presentation_total_base: object,
+    normalized_quantity: object,
+    normalized_unit: object,
+    normalized_pack_count: object,
+    canonical_total: object,
+) -> str | None:
+    """Etiqueta de lo que publica el súper cuando el motor corrigió su tamaño (v2.10).
+
+    El perfil conserva en los campos canónicos (``normalized_*``, ``canonical_total``)
+    lo publicado y en ``presentation_*`` el tamaño con el que compara. Sólo una
+    corrección por evidencia los deja distintos en una oferta ``ready``.
+    """
+    if comparison_status != "ready" or normalized_unit not in _PUBLISHED_DIMENSION:
+        return None
+    published = _decimal_or_none(canonical_total)
+    compared = _decimal_or_none(presentation_total_base)
+    if published is None or compared is None:
+        return None
+    if _PUBLISHED_DIMENSION[str(normalized_unit)] == presentation_dimension and published == compared:
+        return None
+    if normalized_unit == "unit":
+        return f"{display_quantity(published)} unidades"
+    unit = _PUBLISHED_UNIT[str(normalized_unit)]
+    quantity = _decimal_or_none(normalized_quantity)
+    pack = normalized_pack_count if type(normalized_pack_count) is int else 1
+    if pack > 1 and quantity is not None:
+        return f"{pack} × {display_quantity(quantity)} {unit}"
+    return f"{display_quantity(published)} {unit}"
+
+
+def contradicted_by_photo(comparison_status: object, conflict_reasons_json: object) -> bool:
+    """La oferta salió de su grupo porque su propia foto contradice el tamaño oficial."""
+    if comparison_status != "review_required" or not isinstance(conflict_reasons_json, str):
+        return False
+    try:
+        reasons = json.loads(conflict_reasons_json)
+    except ValueError:
+        return False
+    return isinstance(reasons, list) and SIZE_EVIDENCE_CONTRADICTED in reasons \
+        and "member_excluded_from_ready_group" in reasons
+
+
 def fetch_visible_offers(
     backend: QueryBackend,
     scope: ComparisonScope,
@@ -213,21 +303,31 @@ def fetch_visible_offers(
     """
     result: list[VisibleOffer] = []
     seen: set[tuple[int, str]] = set()
+    with_keys = capture_membership.table_exists(backend)
+    select_sql = _VISIBLE_OFFERS_SELECT_WITH_KEYS if with_keys else _VISIBLE_OFFERS_SELECT
+    select_sql = _with_present_profile_columns(backend, select_sql)
     rows = fetch_current_rows_by_location(
         backend,
         scope,
-        select_sql=_VISIBLE_OFFERS_SELECT,
+        select_sql=select_sql,
         location_index=5,
         invalid_code="consumer_catalog_offer_invalid",
         page_size=VISIBLE_OFFERS_PAGE_SIZE,
     )
     for row in rows:
+        offer_capture_key = None
+        if with_keys:
+            *row, source_key_type, source_key = row
+            if isinstance(source_key_type, str) and isinstance(source_key, str):
+                offer_capture_key = capture_membership.capture_key(source_key_type, source_key)
         (
             product_id, supermarket_id, name, brand, presentation,
             location_id, current_price, regular_price, is_promotion, availability,
             observed_at, canonical_product_id, category, product_type,
             presentation_dimension, presentation_total_base, presentation_status,
-            comparison_status, normalization_version, source_category,
+            comparison_status, normalization_version,
+            normalized_quantity, normalized_unit, normalized_pack_count, canonical_total, conflict_reasons_json,
+            source_category,
         ) = row
         key = (product_id, str(location_id))
         if key in seen:
@@ -268,6 +368,12 @@ def fetch_visible_offers(
                 presentation_status=str(presentation_status),
                 comparison_status=str(comparison_status),
                 source_category=_text(source_category),
+                capture_key=offer_capture_key,
+                published_as=published_size(
+                    comparison_status, presentation_dimension, presentation_total_base, normalized_quantity,
+                    normalized_unit, normalized_pack_count, canonical_total,
+                ),
+                other_presentation=contradicted_by_photo(comparison_status, conflict_reasons_json),
             )
         )
     return apply_master_link_overrides(tuple(result), fetch_master_link_overrides(backend))
@@ -581,9 +687,13 @@ def _comparability_today(mode: str, group: Sequence[VisibleOffer]) -> str:
 
 
 def _representative(group: Sequence[VisibleOffer]) -> VisibleOffer:
+    # El título sale de un súper que publica el tamaño oficial: si el motor corrigió
+    # la oferta con evidencia (``published_as``), su nombre trae el tamaño viejo
+    # ("Lactolac ... 230 Gr" en una fila de 240 g).
     return sorted(
         group,
         key=lambda offer: (
+            offer.published_as is not None,
             offer.product_type is None,
             offer.category is None,
             offer.brand is None,
@@ -592,6 +702,8 @@ def _representative(group: Sequence[VisibleOffer]) -> VisibleOffer:
             offer.supermarket_id,
         ),
     )[0]
+
+
 def _public_assignment(group: Sequence[VisibleOffer]) -> master_taxonomy.Assignment:
     """Nodo del árbol maestro v1 de un grupo (comparte el más específico)."""
     assignments = [
@@ -669,6 +781,9 @@ def build_rows(
                         history_by_offer.get((offer.source_product_id, offer.location_id), ()),
                         as_of_utc=as_of_utc or _parse_utc(offer.observed_at, "consumer_catalog_offer_timestamp_invalid"),
                     ),
+                    # v2.10 (opcionales): "Walmart lo publica como 148 g" / presentación distinta.
+                    **({"published_as": offer.published_as} if offer.published_as else {}),
+                    **({"other_presentation": True} if offer.other_presentation else {}),
                 }
             )
         category, public_type = master_taxonomy.public_fields(assignment.node)
@@ -921,6 +1036,45 @@ def _file_metadata(root: Path, relative: str) -> dict[str, object]:
         "bytes": len(content),
         "gzip_bytes": len(gzip.compress(content, mtime=0)),
     }
+def hide_unseen_offers(
+    backend: QueryBackend,
+    scope: ComparisonScope,
+    offers: Sequence[VisibleOffer],
+    freshness: Sequence[object],
+    policy: capture_membership.UnseenOffersPolicy | None = None,
+) -> tuple[tuple[VisibleOffer, ...], dict[str, object] | None]:
+    """Quita (o sólo mide) ofertas ausentes de la última captura aceptada.
+
+    Sin tabla ``capture_membership`` no lee nada más y la salida es idéntica a la
+    anterior. Con tabla: lee ≤ 1 fila por contexto y compara contra la última
+    captura aceptada que ya calculó ``fetch_freshness`` (sin releer scrape_runs).
+    """
+    if not capture_membership.table_exists(backend):
+        return tuple(offers), None
+    policy = policy or capture_membership.load_policy()
+    contexts = tuple(scope.locations)
+    kept, contexts_report = capture_membership.apply_unseen_policy(
+        offers,
+        contexts=contexts,
+        memberships=capture_membership.fetch_memberships(backend, contexts),
+        latest_accepted_runs={
+            (item.source_id, item.location_id): item.last_successful_run_id for item in freshness
+        },
+        policy=policy,
+        context_of=lambda offer: (offer.supermarket_id, offer.location_id),
+        key_of=lambda offer: offer.capture_key,
+    )
+    report = {
+        "policy": "hide_offers_absent_from_latest_accepted_capture"
+        if policy.hide_unseen_offers else "measure_only",
+        "max_unseen_fraction": policy.max_unseen_fraction,
+        "hidden_offers": len(offers) - len(kept),
+        "contexts": contexts_report,
+    }
+    print(json.dumps({"unseen_offers": report}, ensure_ascii=False, sort_keys=True), file=sys.stderr)
+    return tuple(kept), report
+
+
 def export_consumer_catalog(
     backend: QueryBackend,
     scope: ComparisonScope,
@@ -933,6 +1087,13 @@ def export_consumer_catalog(
     if tuple(scope.locations) != EXPECTED_SCOPE:
         raise ExportError("consumer_catalog_sps_scope_invalid")
     offers = fetch_visible_offers(backend, scope)
+    freshness = fetch_freshness(
+        backend,
+        scope,
+        as_of_utc=as_of_utc,
+        freshness_window=freshness_window,
+    )
+    offers, unseen_report = hide_unseen_offers(backend, scope, offers, freshness)
     unmapped = master_taxonomy.unmapped_source_categories(
         (offer.supermarket_id, offer.source_category) for offer in offers
     )
@@ -948,12 +1109,6 @@ def export_consumer_catalog(
     }
     if require_products and (not offers or any(count == 0 for count in retailer_offer_counts.values())):
         raise ExportError("consumer_catalog_missing_visible_retailer")
-    freshness = fetch_freshness(
-        backend,
-        scope,
-        as_of_utc=as_of_utc,
-        freshness_window=freshness_window,
-    )
     freshness_by_scope = {
         (item.source_id, item.location_id): item.freshness_status.value for item in freshness
     }
@@ -1093,6 +1248,8 @@ def export_consumer_catalog(
             for item in freshness
         ],
     }
+    if unseen_report is not None:
+        manifest["unseen_offers"] = unseen_report
     _atomic_bytes(output_directory / "manifest.json", _json_bytes(manifest))
     return manifest
 def parser() -> argparse.ArgumentParser:

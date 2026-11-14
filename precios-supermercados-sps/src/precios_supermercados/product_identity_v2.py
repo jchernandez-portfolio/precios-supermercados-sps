@@ -55,7 +55,12 @@ from .size_decisions import SizeDecision, match_official
 # v2.9 (2026-11-13): reglas de tamaño del PR B en grupos GTIN (con "nunca
 # empeorar"): g ≈ ml en lácteos, jugos y salsas (≤ 5 %, estándar gramos) y peso
 # sobre conteo (conteo 1, mismo pack o el título con peso menciona el conteo).
-IDENTITY_NORMALIZATION_VERSION = "product-homologation-v2.9"
+# v2.10 (2026-11-14): "corrige con evidencia". Con una decisión de tamaño, la
+# lectura de la foto de cada oferta (``size_offer_evidence``) corrige el tamaño de
+# las ofertas cuyo título dice otra cosa (ver ``size_evidence_plan``).
+IDENTITY_NORMALIZATION_VERSION = "product-homologation-v2.10"
+# Oferta aislada porque su propia foto contradice el tamaño oficial (presentación distinta).
+SIZE_EVIDENCE_CONTRADICTED = "human_size_decision_contradicted"
 
 _GENERIC_BRANDS = frozenset(
     {
@@ -2107,11 +2112,14 @@ def _sku_gtin_brand_contradiction(left: ProductProfile, right: ProductProfile) -
     return SequenceMatcher(None, left_brand, right_brand).ratio() < 0.75
 
 
-def _member_intrinsic_conflicts(member: ProductProfile, *, size_decided: bool = False) -> set[str]:
+def _member_intrinsic_conflicts(
+    member: ProductProfile, *, size_decided: bool = False, size_corrected: bool = False
+) -> set[str]:
     reasons: set[str] = set()
     if member.presentation_status == "conflict" and not size_decided:
         reasons.add("source_presentation_conflict")
-    if member.presentation_status == "ambiguous_multipack":
+    # v2.10: una oferta cuyo tamaño corrige la evidencia ya no tiene multipack ambiguo.
+    if member.presentation_status == "ambiguous_multipack" and not size_corrected:
         reasons.add("ambiguous_multipack_presentation")
     return reasons
 
@@ -2123,6 +2131,7 @@ def _resolve_gtin_members(
     ounce_rule: bool = False,
     size_decided: bool = False,
     size_rules: bool = False,
+    size_corrected: frozenset[str] = frozenset(),
 ) -> tuple[list[ProductProfile], dict[str, set[str]], set[str]]:
     """Separa miembros comparables de los que tienen un conflicto atribuible.
 
@@ -2160,7 +2169,9 @@ def _resolve_gtin_members(
     remaining = [member for member in remaining if member.record.source_record_id not in excluded]
 
     for member in remaining:
-        intrinsic = _member_intrinsic_conflicts(member, size_decided=size_decided)
+        intrinsic = _member_intrinsic_conflicts(
+            member, size_decided=size_decided, size_corrected=member.record.source_record_id in size_corrected
+        )
         if intrinsic:
             exclude(member, intrinsic)
     remaining = [member for member in remaining if member.record.source_record_id not in excluded]
@@ -2198,34 +2209,79 @@ def _chains(members: Iterable[ProductProfile]) -> int:
     return len({member.record.supermarket_id for member in members})
 
 
-def _resolve_with_decision(
-    gtin: str,
-    members: list[ProductProfile],
+def size_evidence_plan(
+    members: Iterable[ProductProfile],
     decision: SizeDecision,
     *,
-    size_rules: bool = True,
-) -> tuple[tuple[list[ProductProfile], dict[str, set[str]], set[str]], dict[str, str]]:
-    """Grupo con decisión humana (``size_decisions``).
+    mass_volume_tolerance: Decimal | None = None,
+) -> dict[str, object]:
+    """Qué ofertas corrige la evidencia de foto (motor v2.10, "corrige con evidencia").
 
-    ``different_products``: código reutilizado, nadie se agrupa. ``size``: los demás
-    bloqueos (tipo, sabor, código derivado de SKU, multipack ambiguo...) siguen
-    igual; el tamaño ya no se discute entre cadenas sino contra el oficial: las
-    ofertas que coinciden forman el grupo y las demás quedan aisladas. Las reglas
-    de tamaño v2.9 no deciden nada aquí; sólo, en lácteos/jugos/salsas, un oficial
-    en g coincide con una oferta en ml (y viceversa) con la tolerancia de g ≈ ml.
+    Cuenta, entre los súper con oferta en el GTIN, cuántas fotos confirman el
+    tamaño oficial (``match_official``, con g ≈ ml donde aplica) y cuántas lo
+    contradicen. El título solo nunca cuenta como evidencia.
+
+    - ``mayoria``: ≥ 2 súper confirman con foto y son más que los que contradicen →
+      el oficial se aplica a TODAS las ofertas (también sin foto o con otra foto,
+      probablemente empaque anterior). Nada queda aparte por tamaño.
+    - ``empate``: alguna foto confirma pero las que contradicen son tantas o más →
+      no se corrige nada (como v2.9; queda para revisión humana).
+    - ``propia``: se corrigen las ofertas cuya propia foto confirma; las que la
+      contradicen se aíslan (``SIZE_EVIDENCE_CONTRADICTED``); las sin foto quedan
+      como en v2.9 salvo ``apply == "all"``, que también las corrige.
     """
-    if decision.decision == "different_products":
-        excluded = {member.record.source_record_id: {"human_different_products"} for member in members}
-        return ([], excluded, {"human_different_products"}), {}
-    remaining, excluded, _ = _resolve_gtin_members(gtin, members, size_decided=True)
     official = decision.official
     assert official is not None
-    mass_volume = GML_TOLERANCE if size_rules and any(gml_keyword(member) for member in members) else None
+    stores = {member.record.supermarket_id for member in members}
+    confirm: set[str] = set()
+    contra: set[str] = set()
+    for item in decision.evidence:
+        if item.supermarket_id not in stores:
+            continue
+        matches, _ = match_official(official, item.signature, mass_volume_tolerance=mass_volume_tolerance)
+        (confirm if matches else contra).add(item.supermarket_id)
+    if len(confirm) >= 2 and len(confirm) > len(contra):
+        mode, corrected, contradicted = "mayoria", set(stores), set()
+    elif confirm and len(contra) >= len(confirm):
+        mode, corrected, contradicted = "empate", set(), set()
+    else:
+        mode, corrected, contradicted = "propia", set(confirm), set(contra)
+        if decision.apply == "all":
+            corrected |= stores - confirm - contra
+    return {
+        "mode": mode, "confirm": frozenset(confirm), "contra": frozenset(contra),
+        "corrected_stores": frozenset(corrected), "contradicted_stores": frozenset(contradicted),
+    }
+
+
+def _decide_sizes(
+    gtin: str,
+    members: list[ProductProfile],
+    official: PresentationSignature,
+    mass_volume: Decimal | None,
+    *,
+    corrected_stores: frozenset[str] = frozenset(),
+    contradicted_stores: frozenset[str] = frozenset(),
+) -> tuple[tuple[list[ProductProfile], dict[str, set[str]], set[str]], dict[str, str], dict[str, PresentationSignature]]:
+    """Grupo contra el oficial; las ofertas de ``corrected_stores`` toman el oficial."""
+    corrected_ids = frozenset(
+        member.record.source_record_id for member in members if member.record.supermarket_id in corrected_stores
+    )
+    remaining, excluded, _ = _resolve_gtin_members(gtin, members, size_decided=True, size_corrected=corrected_ids)
     kept: list[ProductProfile] = []
     readings: dict[str, str] = {}
+    corrections: dict[str, PresentationSignature] = {}
     for member in remaining:
         matches, reading = match_official(official, member.presentation, mass_volume_tolerance=mass_volume)
         source_id = member.record.source_record_id
+        store = member.record.supermarket_id
+        if store in contradicted_stores:
+            excluded.setdefault(source_id, set()).add(SIZE_EVIDENCE_CONTRADICTED)
+            continue
+        if store in corrected_stores and (member.presentation is None or not matches):
+            kept.append(member)
+            corrections[source_id] = official
+            continue
         if not matches:
             excluded.setdefault(source_id, set()).add("human_size_decision_mismatch")
             continue
@@ -2233,16 +2289,86 @@ def _resolve_with_decision(
         if reading is not None and member.presentation is not None and member.presentation.dimension == "ounce":
             readings[source_id] = reading
     if _chains(kept) < 2:
-        return (kept, excluded, set().union(*excluded.values()) if excluded else set()), {}
+        return (kept, excluded, set().union(*excluded.values()) if excluded else set()), {}, {}
     # Oficial en onzas ("5 oz"): la lectura de cada onza la dan los compañeros en g/ml.
     for member in kept:
         source_id = member.record.source_record_id
-        if source_id in readings or member.presentation is None or member.presentation.dimension != "ounce":
+        if source_id in readings or source_id in corrections or member.presentation is None \
+                or member.presentation.dimension != "ounce":
             continue
-        found = {ounce_reading(member.presentation, other.presentation) for other in kept if other is not member} - {None}
+        found = {
+            ounce_reading(member.presentation, other.presentation)
+            for other in kept if other is not member and other.record.source_record_id not in corrections
+        } - {None}
         if len(found) == 1:
             readings[source_id] = next(iter(found))
-    return (kept, excluded, set()), readings
+    return (kept, excluded, set()), readings, corrections
+
+
+def _evidence_worsens(
+    before: list[ProductProfile], after: list[ProductProfile], contradicted: frozenset[str]
+) -> bool:
+    """"Nunca empeorar" de la evidencia: no bloquear un grupo comparable ni perder
+    ofertas que no sean las que su propia foto contradice."""
+    if _chains(before) >= 2 and _chains(after) < 2:
+        return True
+    lost = {m.record.source_record_id for m in before} - {m.record.source_record_id for m in after}
+    return any(member.record.supermarket_id not in contradicted
+               for member in before if member.record.source_record_id in lost)
+
+
+def _resolve_with_decision(
+    gtin: str,
+    members: list[ProductProfile],
+    decision: SizeDecision,
+    *,
+    size_rules: bool = True,
+    details: dict[str, object] | None = None,
+) -> tuple[tuple[list[ProductProfile], dict[str, set[str]], set[str]], dict[str, str]]:
+    """Grupo con decisión humana o de IA (``size_decisions``).
+
+    ``different_products``: código reutilizado, nadie se agrupa. ``size``: los demás
+    bloqueos (tipo, sabor, código derivado de SKU...) siguen igual; el tamaño ya no
+    se discute entre cadenas sino contra el oficial: las ofertas que coinciden
+    forman el grupo y las demás quedan aisladas. Las reglas de tamaño v2.9 no
+    deciden nada aquí; sólo, en lácteos/jugos/salsas, un oficial en g coincide con
+    una oferta en ml (y viceversa) con la tolerancia de g ≈ ml.
+
+    v2.10: la evidencia de foto de la decisión (``size_evidence_plan``) corrige el
+    tamaño de las ofertas que el título deja fuera y aísla las que su propia foto
+    contradice, con "nunca empeorar" (si bloquea el grupo o saca una oferta que su
+    foto no contradice, se queda la resolución v2.9). ``details`` (opcional) recibe
+    el modo, las ofertas corregidas (``corrections``: id → firma oficial) y las
+    contradichas.
+    """
+    if decision.decision == "different_products":
+        excluded = {member.record.source_record_id: {"human_different_products"} for member in members}
+        return ([], excluded, {"human_different_products"}), {}
+    official = decision.official
+    assert official is not None
+    mass_volume = GML_TOLERANCE if size_rules and any(gml_keyword(member) for member in members) else None
+    plan = size_evidence_plan(members, decision, mass_volume_tolerance=mass_volume)
+    title_only = _decide_sizes(gtin, members, official, mass_volume)
+    chosen = title_only
+    fallback = False
+    if plan["corrected_stores"] or plan["contradicted_stores"]:
+        candidate = _decide_sizes(
+            gtin, members, official, mass_volume,
+            corrected_stores=plan["corrected_stores"], contradicted_stores=plan["contradicted_stores"],
+        )
+        if _evidence_worsens(title_only[0][0], candidate[0][0], plan["contradicted_stores"]):
+            fallback = True
+        else:
+            chosen = candidate
+    result, readings, corrections = chosen
+    if details is not None:
+        details.update(plan)
+        details["fallback_v2_9"] = fallback
+        details["corrections"] = dict(corrections)
+        details["contradicted"] = frozenset(
+            source_id for source_id, reasons in result[1].items() if SIZE_EVIDENCE_CONTRADICTED in reasons
+        )
+    return result, readings
 
 
 def _resolve_ounces(
@@ -2294,8 +2420,9 @@ def resolve_gtin_group(
     decision: SizeDecision | None = None,
     *,
     size_rules: bool = True,
+    details: dict[str, object] | None = None,
 ) -> tuple[tuple[list[ProductProfile], dict[str, set[str]], set[str]], dict[str, str]]:
-    """Resolución vigente de un grupo GTIN (v2.9).
+    """Resolución vigente de un grupo GTIN (v2.10).
 
     1. Regla de onzas (v2.8): si el grupo tiene alguna onza sin convertir se
        resuelve con y sin la regla; se queda la de la regla salvo que deje menos
@@ -2306,11 +2433,12 @@ def resolve_gtin_group(
        si con ellas un grupo comparable queda con menos cadenas, se bloquea o
        pierde alguna oferta, se conserva la resolución v2.8.
 
-    Una decisión de ``size_decisions`` (humana o de IA) manda sobre ambas.
-    ``size_rules=False`` reproduce el motor v2.8 (sólo para mediciones).
+    Una decisión de ``size_decisions`` (humana o de IA) manda sobre ambas, con su
+    evidencia de foto (v2.10, ``_resolve_with_decision``; ``details`` recibe las
+    correcciones). ``size_rules=False`` reproduce el motor v2.8 (sólo para mediciones).
     """
     if decision is not None:
-        return _resolve_with_decision(gtin, members, decision, size_rules=size_rules)
+        return _resolve_with_decision(gtin, members, decision, size_rules=size_rules, details=details)
     before = _resolve_ounces(gtin, members, size_rules=False)
     if not size_rules or not _size_rules_may_apply(members):
         return before
@@ -2397,11 +2525,17 @@ def _exact_groups(
         supermarkets = sorted({member.record.supermarket_id for member in members})
         if len(supermarkets) < 2:
             continue
+        details: dict[str, object] = {}
         (remaining, excluded, group_reasons), readings = resolve_gtin_group(
-            gtin, members, (size_decisions or {}).get(gtin)
+            gtin, members, (size_decisions or {}).get(gtin), details=details
         )
+        corrections: dict[str, PresentationSignature] = dict(details.get("corrections") or {})
         remaining_supermarkets = sorted({member.record.supermarket_id for member in remaining})
         if len(remaining_supermarkets) >= 2:
+            standards = {
+                source_id: value for source_id, value in standard_presentations(remaining, readings).items()
+                if source_id not in corrections
+            }
             groups.append(
                 ExactGtinGroup(
                     canonical_gtin=gtin,
@@ -2415,7 +2549,8 @@ def _exact_groups(
                         for source_id, reasons in sorted(excluded.items())
                     ),
                     ounce_readings=tuple(sorted(readings.items())),
-                    size_standards=tuple(sorted(standard_presentations(remaining, readings).items())),
+                    size_standards=tuple(sorted(standards.items())),
+                    size_corrections=tuple(sorted(corrections.items())),
                 )
             )
             continue

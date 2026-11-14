@@ -12,6 +12,10 @@ Efectos (sólo con ``--apply``; por defecto es dry-run y no escribe):
   ``net_content_value``/``net_content_unit`` del maestro de ese GTIN; con
   ``different_products`` quita esos dos atributos si venían de este panel.
 - ``master_sync_dirty``: marca esos maestros para que el refresco los recalcule.
+- ``size_offer_evidence`` (motor v2.10): si la decisión trae ``evidence`` o
+  ``apply``, reemplaza la evidencia de foto de ese GTIN (una fila por súper y,
+  con ``apply: "all"``, una fila de alcance ``*``). Toda decisión nueva borra el
+  alcance anterior; sin ``evidence`` (panel actual) las lecturas guardadas siguen.
 
 Todo en un único lote atómico. Falla cerrado: un dato inválido o un GTIN que no
 existe en los perfiles rechaza el envío completo. El motor aplica la regla en
@@ -44,8 +48,12 @@ from precios_supermercados.product_master import (  # noqa: E402
     gtin_master_id,
 )
 from precios_supermercados.size_decisions import (  # noqa: E402
+    APPLY_ALL_STORE,
+    APPLY_ALL_TEXT,
     APPROVED_ENGINES,
     ENGINE_ACTORS,
+    EVIDENCE_TABLE,
+    EVIDENCE_TABLE_SQL,
     MAX_DECISIONS,
     MAX_NOTE_CHARS,
     MAX_PAYLOAD_CHARS,
@@ -81,6 +89,17 @@ CLEAR_SIZE_SQL = (
     f"AND json_extract(human_attributes_json,'$.net_content_value.source')='{TABLE_NAME}'" + _SAME_AUTHOR
 )
 ENGINE_CHUNK = 300
+# Evidencia de foto (v2.10): sólo si la fila guardada de size_decisions es de este mismo autor
+# (una decisión de IA que la humana ya reemplazó no toca la evidencia).
+_EVIDENCE_AUTHOR = f"EXISTS (SELECT 1 FROM {TABLE_NAME} WHERE canonical_gtin=? AND decided_by=?)"
+CLEAR_SCOPE_SQL = (
+    f"DELETE FROM {EVIDENCE_TABLE} WHERE canonical_gtin=? AND supermarket_id='{APPLY_ALL_STORE}' AND {_EVIDENCE_AUTHOR}"
+)
+CLEAR_EVIDENCE_SQL = f"DELETE FROM {EVIDENCE_TABLE} WHERE canonical_gtin=? AND {_EVIDENCE_AUTHOR}"
+INSERT_EVIDENCE_SQL = (
+    f"INSERT INTO {EVIDENCE_TABLE}(canonical_gtin,supermarket_id,value,unit,source,text,decided_at_utc) "
+    f"SELECT ?,?,?,?,?,?,? WHERE {_EVIDENCE_AUTHOR}"
+)
 DIRTY_SQL = (
     f"INSERT INTO {DIRTY_TABLE}(master_product_id,reason,marked_at_utc) VALUES(?,?,?) "
     "ON CONFLICT(master_product_id) DO UPDATE SET reason=excluded.reason, marked_at_utc=excluded.marked_at_utc"
@@ -142,8 +161,9 @@ def plan(
     steps: list[tuple[str, str, tuple[object, ...]]] = [
         ("begin", "BEGIN IMMEDIATE", ()),
         ("create_size_decisions", TABLE_SQL, ()),
+        ("create_size_offer_evidence", EVIDENCE_TABLE_SQL, ()),
     ]
-    counts = {"size": 0, "different_products": 0, "masters_updated": 0}
+    counts = {"size": 0, "different_products": 0, "masters_updated": 0, "evidence_rows": 0, "apply_all": 0}
     dirty: list[str] = []
     for decision in decisions:
         counts[decision.decision] += 1
@@ -162,6 +182,7 @@ def plan(
                 decision.decided_at_utc,
             ),
         ))
+        steps.extend(_evidence_steps(decision, counts))
         master_id = gtin_master_id(decision.canonical_gtin)
         if master_id not in masters:
             continue
@@ -182,6 +203,29 @@ def plan(
     steps.append(("commit", "COMMIT", ()))
     counts["masters_updated"] = len(set(dirty))
     return steps, counts, errors
+
+
+def _evidence_steps(decision: SizeDecision, counts: dict[str, int]) -> list[tuple[str, str, tuple[object, ...]]]:
+    """Delta de ``size_offer_evidence`` de un GTIN (≤ 8 sentencias, sin lecturas)."""
+    gtin, author = decision.canonical_gtin, decision.decided_by
+    if not decision.evidence_given:
+        return [(f"evidence_scope_{gtin}", CLEAR_SCOPE_SQL, (gtin, gtin, author))]
+    steps: list[tuple[str, str, tuple[object, ...]]] = [(f"evidence_clear_{gtin}", CLEAR_EVIDENCE_SQL, (gtin, gtin, author))]
+    for item in decision.evidence:
+        steps.append((
+            f"evidence_{gtin}_{item.supermarket_id}", INSERT_EVIDENCE_SQL,
+            (gtin, item.supermarket_id, format(item.value, "f"), item.unit, item.source, item.text,
+             item.decided_at_utc, gtin, author),
+        ))
+        counts["evidence_rows"] += 1
+    if decision.apply == "all":
+        source = author.removeprefix("engine:") if author.startswith("engine:") else "human"
+        steps.append((
+            f"evidence_{gtin}_apply_all", INSERT_EVIDENCE_SQL,
+            (gtin, APPLY_ALL_STORE, None, None, source, APPLY_ALL_TEXT, decision.decided_at_utc, gtin, author),
+        ))
+        counts["apply_all"] += 1
+    return steps
 
 
 def apply_size_decisions(
@@ -240,8 +284,7 @@ def apply_engine_decisions(
         items = [_with_approval(item, approved_by) for item in items]
     result: dict[str, object] = {"decisions": 0, "skipped_human": [], "skipped_unknown": [], "written": False,
                                  "dry_run": not apply, "batches": 0}
-    for start in range(0, len(items), ENGINE_CHUNK):
-        chunk = json.dumps({"schema": document.get("schema"), "decisions": items[start : start + ENGINE_CHUNK]})
+    for chunk in engine_chunks(document.get("schema"), items):
         decisions = parse_payload(chunk, decided_by=engine, decided_at_utc=now, engine=True)
         gtins = [decision.canonical_gtin for decision in decisions]
         human = human_decided(store, gtins)
@@ -263,6 +306,24 @@ def apply_engine_decisions(
 
 
 _ACTOR_NAME = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})")
+
+
+def engine_chunks(schema: object, items: Sequence[object]) -> list[str]:
+    """Lotes de hasta 300 decisiones y ``MAX_PAYLOAD_CHARS`` caracteres (con la evidencia
+    de foto, v2.10, 300 decisiones ya no caben en un solo envío)."""
+    chunks: list[str] = []
+    current: list[object] = []
+    for item in items:
+        candidate = [*current, item]
+        text = json.dumps({"schema": schema, "decisions": candidate})
+        if current and (len(candidate) > ENGINE_CHUNK or len(text) > MAX_PAYLOAD_CHARS):
+            chunks.append(json.dumps({"schema": schema, "decisions": current}))
+            current = [item]
+        else:
+            current = candidate
+    if current:
+        chunks.append(json.dumps({"schema": schema, "decisions": current}))
+    return chunks
 
 
 def _with_approval(item: object, approved_by: str) -> object:

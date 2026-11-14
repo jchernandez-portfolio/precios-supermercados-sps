@@ -89,8 +89,8 @@ def chains(resolution) -> set[str]:
 
 
 def test_version_is_v2_9(rows) -> None:
-    assert IDENTITY_NORMALIZATION_VERSION == "product-homologation-v2.9"
-    assert {row.normalization_version for row in rows.values()} == {"product-homologation-v2.9"}
+    assert IDENTITY_NORMALIZATION_VERSION == "product-homologation-v2.10"
+    assert {row.normalization_version for row in rows.values()} == {"product-homologation-v2.10"}
 
 
 def test_g_ml_in_dairy_category_joins_and_standardizes_to_grams(rows) -> None:

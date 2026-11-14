@@ -103,6 +103,27 @@ def test_search_index_rejects_row_count_mismatch(tmp_path: Path) -> None:
         MODULE.attach_search_index(output, manifest)
 
 
+def test_search_pack_column_is_zero_without_multipacks_and_copies_the_row_pack(tmp_path: Path) -> None:
+    """Catálogo sin multipacks: misma salida salvo la columna ``pack`` (0 en cada fila)."""
+    database = tmp_path / "source.sqlite"
+    output = tmp_path / "public"
+    build_db(database)
+    manifest = export(database, output)
+    search = _search(output)
+    column = {name: index for index, name in enumerate(search["columns"])}
+    assert search["columns"][-1] == "pack"
+    assert {row[column["pack"]] for row in search["rows"]} == {0}
+    rows = [row for item in manifest["files"] if item["path"].startswith("catalog/")
+            for row in json.loads((output / item["path"]).read_text(encoding="utf-8"))["rows"]]
+    assert all("pack" not in row for row in rows)
+
+    row = {**rows[0], "presentation": "4 × 92 g", "pack": [4, "368 g"]}
+    entry = MODULE._search_entry(row, 0, {"la_colonia": 0, "walmart": 1})
+    assert entry[column["pack"]] == [4, "368 g"] and entry[column["presentation"]] == "4 × 92 g"
+    assert MODULE._presentation_entry(row, large_size=False)["pack"] == [4, "368 g"]
+    assert "pack" not in MODULE._presentation_entry(rows[0], large_size=False)
+
+
 def test_search_photo_column_comes_from_images_index(tmp_path: Path) -> None:
     database = tmp_path / "source.sqlite"
     output = tmp_path / "public"
@@ -165,9 +186,16 @@ def test_app_shell_is_static_safe_and_installable() -> None:
     assert "fonts.googleapis.com" not in html and "fonts.gstatic.com" not in html
     assert "font-src 'self'" in html and "style-src 'self';" in html
     styles = (APP_DIR / "styles.css").read_text(encoding="utf-8")
-    for weight in (400, 500, 600, 700, 800):
-        assert f'url("fonts/figtree-{weight}.woff2")' in styles and (APP_DIR / "fonts" / f"figtree-{weight}.woff2").is_file()
-    assert (APP_DIR / "fonts" / "LICENSE-Figtree.txt").is_file()
+    # Diseño «Lima»: Inter (texto) y Space Grotesk (títulos y precios), cada una con su OFL.
+    fonts = [("inter", weight) for weight in (400, 600, 700)] + [("space-grotesk", weight) for weight in (500, 700)]
+    for family, weight in fonts:
+        name = f"fonts/{family}-{weight}.woff2"
+        assert f'url("{name}")' in styles and (APP_DIR / name).is_file(), name
+        assert f'"{name}"' in shell, name  # el service worker la guarda para abrir sin conexión
+    for license_name in ("LICENSE-Inter.txt", "LICENSE-SpaceGrotesk.txt"):
+        assert "SIL Open Font License" in (APP_DIR / "fonts" / license_name).read_text(encoding="utf-8")
+    assert 'href="fonts/inter-400.woff2"' in html and 'href="fonts/space-grotesk-700.woff2"' in html
+    assert not list((APP_DIR / "fonts").glob("figtree-*")) and "Figtree" not in styles and "figtree" not in shell
 
 
 def test_app_never_injects_html_or_reads_private_sources() -> None:
@@ -393,6 +421,36 @@ console.log(JSON.stringify([l('453.59 g'), l('907.18 g'), l('226.8 g'), l('2.268
     ]
 
 
+def test_presentation_labels_show_pack_count_and_total(tmp_path: Path) -> None:
+    """``pack`` = [conteo, "total"] del exportador: sólo cambia el formato de la etiqueta."""
+    script = """
+import { Catalog, presentationLabel } from './data.js';
+const l = (presentation, pack, unit_per) => presentationLabel({ presentation, pack, unit_per });
+const labels = [l('4 × 92 g', [4, '368 g']), l('6 × 200 ml', [6, '1.2 L']), l('2 × 7 oz', [2, '14 oz'], '100 g'),
+  l('25 × 453.59 g', [25, '11.34 kg']), l('368 g', [4, '368 g']), l('4 × 92 g', null), l('4 × 92 g', 0),
+  l('4 × 92 g', [1, '92 g']), l('4 × 92 g', ['4', '368 g']), l('por libra', [4, '368 g']), l('', [4, '368 g']),
+  l('—', [4, '368 g']), l('12 × 22 g', [12, '264 g'])];
+const old = ['id','product_name','brand','presentation','category','product_type','partition','best_price','unit_amount','unit_per','retailers','promo','other_presentations','comparability','photo'];
+const row = ['a1', 'Pudín 4 Unidades / 92 g', 'Snack Pack', '4 × 92 g', 'Alimentos', 'Postre', 0, '75.20', '20.43', '100 g', [0], 0, 0, 'i', 0];
+const c = new Catalog('https://x.test/manifest.json');
+const document = { columns: old, partitions: ['catalog/p.json'], retailers: ['walmart'], rows: [row] };
+const before = c.materialize(document).get('a1');
+const after = c.materialize({ ...document, columns: [...old, 'pack'], rows: [[...row, [4, '368 g']]] }).get('a1');
+const zero = c.materialize({ ...document, columns: [...old, 'pack'], rows: [[...row, 0]] }).get('a1');
+console.log(JSON.stringify({ labels, before: [presentationLabel(before), before.presentation, before.unit_amount],
+  after: [presentationLabel(after), after.presentation, after.unit_amount], zero: presentationLabel(zero) }));
+"""
+    result = json.loads(_node(script, tmp_path))
+    assert result["labels"] == [
+        "4 × 92 g (368 g)", "6 × 200 ml (1.2 L)", "2 × 7 oz (14 oz)", "25 × 453.59 g (11.34 kg)", "4 Pack (368 g)",
+        "4 × 92 g", "4 × 92 g", "4 × 92 g", "4 × 92 g", "por libra", "", "—", "12 × 22 g (264 g)",
+    ]
+    # Catálogo viejo sin columna: comportamiento actual. Presentación y precio unitario no cambian.
+    assert result["before"] == ["4 × 92 g", "4 × 92 g", "20.43"]
+    assert result["after"] == ["4 × 92 g (368 g)", "4 × 92 g", "20.43"]
+    assert result["zero"] == "4 × 92 g"
+
+
 def test_store_labels_name_branches_only_when_a_chain_has_several(tmp_path: Path) -> None:
     script = """
 import { storeLabel } from './data.js';
@@ -433,7 +491,8 @@ def test_public_page_is_ready_to_share_and_does_not_overflow_on_phones() -> None
     manifest = json.loads((APP_DIR / "manifest.webmanifest").read_text(encoding="utf-8"))
     assert "Tegucigalpa" in manifest["description"]
     styles = (APP_DIR / "styles.css").read_text(encoding="utf-8")
-    assert ".product-layout { display: grid; grid-template-columns: minmax(0, 1fr);" in styles
+    # «Lima»: foto de 120 px y columna de texto que puede encogerse (la foto de 800 px no ensancha).
+    assert ".product-layout { display: grid; grid-template-columns: 120px minmax(0, 1fr);" in styles
     assert ".filters { position: relative;" in styles
     assert re.search(r"\.product-image \.photo \{ position: absolute;", styles)
     app = (APP_DIR / "app.js").read_text(encoding="utf-8")

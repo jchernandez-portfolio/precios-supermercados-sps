@@ -5,6 +5,7 @@ no puede saber cuál es el correcto. Una persona revisa la etiqueta en la págin
 súper y fija el **tamaño oficial**; el motor aplica la regla en cada refresco:
 
 > Las ofertas que coinciden con el tamaño oficial forman el grupo; las demás se aíslan.
+> Desde el motor v2.10 la foto de cada oferta puede corregir su tamaño (ver "Motor v2.10: corrige con evidencia").
 
 ## Piezas
 
@@ -30,6 +31,69 @@ pero el oficial ya compara g con ml en esas categorías, así que un grupo decid
 puede **ganar** ofertas (un oficial "180 ml" acepta ahora las de "180 g"; nunca
 pierde ninguna). La medición `medir_reglas_identidad.py --pr-b` lo cuenta en
 `motor_vigente.grupos_decididos_que_cambian_por_g_ml`.
+
+### Motor v2.10: corrige con evidencia
+
+Antes, una decisión de tamaño sólo agrupaba las ofertas cuyo **título** ya coincidía; las
+demás quedaban aisladas con su tamaño equivocado (El Migo: Walmart y Paiz publican 148 g,
+el peso escurrido, aunque la lata dice "PESO NETO 8.5 oz (240 g)"). Orden de confianza
+por producto: (1) la decisión (humana, o de Claude aprobada por el dueño), (2) lo impreso
+en la foto **de esa oferta**, (3) el título del súper. El título solo nunca es evidencia.
+
+**Evidencia**: cada decisión puede traer `evidence: [{store, value, unit, text}]` (lo leído
+en la foto propia de cada súper) y `apply: "evidence" | "all"` (por omisión `evidence`).
+Se guarda en la tabla derivada `size_offer_evidence` (`canonical_gtin`, `supermarket_id`,
+`value`, `unit` canónica g/ml/oz/unit, `source` ∈ human/claude_sesion/claude_auto/gemini_auto,
+`text` ≤ 60, `decided_at_utc`; `apply: "all"` es una fila de alcance con súper `*` y sin
+valor). Sólo la escribe `aplicar_decisiones_tamano.py` (workflow de decisiones y guardado
+automático de la IA), en el mismo lote atómico que la decisión, como delta de ese GTIN y
+sólo si la fila guardada de `size_decisions` es del mismo autor (la IA nunca toca la
+evidencia de una decisión humana). Un envío con `evidence`/`apply` reemplaza la evidencia
+del GTIN; uno sin ellos (el panel actual) borra sólo el alcance `all` y conserva las
+lecturas. Está en `OPTIONAL_DERIVED_TABLES` y `OPTIONAL_COUNTED_TABLES`.
+
+**Regla** (`product_identity_v2.size_evidence_plan`), contando por súper con oferta en el
+GTIN las fotos que confirman el oficial (`match_official`, con g ≈ ml donde aplica) y las
+que lo contradicen:
+
+| Caso | Efecto |
+| --- | --- |
+| ≥ 2 súper confirman con foto y son más que los que contradicen (`mayoria`) | El oficial se aplica a **todas** las ofertas del GTIN, también sin foto o con foto/título distinto (probablemente empaque anterior). Nada queda aparte por tamaño. |
+| Alguna foto confirma pero las que contradicen son tantas o más (`empate`) | No se corrige nada (como v2.9): queda para revisión humana. |
+| 1 o 0 fotos confirman (`propia`) | Se corrigen las ofertas cuya foto propia confirma; la que su foto contradice se aísla como presentación distinta (`human_size_decision_contradicted`); las sin foto quedan como hoy, salvo `apply: "all"`. |
+
+Una oferta corregida entra al grupo con el tamaño oficial (`presentation_*` y
+`display_presentation`; precio por unidad con el oficial) y conserva lo que publica el súper
+en los campos canónicos del perfil (`normalized_*`, `canonical_total`, `raw_presentation`).
+La corrección también levanta el "multipack ambiguo" de esa oferta; los demás bloqueos
+(tipo, sabor, colisión por cadena) siguen. "Nunca empeorar": si aislar una oferta
+contradicha bloquea el grupo o se pierde una oferta que su foto no contradice, se conserva
+la resolución v2.9. `different_products` no cambia y no acepta evidencia.
+
+**Quién manda evidencia**: `guardar_revision_claude.py` convierte `lecturas` a
+valor/unidad sólo si el texto es inequívoco (`size_decisions.evidence_from_text`: prefiere
+la medida métrica, "N × X" cuenta el total, descarta el peso escurrido y rechaza
+"parcial", "banner", "c/u", "(1 sobre)" u "otro diseño") y sólo de las fotos **propias**
+de cada súper (una foto compartida de otro súper no cuenta); `apply: "all"` sólo si la fila
+aprobada lo trae. La IA de la cola (`sugerir_tamanos_ia.py`) manda la lectura de la foto
+propia de cada oferta. El panel puede seguir enviando sin esos campos.
+
+**Catálogo público (contrato para el frontend; SPS y TGU)**, campos opcionales en cada
+oferta de `offers[]` de las particiones (no van en `search.json`):
+
+- `published_as` (texto, p. ej. `"148 g"`, `"16 unidades"`, `"8.5 oz"`): la evidencia
+  corrigió el tamaño de esa oferta; `presentation` de la fila y su precio por unidad ya usan
+  el oficial. Sugerencia: "Walmart lo publica como 148 g".
+- `other_presentation: true`: la oferta quedó aparte porque su propia foto muestra otro
+  tamaño (presentación distinta o anterior). Va en una tarjeta individual.
+
+Sin esos campos la oferta se muestra como hoy; una app vieja los ignora.
+
+**Medición** (sólo lectura): el workflow "Auditoría de identidad de producto" (sin inputs)
+deja en el artifact `identidad-productos-<run>/reglas/` la sección
+`correccion_con_evidencia` de `medicion-reglas.json` (resumen y fichas por GTIN: modo, fotos
+que confirman/contradicen, rol de cada oferta sin evidencia, con evidencia y con
+`apply: "all"`) y `evidencia-grupos.csv` (una línea por oferta de cada GTIN decidido).
 
 ## Llave de GitHub
 

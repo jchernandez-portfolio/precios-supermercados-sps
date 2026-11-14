@@ -78,16 +78,19 @@ from precios_supermercados.product_master import (  # noqa: E402
     sync_product_master,
 )
 from precios_supermercados.size_decisions import (  # noqa: E402
+    EVIDENCE_SELECT_SQL,
+    EVIDENCE_TABLE,
+    SizeDecision,
+    attach_evidence,
+    decision_from_row,
+    human_attributes,
+    index_decisions,
+)
+from precios_supermercados.size_decisions import (  # noqa: E402
     SELECT_SQL as SIZE_DECISIONS_SELECT_SQL,
 )
 from precios_supermercados.size_decisions import (  # noqa: E402
     TABLE_NAME as SIZE_DECISIONS_TABLE,
-)
-from precios_supermercados.size_decisions import (  # noqa: E402
-    SizeDecision,
-    decision_from_row,
-    human_attributes,
-    index_decisions,
 )
 
 STAGE_TABLE = "product_homologation_profiles_stage"
@@ -327,11 +330,19 @@ def _fetch_pricesmart_spec_attributes(url: str, token: str) -> dict[int, tuple[s
 
 
 def _fetch_size_decisions(url: str, token: str) -> dict[str, SizeDecision]:
-    """Decisiones humanas de tamaño (panel de revisión). Sin tabla todavía: ninguna."""
-    exists = _query(url, token, "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (SIZE_DECISIONS_TABLE,))
-    if not exists:
+    """Decisiones de tamaño (panel o IA) con su evidencia de foto (v2.10). Sin tabla todavía: ninguna."""
+    exists = {
+        str(row[0]) for row in _query(
+            url, token, "SELECT name FROM sqlite_master WHERE type='table' AND name IN (?,?)",
+            (SIZE_DECISIONS_TABLE, EVIDENCE_TABLE),
+        )
+    }
+    if SIZE_DECISIONS_TABLE not in exists:
         return {}
-    return index_decisions(decision_from_row(row) for row in _query(url, token, SIZE_DECISIONS_SELECT_SQL))
+    decisions = index_decisions(decision_from_row(row) for row in _query(url, token, SIZE_DECISIONS_SELECT_SQL))
+    if EVIDENCE_TABLE not in exists:
+        return decisions
+    return attach_evidence(decisions, _query(url, token, EVIDENCE_SELECT_SQL))
 
 
 def size_decision_master_attributes(decisions: dict[str, SizeDecision]) -> dict[str, dict[str, dict[str, object]]]:

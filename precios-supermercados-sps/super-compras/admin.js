@@ -10,7 +10,7 @@
 // en el encabezado Authorization a api.github.com.
 import {
   RETAILER_NAMES, SIZE_DECISIONS_RUNS_URL, SIZE_UNITS, loadSizeQueue, sendSizeDecisions,
-} from "./data.js?v=20261113-6";
+} from "./data.js?v=20261114-3";
 
 const TOKEN_KEY = "super-compras-admin-github-token";
 const UNIT_LABEL = { g: "g", ml: "ml", oz: "oz", lb: "lb", unit: "unidades" };

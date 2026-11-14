@@ -49,7 +49,14 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from precios_supermercados.product_homologation import PresentationSignature  # noqa: E402
-from precios_supermercados.size_decisions import PAYLOAD_SCHEMA, canonical_size, match_official  # noqa: E402
+from precios_supermercados.size_decisions import (  # noqa: E402
+    EVIDENCE_STORES,
+    MAX_EVIDENCE_TEXT,
+    MAX_VALUE,
+    PAYLOAD_SCHEMA,
+    canonical_size,
+    match_official,
+)
 
 CACHE_SCHEMA = "rpi-size-ai/v2"
 PROMPT_VERSION = 2
@@ -129,9 +136,9 @@ CLAUDE_SCHEMA = {
                     "photo": {"type": "integer"},
                     "legible": {"type": "boolean"},
                     "same_product": {"type": "boolean"},
-                    "value": {"type": ["number", "null"]},
-                    "unit": {"type": ["string", "null"], "enum": [*UNITS_FROM_MODEL, None]},
-                    "label_text": {"type": ["string", "null"]},
+                    "value": {"anyOf": [{"type": "number"}, {"type": "null"}]},
+                    "unit": {"anyOf": [{"type": "string", "enum": list(UNITS_FROM_MODEL)}, {"type": "null"}]},
+                    "label_text": {"anyOf": [{"type": "string"}, {"type": "null"}]},
                 },
                 "required": ["photo", "legible", "same_product", "value", "unit", "label_text"],
                 "additionalProperties": False,
@@ -445,6 +452,7 @@ class Claude:
         self.retries = 0
         self.last_error: str | None = None
         self.usage = {"entrada": 0, "salida": 0}
+        self.compat = False  # sin salida estructurada (si la API rechazó output_config)
 
     def _request(self, path: str, body: Mapping[str, object] | None = None) -> object:
         data = None if body is None else json.dumps(body).encode("utf-8")
@@ -511,14 +519,18 @@ class Claude:
             content.append({"type": "text", "text": f"Foto {number}:"})
             content.append({"type": "image", "source": {"type": "base64", "media_type": "image/webp",
                                                         "data": base64.b64encode(image).decode("ascii")}})
-        body = {
-            "model": self.pick_model(),
-            "max_tokens": CLAUDE_MAX_TOKENS,
-            "output_config": {"effort": "low", "format": {"type": "json_schema", "schema": CLAUDE_SCHEMA}},
-            "messages": [{"role": "user", "content": content}],
-        }
+        model = self.pick_model()
         self.queries += 1
-        answer = self._request("messages", body)
+        try:
+            answer = self._request("messages", self._body(model, content))
+        except ProviderFailed as error:
+            # Un 400 que no es de crédito suele ser un parámetro que esta cuenta/modelo no
+            # acepta (salida estructurada o effort): se reintenta UNA vez en modo simple
+            # (JSON pedido en el texto) y, si funciona, se sigue así el resto de la corrida.
+            if str(error) != "claude_http_400" or self.compat:
+                raise
+            self.compat = True
+            answer = self._request("messages", self._body(model, content))
         if not isinstance(answer, Mapping):
             return None
         usage = answer.get("usage")
@@ -529,10 +541,39 @@ class Claude:
             return None  # refusal / max_tokens: la foto queda sin lectura
         text = "".join(str(block.get("text") or "") for block in answer.get("content") or ()
                        if isinstance(block, Mapping) and block.get("type") == "text")
-        try:
-            return json.loads(text)
-        except ValueError:
-            return None
+        return _json_from_text(text)
+
+    def _body(self, model: str, content: list[dict[str, object]]) -> dict[str, object]:
+        body: dict[str, object] = {"model": model, "max_tokens": CLAUDE_MAX_TOKENS}
+        if self.compat:
+            hint = {"type": "text", "text": CLAUDE_JSON_HINT}
+            body["messages"] = [{"role": "user", "content": [*content, hint]}]
+        else:
+            body["output_config"] = {"effort": "low", "format": {"type": "json_schema", "schema": CLAUDE_SCHEMA}}
+            body["messages"] = [{"role": "user", "content": content}]
+        return body
+
+
+CLAUDE_JSON_HINT = (
+    'Responde SOLO con un objeto JSON, sin texto adicional: {"readings": [{"photo": 1, "legible": true, '
+    '"same_product": true, "value": 240, "unit": "g", "label_text": "PESO NETO 240 g"}]}. '
+    "unit es uno de: g, kg, ml, l, oz, fl_oz, lb, unit; usa null en value/unit/label_text si no se lee."
+)
+
+
+def _json_from_text(text: str) -> object:
+    """JSON de la respuesta (acepta un bloque ```json …``` o texto alrededor del objeto)."""
+    try:
+        return json.loads(text)
+    except ValueError:
+        pass
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end <= start:
+        return None
+    try:
+        return json.loads(text[start:end + 1])
+    except ValueError:
+        return None
 
 
 def _supports_images(model: Mapping[str, object]) -> bool:
@@ -608,6 +649,10 @@ class VisionChain:
             "tokens": {getattr(p, "name", "ia"): dict(getattr(p, "usage", {})) for p in self.providers},
             "cambio_de_proveedor": self.switches[-1]["motivo"] if self.switches else None,
             "cambios": list(self.switches),
+            # Último error de cada proveedor (sin encabezados: nunca incluye la llave).
+            "errores_por_proveedor": {getattr(p, "name", "ia"): getattr(p, "last_error", None)
+                                      for p in self.providers if getattr(p, "last_error", None)},
+            "claude_modo_simple": any(getattr(p, "compat", False) for p in self.providers),
         }
 
 def _error_message(error: urllib.error.HTTPError) -> str:
@@ -648,7 +693,43 @@ def auto_decision(item: Mapping[str, object]) -> dict[str, object]:
     ia = item["ia"]
     who = PROVIDER_LABEL.get(str(ia.get("fuente")), "Gemini")
     note = f"{who}: {ia.get('text')}" if ia.get("text") else f"{who}: tamaño de la mayoría confirmado en la foto"
-    return {"gtin": item["gtin"], "decision": "size", "value": ia["value"], "unit": ia["unit"], "note": note[:200]}
+    decision = {"gtin": item["gtin"], "decision": "size", "value": ia["value"], "unit": ia["unit"], "note": note[:200]}
+    evidence = offer_evidence(item)
+    if evidence:
+        decision["evidence"] = evidence
+    return decision
+
+
+def offer_evidence(item: Mapping[str, object]) -> list[dict[str, str]]:
+    """Lectura de la foto PROPIA de cada súper (motor v2.10, ``size_offer_evidence``).
+
+    La foto de cada oferta ya viene mapeada a su súper (``offer["foto"]``); una foto
+    compartida de otro súper (``foto_de`` distinto) no cuenta como evidencia de esa
+    oferta, ni un súper con dos ofertas en el código.
+    """
+    evidence: dict[str, dict[str, str]] = {}
+    repeated: set[str] = set()
+    for offer in item.get("offers") or ():
+        store, reading = offer.get("store"), offer.get("ia")
+        if store not in EVIDENCE_STORES or not isinstance(reading, Mapping) or reading.get("status") != "leido":
+            continue
+        source = offer.get("foto_de")
+        if source and source != store:
+            continue
+        if store in evidence:
+            repeated.add(str(store))
+        unit = str(reading.get("unit"))
+        try:
+            value = Decimal(str(reading.get("value")))
+        except InvalidOperation:
+            continue
+        if unit not in MAX_VALUE or not value.is_finite() or not 0 < value <= MAX_VALUE[unit]:
+            continue  # una lectura fuera de rango no tumba el envío: esa oferta queda sin evidencia
+        entry = {"store": str(store), "value": format(value, "f"), "unit": unit}
+        if reading.get("text"):
+            entry["text"] = " ".join(str(reading["text"]).split())[:MAX_EVIDENCE_TEXT]
+        evidence[str(store)] = entry
+    return [entry for store, entry in sorted(evidence.items()) if store not in repeated]
 
 
 def annotate(queue: dict[str, object], cache: dict[str, dict[str, object]], *,

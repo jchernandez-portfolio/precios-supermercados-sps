@@ -196,6 +196,9 @@ class ExactGtinGroup:
     # del grupo comparable: ml leído como g (g ≈ ml) o conteo con el peso del
     # grupo (peso sobre conteo): ``(source_record_id, firma)``.
     size_standards: tuple[tuple[str, PresentationSignature], ...] = ()
+    # v2.10: ofertas cuyo tamaño corrigió la evidencia de foto de una decisión de
+    # tamaño (``size_offer_evidence``): toman el tamaño oficial ``(id, firma)``.
+    size_corrections: tuple[tuple[str, PresentationSignature], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

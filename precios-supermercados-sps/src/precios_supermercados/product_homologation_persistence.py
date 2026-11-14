@@ -9,7 +9,7 @@ import hashlib
 import json
 import sqlite3
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -210,9 +210,11 @@ def build_homologation_rows(
     group_by_source: dict[str, tuple[str, tuple[str, ...]]] = {}
     ounce_readings: dict[str, str] = {}
     size_standards: dict[str, object] = {}
+    size_corrections: dict[str, object] = {}
     for group in result.exact_gtin_groups:
         ounce_readings.update(group.ounce_readings)
         size_standards.update(group.size_standards)
+        size_corrections.update(group.size_corrections)
         for source_record_id in group.source_record_ids:
             group_by_source[source_record_id] = (
                 group.comparison_status,
@@ -241,7 +243,17 @@ def build_homologation_rows(
         presentation = profile.presentation
         canonical_presentation = canonical_presentation_fields(record, profile.taxonomy)
         reading = ounce_readings.get(record.source_record_id)
-        if reading is not None:
+        if record.source_record_id in size_corrections:
+            # v2.10: la evidencia de foto corrigió el tamaño. La comparación y lo que se
+            # muestra (``presentation_*``, ``display_presentation``) usan el oficial; los
+            # campos canónicos (``normalized_*``, ``canonical_total``, ``raw_presentation``)
+            # conservan lo que publica el súper: el catálogo publica ``published_as``.
+            presentation = size_corrections[record.source_record_id]
+            official = canonical_presentation_from_signature(
+                canonical_presentation.raw_presentation, presentation, canonical_presentation.status
+            )
+            canonical_presentation = replace(canonical_presentation, display_presentation=official.display_presentation)
+        elif reading is not None:
             # La onza que su grupo GTIN confirma como líquido o peso pasa a ml/g:
             # así tiene precio por unidad y vota bien el contenido neto del maestro.
             presentation = converted_ounce(presentation, reading)

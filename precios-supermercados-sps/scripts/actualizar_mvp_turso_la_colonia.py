@@ -28,6 +28,7 @@ from actualizar_mvp_sqlite_la_colonia import (  # noqa: E402
     _minor,
     validate_snapshot_bytes,
 )
+from precios_supermercados import capture_membership  # noqa: E402
 from precios_supermercados.unpriced_unavailable import (  # noqa: E402
     UNPRICED_OBSERVATIONS_INDEX_SQL,
     UNPRICED_OBSERVATIONS_TABLE_SQL,
@@ -39,7 +40,10 @@ EXPECTED_TABLES = {"supermarkets", "locations", "products", "price_history", "sc
 # observaciones de productos listados sin precio y no disponibles,
 # especificaciones PriceSmart (las escribe sólo el workflow semanal) y decisiones
 # de tamaño del panel de revisión (size_decisions; faltaba: el 12-nov la primera
-# decisión guardada creó la tabla y el refresco falló con turso_schema_mismatch).
+# decisión guardada creó la tabla y el refresco falló con turso_schema_mismatch)
+# con su evidencia de foto por oferta (size_offer_evidence, motor v2.10)
+# y membresía de la última captura aceptada por contexto (capture_membership,
+# ofertas no vistas; la crea esta persistencia sólo con el interruptor activo).
 OPTIONAL_DERIVED_TABLES = {
     "product_homologation_profiles",
     "master_products",
@@ -50,6 +54,8 @@ OPTIONAL_DERIVED_TABLES = {
     "catalog_unpriced_observations",
     "pricesmart_product_specs",
     "size_decisions",
+    "size_offer_evidence",
+    capture_membership.TABLE_NAME,
 }
 
 
@@ -344,6 +350,7 @@ def _mutation_steps(
     digest: str,
     supermarket_id: str = SUPERMARKET_ID,
     unpriced_incoming: str | None = None,
+    membership_keys: list[str] | None = None,
 ) -> list[tuple[str, str, tuple[object, ...]]]:
     # incoming se materializa e indexa una sola vez. Dentro de la transacción se
     # materializa delta para no repetir la misma comparación current-vs-snapshot
@@ -574,7 +581,29 @@ def _mutation_steps(
         steps[begin:begin] = before_begin
         commit = next(i for i, step in enumerate(steps) if step[0] == "commit")
         steps[commit:commit] = before_commit
+    if membership_keys is not None:
+        # Ofertas no vistas: 1 fila por contexto en la misma transacción que el
+        # scrape_runs aceptado (sin lecturas por producto). Sólo con el interruptor.
+        commit = next(i for i, step in enumerate(steps) if step[0] == "commit")
+        steps[commit:commit] = capture_membership.persistence_steps(
+            membership_keys,
+            supermarket_id=supermarket_id,
+            location_id=location_id,
+            run_id=run_id,
+            observed_at=observed_at,
+        )
     return steps
+
+
+def membership_keys_if_enabled(snapshot: dict[str, Any]) -> list[str] | None:
+    """Llaves del snapshot aceptado si ``record_capture_membership`` está activo."""
+    if not capture_membership.load_policy().record_capture_membership:
+        return None
+    return capture_membership.snapshot_keys(snapshot)
+
+
+def membership_summary(keys: list[str] | None) -> dict[str, object]:
+    return {} if keys is None else {"capture_membership_keys": len(set(keys))}
 
 
 def _batch_request(steps: list[tuple[str, str, tuple[object, ...]]]) -> dict[str, Any]:
@@ -692,6 +721,7 @@ def persist_snapshot(
         raise SnapshotError("run_id_conflict")
 
     unpriced_incoming = _normalised_unpriced_json(snapshot)
+    membership_keys = membership_keys_if_enabled(snapshot)
     steps = _mutation_steps(
         _normalised_json(snapshot),
         location_id=location_id,
@@ -703,6 +733,7 @@ def persist_snapshot(
         digest=digest,
         supermarket_id=supermarket_id,
         unpriced_incoming=unpriced_incoming,
+        membership_keys=membership_keys,
     )
     results = _run_batch(database_url, auth_token, steps)
     opened = _affected(results, steps, "open_history")
@@ -722,6 +753,7 @@ def persist_snapshot(
         "history_closed": _affected(results, steps, "close_history"),
         "history_unchanged": len(snapshot["products"]) - opened,
         **unpriced_summary,
+        **membership_summary(membership_keys),
     }
 
 
