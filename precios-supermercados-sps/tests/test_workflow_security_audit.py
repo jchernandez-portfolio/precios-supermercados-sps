@@ -752,7 +752,9 @@ def test_size_decisions_workflow_is_owner_only_and_never_inlines_the_payload() -
     workflow = base.load_workflow(path)
     job = base.jobs(workflow)["apply"]
     assert "github.ref == 'refs/heads/main'" in job["if"]
-    assert "github.actor == 'Jchernand3z19'" in job["if"]
+    # Sólo las cuentas del dueño (personal y la de la organización) pueden guardar decisiones.
+    assert "(github.actor == 'Jchernand3z19' || github.actor == 'novawebstudio-HN')" in job["if"]
+    assert job["if"].count("github.actor ==") == 2
     assert job["env"]["DECISIONS_JSON"] == "${{ inputs.decisions }}"
     for step in base.steps(workflow):
         # El JSON del panel sólo entra por variable de entorno, nunca en el comando.

@@ -39,7 +39,7 @@ jobs:
     if: >-
       ${{ github.repository == 'jchernandez-portfolio/precios-supermercados-sps' &&
           github.ref == 'refs/heads/main' &&
-          github.actor == 'Jchernand3z19' }}
+          (github.actor == 'Jchernand3z19' || github.actor == 'novawebstudio-HN') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
