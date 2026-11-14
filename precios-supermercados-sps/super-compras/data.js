@@ -78,7 +78,34 @@ function litersText(millis) {
   return millis >= 1000 ? `${Number((millis / 1000).toFixed(2))} L` : `${Math.round(millis)} ml`;
 }
 
+// Multipack: el exportador manda pack = [conteo, "total"] (p. ej. [4, "368 g"]) cuando
+// la presentación es "4 × 92 g" y el total cuadra. Aquí sólo se da formato: "4 × 92 g
+// (368 g)", o "4 Pack (368 g)" si lo publicado es el total. Ni cálculo ni identidad.
 export function presentationLabel(product) {
+  const text = measureLabel(product);
+  const pack = packValue(product?.pack);
+  if (!pack || !text) return text;
+  const presentation = String(product?.presentation ?? "").trim();
+  const total = packTotalText(pack[1], product?.unit_per);
+  if (presentation.startsWith(`${pack[0]} × `)) return `${presentation} (${total})`;
+  return presentation === pack[1] ? `${pack[0]} Pack (${total})` : text;
+}
+
+function packValue(value) {
+  if (!Array.isArray(value) || value.length !== 2) return null;
+  const [count, total] = value;
+  return Number.isInteger(count) && count > 1 && typeof total === "string" && total.trim() ? [count, total.trim()] : null;
+}
+
+// Total con el formato vigente, pero sin paréntesis dentro del paréntesis: de
+// "13 oz (368 g)" queda la medida métrica ya redondeada ("368 g").
+function packTotalText(total, unitPer) {
+  const label = measureLabel({ presentation: total, unit_per: unitPer });
+  const metric = /\s\(([^()]+)\)$/.exec(label);
+  return metric && !/oz$/i.test(total) ? metric[1] : total;
+}
+
+function measureLabel(product) {
   const text = String(product?.presentation ?? "").trim();
   if (/^1\s+unidades$/i.test(text)) return "1 unidad";
   // Medidas en galones, onzas líquidas o libras: con su equivalente métrico al lado.
@@ -621,6 +648,7 @@ export class Catalog {
         promo: row[column.promo] === 1, other_count: row[column.other_presentations] || 0,
         comparability: row[column.comparability],
         photo: column.photo === undefined ? 0 : photoValue(row[column.photo]),
+        pack: column.pack === undefined ? null : packValue(row[column.pack]),
       };
       product.text = fold([product.brand, product.product_name, product.presentation, product.product_type].join(" "));
       return product;

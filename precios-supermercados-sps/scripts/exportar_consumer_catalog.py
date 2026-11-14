@@ -27,6 +27,7 @@ from precios_supermercados.consumer_catalog_display import (  # noqa: E402
     canonical_brand,
     canonical_egg_size,
     canonical_presentation,
+    multipack,
 )
 from precios_supermercados.gtin_policy import restricted_circulation_reason  # noqa: E402
 from precios_supermercados.identifiers import canonicalize_gtin  # noqa: E402
@@ -292,8 +293,46 @@ def build_rows(
             visible.append(row)
     for row in visible:
         _price_per_pound(row)
+        _attach_pack(row, offers_by_key)
     attach_other_presentations(visible, offers_by_key)
     return visible
+
+
+def _offer_pack(offer: VisibleOffer) -> list[object] | None:
+    return multipack(
+        source_presentation=offer.presentation,
+        presentation_dimension=offer.presentation_dimension,
+        presentation_status=offer.presentation_status,
+        presentation_total_base=offer.presentation_total_base,
+    )
+
+
+def _attach_pack(row: dict[str, object], offers_by_key: dict[tuple[str, str], VisibleOffer]) -> None:
+    """Campo opcional ``pack`` = ``[conteo, "total"]`` para la etiqueta "4 × 92 g (368 g)".
+
+    Sólo si la presentación publicada es ese multipack ("por libra" o huevos no) y
+    ningún miembro del grupo lo contradice: cada oferta trae el mismo ``pack``, el
+    mismo multipack o el mismo total, o no trae tamaño. Ante la duda no se emite.
+    No cambia ``presentation``, facetas, orden ni precio por unidad.
+    """
+    group = [
+        offers_by_key[(str(offer["source_product_id"]), str(offer["location_id"]))]
+        for offer in row.get("offers") or ()  # type: ignore[union-attr]
+        if isinstance(offer, dict)
+    ]
+    if not group:
+        return
+    pack = _offer_pack(_core._representative(group))
+    presentation = row.get("presentation")
+    if pack is None or not isinstance(presentation, str) or not presentation.startswith(f"{pack[0]} × "):
+        return
+    for member in group:
+        member_pack = _offer_pack(member)
+        if member_pack is not None and member_pack != pack:
+            return
+        if member_pack is None and _derived_presentation(member) not in {None, presentation, pack[1]}:
+            return
+    row["pack"] = pack
 
 
 def _weighed_type(row: dict[str, object]) -> bool:
@@ -355,6 +394,7 @@ def _presentation_entry(row: dict[str, object], *, large_size: bool) -> dict[str
         "best_price": None if best_price is None else format(best_price, "f"),
         "best_unit_price": best_offer.get("unit_price"),
         "large_size": large_size,
+        **({"pack": row["pack"]} if row.get("pack") else {}),
     }
 
 
@@ -591,11 +631,13 @@ HOME_ROWS = 16
 SEARCH_COLUMNS = (
     "id", "product_name", "brand", "presentation", "category", "product_type",
     "partition", "best_price", "unit_amount", "unit_per", "retailers", "promo",
-    "other_presentations", "comparability", "photo",
+    "other_presentations", "comparability", "photo", "pack",
 )
 # id = hash del row_id sin prefijo; comparabilidad en una letra; photo = foto del
 # producto: huella de 10 caracteres de la versión 2 (R2, 800 y 320 px), número de
-# versión de la rama ``product-images`` (v1, 400 px) o 0 (la app dibuja la ilustración).
+# versión de la rama ``product-images`` (v1, 400 px) o 0 (la app dibuja la ilustración);
+# pack = ``[conteo, "total"]`` de un multipack (``[4, "368 g"]``) o 0. La app lee las
+# columnas por nombre: una versión en caché ignora ``pack``.
 PHOTO_INDEX_SCHEMA = "super-compras-product-images/v1"
 PHOTO_INDEX_SCHEMA_V2 = "super-compras-product-images/v2"
 _PHOTO_VERSIONS: dict[str, int | str] = {}
@@ -667,6 +709,7 @@ def _search_entry(row: dict[str, object], partition: int, retailer_index: dict[s
         retailers, 1 if promo else 0, len(row.get("other_presentations") or ()),
         _COMPARABILITY_CODES.get(str(row.get("comparability")), "i"),
         _PHOTO_VERSIONS.get(key, 0),
+        row.get("pack") or 0,
     ]
 
 

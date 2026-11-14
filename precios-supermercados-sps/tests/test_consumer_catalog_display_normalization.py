@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+from dataclasses import replace
 from pathlib import Path
+
+from precios_supermercados.consumer_catalog_display import multipack
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "exportar_consumer_catalog.py"
@@ -243,3 +246,100 @@ def test_common_unmodeled_unit_is_normalized_without_becoming_unknown() -> None:
         presentation_total_base=None,
         presentation_status="missing",
     ) == "1 gal"
+
+
+# ------------------------------------------------- pack = [conteo, "total"] (propuesta 4)
+
+PACK_FRESH = {(sm, f"{sm}_sps"): "FRESH" for sm in ("la_colonia", "colonial", "walmart", "pricesmart")}
+
+
+def pack_offer(supermarket: str = "pricesmart", number: int = 1, **fields: object) -> object:
+    base = offer(
+        name="Snack Pack Pudín de Chocolate 4 Unidades / 92 g / 3 oz",
+        brand="Snack Pack",
+        presentation="4 × 92 g",
+        dimension="mass_g",
+        total="368",
+        status="name_only",
+        product_type="Postre",
+    )
+    return replace(
+        base,
+        **{
+            "source_product_id": f"{supermarket}:{number}",
+            "supermarket_id": supermarket,
+            "location_id": f"{supermarket}_sps",
+            **fields,
+        },
+    )
+
+
+def test_multipack_returns_count_and_total_only_for_accepted_arithmetic() -> None:
+    def pack(display: str | None, dimension: str | None, total: str | None, status: str = "confirmed") -> object:
+        return multipack(
+            source_presentation=display,
+            presentation_dimension=dimension,
+            presentation_status=status,
+            presentation_total_base=total,
+        )
+
+    assert pack("4 × 92 g", "mass_g", "368", "name_only") == [4, "368 g"]
+    assert pack("6 × 200 ml", "volume_ml", "1200") == [6, "1.2 L"]
+    assert pack("2 × 7 oz", "ounce", "14") == [2, "14 oz"]
+    assert pack("25 × 453.59 g", "mass_g", "11339.75") == [25, "11.34 kg"]
+    # Sin pack: un solo envase, conteo, aritmética que no cuadra o estado excluido.
+    assert pack("368 g", "mass_g", "368") is None
+    assert pack("1 × 368 g", "mass_g", "368") is None
+    assert pack("12 unidades", "count", "12") is None
+    assert pack("4 × 92 g", "mass_g", "92") is None
+    assert pack("4 × 92 g", "volume_ml", "368") is None
+    for status in ("ambiguous_multipack", "conflict", "source_only", "name_preferred_source_conflict", "missing"):
+        assert pack("4 × 92 g", "mass_g", "368", status) is None
+
+
+def test_build_rows_adds_pack_without_touching_presentation_order_or_unit_price() -> None:
+    [row] = MODULE.build_rows((pack_offer(),), PACK_FRESH)
+    [ambiguous] = MODULE.build_rows((pack_offer(presentation_status="confirmed", presentation="368 g"),), PACK_FRESH)
+    assert row["pack"] == [4, "368 g"]
+    assert row["presentation"] == "4 × 92 g"
+    assert "pack" not in ambiguous and ambiguous["presentation"] == "368 g"
+    # El precio por unidad sale del mismo total con o sin pack.
+    assert row["offers"][0]["unit_price"] == ambiguous["offers"][0]["unit_price"]
+
+
+def test_build_rows_omits_pack_for_single_sizes_and_excluded_states() -> None:
+    single = pack_offer(presentation="368 g", product_name="Pudín 368 g")
+    conflict = pack_offer(number=2, presentation_status="conflict", product_name="Pudín B 4 Unidades / 92 g")
+    ambiguous = pack_offer(number=3, presentation_status="ambiguous_multipack", product_name="4 Pack Pudding - 368 g")
+    rows = MODULE.build_rows((single, conflict, ambiguous), PACK_FRESH)
+    assert len(rows) == 3 and all("pack" not in row for row in rows)
+
+
+def test_build_rows_omits_pack_when_a_group_member_contradicts_it() -> None:
+    def member(supermarket: str, number: int, **fields: object) -> object:
+        return pack_offer(supermarket, number, canonical_product_id="gtin:pudin", comparison_status="ready", **fields)
+
+    agree = (member("pricesmart", 1), member("walmart", 2, presentation="368 g", presentation_status="confirmed"))
+    [row] = MODULE.build_rows(agree, PACK_FRESH)
+    assert row["comparability"] == "comparable" and row["pack"] == [4, "368 g"]
+
+    other_count = (member("pricesmart", 1), member("walmart", 2, presentation="2 × 184 g"))
+    [row] = MODULE.build_rows(other_count, PACK_FRESH)
+    assert row["comparability"] == "comparable" and "pack" not in row
+
+    other_size = (
+        member("pricesmart", 1),
+        member("walmart", 2, presentation=None, product_name="4 Pack Pudding - 92 g", presentation_status="ambiguous_multipack"),
+    )
+    [row] = MODULE.build_rows(other_size, PACK_FRESH)
+    assert "pack" not in row
+
+
+def test_build_rows_drops_pack_when_the_row_is_sold_by_pound() -> None:
+    weighed = pack_offer("walmart", 7, product_name="Pudín de chocolate")
+    MODULE.SOURCE_POUND.add("walmart:7")
+    try:
+        [row] = MODULE.build_rows((weighed,), PACK_FRESH)
+    finally:
+        MODULE.SOURCE_POUND.discard("walmart:7")
+    assert row["presentation"] == "por libra" and "pack" not in row
