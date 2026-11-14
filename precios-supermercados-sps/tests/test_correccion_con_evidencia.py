@@ -532,3 +532,23 @@ def test_offer_evidence_dataclass_rejects_bad_values() -> None:
     with pytest.raises(SizeDecisionError):
         replace(decide(LACTOLAC)[LACTOLAC], decision="different_products", net_content_value=None,
                 net_content_unit=None, apply="all")
+
+
+def test_title_comes_from_a_store_that_publishes_the_official_size() -> None:
+    def visible(store: str, name: str, published_as: str | None) -> core.VisibleOffer:
+        return core.VisibleOffer(
+            source_product_id=f"{store}:1", supermarket_id=store, location_id=f"{store}_sps", product_name=name,
+            brand="Lactolac", presentation="240 g", current_price_minor=5000, reported_regular_price_minor=None,
+            is_promotion=False, availability="in_stock", observed_at="2026-11-14T08:00:00Z",
+            canonical_product_id=f"gtin:{LACTOLAC}", category="Lácteos", product_type="Queso",
+            presentation_dimension="mass_g", presentation_total_base="240", presentation_status="confirmed",
+            comparison_status="ready", published_as=published_as,
+        )
+
+    group = [
+        visible("la_colonia", "Queso Americano Lactolac Blanco 230 Gr", "230 g"),  # nombre más corto
+        visible("walmart", "Queso Americano Lactolac Procesado Blanco 240 g", None),
+    ]
+    assert core._representative(group).supermarket_id == "walmart"
+    # Si todas fueron corregidas, sigue el orden de siempre.
+    assert core._representative([replace(item, published_as="230 g") for item in group]).supermarket_id == "la_colonia"
