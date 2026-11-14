@@ -34,6 +34,7 @@ BATCH_FILE = "lote.json"
 DEFAULT_N = 25
 TILE = 560
 CAPTION = 130
+CAPTION_CHARS = 46
 HEADER = 70
 MAX_COLUMNS = 3
 PHOTO_DELAY = 0.3
@@ -82,7 +83,8 @@ def offer_label(offer: Mapping[str, object]) -> list[str]:
         lines[0] += f" · foto compartida (de {store_name(source)})"
     if not offer.get("foto"):
         lines[0] += " · sin foto"
-    lines += textwrap.wrap(str(offer.get("name") or ""), 58)[:2]
+    lines = textwrap.wrap(lines[0], CAPTION_CHARS)[:2]  # sin encimarse con la casilla vecina
+    lines += textwrap.wrap(str(offer.get("name") or ""), CAPTION_CHARS)[:2]
     if offer.get("code"):
         lines.append(f"código {offer['code']}")
     return lines
