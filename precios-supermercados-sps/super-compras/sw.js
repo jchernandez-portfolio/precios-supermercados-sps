@@ -1,13 +1,13 @@
 // Service worker de Súper Compras: guarda la app para abrirla sin conexión.
 // Los datos (raw.githubusercontent.com) van primero a la red y caen a la copia
 // guardada si no hay internet, así nunca se muestran precios viejos sin necesidad.
-const VERSION = "super-compras-20261114-2";
+const VERSION = "super-compras-20261114-3";
 // Las fotos llevan ?v=<versión> o la huella en el nombre: una vez guardadas no
 // cambian (primero caché).
 const PHOTOS = "super-compras-fotos-1";
 const MAX_PHOTOS = 600;
-const SHELL = ["./", "index.html", "styles.css?v=20261114-2", "app.js?v=20261114-2", "data.js?v=20261114-2", "illustration.js?v=20261114-2",
-  "scanner.js?v=20261114-2", "vendor/zxing-upcean.js?v=20261114-2", "manifest.webmanifest", "icons/icon.svg", "icons/logo.svg",
+const SHELL = ["./", "index.html", "styles.css?v=20261114-3", "app.js?v=20261114-3", "data.js?v=20261114-3", "illustration.js?v=20261114-3",
+  "scanner.js?v=20261114-3", "vendor/zxing-upcean.js?v=20261114-3", "manifest.webmanifest", "icons/icon.svg", "icons/logo.svg",
   "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png",
   "fonts/inter-400.woff2", "fonts/inter-600.woff2", "fonts/inter-700.woff2", "fonts/space-grotesk-500.woff2", "fonts/space-grotesk-700.woff2"];
 
