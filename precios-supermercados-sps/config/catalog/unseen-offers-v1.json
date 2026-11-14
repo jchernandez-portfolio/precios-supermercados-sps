@@ -1,6 +1,6 @@
 {
   "schema": "rpi-unseen-offers-policy/v1",
-  "record_capture_membership": false,
+  "record_capture_membership": true,
   "hide_unseen_offers": false,
   "max_unseen_fraction": 0.5,
   "notes": "Ofertas no vistas en la última captura aceptada (docs/calidad/ofertas-no-vistas.md). Paso 1, con permiso del dueño: record_capture_membership=true (la persistencia diaria crea y llena la tabla derivada capture_membership, 1 fila por contexto). Paso 2, tras revisar la medición del manifest (unseen_offers): hide_unseen_offers=true."

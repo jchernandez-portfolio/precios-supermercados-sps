@@ -39,9 +39,14 @@ RUN_AT = "2026-09-20T10:00:00Z"
 # --------------------------------------------------------------------- política
 
 
-def test_versioned_policy_ships_disabled() -> None:
-    policy = cm.load_policy()
-    assert policy == cm.UnseenOffersPolicy(False, False, 0.5)
+def test_versioned_policy_measures_but_never_hides_yet() -> None:
+    # Paso 1 aprobado por el dueño: se mide, todavía no se oculta nada.
+    policy = cm.load_policy(cm.POLICY_PATH)
+    assert policy == cm.UnseenOffersPolicy(True, False, 0.5)
+
+
+def test_without_the_switch_nothing_is_recorded() -> None:
+    assert cm.load_policy() == cm.UnseenOffersPolicy()  # conftest: apagado por defecto en pruebas
     assert turso_updater.membership_keys_if_enabled(json.loads(snapshot(RUN_AT, [product()]))) is None
 
 
