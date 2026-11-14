@@ -687,9 +687,13 @@ def _comparability_today(mode: str, group: Sequence[VisibleOffer]) -> str:
 
 
 def _representative(group: Sequence[VisibleOffer]) -> VisibleOffer:
+    # El título sale de un súper que publica el tamaño oficial: si el motor corrigió
+    # la oferta con evidencia (``published_as``), su nombre trae el tamaño viejo
+    # ("Lactolac ... 230 Gr" en una fila de 240 g).
     return sorted(
         group,
         key=lambda offer: (
+            offer.published_as is not None,
             offer.product_type is None,
             offer.category is None,
             offer.brand is None,
@@ -698,6 +702,8 @@ def _representative(group: Sequence[VisibleOffer]) -> VisibleOffer:
             offer.supermarket_id,
         ),
     )[0]
+
+
 def _public_assignment(group: Sequence[VisibleOffer]) -> master_taxonomy.Assignment:
     """Nodo del árbol maestro v1 de un grupo (comparte el más específico)."""
     assignments = [
