@@ -1,6 +1,6 @@
 # Errores de datos en Súper Compras
 
-Actualizado automáticamente el 2026-11-14 a partir del catálogo publicado (San Pedro Sula: 2026-11-14T02:30:23.772992Z; Tegucigalpa: 2026-11-14T02:33:08.868163Z).
+Actualizado automáticamente el 2026-11-14 a partir del catálogo publicado (San Pedro Sula: 2026-11-14T02:44:10.701192Z; Tegucigalpa: 2026-11-14T02:45:54.131414Z).
 
 - [`errores_detectados.csv`](errores_detectados.csv): todo lo que la revisión automática encuentra hoy, una fila por producto y supermercado, con enlace al producto.
 - [`errores_confirmados.csv`](errores_confirmados.csv): errores revisados a mano, de dónde vienen (súper o Súper Compras) y su estado.
@@ -19,9 +19,9 @@ Actualizado automáticamente el 2026-11-14 a partir del catálogo publicado (San
 | San Pedro Sula | Walmart | walmart_sps | 2026-11-13 11:26 | 15 | Al día |
 | San Pedro Sula | PriceSmart | pricesmart_sps | 2026-11-13 11:18 | 15 | Al día |
 | San Pedro Sula | Los Andes | comisariato_los_andes_sps | 2026-11-13 11:19 | 15 | Al día |
-| Tegucigalpa | La Colonia | la_colonia_tgu | 2026-11-12 11:37 | 38 | Al día |
-| Tegucigalpa | Walmart | walmart_tgu_ffaa | 2026-11-13 11:34 | 14 | Al día |
-| Tegucigalpa | Walmart | walmart_tgu_el_sauce | 2026-11-13 11:42 | 14 | Al día |
+| Tegucigalpa | La Colonia | la_colonia_tgu | 2026-11-12 11:37 | 39 | Al día |
+| Tegucigalpa | Walmart | walmart_tgu_ffaa | 2026-11-13 11:34 | 15 | Al día |
+| Tegucigalpa | Walmart | walmart_tgu_el_sauce | 2026-11-13 11:42 | 15 | Al día |
 | Tegucigalpa | PriceSmart | pricesmart_tgu | 2026-11-13 11:19 | 15 | Al día |
 | Tegucigalpa | Paiz | paiz_tgu_multiplaza | 2026-11-13 11:22 | 15 | Al día |
 | Tegucigalpa | Paiz | paiz_tgu_proceres | 2026-11-13 11:26 | 15 | Al día |
