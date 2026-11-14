@@ -52,7 +52,8 @@ def test_pending_puts_requested_codes_first_then_ties_and_skips_auto_and_seen() 
 def test_labels_mark_shared_photos_and_missing_ones() -> None:
     walmart, paiz, colonial = item(MIGO)["offers"]
     assert preparar.offer_label(walmart)[0] == "Walmart · publicado: 907.18 g"
-    assert preparar.offer_label(paiz)[0] == "Paiz · publicado: 1000 g · foto compartida (de Walmart)"
+    assert " ".join(preparar.offer_label(paiz)[:2]) == "Paiz · publicado: 1000 g · foto compartida (de Walmart)"
+    assert all(len(line) <= preparar.CAPTION_CHARS for line in preparar.offer_label(paiz))
     assert preparar.offer_label(colonial)[0] == "Colonial · publicado: 908 g · sin foto"
 
 
