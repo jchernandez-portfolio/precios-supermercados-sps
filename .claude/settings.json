@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh api -X POST repos/jchernandez-portfolio/precios-supermercados-sps/actions/workflows/*)",
+      "Bash(gh api -X DELETE repos/jchernandez-portfolio/precios-supermercados-sps/git/refs/heads/rpi/*)",
+      "Bash(gh api repos/jchernandez-portfolio/precios-supermercados-sps/actions/*)"
+    ]
+  }
+}
