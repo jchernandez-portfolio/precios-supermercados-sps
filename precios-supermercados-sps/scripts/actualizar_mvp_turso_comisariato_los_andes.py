@@ -24,6 +24,8 @@ from actualizar_mvp_turso_la_colonia import (  # noqa: E402
     _run_batch,
     _stmt,
     _validate_table_names,
+    membership_keys_if_enabled,
+    membership_summary,
 )
 from precios_supermercados.scrapers.comisariato_los_andes import gtin_from_code  # noqa: E402
 
@@ -322,6 +324,7 @@ def persist_snapshot(
         raise SnapshotError("run_id_conflict")
 
     _register_scope(database_url, auth_token)
+    membership_keys = membership_keys_if_enabled(snapshot)
     steps = _mutation_steps(
         _normalised_json(snapshot),
         location_id=LOCATION_ID,
@@ -332,6 +335,7 @@ def persist_snapshot(
         artifact_id=source_artifact_id,
         digest=digest,
         supermarket_id=SUPERMARKET_ID,
+        membership_keys=membership_keys,
     )
     results = _run_batch(database_url, auth_token, steps)
     opened = _affected(results, steps, "open_history")
@@ -345,6 +349,7 @@ def persist_snapshot(
         "history_opened": opened,
         "history_closed": closed,
         "history_unchanged": len(snapshot["products"]) - opened,
+        **membership_summary(membership_keys),
     }
 
 

@@ -180,7 +180,8 @@ de fotos; no escriben en Turso ni cambian identidad, perfiles ni comparabilidad.
 
 ## Pendiente (priorizado)
 
-1. **Ofertas fantasma** (alta): registrar la última captura que vio cada oferta (p. ej.
+1. **Ofertas fantasma** (alta; implementado detrás de un interruptor apagado, ver
+   `docs/calidad/ofertas-no-vistas.md`): registrar la última captura que vio cada oferta (p. ej.
    `last_seen_run` por contexto, escrito como delta) y publicar `last_seen_at`; después,
    ocultar o marcar ofertas que el súper dejó de publicar hace N días. Requiere cambio de
    persistencia (tabla derivada opcional o columna) y revisión de costo en Turso. Señal

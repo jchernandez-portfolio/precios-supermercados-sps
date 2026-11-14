@@ -82,7 +82,8 @@ python scripts/versionar_super_compras.py --auto   # o --check
 - Diseño pendiente de implementar: `docs/propuestas-revision-tamanos.md` (#79).
 - Open Food Facts eliminado (#84).
 
-**Pendientes**: ofertas fantasma (`last_seen`), 3,913 fotos heredadas TGU por verificar,
+**Pendientes**: activar ofertas no vistas (código listo y apagado; requiere permiso del
+dueño, `docs/calidad/ofertas-no-vistas.md`), 3,913 fotos heredadas TGU por verificar,
 títulos duplicados VTEX, implementar las 4 propuestas de #79, borrar ramas `rpi/*` ya
 fusionadas (requiere permiso del dueño), probar el escáner en un iPhone/Android reales.
 
