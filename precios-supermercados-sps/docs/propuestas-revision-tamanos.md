@@ -398,6 +398,24 @@ Catálogo sin multipacks: salida idéntica salvo la columna.
 Un campo en el exportador, una rama en una función del frontend y sus pruebas. Sin
 tablas, sin identidad, sin workflows.
 
+### Estado (14-nov-2026): implementado (`rpi/etiqueta-pack`)
+
+`multipack()` en `consumer_catalog_display.py`, `_attach_pack` y `confirm_packs` en el
+exportador, columna `pack` en `search.json` y `presentationLabel`. De las 471 filas "N × X"
+del catálogo SPS publicado el 13-nov (435 en TGU), sólo las del tipo (a) reciben `pack`:
+el nombre dice la medida por envase ("12x36gr", "21 grx12 pack", "4/10 g", "50 g c/u" o
+"6 Unidades / 250 mL" de PriceSmart) y el precio por unidad no lo contradice (≥ 1/4 de la
+mediana de su tipo o categoría y más cerca de ella que la lectura "X es el total"). SPS:
+336 (a), 110 (b) X puede ser el total ("Pozuelo -12 uds/265g", "Snickers 30 Unidades /
+1.5 kg"), 25 (c) capacidad del envase o conteo mal leído (vasos, bolsas, "1 000 Unidades").
+TGU: 329 / 83 / 23. Las (b) y (c) se ven como hoy; su lectura "N × X" (y su precio por
+unidad) sigue mal en el motor y queda como ajuste aparte del parser.
+El caso Hunts/Snack Pack **no** cumple: "4 Pack ... - 368 g" es
+`ambiguous_multipack` en el parser y Walmart publica el mismo producto como "- 368 g" y
+"- 92 g" al mismo precio (L 75.20), así que el nombre no dice si la medida es total o por
+unidad (≈500 filas así). No se cambió el parser: hace falta otra evidencia (otro súper o
+una decisión humana).
+
 ---
 
 ## Preguntas abiertas para el dueño
