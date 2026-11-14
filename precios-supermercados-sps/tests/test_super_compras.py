@@ -165,9 +165,16 @@ def test_app_shell_is_static_safe_and_installable() -> None:
     assert "fonts.googleapis.com" not in html and "fonts.gstatic.com" not in html
     assert "font-src 'self'" in html and "style-src 'self';" in html
     styles = (APP_DIR / "styles.css").read_text(encoding="utf-8")
-    for weight in (400, 500, 600, 700, 800):
-        assert f'url("fonts/figtree-{weight}.woff2")' in styles and (APP_DIR / "fonts" / f"figtree-{weight}.woff2").is_file()
-    assert (APP_DIR / "fonts" / "LICENSE-Figtree.txt").is_file()
+    # Diseño «Lima»: Inter (texto) y Space Grotesk (títulos y precios), cada una con su OFL.
+    fonts = [("inter", weight) for weight in (400, 600, 700)] + [("space-grotesk", weight) for weight in (500, 700)]
+    for family, weight in fonts:
+        name = f"fonts/{family}-{weight}.woff2"
+        assert f'url("{name}")' in styles and (APP_DIR / name).is_file(), name
+        assert f'"{name}"' in shell, name  # el service worker la guarda para abrir sin conexión
+    for license_name in ("LICENSE-Inter.txt", "LICENSE-SpaceGrotesk.txt"):
+        assert "SIL Open Font License" in (APP_DIR / "fonts" / license_name).read_text(encoding="utf-8")
+    assert 'href="fonts/inter-400.woff2"' in html and 'href="fonts/space-grotesk-700.woff2"' in html
+    assert not list((APP_DIR / "fonts").glob("figtree-*")) and "Figtree" not in styles and "figtree" not in shell
 
 
 def test_app_never_injects_html_or_reads_private_sources() -> None:
@@ -433,7 +440,8 @@ def test_public_page_is_ready_to_share_and_does_not_overflow_on_phones() -> None
     manifest = json.loads((APP_DIR / "manifest.webmanifest").read_text(encoding="utf-8"))
     assert "Tegucigalpa" in manifest["description"]
     styles = (APP_DIR / "styles.css").read_text(encoding="utf-8")
-    assert ".product-layout { display: grid; grid-template-columns: minmax(0, 1fr);" in styles
+    # «Lima»: foto de 120 px y columna de texto que puede encogerse (la foto de 800 px no ensancha).
+    assert ".product-layout { display: grid; grid-template-columns: 120px minmax(0, 1fr);" in styles
     assert ".filters { position: relative;" in styles
     assert re.search(r"\.product-image \.photo \{ position: absolute;", styles)
     app = (APP_DIR / "app.js").read_text(encoding="utf-8")

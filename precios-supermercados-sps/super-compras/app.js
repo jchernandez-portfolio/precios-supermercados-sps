@@ -2,10 +2,10 @@
 // Vistas: inicio, búsqueda, ficha de producto, ofertas y Mi compra; #/admin/revision
 // (panel interno de tamaños) se carga aparte sólo cuando se abre.
 import {
-  Catalog, RETAILER_COLORS, rowKey, RETAILER_INITIALS, RETAILER_NAMES, countText, listText, loadCart, loadCities, loadCitySlug,
+  Catalog, RETAILER_COLORS, rowKey, RETAILER_NAMES, countText, listText, loadCart, loadCities, loadCitySlug,
   migrateCartLines, money, photoSrcset, photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, storeLabel,
-} from "./data.js?v=20261113-6";
-import { productIllustration } from "./illustration.js?v=20261113-6";
+} from "./data.js?v=20261114-1";
+import { productIllustration } from "./illustration.js?v=20261114-1";
 
 // Foto real si existe; si no hay o falla al cargar, la ilustración de siempre.
 // Tarjetas y miniaturas usan 320 px; el detalle deja que el navegador elija 320 u
@@ -98,6 +98,9 @@ const state = {
   cart: [],
   limit: PAGE_SIZE,
   lastQueryKey: "",
+  // Franjas de precios por súper: un observador por vista y la carga de cada tarjeta.
+  observer: null,
+  loaders: new Map(),
 };
 
 function catalogUrl() {
@@ -247,22 +250,168 @@ function storesLine(product) {
     count > 1 ? `Compara en ${count} súper` : `En ${RETAILER_NAMES[product.retailers[0]] || "1 súper"}`);
 }
 
-function productCard(product) {
-  return h("a", { class: "card", href: `#/p/${product.id}` },
-    h("div", { class: "tile" },
-      product.promo ? h("span", { class: "badge-offer" }, "Oferta") : null,
-      productVisual(product, { size: 118 })),
-    h("div", { class: "pills" }, sizePill(product)),
-    h("strong", { class: "brand" }, product.brand_label ?? (product.brand || product.product_type || "Producto")),
-    h("span", { class: "name" }, product.display_name ?? product.product_name),
-    h("span", { class: "price" }, h("small", {}, "desde "), money(product.best_price)),
-    product.unit_amount ? h("span", { class: "unit" }, `${money(product.unit_amount)} por ${product.unit_per}`) : h("span", { class: "unit" }, " "),
-    storesLine(product));
-}
-
 function sectionHeader(title, link) {
   return h("div", { class: "section-head" }, h("h2", {}, title), link || null);
 }
+
+function productName(product) {
+  return product.display_name ?? product.product_name;
+}
+
+// Etiqueta lima del precio (identidad «Lima»).
+function priceTag(value, extra = "") {
+  return h("span", { class: `price-tag${extra ? ` ${extra}` : ""}` }, money(value));
+}
+
+function storeDot(id) {
+  return h("i", { class: "dot", style: { background: RETAILER_COLORS[id] || "#545B55" }, "aria-hidden": "true" });
+}
+
+// Rebaja publicada por el súper: precio regular contra el actual.
+function discountOf(offer) {
+  const regular = Number(offer?.reported_regular_price);
+  const current = Number(offer?.current_price);
+  if (!(regular > current) || !(current > 0)) return null;
+  return { regular, pct: Math.round((1 - current / regular) * 100) };
+}
+
+function bestDiscount(offers) {
+  let best = null;
+  for (const offer of offers) {
+    const discount = discountOf(offer);
+    if (discount && (!best || discount.pct > best.pct)) best = { ...discount, offer };
+  }
+  return best;
+}
+
+function liveOffers(row) {
+  return (row?.offers || []).filter((offer) => offer.current_price && offer.availability !== "out_of_stock")
+    .sort((a, b) => Number(a.current_price) - Number(b.current_price));
+}
+
+// Precios de una fila (partición del catálogo) sin bloquear la vista: si fallan o la
+// vista cambió, la tarjeta se queda como está. Catalog.row guarda cada partición una
+// sola vez, así varias tarjetas de la misma partición comparten una descarga.
+function withRow(product, onOffers) {
+  const catalog = state.catalog;
+  const token = state.renderToken;
+  return catalog.row(product).then((row) => {
+    if (state.catalog !== catalog || state.renderToken !== token || !row) return null;
+    const offers = liveOffers(row);
+    onOffers(offers, row);
+    return offers;
+  }).catch(() => null);
+}
+
+// Franja de precios por súper: una celda por cadena (su sucursal más barata); la más
+// barata en verde sólo si hay con qué comparar.
+function storeStrip(offers) {
+  const bySuper = new Map();
+  for (const offer of offers) if (!bySuper.has(offer.supermarket_id)) bySuper.set(offer.supermarket_id, offer);
+  // Con un solo súper no hay nada que comparar: la tarjeta ya dice dónde está.
+  if (bySuper.size < 2) return null;
+  const minimum = Math.min(...[...bySuper.values()].map((offer) => Number(offer.current_price)));
+  return h("ul", { class: "strip", "aria-label": "Precio en cada súper" },
+    [...bySuper.entries()].map(([id, offer]) => {
+      const cheapest = Number(offer.current_price) === minimum;
+      return h("li", { class: cheapest ? "cheapest" : null },
+        h("span", { class: "strip-store" }, RETAILER_NAMES[id] || id),
+        h("strong", {}, money(offer.current_price)),
+        cheapest ? h("span", { class: "sr-only" }, " (el más barato)") : null);
+    }));
+}
+
+// Carga diferida: sólo cuando la tarjeta se ve (o, sin IntersectionObserver, ya).
+function watchVisible(node, load) {
+  if (!("IntersectionObserver" in window)) { load(); return; }
+  if (!state.observer) {
+    state.observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        state.observer.unobserve(entry.target);
+        state.loaders.get(entry.target)?.();
+        state.loaders.delete(entry.target);
+      }
+    }, { rootMargin: "160px 0px" });
+  }
+  state.loaders.set(node, load);
+  state.observer.observe(node);
+}
+
+// Después de pintar: las franjas nunca retrasan la vista.
+function afterPaint(callback) {
+  const token = state.renderToken;
+  const run = () => { if (state.renderToken === token) callback(); };
+  if ("requestIdleCallback" in window) window.requestIdleCallback(run, { timeout: 800 });
+  else setTimeout(run, 120);
+}
+
+// ------------------------------------------------------------------ filtros desplegables
+// Botón píldora + lista de opciones (una sola, como super/cat/orden en la URL). En
+// celular la lista sube desde abajo; en computadora flota bajo el botón.
+let openMenu = null;
+
+function closeMenu({ focus = true } = {}) {
+  if (!openMenu) return;
+  const { button, panel } = openMenu;
+  openMenu = null;
+  panel.hidden = true;
+  button.setAttribute("aria-expanded", "false");
+  document.body.classList.remove("sheet-open");
+  if (focus && button.isConnected) button.focus();
+}
+
+function filterMenu({ id, label, value, options, defaultValue = "", onPick }) {
+  const current = options.find(([optionValue]) => optionValue === value);
+  const active = Boolean(current) && value !== defaultValue;
+  const listId = `menu-${id}`;
+  const button = h("button", {
+    type: "button", class: `filter-btn${active ? " is-set" : ""}`, "aria-haspopup": "listbox", "aria-expanded": "false",
+    "aria-controls": listId, "aria-label": active ? `${label}: ${current[1]}` : label,
+  }, h("span", { class: "filter-text" }, active ? current[1] : label), h("span", { class: "chev", "aria-hidden": "true" }));
+  const items = options.map(([optionValue, text]) => h("button", {
+    type: "button", role: "option", class: "menu-option", "aria-selected": String(optionValue === value),
+    tabindex: optionValue === value ? "0" : "-1",
+    onclick: () => {
+      closeMenu({ focus: optionValue === value });
+      if (optionValue !== value) onPick(optionValue);
+    },
+  }, text));
+  const list = h("div", {
+    class: "menu-list", role: "listbox", id: listId, "aria-label": label,
+    onkeydown: (event) => {
+      const position = items.indexOf(document.activeElement);
+      const target = { ArrowDown: position + 1, ArrowUp: position - 1, Home: 0, End: items.length - 1 }[event.key];
+      if (target === undefined) return;
+      event.preventDefault();
+      items[Math.max(0, Math.min(items.length - 1, target))]?.focus();
+    },
+  }, items);
+  const panel = h("div", { class: "menu", hidden: true }, h("p", { class: "menu-head", "aria-hidden": "true" }, label), list);
+  const wrap = h("div", {
+    class: "dd",
+    onfocusout: (event) => { if (openMenu?.wrap === wrap && !wrap.contains(event.relatedTarget)) closeMenu({ focus: false }); },
+  }, button, panel);
+  button.addEventListener("click", () => {
+    if (openMenu?.button === button) { closeMenu(); return; }
+    closeMenu({ focus: false });
+    panel.hidden = false;
+    panel.classList.remove("menu-right");
+    button.setAttribute("aria-expanded", "true");
+    document.body.classList.add("sheet-open");
+    openMenu = { button, panel, wrap };
+    if (panel.getBoundingClientRect().right > window.innerWidth - 8) panel.classList.add("menu-right");
+    (items.find((item) => item.getAttribute("aria-selected") === "true") || items[0])?.focus();
+  });
+  return wrap;
+}
+
+document.addEventListener("pointerdown", (event) => {
+  if (openMenu && !openMenu.wrap.contains(event.target)) closeMenu({ focus: false });
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && openMenu) { event.preventDefault(); closeMenu(); }
+});
 
 // ------------------------------------------------------------------ views
 // Portada: ofertas y más comparados vienen en home.json (misma selección que aquí);
@@ -297,31 +446,208 @@ function whenIndexed(catalog, text = "Cargando el catálogo…") {
   return loadingPage(text);
 }
 
+// Foto de cada departamento: el primer producto con foto entre los datos ya cargados
+// (portada o índice completo); sin foto, la inicial.
+function departmentPictures(catalog, departments) {
+  const wanted = new Set(departments.map((department) => department.name));
+  const found = new Map();
+  const pool = catalog.ready ? catalog.products : [...(catalog.home?.deals || []), ...(catalog.home?.compared || [])];
+  for (const product of pool) {
+    if (found.size === wanted.size) break;
+    if (product.category && wanted.has(product.category) && !found.has(product.category) && photoUrl(product, 320)) found.set(product.category, product);
+  }
+  return found;
+}
+
+function departmentCircle(department, product) {
+  return h("a", { class: "circle", href: `#/buscar?cat=${encodeURIComponent(department.name)}`, "data-department": department.name },
+    h("span", { class: "circle-disc" }, product ? productVisual(product, { size: 44 }) : h("span", { class: "circle-initial", "aria-hidden": "true" }, department.name.slice(0, 1))),
+    h("span", { class: "circle-name" }, department.name));
+}
+
+// Tarjeta ancha de rebaja: foto, nombre, precio lima y, cuando llegan los precios de la
+// partición, el precio anterior, el % y la franja por súper.
+function dealCard(product) {
+  const was = h("span", { class: "deal-was" });
+  const slot = h("span", { class: "strip-slot" });
+  const node = h("a", { class: "deal", href: `#/p/${product.id}` },
+    h("span", { class: "thumb" }, productVisual(product, { size: 76 })),
+    h("span", { class: "deal-body" },
+      h("strong", { class: "deal-name" }, productName(product)),
+      h("span", { class: "muted small" }, [presentationLabel(product), product.retailers.length > 1 ? `${product.retailers.length} súper` : null].filter(Boolean).join(" · ")),
+      h("span", { class: "deal-price" }, priceTag(product.best_price), was)),
+    slot);
+  const load = () => withRow(product, (offers) => {
+    const discount = bestDiscount(offers);
+    if (discount) {
+      fill(was, discount.offer === offers[0]
+        ? [h("del", {}, money(discount.regular)), h("span", { class: "pct" }, `−${discount.pct}%`)]
+        : h("span", { class: "pct" }, `−${discount.pct}% en ${storeLabel(discount.offer, offers)}`));
+    }
+    const strip = storeStrip(offers);
+    if (strip) slot.replaceWith(strip);
+  });
+  return { node, load };
+}
+
+// "Los más comparados": la nota de ahorro sólo usa particiones que ya se bajaron.
+function comparedRow(product) {
+  const note = storesLine(product);
+  const node = h("a", { class: "compared", href: `#/p/${product.id}` },
+    h("span", { class: "thumb thumb-sm" }, productVisual(product, { size: 52 })),
+    h("span", { class: "compared-body" },
+      h("strong", {}, productName(product)),
+      presentationLabel(product) ? h("span", { class: "muted small" }, presentationLabel(product)) : null,
+      note),
+    priceTag(product.best_price));
+  const loadIfCached = () => {
+    if (!state.catalog.partitionCache?.has(product.partition)) return;
+    withRow(product, (offers) => {
+      if (!offers.length) return;
+      const top = Number(offers[offers.length - 1].current_price);
+      const saving = top - Number(offers[0].current_price);
+      const stores = new Set(offers.map((offer) => offer.supermarket_id)).size;
+      fill(note, [storeLabel(offers[0], offers), `${stores} súper`, saving > 0.005 ? `ahorras ${money(saving)}` : null].filter(Boolean).join(" · "));
+      note.className = "stores compare";
+    });
+  };
+  return { node, loadIfCached };
+}
+
 function viewHome() {
   const catalog = state.catalog;
   const { deals, compared } = homeSections(catalog);
-  return h("div", { class: "page" },
-    h("section", { class: "hero" },
-      h("h1", {}, `Compara precios de súper en ${cityName()}`),
-      h("p", { class: "muted" }, `${countText(catalog.productCount, "producto")} en ${listText(catalog.retailers.map((id) => RETAILER_NAMES[id] || id))}.`),
-      h("div", { class: "hero-search" }, searchForm("", { large: true })),
-      h("p", { class: "fresh" }, icon("pin", 14), freshnessText())),
-    h("section", {},
-      sectionHeader("Ofertas de hoy", h("a", { href: "#/ofertas" }, "Ver todas")),
-      h("div", { class: "row-scroll" }, deals.map(productCard))),
-    h("section", {},
+  const departments = catalog.departments();
+  const pictures = departmentPictures(catalog, departments);
+  const dealCards = deals.map(dealCard);
+  const comparedRows = compared.map(comparedRow);
+  afterPaint(() => {
+    Promise.all(dealCards.slice(0, 6).map((card) => card.load()))
+      .then(() => { for (const row of comparedRows) row.loadIfCached(); });
+  });
+  // Al llegar el índice completo (se baja de todos modos en segundo plano), los
+  // departamentos que quedaron con la inicial reciben la foto de un producto suyo.
+  if (!catalog.ready) {
+    const token = state.renderToken;
+    catalog.loadIndex().then(() => {
+      if (state.renderToken !== token || state.catalog !== catalog) return;
+      const found = departmentPictures(catalog, departments);
+      for (const circle of document.querySelectorAll("[data-department]")) {
+        const product = found.get(circle.dataset.department);
+        const disc = circle.querySelector(".circle-disc");
+        if (product && disc?.querySelector(".circle-initial")) fill(disc, productVisual(product, { size: 44 }));
+      }
+    }).catch(() => {});
+  }
+  return h("div", { class: "page home" },
+    h("section", { class: "home-intro" },
+      h("h1", {}, `Compara precios en ${cityName()}`),
+      h("p", { class: "fresh" }, freshnessText()),
+      h("p", { class: "muted small" }, `${countText(catalog.productCount, "producto")} en ${listText(catalog.retailers.map((id) => RETAILER_NAMES[id] || id))}.`)),
+    departments.length ? h("section", { class: "circles-section" },
+      h("h2", { class: "sr-only" }, "Departamentos"),
+      h("div", { class: "circles" }, departments.map((department) => departmentCircle(department, pictures.get(department.name))))) : null,
+    deals.length ? h("section", {},
+      sectionHeader("En rebaja hoy", h("a", { href: "#/ofertas" }, "Ver todas")),
+      h("div", { class: "deal-list" }, dealCards.map((card) => card.node))) : null,
+    compared.length ? h("section", {},
       sectionHeader("Los más comparados"),
-      h("div", { class: "row-scroll" }, compared.map(productCard))),
+      h("div", { class: "compared-list" }, comparedRows.map((row) => row.node))) : null,
     h("section", {},
       sectionHeader("Departamentos"),
-      h("div", { class: "departments" }, catalog.departments().map((department) =>
+      h("div", { class: "departments" }, departments.map((department) =>
         h("a", { class: "department", href: `#/buscar?cat=${encodeURIComponent(department.name)}` },
           h("strong", {}, department.name),
           h("span", {}, countText(department.count, "producto")))))),
     h("section", { class: "stores-strip" },
       h("span", { class: "label" }, "Comparamos"),
-      catalog.retailers.map((id) => h("span", { class: "chip" }, h("i", { style: { background: RETAILER_COLORS[id] } }), RETAILER_NAMES[id])),
+      catalog.retailers.map((id) => h("span", { class: "chip" }, storeDot(id), RETAILER_NAMES[id])),
       h("p", { class: "muted small" }, "Precios públicos en línea de cada supermercado; pueden variar en tienda. Esta página no vende productos.")));
+}
+
+// Resultado: foto, nombre, presentación, precio por unidad, precio lima y la franja por
+// súper (sólo cuando la tarjeta se ve).
+function resultCard(product) {
+  const slot = h("span", { class: "strip-slot" });
+  const node = h("a", { class: "result", href: `#/p/${product.id}` },
+    h("span", { class: "thumb" }, productVisual(product, { size: 72 })),
+    h("span", { class: "result-body" },
+      h("span", { class: "result-brand" }, product.brand_label ?? (product.brand || product.product_type || "")),
+      h("strong", { class: "result-name" }, productName(product)),
+      h("span", { class: "result-meta" }, sizePill(product),
+        product.unit_amount ? h("span", { class: "muted small" }, `${money(product.unit_amount)} por ${product.unit_per}`) : null),
+      storesLine(product)),
+    h("span", { class: "result-price" },
+      product.retailers.length > 1 ? h("small", {}, "desde") : null,
+      priceTag(product.best_price),
+      product.promo ? h("span", { class: "offer-pill" }, "Oferta") : null),
+    slot);
+  watchVisible(node, () => withRow(product, (offers) => {
+    const strip = storeStrip(offers);
+    if (strip) slot.replaceWith(strip);
+  }));
+  return node;
+}
+
+// Tarjeta chica (carrusel / mosaico / lista de ofertas): foto, nombre, precio y %.
+function miniCard(product, extra = "") {
+  const pct = h("span", { class: "mini-pct" });
+  const node = h("a", { class: `mini${extra ? ` ${extra}` : ""}`, href: `#/p/${product.id}` },
+    h("span", { class: "thumb" }, productVisual(product, { size: 72 })),
+    h("span", { class: "mini-name" }, productName(product)),
+    h("span", { class: "mini-price" }, priceTag(product.best_price), pct));
+  return { node, pct, product };
+}
+
+function featuredCard(product, discount = null, offers = []) {
+  const cheapest = offers[0];
+  return h("a", { class: "featured", href: `#/p/${product.id}` },
+    h("span", { class: "featured-head" },
+      h("span", { class: "featured-eyebrow" }, discount ? "La mejor rebaja de hoy" : "Oferta destacada"),
+      discount ? h("span", { class: "pct-pill" }, `−${discount.pct}%`) : null),
+    h("span", { class: "featured-photo" }, productVisual(product, { size: 120 })),
+    h("span", { class: "featured-body" },
+      h("strong", { class: "featured-name" }, productName(product)),
+      presentationLabel(product) ? h("span", { class: "featured-size" }, presentationLabel(product)) : null,
+      h("span", { class: "featured-price" }, money(discount ? discount.offer.current_price : product.best_price)),
+      discount ? h("span", { class: "featured-was" }, `antes ${money(discount.regular)} · ${storeLabel(discount.offer, offers)}`)
+        : cheapest ? h("span", { class: "featured-was" }, `en ${storeLabel(cheapest, offers)}`) : null));
+}
+
+// Ofertas: destacada (la mayor rebaja entre las primeras), carrusel (celular) o mosaico
+// 3×2 (computadora) y luego el resto.
+function offersLayout(items) {
+  const featuredSlot = h("div", { class: "featured-slot" }, featuredCard(items[0]));
+  const minis = items.slice(1, 7).map((product, index) => miniCard(product, index >= 4 ? "mosaic-extra" : ""));
+  const mosaic = h("div", { class: "mosaic" }, minis.map((mini) => mini.node));
+  const rest = items.slice(5).map((product, index) => miniCard(product, `list-item${index < 2 ? " mobile-only" : ""}`).node);
+  afterPaint(() => {
+    const top = items.slice(0, 7);
+    Promise.all(top.map((product) => withRow(product, () => {}))).then((results) => {
+      const info = results.map((offers) => (offers ? { offers, discount: bestDiscount(offers) } : null));
+      minis.forEach((mini, index) => {
+        const discount = info[index + 1]?.discount;
+        if (discount) fill(mini.pct, `−${discount.pct}%`);
+      });
+      // La mayor rebaja entre la destacada y el carrusel pasa al frente.
+      let best = 0;
+      for (let index = 1; index < 5; index += 1) {
+        if ((info[index]?.discount?.pct || 0) > (info[best]?.discount?.pct || 0)) best = index;
+      }
+      if (!featuredSlot.isConnected) return;
+      if (best > 0 && minis[best - 1]) {
+        const swapped = miniCard(items[0], minis[best - 1].node.className.replace(/^mini\s?/, ""));
+        if (info[0]?.discount) fill(swapped.pct, `−${info[0].discount.pct}%`);
+        minis[best - 1].node.replaceWith(swapped.node);
+      }
+      const chosen = info[best];
+      fill(featuredSlot, featuredCard(items[best], chosen?.discount || null, chosen?.offers || []));
+    });
+  });
+  return [
+    h("div", { class: "offers-top" }, featuredSlot, mosaic),
+    rest.length ? h("div", { class: "offer-list" }, rest) : null,
+  ];
 }
 
 function viewSearch(params, { offers = false } = {}) {
@@ -341,27 +667,34 @@ function viewSearch(params, { offers = false } = {}) {
     if (value) next.set(name, value); else next.delete(name);
     go(offers ? "/ofertas" : "/buscar", next);
   };
-  const select = (name, label, value, options) => h("label", { class: "filter" },
-    h("span", { class: "sr-only" }, label),
-    h("select", { "aria-label": label, onchange: (event) => update(name, event.target.value) },
-      options.map(([optionValue, text]) => h("option", { value: optionValue, selected: optionValue === value }, text))));
 
   const filters = h("div", { class: "filters" },
-    select("orden", "Ordenar", sort, [["price", "Precio más bajo"], ["unit", "Más barato por kg/L"], ["relevance", "Más relevantes"], ["stores", "Más súper para comparar"]]),
-    select("super", "Supermercado", retailer, [["", "Todos los súper"], ...catalog.retailers.map((id) => [id, RETAILER_NAMES[id]])]),
-    select("cat", "Departamento", category, [["", "Todos los departamentos"], ...catalog.departments().map((d) => [d.name, d.name])]),
+    filterMenu({
+      id: "super", label: "Supermercado", value: retailer, onPick: (value) => update("super", value),
+      options: [["", "Todos los súper"], ...catalog.retailers.map((id) => [id, RETAILER_NAMES[id]])],
+    }),
+    filterMenu({
+      id: "cat", label: "Departamento", value: category, onPick: (value) => update("cat", value),
+      options: [["", "Todos los departamentos"], ...catalog.departments().map((d) => [d.name, d.name])],
+    }),
+    filterMenu({
+      id: "orden", label: "Ordenar", value: sort, defaultValue: "price", onPick: (value) => update("orden", value),
+      options: [["price", "Precio más bajo"], ["unit", "Más barato por kg/L"], ["relevance", "Más relevantes"], ["stores", "Más súper para comparar"]],
+    }),
     offers ? null : h("button", {
       type: "button", class: `toggle${promoOnly ? " on" : ""}`, "aria-pressed": String(promoOnly),
       onclick: () => update("oferta", promoOnly ? "" : "1"),
-    }, "En oferta"));
+    }, h("span", { class: "switch", "aria-hidden": "true" }), "En oferta"));
 
   const title = offers ? "Ofertas de hoy" : query ? `Resultados para “${query}”` : category || "Todos los productos";
-  return h("div", { class: "page" },
-    h("div", { class: "search-top" }, offers ? null : searchForm(query)),
+  const body = !total
+    ? h("div", { class: "empty" }, h("strong", {}, "No encontramos productos con esa búsqueda."), h("p", {}, "Prueba con otra palabra, la marca o quita filtros."))
+    : offers ? offersLayout(items) : resultGrid(items, query, related);
+  return h("div", { class: `page${offers ? " offers-page" : " search-page"}` },
+    offers ? null : h("div", { class: "search-top" }, searchForm(query)),
     h("div", { class: "results-head" }, h("h1", {}, title), h("span", { class: "muted" }, countText(total, "producto"))),
     filters,
-    total ? resultGrid(items, query, related)
-      : h("div", { class: "empty" }, h("strong", {}, "No encontramos productos con esa búsqueda."), h("p", {}, "Prueba con otra palabra, la marca o quita filtros.")),
+    body,
     total > items.length ? h("button", {
       type: "button", class: "more", onclick: () => { state.limit += PAGE_SIZE; render(); },
     }, `Mostrar más (${(total - items.length).toLocaleString("es-HN")})`) : null);
@@ -371,13 +704,13 @@ function viewSearch(params, { offers = false } = {}) {
 function resultGrid(items, query, related) {
   const main = items.filter((product) => product.tier !== 2);
   const extra = items.filter((product) => product.tier === 2);
-  if (!query || !extra.length) return h("div", { class: "grid" }, items.map(productCard));
+  if (!query || !extra.length) return h("div", { class: "results" }, items.map(resultCard));
   return [
-    main.length ? h("div", { class: "grid" }, main.map(productCard)) : null,
+    main.length ? h("div", { class: "results" }, main.map(resultCard)) : null,
     h("div", { class: "related-head" },
       h("h2", {}, `También mencionan “${query}”`),
       h("span", { class: "muted small" }, `${related.toLocaleString("es-HN")} productos de otros tipos`)),
-    h("div", { class: "grid" }, extra.map(productCard)),
+    h("div", { class: "results" }, extra.map(resultCard)),
   ];
 }
 
@@ -422,9 +755,30 @@ function viewProduct(id, container, code = "") {
   return null;
 }
 
+// "Precio en cada súper": barra = 40 % + 60 % × (precio − mínimo) / (máximo − mínimo).
+function barWidth(price, minimum, maximum) {
+  if (!(maximum > minimum)) return 100;
+  return 40 + (60 * (price - minimum)) / (maximum - minimum);
+}
+
+function offerNotes(offers, catalog) {
+  const present = new Set(offers.map((offer) => offer.supermarket_id));
+  const absent = catalog.retailers.filter((id) => !present.has(id)).map((id) => RETAILER_NAMES[id] || id);
+  const notes = [];
+  if (absent.length && offers.length) notes.push(`Hoy no lo encontramos en ${listText(absent)}.`);
+  for (const offer of offers) {
+    const discount = discountOf(offer);
+    const label = storeLabel(offer, offers);
+    if (discount) notes.push(`${label} la tiene en oferta, antes ${money(discount.regular)}.`);
+    else if (offer.is_promotion === true) notes.push(`${label} la tiene en oferta.`);
+  }
+  return notes;
+}
+
 function renderProduct(product, container, code = "") {
   const catalog = state.catalog;
   if (!product) return h("div", { class: "page empty" }, h("h1", {}, "Este producto ya no está en el catálogo de hoy."), h("a", { class: "primary", href: "#/" }, "Volver al inicio"));
+  const unit = product.unit_amount ? `${money(product.unit_amount)} por ${product.unit_per}` : "";
   const page = h("div", { class: "page product" },
     h("div", { class: "product-top" },
       h("button", { type: "button", class: "icon-button", "aria-label": "Volver", onclick: () => history.length > 1 ? history.back() : go("/") }, icon("back")),
@@ -436,57 +790,66 @@ function renderProduct(product, container, code = "") {
         },
       }, icon("share", 20))),
     h("div", { class: "product-layout" },
-      h("div", { class: "product-image" }, productVisual(product, { size: 240, decorative: false, sizes: "(min-width: 900px) 420px, 70vw" })),
-      h("div", { class: "product-info" },
-        h("div", { class: "product-title" },
-          h("strong", { class: "brand-xl" }, product.brand_label ?? (product.brand || product.product_type || "")),
-          h("h1", {}, product.display_name ?? product.product_name),
-          h("div", { class: "pills" }, sizePill(product),
-            h("span", { class: "muted small" }, [product.category, product.product_type].filter(Boolean).join(" › ")))),
-        h("section", { class: "offers", "aria-busy": "true" }, h("h2", {}, "Dónde comprar"), h("p", { class: "muted" }, "Cargando precios…")))),
+      h("div", { class: "product-image" }, productVisual(product, { size: 120, decorative: false, sizes: "(min-width: 1024px) 180px, 120px" })),
+      h("div", { class: "product-title" },
+        h("strong", { class: "brand-xl" }, product.brand_label ?? (product.brand || product.product_type || "")),
+        h("h1", {}, productName(product)),
+        h("div", { class: "pills" }, sizePill(product), unit ? h("span", { class: "muted small" }, unit) : null),
+        h("span", { class: "muted small" }, [product.category, product.product_type].filter(Boolean).join(" › "))),
+      h("p", { class: "product-from" }, h("span", {}, "desde"), h("strong", {}, money(product.best_price)))),
+    h("section", { class: "offers", "aria-busy": "true" }, h("h2", {}, "Precio en cada súper"), h("p", { class: "muted" }, "Cargando precios…")),
+    h("div", { class: "add-bar", hidden: true }),
     h("div", { class: "product-extra" }));
   fill(container, page);
 
   catalog.row(product).then((row) => {
     const offersBox = page.querySelector(".offers");
-    if (!row) { fill(offersBox, h("h2", {}, "Dónde comprar"), h("p", {}, "No pudimos cargar los precios.")); return; }
-    const offers = row.offers
-      .filter((offer) => offer.current_price && offer.availability !== "out_of_stock")
-      .sort((a, b) => Number(a.current_price) - Number(b.current_price));
+    if (!row) { fill(offersBox, h("h2", {}, "Precio en cada súper"), h("p", {}, "No pudimos cargar los precios.")); return; }
+    const offers = liveOffers(row);
     const cheapest = offers[0];
     const cheapestLabel = cheapest ? storeLabel(cheapest, offers) : "";
+    const prices = offers.map((offer) => Number(offer.current_price));
+    const minimum = Math.min(...prices);
+    const maximum = Math.max(...prices);
     offersBox.removeAttribute("aria-busy");
-    fill(offersBox, 
-      h("h2", {}, "Dónde comprar"),
+    fill(offersBox,
+      h("h2", {}, "Precio en cada súper"),
       code ? scanSummary(code, cheapest, cheapestLabel, offers.length) : null,
-      offers.map((offer, index) => {
+      offers.length ? h("div", { class: "bars" }, offers.map((offer) => {
+        const price = Number(offer.current_price);
         const regular = Number(offer.reported_regular_price);
-        const onSale = offer.is_promotion === true || (regular && regular > Number(offer.current_price));
+        const onSale = offer.is_promotion === true || (regular && regular > price);
         const label = storeLabel(offer, offers);
         const unitPrice = offerUnitPrice(product, offer);
         const staleSince = catalog.staleSince(offer);
-        return h("div", { class: `offer${index === 0 && offers.length > 1 ? " best" : ""}` },
-          h("span", { class: "store-badge", style: { background: RETAILER_COLORS[offer.supermarket_id] } }, RETAILER_INITIALS[offer.supermarket_id] || "?"),
-          h("div", { class: "offer-main" },
-            h("div", {}, h("strong", {}, label),
-              index === 0 && offers.length > 1 ? h("span", { class: "badge-best" }, "MÁS BARATO") : null),
+        const best = offers.length > 1 && price === minimum;
+        return h("div", { class: `bar-row${best ? " best" : ""}` },
+          h("div", { class: "bar-store" },
+            h("span", { class: "bar-name" }, storeDot(offer.supermarket_id), h("strong", {}, label),
+              best ? h("span", { class: "badge-best" }, "MÁS BARATO") : null),
             unitPrice ? h("span", { class: "muted small" }, `${money(unitPrice.amount)} por ${unitPrice.per}`) : null,
             staleSince ? h("span", { class: "stale" }, `Precio del ${shortDate(staleSince)} · puede haber cambiado`) : null),
-          h("div", { class: "offer-price" },
+          h("div", { class: "bar-track", "aria-hidden": "true" }, h("span", { class: "bar", style: { width: `${barWidth(price, minimum, maximum)}%` } })),
+          h("div", { class: "bar-price" },
             h("strong", {}, money(offer.current_price)),
-            onSale && regular > Number(offer.current_price) ? h("span", { class: "sale" }, "Oferta · antes ", h("del", {}, money(regular))) : onSale ? h("span", { class: "sale" }, "Oferta") : null),
+            onSale && regular > price ? h("span", { class: "sale" }, "Oferta · antes ", h("del", {}, money(regular))) : onSale ? h("span", { class: "sale" }, "Oferta") : null),
           h("button", {
             type: "button", class: "add-store", "aria-label": `Agregar a Mi compra en ${label}`, title: `Agregar en ${label}`,
             onclick: () => addToCart(product.id, offer.location_id, label),
           }, icon("plus", 18)));
-      }),
+      })) : h("p", {}, "Hoy ningún súper lo tiene con precio."),
+      offerNotes(offers, catalog).map((note) => h("p", { class: "bar-note" }, note)),
       h("p", { class: "muted small" }, offers.some((offer) => catalog.staleSince(offer))
         ? "Precios en línea; los marcados con fecha no se pudieron actualizar hoy. Pueden variar en tienda."
-        : "Precios en línea de hoy; pueden variar en tienda. Usa + para elegir en qué súper comprarlo."),
-      h("button", {
-        type: "button", class: "primary wide",
-        onclick: () => addToCart(product.id, offers.length > 1 && cheapest ? cheapest.location_id : null, offers.length > 1 ? cheapestLabel : ""),
-      }, offers.length > 1 ? `Agregar a Mi compra · ${cheapestLabel}` : "Agregar a Mi compra"));
+        : "Precios en línea de hoy; pueden variar en tienda. Usa + para elegir en qué súper comprarlo."));
+
+    const addBar = page.querySelector(".add-bar");
+    fill(addBar, h("button", {
+      type: "button", class: "primary wide",
+      onclick: () => addToCart(product.id, offers.length > 1 && cheapest ? cheapest.location_id : null, offers.length > 1 ? cheapestLabel : ""),
+    }, offers.length > 1 ? `Agregar a Mi compra · ${cheapestLabel}` : "Agregar a Mi compra"));
+    addBar.hidden = false;
+    page.classList.add("has-add-bar");
 
     if (!page.isConnected) return;
     const extra = page.querySelector(".product-extra");
@@ -502,32 +865,32 @@ function renderProduct(product, container, code = "") {
       return value && (!best || value < best) ? value : best;
     }, Number(offerUnitPrice(product, cheapest)?.amount) || null);
     const alternatives = catalog.alternatives(product);
-    fill(extra, 
+    fill(extra,
       priceHistory,
       others.length ? h("section", {},
-        sectionHeader("Otras presentaciones", h("span", { class: "muted small" }, "precio por unidad para comparar tamaños")),
+        sectionHeader("Otros tamaños", h("span", { class: "muted small" }, "precio por unidad para comparar tamaños")),
         h("div", { class: "row-scroll sizes" }, others.map(({ other, otherProduct }) => {
-          const unit = Number(other.best_unit_price?.amount);
-          return h("a", { class: `size-card${unit && unit === bestUnit ? " best" : ""}`, href: otherProduct ? `#/p/${otherProduct.id}` : "#" },
+          const unitValue = Number(other.best_unit_price?.amount);
+          return h("a", { class: `size-card${unitValue && unitValue === bestUnit ? " best" : ""}`, href: otherProduct ? `#/p/${otherProduct.id}` : "#" },
             sizePill({ presentation: other.presentation || "—" }),
-            h("strong", {}, money(other.best_price)),
+            priceTag(other.best_price),
             other.best_unit_price ? h("span", { class: "muted small" }, `${money(other.best_unit_price.amount)} / ${other.best_unit_price.per}`) : null,
             otherProduct ? h("span", { class: "muted small" }, otherProduct.retailers.map((r) => RETAILER_NAMES[r]).join(", ")) : null,
-            unit && unit === bestUnit ? h("span", { class: "badge-text" }, "MÁS CONVENIENTE") : null,
+            unitValue && unitValue === bestUnit ? h("span", { class: "badge-text" }, "MÁS CONVENIENTE") : null,
             other.large_size ? h("span", { class: "badge-text muted" }, "TAMAÑO GRANDE") : null);
         }))) : null,
       alternatives.length ? h("section", {},
         sectionHeader("Alternativas", h("span", { class: "muted small" }, "otras marcas, por precio por unidad")),
         h("div", { class: "alt-list" }, alternatives.map((alt) => h("a", { class: "alt", href: `#/p/${alt.id}` },
           h("span", { class: "alt-tile" }, productVisual(alt, { size: 52 })),
-          h("span", { class: "alt-main" }, h("strong", {}, alt.brand || ""), h("span", { class: "muted small" }, `${alt.display_name ?? alt.product_name}`), storesLine(alt)),
-          h("span", { class: "alt-price" }, h("strong", {}, money(alt.best_price)),
+          h("span", { class: "alt-main" }, h("strong", {}, alt.brand || ""), h("span", { class: "muted small" }, `${productName(alt)}`), storesLine(alt)),
+          h("span", { class: "alt-price" }, priceTag(alt.best_price),
             h("span", { class: Number(alt.unit_amount) < Number(product.unit_amount) ? "good small" : "muted small" }, `${money(alt.unit_amount)} / ${alt.unit_per}`)))))) : null);
   }).catch((error) => {
     if (!page.isConnected) return;
     const offersBox = page.querySelector(".offers");
     offersBox.removeAttribute("aria-busy");
-    fill(offersBox, h("h2", {}, "Dónde comprar"), h("p", {}, `No pudimos cargar los precios. ${errorText(error)}`),
+    fill(offersBox, h("h2", {}, "Precio en cada súper"), h("p", {}, `No pudimos cargar los precios. ${errorText(error)}`),
       h("button", { type: "button", class: "primary", onclick: () => render() }, "Reintentar"));
   });
   return null;
@@ -594,7 +957,7 @@ function barcodeResult(digits, result) {
       h("span", { class: "alt-tile" }, productVisual(product, { size: 52 })),
       h("span", { class: "alt-main" },
         h("strong", {}, [product.brand_label ?? product.brand, presentationLabel(product)].filter(Boolean).join(" · ")),
-        h("span", { class: "muted small" }, product.display_name ?? product.product_name),
+        h("span", { class: "muted small" }, productName(product)),
         best));
   });
   return h("div", { class: "page" },
@@ -604,9 +967,31 @@ function barcodeResult(digits, result) {
     scanAgainActions());
 }
 
-function liveOffers(row) {
-  return (row?.offers || []).filter((offer) => offer.current_price && offer.availability !== "out_of_stock")
-    .sort((a, b) => Number(a.current_price) - Number(b.current_price));
+// Tabla producto × súper (computadora): total de cada línea en cada súper; el más
+// barato de cada fila en verde y negrita; faltante como "—".
+function cartTable(loaded, stores) {
+  const ids = stores.map(([id]) => id);
+  return h("div", { class: "cart-table-wrap" },
+    h("table", { class: "cart-table" },
+      h("caption", {}, "Cada producto en cada súper (precio × cantidad)"),
+      h("thead", {}, h("tr", {},
+        h("th", { scope: "col" }, "Producto"),
+        ids.map((id) => h("th", { scope: "col" }, storeDot(id), RETAILER_NAMES[id] || id)))),
+      h("tbody", {}, loaded.map((line) => {
+        const cells = ids.map((id) => line.offers.find((offer) => offer.supermarket_id === id) || null);
+        const values = cells.filter(Boolean).map((offer) => Number(offer.current_price));
+        const minimum = values.length > 1 ? Math.min(...values) : null;
+        return h("tr", {},
+          h("th", { scope: "row" }, productName(line.product), line.qty > 1 ? h("span", { class: "muted small" }, ` × ${line.qty}`) : null),
+          cells.map((offer) => (offer
+            ? h("td", { class: Number(offer.current_price) === minimum ? "cheapest" : null }, money(Number(offer.current_price) * line.qty),
+              Number(offer.current_price) === minimum ? h("span", { class: "sr-only" }, " (el más barato)") : null)
+            : h("td", { class: "missing" }, "—"))));
+      })),
+      h("tfoot", {}, h("tr", {},
+        h("th", { scope: "row" }, "Todo en ese súper"),
+        stores.map(([, entry]) => h("td", {}, money(entry.total),
+          entry.missing ? h("span", { class: "warn small" }, ` (faltan ${entry.missing})`) : null))))));
 }
 
 function viewCart(container) {
@@ -624,12 +1009,16 @@ function viewCart(container) {
       h("p", {}, missing.length ? "No queda ningún producto con precio hoy." : "Todavía no agregaste productos."),
       h("a", { class: "primary", href: "#/buscar" }, "Buscar productos"));
   }
+  const head = () => h("div", { class: "results-head" }, h("h1", {}, "Mi compra"), h("span", { class: "muted" }, countText(cartCount(), "artículo")));
   const page = h("div", { class: "page cart" },
-    h("div", { class: "cart-layout" },
-      h("section", { class: "cart-lines" },
-        h("div", { class: "results-head" }, h("h1", {}, "Mi compra"), h("span", { class: "muted" }, countText(cartCount(), "artículo"))),
-        h("p", { class: "muted" }, "Cargando precios…")),
-      h("aside", { class: "cart-summary" }, h("h2", {}, "¿Dónde me sale más barato?"), h("p", { class: "muted" }, "Calculando…"))));
+    head(),
+    missingNote,
+    h("section", { class: "compare" },
+      h("h2", {}, "¿Dónde te sale más barata toda la lista?"),
+      h("div", { class: "compare-cards" }, h("p", { class: "muted" }, "Calculando…"))),
+    h("div", { class: "cart-table-slot" }),
+    h("section", { class: "cart-lines", "aria-label": "Productos de tu lista" }, h("p", { class: "muted" }, "Cargando precios…")),
+    h("section", { class: "cart-summary" }));
   fill(container, page);
 
   Promise.all(lines.map((line) => catalog.row(line.product).then((row) => ({ ...line, offers: liveOffers(row) })))).then((loaded) => {
@@ -654,11 +1043,13 @@ function viewCart(container) {
       }
       const gone = line.store && !picked;
       return h("div", { class: "line" },
-        h("span", { class: "alt-tile" }, productVisual(line.product, { size: 52 })),
+        h("span", { class: "thumb thumb-line" }, productVisual(line.product, { size: 52 })),
         h("div", { class: "line-body" },
           h("a", { class: "line-main", href: `#/p/${line.id}` },
             h("strong", {}, [line.product.brand, presentationLabel(line.product)].filter(Boolean).join(" · ") || line.product.product_name),
-            h("span", { class: "muted small" }, (line.product.display_name ?? line.product.product_name))),
+            h("span", { class: "muted small" }, productName(line.product))),
+          best ? h("span", { class: "line-cheapest" }, storeDot(best.supermarket_id),
+            offers.length > 1 ? `Más barato en ${storeLabel(best, offers)}` : `Sólo en ${storeLabel(best, offers)}`) : null,
           offers.length ? h("label", { class: "line-store" },
             h("span", { class: "sr-only" }, "Súper"),
             h("select", {
@@ -676,34 +1067,39 @@ function viewCart(container) {
               h("button", { type: "button", "aria-label": "Agregar uno", onclick: () => updateLine(line.index, { qty: line.qty + 1 }) }, "+")),
             h("span", { class: "line-total" }, h("strong", {}, used ? money(Number(used.current_price) * line.qty) : "—")))));
     });
-    fill(page.querySelector(".cart-lines"),
-      h("div", { class: "results-head" }, h("h1", {}, "Mi compra"), h("span", { class: "muted" }, countText(cartCount(), "artículo"))),
-      missingNote, lineViews);
+    fill(page.querySelector(".cart-lines"), h("h2", {}, "Tu lista"), lineViews);
 
     const stores = [...perStore.entries()].filter(([, entry]) => entry.missing < loaded.length)
       .sort((a, b) => a[1].missing - b[1].missing || a[1].total - b[1].total);
     const saving = chosenTotal - split;
+    const bestSingle = stores.find(([, entry]) => entry.missing === 0)?.[0] || null;
+    fill(page.querySelector(".compare-cards"),
+      h("div", { class: "cmp cmp-mix" },
+        h("span", { class: "cmp-title" }, where.size > 1 ? `Mezclando ${where.size} súper` : "Donde es más barato"),
+        h("strong", { class: "cmp-total" }, money(split)),
+        h("span", { class: "cmp-note" }, "La opción más barata"),
+        h("span", { class: "small" }, [...where.entries()].map(([label, count]) => `${label} (${count})`).join(" · "))),
+      stores.map(([id, entry]) => {
+        const extra = entry.total - split;
+        return h("div", { class: `cmp${id === bestSingle ? " cmp-best" : ""}${entry.missing ? " cmp-incomplete" : ""}` },
+          h("span", { class: "cmp-title" }, storeDot(id), `Todo en ${RETAILER_NAMES[id]}`),
+          h("strong", { class: "cmp-total" }, money(entry.total)),
+          entry.missing
+            ? h("span", { class: "cmp-note warn" }, `Le ${entry.missing === 1 ? "falta 1 producto" : `faltan ${entry.missing} productos`}`)
+            : h("span", { class: "cmp-note" }, extra > 0.005 ? `+ ${money(extra)} frente a mezclar` : "Igual que mezclar"));
+      }));
+    fill(page.querySelector(".cart-table-slot"), stores.length > 1 ? cartTable(loaded, stores) : null);
     fill(page.querySelector(".cart-summary"),
-      h("h2", {}, "Tu compra"),
       h("div", { class: "best-total chosen" },
         h("span", { class: "badge-text" }, "CON LOS SÚPER QUE ELEGISTE"),
         h("strong", {}, money(chosenTotal)),
         saving > 0.005 ? h("span", { class: "warn small" }, `Podrías ahorrar ${money(saving)} comprando cada cosa donde es más barata.`) : h("span", { class: "good small" }, "Es lo más barato posible hoy.")),
-      h("div", { class: "best-total" },
-        h("span", { class: "badge-text" }, "COMPRANDO CADA COSA DONDE ES MÁS BARATA"),
-        h("strong", {}, money(split)),
-        h("span", { class: "muted small" }, [...where.entries()].map(([label, count]) => `${label} (${count})`).join(" · "))),
-      stores.map(([id, entry]) => h("div", { class: "store-total" },
-        h("i", { style: { background: RETAILER_COLORS[id] } }),
-        h("span", { class: "store-total-main" }, h("strong", {}, `Todo en ${RETAILER_NAMES[id]}`),
-          h("span", { class: entry.missing ? "warn small" : "muted small" }, entry.missing ? `Le ${entry.missing === 1 ? "falta 1 producto" : `faltan ${entry.missing} productos`}` : "Tiene todo")),
-        h("strong", {}, money(entry.total)))),
       h("p", { class: "muted small" }, `Total estimado con los precios públicos de hoy en ${cityName()}. Tu lista se guarda en este dispositivo.`));
   }).catch((error) => {
     if (!page.isConnected) return;
-    fill(page.querySelector(".cart-lines"), h("h1", {}, "Mi compra"), h("p", {}, `No pudimos cargar los precios. ${errorText(error)}`),
+    fill(page.querySelector(".cart-lines"), h("p", {}, `No pudimos cargar los precios. ${errorText(error)}`),
       h("button", { type: "button", class: "primary", onclick: () => render() }, "Reintentar"));
-    fill(page.querySelector(".cart-summary"), h("h2", {}, "Tu compra"), h("p", { class: "muted" }, "Sin precios no podemos calcular el total. Tu lista sigue guardada."));
+    fill(page.querySelector(".compare-cards"), h("p", { class: "muted" }, "Sin precios no podemos calcular el total. Tu lista sigue guardada."));
   });
   return null;
 }
@@ -715,9 +1111,51 @@ function renderChrome() {
     badge.textContent = String(count);
     badge.hidden = count === 0;
   }
-  const { path } = route();
+  for (const total of document.querySelectorAll("[data-cart-total]")) total.textContent = ` · ${count}`;
+  const { path, params } = route();
   const active = path.startsWith("/buscar") ? "buscar" : path.startsWith("/ofertas") ? "ofertas" : path.startsWith("/compra") ? "compra" : path === "/" ? "inicio" : "";
-  for (const link of document.querySelectorAll("[data-nav]")) link.classList.toggle("active", link.dataset.nav === active);
+  for (const link of document.querySelectorAll("[data-nav]")) {
+    link.classList.toggle("active", link.dataset.nav === active);
+    if (link.dataset.nav === active) link.setAttribute("aria-current", "page"); else link.removeAttribute("aria-current");
+  }
+  // Buscador de la barra (computadora): muestra lo buscado sin pisar lo que se escribe.
+  const input = document.querySelector("[data-top-search] input");
+  if (input && document.activeElement !== input) input.value = path.startsWith("/buscar") ? params.get("q") || "" : "";
+}
+
+// El buscador visible (barra en computadora, arriba de los resultados en celular).
+function focusSearch() {
+  const input = [...document.querySelectorAll("input[type=search]")].find((item) => item.offsetParent !== null);
+  input?.focus();
+}
+
+// ------------------------------------------------------------------ animación de entrada
+// Sólo celular, una vez por sesión; sale cuando cargó la ciudad (mínimo 1.1 s, máximo
+// 2.6 s desde que abrió la página) o al tocarla. Nunca retrasa la carga de datos.
+const INTRO_KEY = "super-compras:intro";
+const INTRO_MIN_MS = 1100;
+const INTRO_MAX_MS = 2600;
+
+function setupIntro() {
+  const node = document.querySelector(".intro");
+  if (!node) return;
+  let seen = false;
+  try { seen = sessionStorage.getItem(INTRO_KEY) === "1"; } catch { /* sin sessionStorage */ }
+  if (seen || !window.matchMedia("(max-width: 1023px)").matches) { node.remove(); return; }
+  try { sessionStorage.setItem(INTRO_KEY, "1"); } catch { /* sin guardar */ }
+  node.addEventListener("pointerdown", () => dismissIntro({ now: true }), { once: true });
+  setTimeout(() => dismissIntro({ now: true }), Math.max(0, INTRO_MAX_MS - performance.now()));
+}
+
+function dismissIntro({ now = false } = {}) {
+  const node = document.querySelector(".intro");
+  if (!node || node.classList.contains("is-leaving")) return;
+  const wait = now ? 0 : INTRO_MIN_MS - performance.now();
+  if (wait > 0) { setTimeout(() => dismissIntro({ now: true }), wait); return; }
+  node.classList.add("is-leaving");
+  const remove = () => node.remove();
+  node.addEventListener("animationend", (event) => { if (event.target === node) remove(); });
+  setTimeout(remove, 600);
 }
 
 const ADMIN_ROUTE = "/admin/revision";
@@ -729,7 +1167,7 @@ async function renderAdmin(main) {
   main.dataset.view = "admin";
   fill(main, loadingPage("Abriendo el panel de revisión…"));
   try {
-    adminModule = adminModule || await import("./admin.js?v=20261113-6");
+    adminModule = adminModule || await import("./admin.js?v=20261114-1");
     if (route().path.startsWith(ADMIN_ROUTE) && main.dataset.view === "admin") adminModule.mountSizeReview(main, { h, fill });
   } catch (error) {
     delete main.dataset.view;
@@ -747,6 +1185,10 @@ function render() {
   delete main.dataset.view;
   if (!state.catalog) return;
   state.renderToken += 1;
+  closeMenu({ focus: false });
+  state.observer?.disconnect();
+  state.observer = null;
+  state.loaders.clear();
   const { path, params } = route();
   let view;
   if (path.startsWith("/p/")) view = viewProduct(safeDecode(path.slice(3)), main, (params.get("codigo") || "").replace(/\D/g, ""));
@@ -815,21 +1257,27 @@ async function switchCity(slug) {
 }
 
 async function start() {
+  setupIntro();
+  for (const node of document.querySelectorAll("[data-top-search]")) fill(node, searchForm(""));
   if (route().path.startsWith(ADMIN_ROUTE)) renderAdmin(document.getElementById("main"));
-  const url = catalogUrl();
-  // Una vista previa con ?catalogo= usa sólo ese catálogo; el sitio publicado lee cities.json.
-  const { cities, fallback } = url === DEFAULT_CATALOG || url === document.body.dataset.catalogUrl
-    ? await loadCities(url)
-    : { cities: [{ slug: "san-pedro-sula", name: "San Pedro Sula", url }], fallback: "san-pedro-sula" };
-  state.cities = cities;
-  await loadCity(pickCity(cities, fallback));
+  try {
+    const url = catalogUrl();
+    // Una vista previa con ?catalogo= usa sólo ese catálogo; el sitio publicado lee cities.json.
+    const { cities, fallback } = url === DEFAULT_CATALOG || url === document.body.dataset.catalogUrl
+      ? await loadCities(url)
+      : { cities: [{ slug: "san-pedro-sula", name: "San Pedro Sula", url }], fallback: "san-pedro-sula" };
+    state.cities = cities;
+    await loadCity(pickCity(cities, fallback));
+  } finally {
+    dismissIntro();
+  }
 }
 
 // Escáner: el módulo (y la cámara) se piden sólo al tocar un botón [data-scan].
 let scannerModule = null;
 async function startScanner(opener) {
   try {
-    scannerModule = scannerModule || await import("./scanner.js?v=20261113-6");
+    scannerModule = scannerModule || await import("./scanner.js?v=20261114-1");
     scannerModule.openScanner({
       h, opener,
       onCode: (code, format) => {
@@ -843,10 +1291,23 @@ async function startScanner(opener) {
   }
 }
 
+// Botón central Buscar (y Buscar del riel): lleva a #/buscar y enfoca el buscador.
+let pendingSearchFocus = false;
 document.addEventListener("click", (event) => {
+  const searchLink = event.target.closest?.("[data-focus-search]");
+  if (searchLink) {
+    if (route().path.startsWith("/buscar")) { event.preventDefault(); focusSearch(); } else pendingSearchFocus = true;
+    return;
+  }
   const button = event.target.closest?.("[data-scan]");
   if (!button) return;
   event.preventDefault();
+  // Escanear de la barra: sin cámara en el navegador, a la búsqueda por nombre.
+  if (button.hasAttribute("data-scan-nav") && !navigator.mediaDevices) {
+    pendingSearchFocus = true;
+    if (route().path.startsWith("/buscar")) { pendingSearchFocus = false; focusSearch(); } else go("/buscar");
+    return;
+  }
   startScanner(button);
 });
 // Al cambiar de vista el foco pasa al contenido (sin mover la página): los lectores de
@@ -855,6 +1316,7 @@ window.addEventListener("hashchange", () => {
   render();
   window.scrollTo(0, 0);
   document.getElementById("main")?.focus({ preventScroll: true });
+  if (pendingSearchFocus) { pendingSearchFocus = false; focusSearch(); }
 });
 document.addEventListener("DOMContentLoaded", start);
 if ("serviceWorker" in navigator && location.protocol === "https:") {
