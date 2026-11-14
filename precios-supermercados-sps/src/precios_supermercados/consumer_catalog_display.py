@@ -275,8 +275,8 @@ def _from_dimension(dimension: object, total_base: object) -> str | None:
 _MULTIPACK_DISPLAY_RE = re.compile(r"^\s*(?P<count>\d{1,4})\s*×\s*(?P<amount>\d+(?:\.\d+)?)\s*(?P<unit>g|ml|oz)\s*$")
 
 
-def _multipack(dimension: object, total_base: object, display: object) -> str | None:
-    """"12 × 946 ml" desde la presentación del perfil si cuadra con el total."""
+def _multipack_parts(dimension: object, total_base: object, display: object) -> tuple[int, Decimal, Decimal] | None:
+    """(conteo, unidad, total) de "12 × 946 ml" si el conteo por la unidad cuadra con el total."""
     match = _MULTIPACK_DISPLAY_RE.match(_clean(display) or "")
     total = _decimal(total_base)
     if match is None or total is None or dimension not in {"mass_g", "volume_ml", "ounce"}:
@@ -287,7 +287,40 @@ def _multipack(dimension: object, total_base: object, display: object) -> str | 
         return None
     if abs(unit_amount * count - total) > max(Decimal("1"), total * Decimal("0.01")):
         return None
-    return f"{count} × {_amount(dimension, unit_amount)}"
+    return count, unit_amount, total
+
+
+def _multipack(dimension: object, total_base: object, display: object) -> str | None:
+    """"12 × 946 ml" desde la presentación del perfil si cuadra con el total."""
+    parts = _multipack_parts(dimension, total_base, display)
+    return None if parts is None else f"{parts[0]} × {_amount(dimension, parts[1])}"
+
+
+# Estados con los que se publica ``pack``: el conteo lo leyó el motor del nombre o
+# de la fuente sin contradicción. Nunca ``ambiguous_multipack`` ni ``conflict``.
+_PACK_STATUSES = frozenset({"confirmed", "name_only"})
+
+
+def multipack(
+    *,
+    source_presentation: object,
+    presentation_dimension: object,
+    presentation_status: object,
+    presentation_total_base: object,
+) -> list[object] | None:
+    """``[conteo, "total"]`` de un multipack aceptado (``[4, "368 g"]``) o ``None``.
+
+    Dato aditivo para la etiqueta "4 × 92 g (368 g)": la presentación pública, sus
+    facetas, el orden y el precio por unidad no cambian. Mismas condiciones que
+    ``_multipack`` (masa, volumen u onza; conteo ≥ 2; conteo × unidad = total).
+    """
+    if presentation_status not in _PACK_STATUSES:
+        return None
+    parts = _multipack_parts(presentation_dimension, presentation_total_base, source_presentation)
+    if parts is None:
+        return None
+    total = _amount(presentation_dimension, parts[2])
+    return None if total is None else [parts[0], total]
 
 
 def _from_text(value: object) -> str | None:

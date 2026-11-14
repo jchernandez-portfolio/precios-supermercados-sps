@@ -309,7 +309,22 @@ def export_tgu_catalog(
     finally:
         base.fetch_visible_offers = fetch_visible
         base._core.fetch_visible_offers = fetch_visible
-    return _rewrite_public_metadata(output, manifest, counts)
+    return _rewrite_public_metadata(output, manifest, _published_counts(counts, manifest))
+
+
+def _published_counts(
+    counts: dict[tuple[str, str], int], manifest: dict[str, object]
+) -> dict[tuple[str, str], int]:
+    """Descuenta las ofertas no vistas que el núcleo dejó de publicar."""
+    report = manifest.get("unseen_offers")
+    if not isinstance(report, dict):
+        return counts
+    result = dict(counts)
+    for entry in report.get("contexts", []):
+        context = (entry.get("supermarket_id"), entry.get("location_id"))
+        if entry.get("status") == "hidden" and context in result:
+            result[context] -= int(entry.get("unseen_offers") or 0)
+    return result
 
 
 def parser() -> argparse.ArgumentParser:

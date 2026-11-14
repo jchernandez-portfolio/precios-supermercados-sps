@@ -4,8 +4,8 @@
 import {
   Catalog, RETAILER_COLORS, rowKey, RETAILER_NAMES, countText, listText, loadCart, loadCities, loadCitySlug,
   migrateCartLines, money, photoSrcset, photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, storeLabel,
-} from "./data.js?v=20261114-1";
-import { productIllustration } from "./illustration.js?v=20261114-1";
+} from "./data.js?v=20261114-2";
+import { productIllustration } from "./illustration.js?v=20261114-2";
 
 // Foto real si existe; si no hay o falla al cargar, la ilustración de siempre.
 // Tarjetas y miniaturas usan 320 px; el detalle deja que el navegador elija 320 u
@@ -872,7 +872,7 @@ function renderProduct(product, container, code = "") {
         h("div", { class: "row-scroll sizes" }, others.map(({ other, otherProduct }) => {
           const unitValue = Number(other.best_unit_price?.amount);
           return h("a", { class: `size-card${unitValue && unitValue === bestUnit ? " best" : ""}`, href: otherProduct ? `#/p/${otherProduct.id}` : "#" },
-            sizePill({ presentation: other.presentation || "—" }),
+            sizePill({ presentation: other.presentation || "—", pack: other.pack }),
             priceTag(other.best_price),
             other.best_unit_price ? h("span", { class: "muted small" }, `${money(other.best_unit_price.amount)} / ${other.best_unit_price.per}`) : null,
             otherProduct ? h("span", { class: "muted small" }, otherProduct.retailers.map((r) => RETAILER_NAMES[r]).join(", ")) : null,
@@ -1167,7 +1167,7 @@ async function renderAdmin(main) {
   main.dataset.view = "admin";
   fill(main, loadingPage("Abriendo el panel de revisión…"));
   try {
-    adminModule = adminModule || await import("./admin.js?v=20261114-1");
+    adminModule = adminModule || await import("./admin.js?v=20261114-2");
     if (route().path.startsWith(ADMIN_ROUTE) && main.dataset.view === "admin") adminModule.mountSizeReview(main, { h, fill });
   } catch (error) {
     delete main.dataset.view;
@@ -1277,7 +1277,7 @@ async function start() {
 let scannerModule = null;
 async function startScanner(opener) {
   try {
-    scannerModule = scannerModule || await import("./scanner.js?v=20261114-1");
+    scannerModule = scannerModule || await import("./scanner.js?v=20261114-2");
     scannerModule.openScanner({
       h, opener,
       onCode: (code, format) => {
