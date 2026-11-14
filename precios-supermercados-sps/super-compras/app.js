@@ -4,8 +4,8 @@
 import {
   Catalog, RETAILER_COLORS, rowKey, RETAILER_INITIALS, RETAILER_NAMES, countText, listText, loadCart, loadCities, loadCitySlug,
   migrateCartLines, money, photoSrcset, photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, storeLabel,
-} from "./data.js?v=20261113-5";
-import { productIllustration } from "./illustration.js?v=20261113-5";
+} from "./data.js?v=20261113-6";
+import { productIllustration } from "./illustration.js?v=20261113-6";
 
 // Foto real si existe; si no hay o falla al cargar, la ilustración de siempre.
 // Tarjetas y miniaturas usan 320 px; el detalle deja que el navegador elija 320 u
@@ -120,7 +120,8 @@ function go(path, params) {
 }
 
 function cartCount() {
-  return state.cart.reduce((sum, line) => sum + line.qty, 0);
+  const byId = state.catalog?.ready ? state.catalog.byId : null;
+  return state.cart.filter((line) => !byId || byId.has(line.id)).reduce((sum, line) => sum + line.qty, 0);
 }
 
 // store = location_id del súper elegido; sin store, Mi compra usa el más barato.
@@ -131,6 +132,15 @@ function addToCart(id, store = null, label = "") {
   saveCart(state.cart, state.city.slug);
   renderChrome();
   toast(label ? `Agregado a Mi compra · ${label}` : "Agregado a Mi compra");
+}
+
+function removeMissing() {
+  const byId = state.catalog?.byId;
+  if (!byId) return;
+  state.cart = state.cart.filter((line) => byId.has(line.id));
+  saveCart(state.cart, state.city.slug);
+  renderChrome();
+  render();
 }
 
 function updateLine(index, changes) {
@@ -603,8 +613,16 @@ function viewCart(container) {
   const catalog = state.catalog;
   if (!catalog.ready) return whenIndexed(catalog, "Cargando los precios de tu compra…");
   const lines = state.cart.map((line, index) => ({ ...line, index, product: catalog.byId.get(line.id) })).filter((line) => line.product);
+  const missing = state.cart.filter((line) => !catalog.byId.get(line.id));
+  const missingNote = missing.length ? h("div", { class: "notice warn small", role: "status" },
+    h("span", {}, missing.length === 1
+      ? "1 producto de tu lista ya no está en el catálogo de hoy (el súper dejó de publicarlo o cambió de ficha)."
+      : `${missing.length} productos de tu lista ya no están en el catálogo de hoy (el súper dejó de publicarlos o cambiaron de ficha).`),
+    h("button", { type: "button", class: "link", onclick: () => removeMissing() }, "Quitar de la lista")) : null;
   if (!lines.length) {
-    return h("div", { class: "page empty" }, h("h1", {}, "Mi compra"), h("p", {}, "Todavía no agregaste productos."), h("a", { class: "primary", href: "#/buscar" }, "Buscar productos"));
+    return h("div", { class: "page empty" }, h("h1", {}, "Mi compra"), missingNote,
+      h("p", {}, missing.length ? "No queda ningún producto con precio hoy." : "Todavía no agregaste productos."),
+      h("a", { class: "primary", href: "#/buscar" }, "Buscar productos"));
   }
   const page = h("div", { class: "page cart" },
     h("div", { class: "cart-layout" },
@@ -660,7 +678,7 @@ function viewCart(container) {
     });
     fill(page.querySelector(".cart-lines"),
       h("div", { class: "results-head" }, h("h1", {}, "Mi compra"), h("span", { class: "muted" }, countText(cartCount(), "artículo"))),
-      lineViews);
+      missingNote, lineViews);
 
     const stores = [...perStore.entries()].filter(([, entry]) => entry.missing < loaded.length)
       .sort((a, b) => a[1].missing - b[1].missing || a[1].total - b[1].total);
@@ -711,7 +729,7 @@ async function renderAdmin(main) {
   main.dataset.view = "admin";
   fill(main, loadingPage("Abriendo el panel de revisión…"));
   try {
-    adminModule = adminModule || await import("./admin.js?v=20261113-5");
+    adminModule = adminModule || await import("./admin.js?v=20261113-6");
     if (route().path.startsWith(ADMIN_ROUTE) && main.dataset.view === "admin") adminModule.mountSizeReview(main, { h, fill });
   } catch (error) {
     delete main.dataset.view;
@@ -775,7 +793,8 @@ async function loadCity(city) {
       if (state.catalog !== catalog) return;
       const migrated = migrateCartLines(state.cart, known, legacy);
       if (JSON.stringify(migrated) !== JSON.stringify(state.cart)) saveCart(migrated, city.slug);
-      state.cart = migrated.filter((line) => known.has(line.id));
+      // Las líneas que ya no están en el catálogo se conservan y Mi compra lo avisa.
+      state.cart = migrated;
       renderChrome();
       if (route().path.startsWith("/compra")) render();
     }).catch(() => {});
@@ -810,7 +829,7 @@ async function start() {
 let scannerModule = null;
 async function startScanner(opener) {
   try {
-    scannerModule = scannerModule || await import("./scanner.js?v=20261113-5");
+    scannerModule = scannerModule || await import("./scanner.js?v=20261113-6");
     scannerModule.openScanner({
       h, opener,
       onCode: (code, format) => {

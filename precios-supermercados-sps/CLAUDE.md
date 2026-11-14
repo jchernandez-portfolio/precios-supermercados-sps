@@ -59,24 +59,32 @@ python scripts/versionar_super_compras.py --auto   # o --check
   `data.js` y `sw.js`; CSP en `index.html` (no añadir orígenes sin necesidad).
 - Turso: leer sólo el alcance necesario, escribir sólo deltas (ver `AGENTS.md`).
 
-## Estado (13-nov-2026)
+## Estado (14-nov-2026, fin de las fases 0–8)
 
-- Motor de identidad v2.9 (`src/precios_supermercados/product_identity_v2.py`): regla de
-  onzas (v2.8, #65) y reglas del PR B (g ≈ ml en lácteos/jugos/salsas, peso sobre conteo),
-  todas con "nunca empeorar".
-- Panel `#/admin/revision` (`super-compras/admin.js`) → workflow
-  `precios-supermercados-sps-size-decisions.yml` → `scripts/aplicar_decisiones_tamano.py`
-  → Turso `size_decisions` + `master_products.human_attributes_json` → relanza refresco.
-  Tamaño oficial forma el grupo, el resto se aísla; `different_products` no agrupa (#67, #68).
-  10 decisiones humanas guardadas y aplicadas.
-- Cola pública: `precios-supermercados-sps-size-queue.yml` → `scripts/exportar_cola_tamanos.py`
-  → rama `revision-tamanos/cola.json` (~1,065 códigos; cada oferta con `foto` R2,
-  `foto_de`, tamaño publicado y código del súper).
-- IA de visión (#69–#71): `scripts/sugerir_tamanos_ia.py` (Gemini). Auto-resuelve
-  (`engine:gemini_auto`) sólo si todas las fotos legibles coinciden y ese tamaño lo publica
-  >50 % de las ofertas. Cache `revision-tamanos/ia-tamanos.json`. Pestaña "Resueltos por IA".
-  **Abierto**: 404 "models/gemini-2.5-flash is no longer available to new users".
-- Open Food Facts descartado (#66).
+- Motor de identidad **v2.9** (`product_identity_v2.py`): regla de onzas (v2.8, #65) y PR B
+  (g ≈ ml ≤5 % en lácteos/jugos/salsas + peso sobre conteo "medio"), todo con "nunca
+  empeorar" (#85). Medición en `scripts/medir_pr_b.py` / workflow de auditoría (`--pr-b`).
+- Decisiones de tamaño: panel `#/admin/revision` (humanas) o modo sesión
+  (`scripts/preparar_revision_claude.py` → tabla → aprobación del dueño →
+  `scripts/guardar_revision_claude.py --enviar`, `engine:claude_sesion`, #76). La IA nunca
+  pisa una decisión humana. La medición de identidad aplica las decisiones (#77).
+- Cola pública `revision-tamanos/cola.json` + IA automática (#75, #78): **Claude Sonnet 5.5**
+  primero (`ANTHROPIC_API_KEY`, créditos de API del plan Max; tope `claude_max`=200) y Gemini
+  de respaldo (404 de modelo retirado → siguiente). `resueltas_motor` alimenta "Resueltos por
+  IA". La cola sólo hace commit si cambian códigos o el resumen de IA (#84).
+- Web pública: escáner de código de barras (`scanner.js`, BarcodeDetector + ZXing propio en
+  `vendor/`, índice `barcodes.json` por ciudad, #82); QA móvil/accesibilidad (#81); Mi compra
+  avisa productos que salieron del catálogo (#84).
+- Datos: auditoría del catálogo público y arreglos (libra en TGU, fotos heredadas ajenas,
+  "Café", alternativas, "de hoy") en #83; informe en
+  `docs/calidad/auditoria-catalogo-publico-2026-11-13.md`.
+- La Colonia: marcas recortadas por VTEX se recuperan por `category-2` (#74).
+- Diseño pendiente de implementar: `docs/propuestas-revision-tamanos.md` (#79).
+- Open Food Facts eliminado (#84).
+
+**Pendientes**: ofertas fantasma (`last_seen`), 3,913 fotos heredadas TGU por verificar,
+títulos duplicados VTEX, implementar las 4 propuestas de #79, borrar ramas `rpi/*` ya
+fusionadas (requiere permiso del dueño), probar el escáner en un iPhone/Android reales.
 
 ## Objetivo: Claude lee las imágenes, Gemini es respaldo
 
