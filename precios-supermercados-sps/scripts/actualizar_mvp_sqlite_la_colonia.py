@@ -18,6 +18,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 if str(ROOT / "src") not in sys.path:
     sys.path.append(str(ROOT / "src"))
 from generar_mvp_sqlite_la_colonia import create_schema  # noqa: E402
+from precios_supermercados.scrapers.colonial import sitemap_drift_limit as colonial_sitemap_drift_limit  # noqa: E402
 from precios_supermercados.unpriced_unavailable import (  # noqa: E402
     validate_unpriced_unavailable,
 )
@@ -145,7 +146,11 @@ def validate_snapshot_bytes(raw: bytes, *, supermarket_id: str = SUPERMARKET_ID)
         if (any(data.get(k) is not True for k in ("catalog_complete", "validation_passed", "location_verified_same_run"))
                 or data.get("currency") != "HNL"
                 or data.get("scope") != "public_ecommerce_sps_not_physical_branch_inventory"
-                or any(type(data.get(k)) is not int or data[k] != reported for k in ("membership_count", "html_cards_count"))):
+                or type(data.get("html_cards_count")) is not int or data["html_cards_count"] != reported
+                # El sitemap llega atrasado: misma tolerancia que el scraper
+                # (``sitemap_drift_limit``); tarjetas y products.json sí cuadran exacto.
+                or type(data.get("membership_count")) is not int
+                or abs(data["membership_count"] - reported) > colonial_sitemap_drift_limit(reported)):
             raise SnapshotError("colonial_evidence_invalid")
         for row in rows:
             if (row["source_key_type"] != "item_id" or row["source_key"] != row["item_id"]
