@@ -3,7 +3,9 @@
 
 Lee ``revision-claude/resultados.json`` (lo que propuso Claude por código, con
 ``aprobado: true`` en las filas que el dueño aprobó), arma el envío
-``rpi-size-decisions/v1`` (nota: lo leído por súper + la razón), lo valida con las
+``rpi-size-decisions/v1`` (nota: lo leído por súper + la razón; ``evidence``: lo leído
+en la foto PROPIA de cada súper convertido a valor/unidad cuando es inequívoco, motor
+v2.10; ``apply: "all"`` sólo si la fila aprobada lo trae), lo valida con las
 mismas reglas que el workflow y, con ``--enviar``, lanza el workflow de decisiones con
 ``fuente=claude_sesion`` (``gh api``; el workflow sólo acepta la cuenta del dueño y
 guarda ``engine:claude_sesion`` con "aprobado por <cuenta>" en la nota). Después marca
@@ -28,9 +30,12 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from precios_supermercados.size_decisions import (  # noqa: E402
+    EVIDENCE_STORES,
     MAX_DECISIONS,
+    MAX_EVIDENCE_TEXT,
     MAX_PAYLOAD_CHARS,
     PAYLOAD_SCHEMA,
+    evidence_from_text,
     parse_payload,
 )
 from preparar_revision_claude import BATCH_FILE, OUT_DIR, SEEN_FILE, load_seen, store_name  # noqa: E402
@@ -51,9 +56,35 @@ def note_for(row: Mapping[str, object]) -> str:
     return text[:NOTE_CHARS]
 
 
+def own_photo_stores(item: Mapping[str, object]) -> set[str]:
+    """Súper cuya oferta tiene foto propia en la tanda (una foto compartida de otro súper no cuenta)."""
+    stores = set()
+    for offer in item.get("offers") or ():
+        if not isinstance(offer, Mapping) or not offer.get("foto"):
+            continue
+        store, source = offer.get("store"), offer.get("foto_de")
+        if store in EVIDENCE_STORES and (not source or source == store):
+            stores.add(str(store))
+    return stores
+
+
+def evidence_for(row: Mapping[str, object], own: set[str]) -> list[dict[str, str]]:
+    """``lecturas`` → ``evidence``: sólo fotos propias y textos con un tamaño inequívoco."""
+    readings = row.get("lecturas") if isinstance(row.get("lecturas"), Mapping) else {}
+    evidence = []
+    for store, text in sorted(readings.items()):
+        if store not in own or (parsed := evidence_from_text(text)) is None:
+            continue
+        value, unit = parsed
+        clean = " ".join(str(text).split())[:MAX_EVIDENCE_TEXT]
+        evidence.append({"store": str(store), "value": format(value, "f"), "unit": unit, "text": clean})
+    return evidence
+
+
 def build(results: Mapping[str, object], batch: Mapping[str, object]) -> tuple[dict[str, object], list[str]]:
     """Filas aprobadas → envío; devuelve también todos los códigos revisados (para marcarlos vistos)."""
-    in_batch = {str(item.get("gtin")) for item in batch.get("items") or () if isinstance(item, Mapping)}
+    items = {str(item.get("gtin")): item for item in batch.get("items") or () if isinstance(item, Mapping)}
+    in_batch = set(items)
     decisions: list[dict[str, object]] = []
     reviewed: list[str] = []
     for row in results.get("items") or ():
@@ -69,6 +100,11 @@ def build(results: Mapping[str, object], batch: Mapping[str, object]) -> tuple[d
         decision: dict[str, object] = {"gtin": gtin, "decision": proposal, "note": note_for(row)}
         if proposal == "size":
             decision.update(value=str(row.get("value")), unit=str(row.get("unit")))
+            evidence = evidence_for(row, own_photo_stores(items[gtin]))
+            if evidence:
+                decision["evidence"] = evidence
+            if row.get("apply") == "all":
+                decision["apply"] = "all"
         decisions.append(decision)
     if len(decisions) > MAX_DECISIONS:
         raise SystemExit("demasiadas_decisiones")

@@ -8,6 +8,12 @@ aplica en cada refresco: las ofertas que coinciden con el tamaño oficial forman
 el grupo comparable y las demás quedan aisladas. ``different_products`` marca un
 código reutilizado: ese GTIN no se agrupa.
 
+Motor v2.10 ("corrige con evidencia"): cada decisión puede traer la lectura de la
+foto de cada oferta (``evidence``, tabla derivada ``size_offer_evidence``) y un
+alcance (``apply``: ``evidence`` por omisión o ``all``). El motor la usa para
+corregir el tamaño de las ofertas cuyo título dice otra cosa (ver
+``product_identity_v2.size_evidence_plan``).
+
 Este módulo es puro (sin red): valida el JSON del panel, normaliza unidades y
 decide si una presentación coincide con el tamaño oficial.
 """
@@ -17,7 +23,7 @@ import json
 import re
 import unicodedata
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal, InvalidOperation
 
 from .identifiers import canonicalize_gtin
@@ -40,6 +46,15 @@ _ACTOR = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})")
 ENGINE_ACTORS = frozenset({"gemini_auto", "claude_auto", "claude_sesion"})
 # Claude en sesión: lo propone la IA pero sólo se guarda con la aprobación de una persona.
 APPROVED_ENGINES = frozenset({"claude_sesion"})
+# Evidencia por oferta (v2.10): lo leído en la foto de cada súper.
+EVIDENCE_TABLE = "size_offer_evidence"
+EVIDENCE_STORES = ("la_colonia", "colonial", "walmart", "pricesmart", "comisariato_los_andes", "paiz")
+EVIDENCE_SOURCES = ("human", "claude_sesion", "claude_auto", "gemini_auto")
+APPLY_SCOPES = ("evidence", "all")
+MAX_EVIDENCE_TEXT = 60
+# Fila de alcance: ``apply: "all"`` se guarda como una fila del GTIN con este súper y sin valor.
+APPLY_ALL_STORE = "*"
+APPLY_ALL_TEXT = "apply:all"
 _RELATIVE_TOLERANCE = Decimal("0.02")
 _ABSOLUTE_TOLERANCE = Decimal("1.5")
 
@@ -55,6 +70,23 @@ TABLE_SQL = f"""CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
     decided_at_utc TEXT NOT NULL,
     CHECK ((decision = 'size') = (net_content_value IS NOT NULL AND net_content_unit IS NOT NULL))
 ) STRICT"""
+_STORE_LIST = ",".join(f"'{store}'" for store in (APPLY_ALL_STORE, *EVIDENCE_STORES))
+_SOURCE_LIST = ",".join(f"'{source}'" for source in EVIDENCE_SOURCES)
+EVIDENCE_TABLE_SQL = f"""CREATE TABLE IF NOT EXISTS {EVIDENCE_TABLE} (
+    canonical_gtin TEXT NOT NULL CHECK (length(canonical_gtin) = 14),
+    supermarket_id TEXT NOT NULL CHECK (supermarket_id IN ({_STORE_LIST})),
+    value TEXT,
+    unit TEXT CHECK (unit IS NULL OR unit IN ('g','ml','oz','unit')),
+    source TEXT NOT NULL CHECK (source IN ({_SOURCE_LIST})),
+    text TEXT CHECK (text IS NULL OR length(text) <= {MAX_EVIDENCE_TEXT}),
+    decided_at_utc TEXT NOT NULL,
+    PRIMARY KEY (canonical_gtin, supermarket_id),
+    CHECK ((supermarket_id = '{APPLY_ALL_STORE}') = (value IS NULL AND unit IS NULL))
+) STRICT"""
+EVIDENCE_SELECT_SQL = (
+    f"SELECT canonical_gtin,supermarket_id,value,unit,source,text,decided_at_utc FROM {EVIDENCE_TABLE} "
+    "ORDER BY canonical_gtin,supermarket_id"
+)
 SELECT_SQL = (
     f"SELECT canonical_gtin,decision,net_content_value,net_content_unit,declared_value,declared_unit,"
     f"note,decided_by,decided_at_utc FROM {TABLE_NAME} ORDER BY canonical_gtin"
@@ -63,6 +95,34 @@ SELECT_SQL = (
 
 class SizeDecisionError(ValueError):
     """El JSON del panel o una fila guardada no cumple el contrato."""
+
+
+@dataclass(frozen=True, slots=True)
+class OfferEvidence:
+    """Contenido neto leído en la foto de la oferta de un súper (unidad canónica)."""
+
+    supermarket_id: str
+    value: Decimal
+    unit: str
+    source: str
+    text: str | None = None
+    decided_at_utc: str = ""
+
+    def __post_init__(self) -> None:
+        if self.supermarket_id not in EVIDENCE_STORES:
+            raise SizeDecisionError("size_evidence_store_invalid")
+        if self.unit not in CANONICAL_UNITS or not self.value.is_finite() or self.value <= 0:
+            raise SizeDecisionError("size_evidence_value_invalid")
+        if self.source not in EVIDENCE_SOURCES:
+            raise SizeDecisionError("size_evidence_source_invalid")
+        if self.text is not None and len(self.text) > MAX_EVIDENCE_TEXT:
+            raise SizeDecisionError("size_evidence_text_too_long")
+
+    @property
+    def signature(self) -> PresentationSignature:
+        return PresentationSignature(
+            dimension=_DIMENSION[self.unit], total_base=self.value, pack_count=1, unit_amount_base=self.value,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,8 +136,19 @@ class SizeDecision:
     note: str | None = None
     decided_by: str = "human"
     decided_at_utc: str = ""
+    # v2.10: lectura de la foto por súper y alcance (``evidence`` | ``all``).
+    evidence: tuple[OfferEvidence, ...] = ()
+    apply: str = "evidence"
+    # ``True`` si el envío trajo ``evidence`` o ``apply``: al guardarlo reemplaza la evidencia del GTIN.
+    evidence_given: bool = False
 
     def __post_init__(self) -> None:
+        if self.apply not in APPLY_SCOPES:
+            raise SizeDecisionError("size_decision_apply_invalid")
+        if self.decision != "size" and (self.evidence or self.apply != "evidence"):
+            raise SizeDecisionError("size_decision_fields_invalid")
+        if len({item.supermarket_id for item in self.evidence}) != len(self.evidence):
+            raise SizeDecisionError("size_evidence_store_duplicate")
         if canonicalize_gtin(self.canonical_gtin) != self.canonical_gtin:
             raise SizeDecisionError("size_decision_gtin_invalid")
         if self.decision not in DECISIONS:
@@ -162,7 +233,8 @@ def parse_payload(text: str, *, decided_by: str, decided_at_utc: str, engine: bo
     result: list[SizeDecision] = []
     seen: set[str] = set()
     for item in items:
-        if not isinstance(item, Mapping) or set(item) - {"gtin", "decision", "value", "unit", "note"}:
+        if not isinstance(item, Mapping) or set(item) - {"gtin", "decision", "value", "unit", "note", "evidence",
+                                                         "apply"}:
             raise SizeDecisionError("size_decision_fields_invalid")
         gtin = canonicalize_gtin(str(item.get("gtin") or "").strip() or None)
         if gtin is None:
@@ -175,7 +247,8 @@ def parse_payload(text: str, *, decided_by: str, decided_at_utc: str, engine: bo
         common = {"canonical_gtin": gtin, "note": note, "decided_by": author,
                   "decided_at_utc": decided_at_utc}
         if kind == "different_products":
-            if item.get("value") is not None or item.get("unit") is not None:
+            if any(key in item for key in ("evidence", "apply")) or item.get("value") is not None \
+                    or item.get("unit") is not None:
                 raise SizeDecisionError("size_decision_fields_invalid")
             result.append(SizeDecision(decision=kind, **common))
             continue
@@ -188,11 +261,57 @@ def parse_payload(text: str, *, decided_by: str, decided_at_utc: str, engine: bo
         if value > MAX_VALUE[unit] or (unit == "unit" and value != value.to_integral_value()):
             raise SizeDecisionError("size_decision_value_out_of_range")
         total, canonical_unit = canonical_size(value, unit)
+        apply = item.get("apply", "evidence")
+        if apply not in APPLY_SCOPES:
+            raise SizeDecisionError("size_decision_apply_invalid")
+        source = decided_by if engine else "human"
+        evidence = _parse_evidence(item.get("evidence", []), source=source, decided_at_utc=decided_at_utc)
         result.append(SizeDecision(
             decision=kind, net_content_value=total.normalize(), net_content_unit=canonical_unit,
-            declared_value=value.normalize(), declared_unit=unit, **common,
+            declared_value=value.normalize(), declared_unit=unit, evidence=evidence, apply=apply,
+            evidence_given="evidence" in item or "apply" in item, **common,
         ))
     return result
+
+
+def _evidence_text(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise SizeDecisionError("size_evidence_text_invalid")
+    text = " ".join(unicodedata.normalize("NFC", value).split())
+    if any(unicodedata.category(char).startswith("C") for char in text):
+        raise SizeDecisionError("size_evidence_text_invalid")
+    if len(text) > MAX_EVIDENCE_TEXT:
+        raise SizeDecisionError("size_evidence_text_too_long")
+    return text or None
+
+
+def _parse_evidence(items: object, *, source: str, decided_at_utc: str) -> tuple[OfferEvidence, ...]:
+    """``evidence`` del envío → lecturas por súper (lista cerrada, un súper una vez, mismos límites)."""
+    if not isinstance(items, list) or len(items) > len(EVIDENCE_STORES):
+        raise SizeDecisionError("size_evidence_invalid")
+    result: list[OfferEvidence] = []
+    for entry in items:
+        if not isinstance(entry, Mapping) or set(entry) - {"store", "value", "unit", "text"} \
+                or not {"store", "value", "unit"} <= set(entry):
+            raise SizeDecisionError("size_evidence_invalid")
+        store, unit = entry.get("store"), entry.get("unit")
+        if store not in EVIDENCE_STORES:
+            raise SizeDecisionError("size_evidence_store_invalid")
+        if unit not in DECLARED_UNITS:
+            raise SizeDecisionError("size_evidence_unit_invalid")
+        value = _decimal(entry.get("value"))
+        if value > MAX_VALUE[unit] or (unit == "unit" and value != value.to_integral_value()):
+            raise SizeDecisionError("size_evidence_value_out_of_range")
+        total, canonical_unit = canonical_size(value, unit)
+        result.append(OfferEvidence(
+            supermarket_id=str(store), value=total.normalize(), unit=canonical_unit, source=source,
+            text=_evidence_text(entry.get("text")), decided_at_utc=decided_at_utc,
+        ))
+    if len({item.supermarket_id for item in result}) != len(result):
+        raise SizeDecisionError("size_evidence_store_duplicate")
+    return tuple(result)
 
 
 def decision_from_row(row: Sequence[object]) -> SizeDecision:
@@ -205,6 +324,33 @@ def decision_from_row(row: Sequence[object]) -> SizeDecision:
         declared_unit=None if declared_unit is None else str(declared_unit),
         note=None if note is None else str(note), decided_by=str(decided_by), decided_at_utc=str(decided_at),
     )
+
+
+def attach_evidence(
+    decisions: Mapping[str, SizeDecision], rows: Iterable[Sequence[object]]
+) -> dict[str, SizeDecision]:
+    """Decisiones + filas de ``size_offer_evidence`` (sólo a las decisiones de tamaño)."""
+    readings: dict[str, list[OfferEvidence]] = {}
+    apply_all: set[str] = set()
+    for gtin, store, value, unit, source, text, decided_at in rows:
+        gtin = str(gtin)
+        if store == APPLY_ALL_STORE:
+            apply_all.add(gtin)
+            continue
+        readings.setdefault(gtin, []).append(OfferEvidence(
+            supermarket_id=str(store), value=Decimal(str(value)), unit=str(unit), source=str(source),
+            text=None if text is None else str(text), decided_at_utc=str(decided_at),
+        ))
+    result = dict(decisions)
+    for gtin, decision in decisions.items():
+        if decision.decision != "size" or (gtin not in readings and gtin not in apply_all):
+            continue
+        result[gtin] = replace(
+            decision,
+            evidence=tuple(sorted(readings.get(gtin, ()), key=lambda item: item.supermarket_id)),
+            apply="all" if gtin in apply_all else "evidence",
+        )
+    return result
 
 
 def index_decisions(decisions: Iterable[SizeDecision]) -> dict[str, SizeDecision]:
@@ -275,3 +421,88 @@ def human_attributes(decision: SizeDecision) -> dict[str, dict[str, object]]:
         "net_content_value": {"value": format(decision.net_content_value, "f"), **meta},
         "net_content_unit": {"value": decision.net_content_unit, **meta},
     }
+
+
+# ------------------------------------------------- lectura de texto de una foto
+
+_FLUID_OUNCE_ML = Decimal("29.5735295625")
+_UNIT_WORDS = (
+    (r"fl\.?\s*oz", "floz"), (r"kg|kilos?|kilogramos?", "kg"), (r"mg", "mg"),
+    (r"g|gr|grs|gramos?", "g"), (r"ml|mililitros?", "ml"), (r"l|lt|lts|litros?", "l"),
+    (r"oz|onzas?", "oz"), (r"lb|lbs|libras?", "lb"),
+)
+_UNIT_RE = "|".join(f"(?:{pattern})" for pattern, _ in _UNIT_WORDS)
+_MEASURE = re.compile(rf"(?<![\w.,])(\d+(?:[.,]\d+)?)\s*({_UNIT_RE})(?![a-z])")
+# "5 sobres x 10 g", "6 pack x 200 ml", "2 x 115 g": N envases de X cada uno.
+_PACK = re.compile(rf"(?<![\w.,])(\d{{1,3}})\s*(?:[a-z]+\s*)?x\s*(\d+(?:[.,]\d+)?)\s*({_UNIT_RE})(?![a-z])")
+# Lecturas que no dicen el contenido neto de lo que se vende: vista parcial, banner,
+# "c/u", una sola unidad del paquete u otro diseño del empaque.
+_NOT_NET = re.compile(r"parcial|banner|c/u|cada\s+un|\(1\s+(?:sobre|unidad|bolsita|lata|botella)\)|otro\s+dise")
+# El peso escurrido no es el contenido neto: se descarta antes de leer.
+_DRAINED = re.compile(r"(?:esc\.?|escurrido|drained)\s*\d+(?:[.,]\d+)?\s*[a-z]*")
+_METRIC = frozenset({"g", "kg", "mg", "ml", "l"})
+
+
+def _unit_name(word: str) -> str:
+    return next(name for pattern, name in _UNIT_WORDS if re.fullmatch(pattern, word))
+
+
+def _to_base(word: str, number: str) -> tuple[str, Decimal, bool]:
+    """(unidad canónica, valor, métrica) de una medida del texto."""
+    unit, value = _unit_name(word), Decimal(number.replace(",", "."))
+    factor = {"kg": ("g", Decimal(1000)), "mg": ("g", Decimal("0.001")), "l": ("ml", Decimal(1000)),
+              "floz": ("ml", _FLUID_OUNCE_ML), "lb": ("g", _POUND_TO_GRAMS)}.get(unit)
+    canonical, value = (factor[0], value * factor[1]) if factor else (unit, value)
+    return canonical, value, unit in _METRIC
+
+
+def evidence_from_text(text: object) -> tuple[Decimal, str] | None:
+    """Texto leído en una foto ("8.5 oz (240 g)", "5 sobres × 10 g") → (valor, unidad canónica).
+
+    Sólo cuando es inequívoco; si no, ``None`` (esa oferta queda sin evidencia).
+    Prefiere las medidas métricas (las imperiales sólo si no hay ninguna), un
+    paquete "N × X" cuenta su total, descarta el peso escurrido y rechaza vistas
+    parciales, banners, "c/u" y lecturas de una sola unidad del paquete.
+    """
+    if not isinstance(text, str):
+        return None
+    folded = unicodedata.normalize("NFKD", text.casefold())
+    folded = "".join(char for char in folded if not unicodedata.combining(char)).replace("×", "x")
+    if _NOT_NET.search(folded):
+        return None
+    folded = _DRAINED.sub(" ", folded)
+    candidates: list[tuple[str, Decimal, bool]] = []
+    counts: list[int] = []
+    covered: list[tuple[int, int]] = []
+    for match in _PACK.finditer(folded):
+        count = int(match.group(1))
+        if count < 2:
+            continue
+        unit, value, metric = _to_base(match.group(3), match.group(2))
+        candidates.append((unit, value * count, metric))
+        counts.append(count)
+        covered.append(match.span())
+    for match in _MEASURE.finditer(folded):
+        if any(start <= match.start() < end for start, end in covered):
+            continue
+        candidates.append(_to_base(match.group(2), match.group(1)))
+    if not candidates:
+        return None
+    chosen = [item for item in candidates if item[2]] or candidates
+    if len({unit for unit, _, _ in chosen}) != 1:
+        return None
+    unit = chosen[0][0]
+    values = sorted(value for _, value, _ in chosen)
+    total, smallest = values[-1], values[0]
+    if not all(_close(value, total) for value in values):
+        # "10 × 6 fl oz (177 ml) · 1.77 L": la medida chica es la de cada envase.
+        if any(not (_close(value, total) or _close(value, smallest)) for value in values):
+            return None
+        if not any(_close(smallest * count, total) for count in counts):
+            return None
+    total = total.quantize(Decimal("0.01")).normalize()
+    if total == total.to_integral_value():
+        total = total.quantize(Decimal(1))
+    if total <= 0 or total > MAX_VALUE[unit] or (unit == "unit" and total != total.to_integral_value()):
+        return None
+    return total, unit

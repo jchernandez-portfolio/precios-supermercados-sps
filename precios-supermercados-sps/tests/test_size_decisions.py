@@ -230,7 +230,8 @@ def test_apply_saves_decisions_updates_master_and_marks_it_dirty() -> None:
                    {"gtin": MCCORMICK, "decision": "size", "value": "180", "unit": "ml"})
 
     dry = aplicar.apply_size_decisions(store, text, actor="Jchernand3z19", now=NOW)
-    assert dry["written"] is False and dry["counts"] == {"size": 2, "different_products": 0, "masters_updated": 1}
+    assert dry["written"] is False and dry["counts"] == {"size": 2, "different_products": 0, "masters_updated": 1,
+                                                     "evidence_rows": 0, "apply_all": 0}
     assert not connection.execute("SELECT name FROM sqlite_master WHERE name='size_decisions'").fetchall()
 
     result = aplicar.apply_size_decisions(store, text, actor="Jchernand3z19", apply=True, now=NOW)

@@ -61,7 +61,8 @@ python scripts/versionar_super_compras.py --auto   # o --check
 
 ## Estado (14-nov-2026, fin de las fases 0–8)
 
-- Motor de identidad **v2.9** (`product_identity_v2.py`): regla de onzas (v2.8, #65) y PR B
+- Motor de identidad **v2.10** (`product_identity_v2.py`): "corrige con evidencia" (foto por oferta,
+  `size_offer_evidence`, `published_as` en el catálogo; ver `docs/revision-tamanos.md`). Antes v2.9: regla de onzas (v2.8, #65) y PR B
   (g ≈ ml ≤5 % en lácteos/jugos/salsas + peso sobre conteo "medio"), todo con "nunca
   empeorar" (#85). Medición en `scripts/medir_pr_b.py` / workflow de auditoría (`--pr-b`).
 - Decisiones de tamaño: panel `#/admin/revision` (humanas) o modo sesión
