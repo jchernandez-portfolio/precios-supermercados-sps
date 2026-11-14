@@ -246,6 +246,11 @@ la validación de subida, el índice compartido y la verificación en una corrid
 
 ## 3. Ofertas "zombi"
 
+> Actualización 14-nov: el arreglo automático (ocultar ofertas que no salieron en la
+> última captura aceptada) quedó implementado detrás de un interruptor apagado; diseño,
+> costo y activación en `docs/calidad/ofertas-no-vistas.md`. La supresión manual de
+> abajo sigue siendo un complemento posible.
+
 ### Problema
 
 "Zombi" no está definido en el repo; se usa aquí esta definición, **a confirmar**: una

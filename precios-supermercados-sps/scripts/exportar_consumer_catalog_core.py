@@ -31,7 +31,7 @@ from exportar_modelo_analitico import (  # noqa: E402
 )
 from exportar_rpi_marts import _parse_utc, fetch_freshness  # noqa: E402
 from generar_mvp_sqlite_la_colonia import HISTORY_INDEX_NAME  # noqa: E402
-from precios_supermercados import consumer_catalog_display, master_taxonomy  # noqa: E402
+from precios_supermercados import capture_membership, consumer_catalog_display, master_taxonomy  # noqa: E402
 from precios_supermercados.price_analytics import ComparisonScope  # noqa: E402
 from precios_supermercados.price_history_analytics import (  # noqa: E402
     HistoricalPriceObservation,
@@ -80,6 +80,11 @@ _VISIBLE_OFFERS_SELECT = """SELECT p.product_id,p.supermarket_id,p.name,
               ON p.product_id=h.product_id AND p.supermarket_id=h.supermarket_id
             JOIN product_homologation_profiles AS hp
               ON hp.product_id=p.product_id AND hp.supermarket_id=p.supermarket_id"""
+# Misma lectura (mismas filas) + llave fuente, sólo si existe ``capture_membership``.
+_VISIBLE_OFFERS_SELECT_WITH_KEYS = _VISIBLE_OFFERS_SELECT.replace(
+    "p.category\n            FROM", "p.category,p.source_key_type,p.source_key\n            FROM", 1
+)
+assert _VISIBLE_OFFERS_SELECT_WITH_KEYS != _VISIBLE_OFFERS_SELECT
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,6 +122,9 @@ class VisibleOffer:
     # Categoría tal como la publica el supermercado (``products.category``); sólo
     # alimenta la tabla de equivalencias del árbol maestro de categorías.
     source_category: str | None = None
+    # Llave fuente (``source_key_type`` + ``source_key``) para saber si la oferta
+    # salió en la última captura aceptada; sólo se lee si existe la membresía.
+    capture_key: str | None = None
 def _text(value: object) -> str | None:
     if not isinstance(value, str):
         return None
@@ -213,15 +221,21 @@ def fetch_visible_offers(
     """
     result: list[VisibleOffer] = []
     seen: set[tuple[int, str]] = set()
+    with_keys = capture_membership.table_exists(backend)
     rows = fetch_current_rows_by_location(
         backend,
         scope,
-        select_sql=_VISIBLE_OFFERS_SELECT,
+        select_sql=_VISIBLE_OFFERS_SELECT_WITH_KEYS if with_keys else _VISIBLE_OFFERS_SELECT,
         location_index=5,
         invalid_code="consumer_catalog_offer_invalid",
         page_size=VISIBLE_OFFERS_PAGE_SIZE,
     )
     for row in rows:
+        offer_capture_key = None
+        if with_keys:
+            *row, source_key_type, source_key = row
+            if isinstance(source_key_type, str) and isinstance(source_key, str):
+                offer_capture_key = capture_membership.capture_key(source_key_type, source_key)
         (
             product_id, supermarket_id, name, brand, presentation,
             location_id, current_price, regular_price, is_promotion, availability,
@@ -268,6 +282,7 @@ def fetch_visible_offers(
                 presentation_status=str(presentation_status),
                 comparison_status=str(comparison_status),
                 source_category=_text(source_category),
+                capture_key=offer_capture_key,
             )
         )
     return apply_master_link_overrides(tuple(result), fetch_master_link_overrides(backend))
@@ -921,6 +936,45 @@ def _file_metadata(root: Path, relative: str) -> dict[str, object]:
         "bytes": len(content),
         "gzip_bytes": len(gzip.compress(content, mtime=0)),
     }
+def hide_unseen_offers(
+    backend: QueryBackend,
+    scope: ComparisonScope,
+    offers: Sequence[VisibleOffer],
+    freshness: Sequence[object],
+    policy: capture_membership.UnseenOffersPolicy | None = None,
+) -> tuple[tuple[VisibleOffer, ...], dict[str, object] | None]:
+    """Quita (o sólo mide) ofertas ausentes de la última captura aceptada.
+
+    Sin tabla ``capture_membership`` no lee nada más y la salida es idéntica a la
+    anterior. Con tabla: lee ≤ 1 fila por contexto y compara contra la última
+    captura aceptada que ya calculó ``fetch_freshness`` (sin releer scrape_runs).
+    """
+    if not capture_membership.table_exists(backend):
+        return tuple(offers), None
+    policy = policy or capture_membership.load_policy()
+    contexts = tuple(scope.locations)
+    kept, contexts_report = capture_membership.apply_unseen_policy(
+        offers,
+        contexts=contexts,
+        memberships=capture_membership.fetch_memberships(backend, contexts),
+        latest_accepted_runs={
+            (item.source_id, item.location_id): item.last_successful_run_id for item in freshness
+        },
+        policy=policy,
+        context_of=lambda offer: (offer.supermarket_id, offer.location_id),
+        key_of=lambda offer: offer.capture_key,
+    )
+    report = {
+        "policy": "hide_offers_absent_from_latest_accepted_capture"
+        if policy.hide_unseen_offers else "measure_only",
+        "max_unseen_fraction": policy.max_unseen_fraction,
+        "hidden_offers": len(offers) - len(kept),
+        "contexts": contexts_report,
+    }
+    print(json.dumps({"unseen_offers": report}, ensure_ascii=False, sort_keys=True), file=sys.stderr)
+    return tuple(kept), report
+
+
 def export_consumer_catalog(
     backend: QueryBackend,
     scope: ComparisonScope,
@@ -933,6 +987,13 @@ def export_consumer_catalog(
     if tuple(scope.locations) != EXPECTED_SCOPE:
         raise ExportError("consumer_catalog_sps_scope_invalid")
     offers = fetch_visible_offers(backend, scope)
+    freshness = fetch_freshness(
+        backend,
+        scope,
+        as_of_utc=as_of_utc,
+        freshness_window=freshness_window,
+    )
+    offers, unseen_report = hide_unseen_offers(backend, scope, offers, freshness)
     unmapped = master_taxonomy.unmapped_source_categories(
         (offer.supermarket_id, offer.source_category) for offer in offers
     )
@@ -948,12 +1009,6 @@ def export_consumer_catalog(
     }
     if require_products and (not offers or any(count == 0 for count in retailer_offer_counts.values())):
         raise ExportError("consumer_catalog_missing_visible_retailer")
-    freshness = fetch_freshness(
-        backend,
-        scope,
-        as_of_utc=as_of_utc,
-        freshness_window=freshness_window,
-    )
     freshness_by_scope = {
         (item.source_id, item.location_id): item.freshness_status.value for item in freshness
     }
@@ -1093,6 +1148,8 @@ def export_consumer_catalog(
             for item in freshness
         ],
     }
+    if unseen_report is not None:
+        manifest["unseen_offers"] = unseen_report
     _atomic_bytes(output_directory / "manifest.json", _json_bytes(manifest))
     return manifest
 def parser() -> argparse.ArgumentParser:

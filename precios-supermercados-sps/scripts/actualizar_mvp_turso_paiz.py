@@ -20,6 +20,8 @@ from actualizar_mvp_turso_la_colonia import (
     _run_batch,
     _stmt,
     _validate_table_names,
+    membership_keys_if_enabled,
+    membership_summary,
 )
 from migrar_mvp_paiz import schema_ready_sql
 
@@ -287,6 +289,7 @@ def persist_snapshot(raw: bytes, *, database_url: str, auth_token: str, run_id: 
             }
         raise SnapshotError("run_id_conflict")
 
+    membership_keys = membership_keys_if_enabled(snapshot)
     steps = _mutation_steps(
         _normalised_json(snapshot),
         location_id=location_id,
@@ -297,6 +300,7 @@ def persist_snapshot(raw: bytes, *, database_url: str, auth_token: str, run_id: 
         artifact_id=source_artifact_id,
         digest=digest,
         supermarket_id=SUPERMARKET_ID,
+        membership_keys=membership_keys,
     )
     begin = next(i for i, step in enumerate(steps) if step[0] == "begin")
     city = str(LOCATIONS[location_id]["city"])
@@ -320,6 +324,7 @@ def persist_snapshot(raw: bytes, *, database_url: str, auth_token: str, run_id: 
         "history_opened": opened,
         "history_closed": closed,
         "history_unchanged": len(snapshot["products"]) - opened,
+        **membership_summary(membership_keys),
     }
 
 
