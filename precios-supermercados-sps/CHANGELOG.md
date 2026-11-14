@@ -5,6 +5,10 @@ número son cambios directos. El detalle de cada incidente vive en
 [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md) y el de cada error de datos en
 [`docs/calidad/errores-confirmados.csv`](docs/calidad/errores-confirmados.csv).
 
+## 2026-11-14
+
+- Motor de identidad v2.10 "corrige con evidencia": las decisiones de tamaño traen la lectura de la foto de cada súper (`evidence`, tabla derivada `size_offer_evidence`) y `apply: "evidence" | "all"`; con ≥ 2 fotos que confirman y son mayoría el tamaño oficial se aplica a todas las ofertas del GTIN, con una sola se corrigen las de foto propia y un empate no corrige nada. El catálogo publica `published_as` (lo que publica el súper) y `other_presentation`; la medición de identidad lista las fichas que cambian (`evidencia-grupos.csv`).
+
 ## 2026-11-13
 
 - #85 Motor de identidad v2.9: g ≈ ml (≤ 5 %) en lácteos, jugos y salsas y peso sobre conteo (conteo 1, mismo pack o título con el conteo) en grupos GTIN, con "nunca empeorar"; el tamaño oficial de `size_decisions` compara g con ml en esas categorías.

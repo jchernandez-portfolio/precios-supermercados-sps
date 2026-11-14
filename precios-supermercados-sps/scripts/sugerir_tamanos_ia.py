@@ -49,7 +49,14 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from precios_supermercados.product_homologation import PresentationSignature  # noqa: E402
-from precios_supermercados.size_decisions import PAYLOAD_SCHEMA, canonical_size, match_official  # noqa: E402
+from precios_supermercados.size_decisions import (  # noqa: E402
+    EVIDENCE_STORES,
+    MAX_EVIDENCE_TEXT,
+    MAX_VALUE,
+    PAYLOAD_SCHEMA,
+    canonical_size,
+    match_official,
+)
 
 CACHE_SCHEMA = "rpi-size-ai/v2"
 PROMPT_VERSION = 2
@@ -648,7 +655,43 @@ def auto_decision(item: Mapping[str, object]) -> dict[str, object]:
     ia = item["ia"]
     who = PROVIDER_LABEL.get(str(ia.get("fuente")), "Gemini")
     note = f"{who}: {ia.get('text')}" if ia.get("text") else f"{who}: tamaño de la mayoría confirmado en la foto"
-    return {"gtin": item["gtin"], "decision": "size", "value": ia["value"], "unit": ia["unit"], "note": note[:200]}
+    decision = {"gtin": item["gtin"], "decision": "size", "value": ia["value"], "unit": ia["unit"], "note": note[:200]}
+    evidence = offer_evidence(item)
+    if evidence:
+        decision["evidence"] = evidence
+    return decision
+
+
+def offer_evidence(item: Mapping[str, object]) -> list[dict[str, str]]:
+    """Lectura de la foto PROPIA de cada súper (motor v2.10, ``size_offer_evidence``).
+
+    La foto de cada oferta ya viene mapeada a su súper (``offer["foto"]``); una foto
+    compartida de otro súper (``foto_de`` distinto) no cuenta como evidencia de esa
+    oferta, ni un súper con dos ofertas en el código.
+    """
+    evidence: dict[str, dict[str, str]] = {}
+    repeated: set[str] = set()
+    for offer in item.get("offers") or ():
+        store, reading = offer.get("store"), offer.get("ia")
+        if store not in EVIDENCE_STORES or not isinstance(reading, Mapping) or reading.get("status") != "leido":
+            continue
+        source = offer.get("foto_de")
+        if source and source != store:
+            continue
+        if store in evidence:
+            repeated.add(str(store))
+        unit = str(reading.get("unit"))
+        try:
+            value = Decimal(str(reading.get("value")))
+        except InvalidOperation:
+            continue
+        if unit not in MAX_VALUE or not value.is_finite() or not 0 < value <= MAX_VALUE[unit]:
+            continue  # una lectura fuera de rango no tumba el envío: esa oferta queda sin evidencia
+        entry = {"store": str(store), "value": format(value, "f"), "unit": unit}
+        if reading.get("text"):
+            entry["text"] = " ".join(str(reading["text"]).split())[:MAX_EVIDENCE_TEXT]
+        evidence[str(store)] = entry
+    return [entry for store, entry in sorted(evidence.items()) if store not in repeated]
 
 
 def annotate(queue: dict[str, object], cache: dict[str, dict[str, object]], *,

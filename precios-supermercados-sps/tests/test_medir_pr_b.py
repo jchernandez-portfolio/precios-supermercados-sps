@@ -168,7 +168,7 @@ def test_decided_groups_are_left_to_the_decision(result) -> None:
 
 def test_engine_v2_9_already_applies_a5_plus_b_media(result) -> None:
     engine = result["motor_vigente"]
-    assert engine["version"] == "product-homologation-v2.9" and engine["variante_aplicada"] == "A5_mas_B_media"
+    assert engine["version"] == "product-homologation-v2.10" and engine["variante_aplicada"] == "A5_mas_B_media"
     assert engine["ya_aplicada"] is True and engine["grupos_distintos_de_la_simulacion"] == 0
     assert engine["grupos_comparados"] == 12 and engine["grupos_decididos_que_pierden_ofertas"] == 0
     # Contra el motor vigente (que ya incluye A5 + B media) la variante no mejora nada más.

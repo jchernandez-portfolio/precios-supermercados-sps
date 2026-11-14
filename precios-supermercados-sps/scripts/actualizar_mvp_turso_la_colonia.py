@@ -41,6 +41,7 @@ EXPECTED_TABLES = {"supermarkets", "locations", "products", "price_history", "sc
 # especificaciones PriceSmart (las escribe sólo el workflow semanal) y decisiones
 # de tamaño del panel de revisión (size_decisions; faltaba: el 12-nov la primera
 # decisión guardada creó la tabla y el refresco falló con turso_schema_mismatch)
+# con su evidencia de foto por oferta (size_offer_evidence, motor v2.10)
 # y membresía de la última captura aceptada por contexto (capture_membership,
 # ofertas no vistas; la crea esta persistencia sólo con el interruptor activo).
 OPTIONAL_DERIVED_TABLES = {
@@ -53,6 +54,7 @@ OPTIONAL_DERIVED_TABLES = {
     "catalog_unpriced_observations",
     "pricesmart_product_specs",
     "size_decisions",
+    "size_offer_evidence",
     capture_membership.TABLE_NAME,
 }
 
