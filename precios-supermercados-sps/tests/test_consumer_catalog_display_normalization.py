@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import sys
 from dataclasses import replace
+from decimal import Decimal
 from pathlib import Path
 
 from precios_supermercados.consumer_catalog_display import multipack
@@ -255,7 +256,8 @@ PACK_FRESH = {(sm, f"{sm}_sps"): "FRESH" for sm in ("la_colonia", "colonial", "w
 
 def pack_offer(supermarket: str = "pricesmart", number: int = 1, **fields: object) -> object:
     base = offer(
-        name="Snack Pack Pudín de Chocolate 4 Unidades / 92 g / 3 oz",
+        # "4x92 g": medida explícita por envase; sin mediana del tipo basta el nombre.
+        name="Snack Pack Pudín de Chocolate 4x92 g",
         brand="Snack Pack",
         presentation="4 × 92 g",
         dimension="mass_g",
@@ -343,3 +345,109 @@ def test_build_rows_drops_pack_when_the_row_is_sold_by_pound() -> None:
     finally:
         MODULE.SOURCE_POUND.discard("walmart:7")
     assert row["presentation"] == "por libra" and "pack" not in row
+
+
+# Nombres reales del catálogo público (SPS/TGU, 13-nov-2026).
+def test_pack_name_kind_accepts_only_explicit_per_unit_measures() -> None:
+    kind = MODULE.pack_name_kind
+    assert kind("Red Bull Bebida Energizante Vitaliza Mente y Cuerpo 6 Unidades / 250 mL", 6) == "unidades"
+    assert kind("Progreso Arroz Blanco 25 Unidades / 1 lb", 25) == "unidades"
+    assert kind("Enterex Diabetex Suplemento Nutricional 16 Unidades/ 237 mL", 16) == "unidades"
+    assert kind("Doraditas queso 21 grx12 pack", 12) == "cada_uno"
+    assert kind("Cheetos crunchy extra queso 28 grx12 pac", 12) == "cada_uno"
+    assert kind("Nabisco oreo vainilla 12x36gr", 12) == "cada_uno"
+    assert kind("GLADE Ae Lavanda 12X400 ML", 12) == "cada_uno"
+    assert kind("Maggi gallina mi sazon 4/10 g", 4) == "cada_uno"
+    assert kind("Barra Desodorante Old Spice Fresh 2 Uds - 50 g c/u", 2) == "cada_uno"
+    assert kind("Pasta Dental Oral-B 3D White Blanqueadora - 2 Uds 67 ml c/u", 2) == "cada_uno"
+    # X puede ser el total, no es contenido o el conteo no es un paquete.
+    assert kind("Galletas de Vainilla Pozuelo con relleno sabor a Vainilla -12 uds/265g", 12) is None
+    assert kind("Galleta Chiky Pozuelo - 12uds/ 80 g", 12) is None
+    assert kind("Paquetes de Palitos de burbujas 3 Uds - 29 ml", 3) is None
+    assert kind("Gancho Adhesivo Negro 3u X 1kg", 3) is None
+    assert kind("Member's Selection Aceite para Motor SAE 15W-40 / 4.73 L", 40) is None
+    assert kind("Kern's Salsa de Tomate 1 000 Unidades / 8 g / 0.28 oz", 1000) is None
+    assert kind("Gillette ... en Gel Cool Wave5 Unidades / 107 mL / 3.8 oz", 5) is None
+    assert kind("Nabisco oreo vainilla 12x36gr", 6) is None  # otro conteo
+
+
+def _priced_row(name: str, presentation: str, unit: str | None, per: str = "100 g", **fields: object) -> dict:
+    row = {
+        "product_name": name,
+        "presentation": presentation,
+        "product_type": "Galletas",
+        "category": "Alimentos",
+        "offers": [{"current_price": "100.00", "availability": "in_stock",
+                    "unit_price": {"amount": unit, "per": per} if unit else None}],
+    }
+    if " × " in presentation:
+        row["pack"] = [int(presentation.split(" × ")[0]), "total"]
+    return {**row, **fields}
+
+
+def test_pack_verdict_keeps_only_unit_prices_that_read_as_per_unit() -> None:
+    """Mediana de "Galletas" 110/100 g: un total N veces mayor da un precio N veces menor."""
+    medians = {
+        ("product_type", "Galletas", "100 g"): Decimal("110"),
+        ("product_type", "Bebida energizante", "100 ml"): Decimal("1.00"),
+    }
+    rows = {
+        # (a) por envase: el precio por unidad está cerca del de su tipo.
+        "redbull": _priced_row("Red Bull Bebida Energizante 6 Unidades / 250 mL", "6 × 250 ml", "0.90", "100 ml",
+                               product_type="Bebida energizante", category="Alimentos"),
+        "oreo": _priced_row("Nabisco oreo vainilla 12x36gr", "12 × 36 g", "35.00"),
+        "bonobon": _priced_row("ARCOR Bon o ChocoFresa 5x15gr", "5 × 15 g", "128.00"),
+        # (b) X es el total: 12× o 30× más barato que la mediana.
+        "pozuelo": _priced_row("Galletas de Vainilla Pozuelo -12 uds/265g", "12 × 265 g", "4.00"),
+        "snickers": _priced_row("Snickers, Twix, M&M's 30 Unidades / 1.5 kg / 3.3 lb", "30 × 1.5 kg", "2.44"),
+        # (b) r = 0.27 con 8 envases: más cerca de "475 g en total" (r × 8 = 2.2) que de 3.8 kg.
+        "brioche": _priced_row("Breadco Pan Brioche para Hot Dog 8 Unidades / 475 g", "8 × 475 g", "30.00"),
+        # (b) formato PriceSmart sin mediana de su tipo ni de su categoría.
+        "sin_mediana": _priced_row("Niagara Almidón en Aerosol 4 Unidades / 567 g / 20 oz", "4 × 567 g", "9.00",
+                                   product_type="Almidón", category="Limpieza"),
+        # (c) capacidad del envase o conteo que el nombre no declara como paquete.
+        "vasos": _priced_row("Kirkland Signature Vasos Desechables 240 Unidades / 532 mL / 18 oz", "240 × 532 ml", "4.00"),
+        "termo": _priced_row("Manna Termo para Bebida en Acero Inoxidable 2 Unidades / 1.18 L / 40 oz", "2 × 1.18 L", "90.00"),
+        "kerns": _priced_row("Kern's Salsa de Tomate 1 000 Unidades / 8 g / 0.28 oz", "1000 × 8 g", "35.00"),
+    }
+    verdicts = {key: MODULE.pack_verdict(row, medians) for key, row in rows.items()}
+    assert verdicts == {
+        "redbull": "a", "oreo": "a", "bonobon": "a",
+        "pozuelo": "b", "snickers": "b", "brioche": "b", "sin_mediana": "b",
+        "vasos": "c", "termo": "c", "kerns": "c",
+    }
+    # Sin mediana, un nombre con medida explícita por envase basta (Chiquita "2x7 oz").
+    assert MODULE.pack_verdict(_priced_row("Chiquita pulpa de maracuya 2x7 oz", "2 × 7 oz", None), medians) == "a"
+
+
+def test_confirm_packs_uses_type_then_category_medians_and_leaves_b_and_c_as_today() -> None:
+    peers = [_priced_row(f"Galleta {index} 200 g", "200 g", str(100 + index)) for index in range(8)]
+    other_type = [_priced_row(f"Cereal {index} 300 g", "300 g", str(100 + index), product_type="Cereal") for index in range(8)]
+    medians = MODULE.unit_price_medians([*peers, *other_type])
+    assert medians[("product_type", "Galletas", "100 g")] == Decimal("104")
+    assert medians[("category", "Alimentos", "100 g")] == Decimal("104")
+    assert ("product_type", "Cereal", "100 g") in medians
+    oreo = _priced_row("Nabisco oreo vainilla 12x36gr", "12 × 36 g", "60.00")
+    pozuelo = _priced_row("Galletas de Vainilla Pozuelo -12 uds/265g", "12 × 265 g", "4.00")
+    # Sin tipo: compara con la mediana de su categoría (104): 30 × 1.5 kg es el total.
+    snickers = _priced_row("Snickers 30 Unidades / 1.5 kg / 3.3 lb", "30 × 1.5 kg", "2.44", product_type=None)
+    counts = MODULE.confirm_packs([*peers, *other_type, oreo, pozuelo, snickers])
+    assert counts == {"a": 1, "b": 2, "c": 0}
+    assert "pack" in oreo and "pack" not in pozuelo and "pack" not in snickers
+    # (b) quedan como hoy: misma presentación, sin total.
+    assert pozuelo["presentation"] == "12 × 265 g"
+
+
+def test_build_rows_drops_pack_from_ambiguous_names_end_to_end() -> None:
+    pozuelo = pack_offer(
+        "walmart", 3, product_name="Galletas de Vainilla Pozuelo con relleno sabor a Vainilla -12 uds/265g",
+        presentation="12 × 265 g", presentation_total_base="3180",
+    )
+    snickers = pack_offer(
+        "pricesmart", 4, product_name="Snickers, Twix, M&M’s, Mix de Barras de Chocolate 30 Unidades / 1.5 kg / 3.3 lb",
+        presentation="30 × 1500 g", presentation_total_base="45000",
+    )
+    rows = {row["product_name"][:8]: row for row in MODULE.build_rows((pozuelo, snickers), PACK_FRESH)}
+    assert all("pack" not in row for row in rows.values())
+    assert rows["Galletas"]["presentation"] == "12 × 265 g"
+    assert rows["Snickers"]["presentation"] == "30 × 1.5 kg"

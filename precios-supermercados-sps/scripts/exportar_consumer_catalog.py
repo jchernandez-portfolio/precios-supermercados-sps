@@ -294,8 +294,130 @@ def build_rows(
     for row in visible:
         _price_per_pound(row)
         _attach_pack(row, offers_by_key)
+    confirm_packs(visible)
     attach_other_presentations(visible, offers_by_key)
     return visible
+
+
+# ``pack`` sólo cuando el nombre dice "N envases de X cada uno" y el precio no lo
+# contradice. "Pozuelo -12 uds/265g" o "Snickers ... 30 Unidades / 1.5 kg" se leen
+# hoy como "12 × 265 g" y "30 × 1.5 kg", pero X es el total: con el total entre
+# paréntesis ("(3.18 kg)", "(45 kg)") el error se vería más. Esas filas quedan sin pack.
+_PACK_UNIT = r"(?:kgs?|kilos?|grms?|grs?|gramos?|g|mls?|lts?|litros?|l|oz|onzas?|lbs?|libras?)"
+_PACK_AMOUNT = r"\d+(?:[.,]\d+)?\s*"
+# Un total N veces mayor que el real da un precio por kg/L N veces menor: por debajo
+# de 1/4 de la mediana de su tipo (o más cerca de la lectura "X es el total"), X
+# puede ser el total y no se emite ``pack`` (ver pack_verdict).
+PACK_MIN_MEDIAN_RATIO = Decimal("0.25")
+# Igual que la portada (home.json): mediana sólo con ≥ 8 precios del tipo y base.
+PACK_MEDIAN_MIN_ROWS = 8
+# Vasos, termos, botellas para agua, bolsas de basura: la medida es la capacidad del
+# envase, no su contenido ("Vasos 240 Unidades / 532 mL"); un total no tiene sentido.
+_PACK_CAPACITY_RE = re.compile(
+    r"\b(?:vasos?|termos?|botellas? (?:para|de) (?:agua|bebidas?)|bolsas? para (?:la |las )?basura|"
+    r"contenedores?|recipientes?|tazas?)\b"
+)
+
+
+def pack_name_kind(name: object, count: int) -> str | None:
+    """Cómo declara el nombre el multipack de ``count`` envases (``None`` si no lo dice).
+
+    - ``"cada_uno"``: la medida es explícitamente por envase: "12x500ml", "4X11g",
+      "21 grx12 pack", "4/10 g", "2 Uds 67 ml c/u".
+    - ``"unidades"``: formato "6 Unidades / 250 mL" de PriceSmart; casi siempre es por
+      envase, pero a veces es el total ("30 Unidades / 1.5 kg"): exige el precio.
+    - ``None``: "12 uds/265g", "3u X 1kg", "15W-40 / 4.73 L" o un conteo que el
+      nombre no declara como paquete; X puede ser el total o no ser contenido.
+    """
+    text = " ".join(str(name or "").split()).casefold()
+    n = re.escape(str(count))
+    each = (
+        rf"(?<![\w.,]){n}\s*[x×]\s*{_PACK_AMOUNT}{_PACK_UNIT}(?![a-z])",
+        rf"(?<![\w.,]){_PACK_AMOUNT}{_PACK_UNIT}\s*x\s*{n}(?![\d.,])",
+        rf"(?<![\w/.,-]){n}\s*/\s*{_PACK_AMOUNT}{_PACK_UNIT}(?![a-z])",
+    )
+    if any(re.search(pattern, text) for pattern in each):
+        return "cada_uno"
+    if re.search(rf"(?<![\w.,]){n}\s*(?:u|un|und|uds?|unid|unidades)(?![a-z])", text) and re.search(
+        rf"{_PACK_AMOUNT}{_PACK_UNIT}\.?\s*c\s*/\s*u(?![a-z])", text
+    ):
+        return "cada_uno"
+    if re.search(rf"(?<![\w.,]){n}\s+unidades\s*/\s*{_PACK_AMOUNT}{_PACK_UNIT}(?![a-z])", text):
+        return "unidades"
+    return None
+
+
+def _best_unit_price(row: dict[str, object]) -> tuple[Decimal, str] | None:
+    """Precio por unidad de la oferta más barata (el mismo que muestra la tarjeta)."""
+    prices = _eligible_prices(row)
+    if not prices:
+        return None
+    unit = min(prices, key=lambda item: item[0])[1].get("unit_price")
+    if not isinstance(unit, dict) or unit.get("per") in {None, "unidad", "libra"}:
+        return None
+    amount = size_variants.parse_price(unit.get("amount"))
+    return None if amount is None or amount <= 0 else (amount, str(unit["per"]))
+
+
+def unit_price_medians(rows: Sequence[dict[str, object]]) -> dict[tuple[str, str, str], Decimal]:
+    """Mediana del precio por unidad por (tipo público, base), como la portada, y por
+    (categoría, base) para las filas sin tipo o de tipos con pocos precios."""
+    groups: dict[tuple[str, str, str], list[Decimal]] = {}
+    for row in rows:
+        unit = _best_unit_price(row)
+        if unit is None:
+            continue
+        for level in ("product_type", "category"):
+            if row.get(level):
+                groups.setdefault((level, str(row[level]), unit[1]), []).append(unit[0])
+    return {
+        key: sorted(values)[len(values) // 2]
+        for key, values in groups.items()
+        if len(values) >= PACK_MEDIAN_MIN_ROWS
+    }
+
+
+def pack_verdict(row: dict[str, object], medians: dict[tuple[str, str, str], Decimal]) -> str:
+    """``"a"`` = N envases de X cada uno (lleva pack); ``"b"`` = X puede ser el total;
+    ``"c"`` = el nombre no declara ese conteo como paquete."""
+    pack = row.get("pack")
+    if not isinstance(pack, list) or _PACK_CAPACITY_RE.search(_fold_public(f"{row.get('product_name')} {row.get('product_type')}")):
+        return "c"
+    kind = pack_name_kind(row.get("product_name"), int(pack[0]))
+    if kind is None:
+        return "b" if re.search(rf"(?<![\w.,]){pack[0]}\s*[a-z]", str(row.get("product_name") or "").casefold()) else "c"
+    unit = _best_unit_price(row)
+    median = None if unit is None else next(
+        (
+            medians[key]
+            for key in (("product_type", str(row.get("product_type")), unit[1]), ("category", str(row.get("category")), unit[1]))
+            if key in medians
+        ),
+        None,
+    )
+    if unit is None or median is None:
+        return "a" if kind == "cada_uno" else "b"
+    # r = precio por unidad leyendo X por envase ÷ mediana; leyendo X como total sería
+    # r × N. Sólo (a) si r no es absurdo (≥ 1/4) y queda más cerca de la mediana que
+    # r × N (en escala logarítmica: r ≥ 1/√N). "8 Unidades / 475 g" de pan con r = 0.25
+    # es un paquete de 475 g, no 3.8 kg.
+    ratio = unit[0] / median
+    return "a" if ratio >= PACK_MIN_MEDIAN_RATIO and ratio * ratio * int(pack[0]) >= 1 else "b"
+
+
+def confirm_packs(rows: list[dict[str, object]]) -> dict[str, int]:
+    """Deja ``pack`` sólo en las filas del tipo (a); (b) y (c) quedan como hoy."""
+    medians = unit_price_medians(rows)
+    counts = {"a": 0, "b": 0, "c": 0}
+    for row in rows:
+        if "pack" not in row:
+            continue
+        verdict = pack_verdict(row, medians)
+        counts[verdict] += 1
+        if verdict != "a":
+            row.pop("pack")
+    print(json.dumps({"pack": counts}, sort_keys=True), file=sys.stderr)
+    return counts
 
 
 def _offer_pack(offer: VisibleOffer) -> list[object] | None:
