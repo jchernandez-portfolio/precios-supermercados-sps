@@ -1,9 +1,42 @@
 {
   "comparison_policy": "fail_closed_strong_identity_and_commercial_consistency",
   "currency": "HNL",
-  "published_at_utc": "2026-11-14T02:47:47Z",
+  "published_at_utc": "2026-11-14T11:48:11Z",
   "row_count": 10,
   "rows": [
+    {
+      "best_price": "346.52",
+      "best_supermarket_id": "la_colonia",
+      "canonical_gtin": "07501199413242",
+      "canonical_product_id": "prod_gtin_07501199413242",
+      "highest_price": "438.00",
+      "offers": [
+        {
+          "current_price": "346.52",
+          "is_best_price": true,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Mas Color",
+          "source_category": "Limpieza",
+          "source_name": "Detergente Líquido Mas Color Cuidado&Renovación 4.65 Lt",
+          "source_presentation": "4.65 Lt",
+          "source_record_id": "la_colonia:7329",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "438.00",
+          "is_best_price": false,
+          "location_id": "walmart_sps",
+          "source_brand": "MAS COLOR",
+          "source_category": "Limpieza",
+          "source_name": "Detergente líquido Más Color cuidado y renovación - 4.65 L",
+          "source_presentation": null,
+          "source_record_id": "walmart:23281",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "91.48",
+      "savings_vs_highest_pct": "20.89"
+    },
     {
       "best_price": "272.20",
       "best_supermarket_id": "la_colonia",
@@ -137,72 +170,6 @@
       "savings_vs_highest_pct": "10.85"
     },
     {
-      "best_price": "173.50",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "07441001609541",
-      "canonical_product_id": "prod_gtin_07441001609541",
-      "highest_price": "207.00",
-      "offers": [
-        {
-          "current_price": "207.00",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Dos Pinos",
-          "source_category": "Alimentos",
-          "source_name": "Helado Dos Pinos Sabor Vainilla Y Caramelo 1028 Gr",
-          "source_presentation": "1028 Gr",
-          "source_record_id": "la_colonia:664",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "173.50",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "DOS PINOS",
-          "source_category": "Alimentos",
-          "source_name": "Helado Dos Pinos Sabor Vainilla Caramelo - 1028 g",
-          "source_presentation": null,
-          "source_record_id": "walmart:18799",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "33.50",
-      "savings_vs_highest_pct": "16.18"
-    },
-    {
-      "best_price": "125.90",
-      "best_supermarket_id": "la_colonia",
-      "canonical_gtin": "07500435183697",
-      "canonical_product_id": "prod_gtin_07500435183697",
-      "highest_price": "155.00",
-      "offers": [
-        {
-          "current_price": "125.90",
-          "is_best_price": true,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Old Spice",
-          "source_category": "Cuidado personal",
-          "source_name": "Desodorante Barra Old Spice Mar Profundo 85 Gr",
-          "source_presentation": "85 Gr",
-          "source_record_id": "la_colonia:2122",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "155.00",
-          "is_best_price": false,
-          "location_id": "walmart_sps",
-          "source_brand": "OLD SPICE",
-          "source_category": "Cuidado personal",
-          "source_name": "Barra Desodorante Old Spice Mar Profundo - 85 g",
-          "source_presentation": null,
-          "source_record_id": "walmart:21717",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "29.10",
-      "savings_vs_highest_pct": "18.77"
-    },
-    {
       "best_price": "80.00",
       "best_supermarket_id": "walmart",
       "canonical_gtin": "07411000204818",
@@ -269,37 +236,37 @@
       "savings_vs_highest_pct": "5.15"
     },
     {
-      "best_price": "231.30",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "07500435155922",
-      "canonical_product_id": "prod_gtin_07500435155922",
-      "highest_price": "252.25",
+      "best_price": "284.35",
+      "best_supermarket_id": "la_colonia",
+      "canonical_gtin": "07610113025239",
+      "canonical_product_id": "prod_gtin_07610113025239",
+      "highest_price": "306.50",
       "offers": [
         {
-          "current_price": "252.25",
-          "is_best_price": false,
+          "current_price": "284.35",
+          "is_best_price": true,
           "location_id": "la_colonia_sps",
-          "source_brand": "Pantene",
-          "source_category": "Cuidado personal",
-          "source_name": "Acondicionador Pantene Pro-V Bambu Nutre Y Crece 400 Ml",
-          "source_presentation": "400 Ml",
-          "source_record_id": "la_colonia:1962",
+          "source_brand": "Bacardi",
+          "source_category": "Bebidas",
+          "source_name": "Ron Bacardí Spiced 700 Ml",
+          "source_presentation": "700 Ml",
+          "source_record_id": "la_colonia:6301",
           "supermarket_id": "la_colonia"
         },
         {
-          "current_price": "231.30",
-          "is_best_price": true,
+          "current_price": "306.50",
+          "is_best_price": false,
           "location_id": "walmart_sps",
-          "source_brand": "PANTENE",
-          "source_category": "Cuidado personal",
-          "source_name": "Acondicionador Pantene Pro-V Bambú Nutre & Crece -400 ml",
+          "source_brand": "BACARDI",
+          "source_category": "Bebidas",
+          "source_name": "Ron Bacardi Spiced 700 Ml",
           "source_presentation": null,
-          "source_record_id": "walmart:19221",
+          "source_record_id": "walmart:27279",
           "supermarket_id": "walmart"
         }
       ],
-      "savings_vs_highest": "20.95",
-      "savings_vs_highest_pct": "8.31"
+      "savings_vs_highest": "22.15",
+      "savings_vs_highest_pct": "7.23"
     },
     {
       "best_price": "58.50",
@@ -333,6 +300,39 @@
       ],
       "savings_vs_highest": "20.65",
       "savings_vs_highest_pct": "26.09"
+    },
+    {
+      "best_price": "48.10",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "00099176120834",
+      "canonical_product_id": "prod_gtin_00099176120834",
+      "highest_price": "67.95",
+      "offers": [
+        {
+          "current_price": "67.95",
+          "is_best_price": false,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Ajax",
+          "source_category": "Limpieza",
+          "source_name": "Limpiador Multiusos Ajax Triclorín con Cloro en Polvo 600 g",
+          "source_presentation": "600 g",
+          "source_record_id": "la_colonia:8062",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "48.10",
+          "is_best_price": true,
+          "location_id": "walmart_sps",
+          "source_brand": "AJAX",
+          "source_category": "Limpieza",
+          "source_name": "Limpiador en Polvo Multiusos Ajax Triclorín con Cloro - 600 g",
+          "source_presentation": null,
+          "source_record_id": "walmart:22987",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "19.85",
+      "savings_vs_highest_pct": "29.21"
     }
   ],
   "schema": "precios-sps-safe-portfolio-sample/v1",
@@ -347,8 +347,8 @@
     }
   ],
   "selection_rule": "highest_absolute_savings_within_safe_common_comparable_universe",
-  "source_as_of": "2026-11-14T02:44:04.022292Z",
-  "source_head_sha": "82519078ca9dd34a0bed1f042a8ca823152ed499",
+  "source_as_of": "2026-11-14T11:42:04.056879Z",
+  "source_head_sha": "48fcbb64bdcaff2d694ee49cd19c5fee81eddeaa",
   "source_schema": "rpi-consumer-mart/v2",
-  "source_workflow_run_id": 43547881547
+  "source_workflow_run_id": 43591234605
 }
