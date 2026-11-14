@@ -58,6 +58,8 @@ python scripts/versionar_super_compras.py --auto   # o --check
 - **Frontend** (`super-compras/`): vanilla JS, sin `innerHTML`, `fetch` sólo en
   `data.js` y `sw.js`; CSP en `index.html` (no añadir orígenes sin necesidad).
 - Turso: leer sólo el alcance necesario, escribir sólo deltas (ver `AGENTS.md`).
+- `.claude/settings.json` (raíz) pre-aprueba `gh api` de lectura de Actions y el dispatch de
+  workflows del repo; lo que escribe en Turso sigue necesitando el permiso del dueño.
 
 ## Estado (14-nov-2026, fin de las fases 0–8)
 
