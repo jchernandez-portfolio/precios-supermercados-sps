@@ -82,6 +82,12 @@ python scripts/versionar_super_compras.py --auto   # o --check
 - La Colonia: marcas recortadas por VTEX se recuperan por `category-2` (#74).
 - Diseño pendiente de implementar: `docs/propuestas-revision-tamanos.md` (#79).
 - Open Food Facts eliminado (#84).
+- 14-nov (noche): Claude en la cola **funciona** tras #93 (esquema `anyOf` + modo simple ante 400;
+  prueba: 20 consultas Sonnet 5.5, 0 errores). Gemini sin cuota (429). Decisiones de tamaño: el
+  workflow acepta `Jchernand3z19` y `novawebstudio-HN` (#94); 14 decisiones de la tanda 1 guardadas.
+  Ficha muestra «X lo publica como N» (#95) y el título sale de un súper con el tamaño oficial (#96).
+- Un refresco lanzado por el workflow de decisiones no dispara la publicación: lanzar a mano
+  «Publicar analítica segura» (workflow_dispatch). El deploy de Pages cambia `?v=` por el commit.
 
 **Pendientes**: activar ofertas no vistas (código listo y apagado; requiere permiso del
 dueño, `docs/calidad/ofertas-no-vistas.md`), 3,913 fotos heredadas TGU por verificar,
