@@ -111,7 +111,7 @@ def test_each_commercial_change_opens_exactly_one_period(database, change):
         assert con.execute("SELECT current_price_minor FROM price_history WHERE valid_to_utc IS NOT NULL").fetchone() == (10000,)
 
 
-@pytest.mark.parametrize("kind", ["invalid", "incomplete", "duplicate", "counts", "scope", "numeric_true"])
+@pytest.mark.parametrize("kind", ["invalid", "incomplete", "duplicate", "counts", "sitemap_far", "scope", "numeric_true"])
 def test_rejected_snapshot_never_changes_accepted_state(database, kind):
     apply(snapshot(), "a")
     bad = json.loads(snapshot(2))
@@ -121,7 +121,8 @@ def test_rejected_snapshot_never_changes_accepted_state(database, kind):
         bad["products"].append(copy.deepcopy(bad["products"][0]))
         bad["skus_extracted"] = bad["skus_with_price"] = 2
         bad["availability_counts"]["in_stock"] = 2
-    elif kind == "counts": bad["membership_count"] = 2
+    elif kind == "counts": bad["html_cards_count"] = 2
+    elif kind == "sitemap_far": bad["membership_count"] = 1 + 51
     elif kind == "scope": bad["location_id"] = "la_colonia_sps"
     else: bad["catalog_complete"] = 1
     before = dump(database)
@@ -167,3 +168,10 @@ def test_wrong_existing_location_is_not_reassigned(database):
     with pytest.raises(local.SnapshotError, match="location_mismatch"):
         apply(snapshot(), "a")
     assert dump(database) == before
+
+
+def test_sitemap_behind_by_a_few_products_is_accepted(database):
+    # 14-nov-2026: 9,151 tarjetas y products.json, sitemap con 9,150 (atrasado).
+    late = json.loads(snapshot())
+    late["membership_count"] = late["catalog_products_reported"] - 1
+    assert local.validate_snapshot_bytes(json.dumps(late).encode(), supermarket_id="colonial")
