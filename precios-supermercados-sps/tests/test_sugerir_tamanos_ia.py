@@ -490,3 +490,40 @@ def test_old_cache_entries_count_as_gemini_and_main_splits_files_by_engine(tmp_p
     gemini = json.loads((tmp_path / "auto.json").read_text())["decisions"]
     assert [d["gtin"] for d in claude] == ["00041331013734"]
     assert all(d["gtin"] != "00041331013734" for d in gemini)
+
+
+def test_claude_400_retries_once_in_simple_mode_and_stays_there() -> None:
+    bodies: list[dict] = []
+
+    def opener(request, timeout):
+        if request.full_url.endswith("models?limit=1000"):
+            return claude_models("claude-sonnet-5-5")
+        body = json.loads(request.data)
+        bodies.append(body)
+        if "output_config" in body:
+            raise http_error(request, 400, "output_config.format: unsupported schema")
+        text = "```json\n" + json.dumps({"readings": [reading(1, 240)]}) + "\n```"
+        return Response(json.dumps({"stop_reason": "end_turn", "usage": {"input_tokens": 10, "output_tokens": 5},
+                                    "content": [{"type": "text", "text": text}]}).encode())
+
+    client = ia.Claude("k", opener=opener, sleep=lambda _: pytest.fail("un 400 no espera"))
+    assert client.read_labels("x", "Foto 1 = Paiz", [b"img"])["readings"][0]["value"] == 240
+    assert client.read_labels("x", "Foto 1 = Paiz", [b"img"])["readings"][0]["value"] == 240
+    assert ["output_config" in body for body in bodies] == [True, False, False]  # modo simple el resto
+    assert client.compat is True and client.last_error.startswith("400: output_config")
+
+
+def test_claude_400_in_simple_mode_too_fails_over_with_its_message() -> None:
+    opener, _ = claude_opener({1: (400, "model: bad request"), 2: (400, "model: bad request")})
+    claude = ia.Claude("k", opener=opener, sleep=lambda _: None)
+    gemini = FakeProvider("gemini", [{"readings": []}], "gemini-3.5-flash")
+    chain = ia.VisionChain([claude, gemini])
+    assert chain.read_labels("x", "Foto 1 = Paiz", [b"img"]) == {"readings": []}
+    report = chain.report()
+    assert report["cambio_de_proveedor"] == "claude_http_400"
+    assert report["errores_por_proveedor"]["claude"] == "400: model: bad request"
+
+
+def test_json_is_found_inside_text() -> None:
+    assert ia._json_from_text('Aquí va: {"readings": []} listo') == {"readings": []}
+    assert ia._json_from_text("sin json") is None
