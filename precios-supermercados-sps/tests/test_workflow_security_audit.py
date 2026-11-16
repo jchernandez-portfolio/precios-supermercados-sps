@@ -763,6 +763,12 @@ def test_size_decisions_workflow_is_owner_only_and_never_inlines_the_payload() -
             assert "aplicar_decisiones_tamano.py" in str(step["run"])
     raw = path.read_text(encoding="utf-8")
     assert "gh workflow run precios-supermercados-sps-homologation-refresh.yml" in raw
+    # Un refresco lanzado con el token del workflow no dispara workflow_run: la cola se
+    # regenera directo (sin IA) para que lo decidido salga del panel en minutos.
+    queue = next(step for step in base.steps(workflow) if "size-queue.yml" in str(step.get("run", "")))
+    assert "gh workflow run precios-supermercados-sps-size-queue.yml" in queue["run"]
+    assert "-f ia_minutos=0" in queue["run"] and "TURSO" not in str(queue.get("env", {}))
+    assert queue["env"] == {"GH_TOKEN": "${{ github.token }}"}
     # Fuente: lista cerrada; claude_sesion sólo como motor aprobado por el dueño.
     fuente = workflow["on"]["workflow_dispatch"]["inputs"]["fuente"]
     assert fuente["type"] == "choice" and fuente["options"] == ["panel", "claude_sesion"]
