@@ -3,9 +3,9 @@
 // (panel interno de tamaños) se carga aparte sólo cuando se abre.
 import {
   Catalog, RETAILER_COLORS, rowKey, RETAILER_NAMES, countText, listText, loadCart, loadCities, loadCitySlug,
-  migrateCartLines, money, photoSrcset, photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, storeLabel,
-} from "./data.js?v=20261116-1";
-import { productIllustration } from "./illustration.js?v=20261116-1";
+  migrateCartLines, money, photoSrcset, photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, storeLabel, unitPriceText,
+} from "./data.js?v=20261116-2";
+import { productIllustration } from "./illustration.js?v=20261116-2";
 
 // Foto real si existe; si no hay o falla al cargar, la ilustración de siempre.
 // Tarjetas y miniaturas usan 320 px; el detalle deja que el navegador elija 320 u
@@ -575,7 +575,7 @@ function resultCard(product) {
       h("span", { class: "result-brand" }, product.brand_label ?? (product.brand || product.product_type || "")),
       h("strong", { class: "result-name" }, productName(product)),
       h("span", { class: "result-meta" }, sizePill(product),
-        product.unit_amount ? h("span", { class: "muted small" }, `${money(product.unit_amount)} por ${product.unit_per}`) : null),
+        product.unit_amount ? h("span", { class: "muted small" }, unitPriceText(product.unit_amount, product.unit_per)) : null),
       storesLine(product)),
     h("span", { class: "result-price" },
       product.retailers.length > 1 ? h("small", {}, "desde") : null,
@@ -786,7 +786,7 @@ function publishedNote(offer, label) {
 function renderProduct(product, container, code = "") {
   const catalog = state.catalog;
   if (!product) return h("div", { class: "page empty" }, h("h1", {}, "Este producto ya no está en el catálogo de hoy."), h("a", { class: "primary", href: "#/" }, "Volver al inicio"));
-  const unit = product.unit_amount ? `${money(product.unit_amount)} por ${product.unit_per}` : "";
+  const unit = product.unit_amount ? unitPriceText(product.unit_amount, product.unit_per) : "";
   const page = h("div", { class: "page product" },
     h("div", { class: "product-top" },
       h("button", { type: "button", class: "icon-button", "aria-label": "Volver", onclick: () => history.length > 1 ? history.back() : go("/") }, icon("back")),
@@ -835,7 +835,7 @@ function renderProduct(product, container, code = "") {
           h("div", { class: "bar-store" },
             h("span", { class: "bar-name" }, storeDot(offer.supermarket_id), h("strong", {}, label),
               best ? h("span", { class: "badge-best" }, "MÁS BARATO") : null),
-            unitPrice ? h("span", { class: "muted small" }, `${money(unitPrice.amount)} por ${unitPrice.per}`) : null,
+            unitPrice ? h("span", { class: "muted small" }, unitPriceText(unitPrice.amount, unitPrice.per)) : null,
             publishedNote(offer, label),
             staleSince ? h("span", { class: "stale" }, `Precio del ${shortDate(staleSince)} · puede haber cambiado`) : null),
           h("div", { class: "bar-track", "aria-hidden": "true" }, h("span", { class: "bar", style: { width: `${barWidth(price, minimum, maximum)}%` } })),
@@ -883,7 +883,7 @@ function renderProduct(product, container, code = "") {
           return h("a", { class: `size-card${unitValue && unitValue === bestUnit ? " best" : ""}`, href: otherProduct ? `#/p/${otherProduct.id}` : "#" },
             sizePill({ presentation: other.presentation || "—", pack: other.pack }),
             priceTag(other.best_price),
-            other.best_unit_price ? h("span", { class: "muted small" }, `${money(other.best_unit_price.amount)} / ${other.best_unit_price.per}`) : null,
+            other.best_unit_price ? h("span", { class: "muted small" }, unitPriceText(other.best_unit_price.amount, other.best_unit_price.per)) : null,
             otherProduct ? h("span", { class: "muted small" }, otherProduct.retailers.map((r) => RETAILER_NAMES[r]).join(", ")) : null,
             unitValue && unitValue === bestUnit ? h("span", { class: "badge-text" }, "MÁS CONVENIENTE") : null,
             other.large_size ? h("span", { class: "badge-text muted" }, "TAMAÑO GRANDE") : null);
@@ -894,7 +894,7 @@ function renderProduct(product, container, code = "") {
           h("span", { class: "alt-tile" }, productVisual(alt, { size: 52 })),
           h("span", { class: "alt-main" }, h("strong", {}, alt.brand || ""), h("span", { class: "muted small" }, `${productName(alt)}`), storesLine(alt)),
           h("span", { class: "alt-price" }, priceTag(alt.best_price),
-            h("span", { class: Number(alt.unit_amount) < Number(product.unit_amount) ? "good small" : "muted small" }, `${money(alt.unit_amount)} / ${alt.unit_per}`)))))) : null);
+            h("span", { class: Number(alt.unit_amount) < Number(product.unit_amount) ? "good small" : "muted small" }, unitPriceText(alt.unit_amount, alt.unit_per))))))) : null);
   }).catch((error) => {
     if (!page.isConnected) return;
     const offersBox = page.querySelector(".offers");
@@ -1176,7 +1176,7 @@ async function renderAdmin(main) {
   main.dataset.view = "admin";
   fill(main, loadingPage("Abriendo el panel de revisión…"));
   try {
-    adminModule = adminModule || await import("./admin.js?v=20261116-1");
+    adminModule = adminModule || await import("./admin.js?v=20261116-2");
     if (route().path.startsWith(ADMIN_ROUTE) && main.dataset.view === "admin") adminModule.mountSizeReview(main, { h, fill });
   } catch (error) {
     delete main.dataset.view;
@@ -1286,7 +1286,7 @@ async function start() {
 let scannerModule = null;
 async function startScanner(opener) {
   try {
-    scannerModule = scannerModule || await import("./scanner.js?v=20261116-1");
+    scannerModule = scannerModule || await import("./scanner.js?v=20261116-2");
     scannerModule.openScanner({
       h, opener,
       onCode: (code, format) => {
