@@ -11,9 +11,15 @@
 // GitHub la rechaza (401/403). Sólo viaja en el encabezado Authorization a api.github.com.
 import {
   RETAILER_NAMES, SIZE_DECISIONS_RUNS_URL, SIZE_UNITS, loadSizeQueue, sendSizeDecisions,
-} from "./data.js?v=20261116-8";
+} from "./data.js?v=20261116-9";
 
 const TOKEN_KEY = "super-compras-admin-github-token";
+// Códigos ya enviados en este dispositivo: {gtin: ISO de envío}. Se ocultan de la cola
+// hasta que una cola generada después del envío los refleje (o pasen 7 días).
+const SENT_KEY = "super-compras-admin-sent";
+const SENT_MAX_DAYS = 7;
+// Margen para no fiarse de una cola que ya se estaba armando cuando se envió.
+const SENT_MARGIN_MS = 10 * 60 * 1000;
 const UNIT_LABEL = { g: "g", ml: "ml", oz: "oz", lb: "lb", unit: "unidades" };
 const KIND_LABEL = {
   empate: "Empate: hoy no se compara",
@@ -32,7 +38,7 @@ const STORE_SEARCH = {
 const PHOTO_BASE = "https://pub-0dcb2204775c484dbe6681e659eee236.r2.dev/fotos/v2/";
 const PHOTO_NAME = /^[0-9a-f]{24}-[0-9a-f]{6,64}$/;
 
-const review = { queue: null, error: null, loading: null, filter: "todos", decisions: {}, sent: new Set(), status: null, sending: false };
+const review = { queue: null, error: null, loading: null, filter: "todos", decisions: {}, sent: new Set(), sentAt: {}, status: null, sending: false };
 
 function storage(kind) {
   try { return kind === "local" ? localStorage : sessionStorage; } catch { return null; }
@@ -55,6 +61,35 @@ export function writeToken(value, remember = false) {
       if (value && (kind === "local") === remember) store.setItem(TOKEN_KEY, value); else store.removeItem(TOKEN_KEY);
     } catch { /* sin almacenamiento: la llave vive sólo en el campo */ }
   }
+}
+
+// Lo enviado que la cola publicada todavía no refleja. Una cola generada más de 10
+// minutos después del envío ya leyó size_decisions: si el código sigue en ella es
+// que no se guardó y debe volver a verse.
+export function pendingSent(stored, queue, now = Date.now()) {
+  const generated = Date.parse(queue?.generated_utc || "");
+  const keep = {};
+  for (const [gtin, at] of Object.entries(stored && typeof stored === "object" ? stored : {})) {
+    const sentAt = Date.parse(at);
+    if (!/^\d{8,14}$/.test(gtin) || !Number.isFinite(sentAt)) continue;
+    if (now - sentAt > SENT_MAX_DAYS * 86400000) continue;
+    if (Number.isFinite(generated) && generated > sentAt + SENT_MARGIN_MS) continue;
+    keep[gtin] = at;
+  }
+  return keep;
+}
+
+function readSent() {
+  try {
+    const value = JSON.parse(localStorage.getItem(SENT_KEY) || "{}");
+    return value && typeof value === "object" ? value : {};
+  } catch { return {}; }
+}
+
+function writeSent(map) {
+  try {
+    if (Object.keys(map).length) localStorage.setItem(SENT_KEY, JSON.stringify(map)); else localStorage.removeItem(SENT_KEY);
+  } catch { /* sin almacenamiento: se recuerda sólo en esta pestaña */ }
 }
 
 // Progreso real de la revisión: decididos (persona + IA, según la cola publicada) más
@@ -326,18 +361,21 @@ export function mountSizeReview(main, { h, fill }) {
   function visibleItems() {
     const items = review.queue?.items || [];
     if (review.filter === "ia") return review.queue?.auto_resueltas || [];
-    if (review.filter === "todos") return items;
-    if (review.filter === "pendiente") return items.filter((item) => !decisionOf(review.decisions[item.gtin]) && !review.sent.has(item.gtin));
-    return items.filter((item) => item.kind === review.filter);
+    const open = items.filter((item) => !review.sent.has(item.gtin));  // lo enviado ya no se revisa
+    if (review.filter === "todos") return open;
+    if (review.filter === "pendiente") return open.filter((item) => !decisionOf(review.decisions[item.gtin]));
+    return open.filter((item) => item.kind === review.filter);
   }
 
   function renderCount() {
     const pending = pendingDecisions().length;
-    const total = review.queue?.items.length || 0;
+    const items = review.queue?.items || [];
+    const waiting = items.filter((item) => review.sent.has(item.gtin)).length;
+    const total = items.length - waiting;
     const auto = review.queue?.auto_resueltas?.length || 0;
     count.textContent = `${pending} por enviar · ${review.sent.size} enviados · ${total} en la cola · ${auto} resueltos por IA`;
     send.disabled = review.sending || pending === 0;
-    const progress = reviewProgress(review.queue, review.sent.size);
+    const progress = reviewProgress(review.queue, waiting);
     progressText.textContent = review.queue
       ? `Progreso de revisión: ${progress.done.toLocaleString("es-HN")}/${progress.total.toLocaleString("es-HN")} productos (${progress.pct}%)`
       : "Progreso de revisión: cargando…";
@@ -371,8 +409,10 @@ export function mountSizeReview(main, { h, fill }) {
     showStatus(`Enviando ${decisions.length} decisiones…`);
     try {
       const result = await sendSizeDecisions(token.value, decisions);
-      for (const item of decisions) review.sent.add(item.gtin);
-      showStatus(`Listo: ${result.sent} decisiones enviadas. GitHub las valida y lanza el refresco (unos minutos).`, "ok", SIZE_DECISIONS_RUNS_URL);
+      const at = new Date().toISOString();
+      for (const item of decisions) { review.sent.add(item.gtin); review.sentAt[item.gtin] = at; }
+      writeSent(review.sentAt);
+      showStatus(`Listo: ${result.sent} decisiones enviadas. Ya no aparecen aquí; GitHub las guarda y la cola pública se actualiza sola en unos 10 minutos.`, "ok", SIZE_DECISIONS_RUNS_URL);
     } catch (error) {
       // Llave rechazada: no se guarda una llave que no sirve.
       if (error.status === 401 || error.status === 403) forgetToken();
@@ -403,7 +443,13 @@ export function mountSizeReview(main, { h, fill }) {
   renderList();
 
   if (!review.queue && !review.loading) {
-    review.loading = loadSizeQueue().then((queue) => { review.queue = queue; review.error = null; })
+    review.loading = loadSizeQueue().then((queue) => {
+      review.queue = queue;
+      review.error = null;
+      review.sentAt = pendingSent(readSent(), queue);
+      writeSent(review.sentAt);
+      review.sent = new Set(Object.keys(review.sentAt));
+    })
       .catch((error) => { review.error = error.message; })
       .finally(() => { review.loading = null; if (page.isConnected) renderList(); });
   } else if (review.loading) {

@@ -5,7 +5,8 @@ name: Precios SPS - Guardar decisiones de tamaño
 # El JSON llega como input y pasa al script por variable de entorno: nunca se
 # pega dentro del comando. El script valida todo y falla cerrado; con datos
 # válidos guarda `size_decisions`, ajusta `human_attributes_json` del maestro y
-# lanza el refresco de homologación para que el motor aplique la decisión.
+# lanza el refresco de homologación para que el motor aplique la decisión y
+# regenera la cola del panel (sin IA) para que lo decidido salga de pendientes.
 # Los secretos de Turso viven sólo en GitHub; el navegador nunca los ve.
 # `fuente=claude_sesion`: tanda revisada por Claude en una sesión de Claude Code y
 # aprobada por el dueño; se guarda como engine:claude_sesion con "aprobado por
@@ -90,6 +91,19 @@ jobs:
           gh workflow run precios-supermercados-sps-homologation-refresh.yml \
             --repo "$GITHUB_REPOSITORY" --ref main
           echo "homologation_refresh_dispatched=true"
+
+      # Un refresco lanzado con el token del workflow no dispara `workflow_run`, así que
+      # la cola sólo se regeneraba con el refresco diario y lo decidido seguía en el
+      # panel hasta el día siguiente. La cola lee `size_decisions` directo de Turso:
+      # se regenera ya (sin IA) y los códigos recién guardados salen de pendientes.
+      - name: Regenerar la cola de revisión (sin IA)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run precios-supermercados-sps-size-queue.yml \
+            --repo "$GITHUB_REPOSITORY" --ref main -f ia_minutos=0
+          echo "size_queue_dispatched=true"
 
       - name: Guardar resultado
         if: always()

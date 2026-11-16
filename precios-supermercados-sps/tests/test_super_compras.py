@@ -824,6 +824,35 @@ console.log(JSON.stringify({ session, local, back, none, progress: reviewProgres
     assert ".rv-check { animation: none; }" in css  # prefers-reduced-motion
 
 
+def test_size_review_hides_sent_codes_until_a_newer_queue_reflects_them(tmp_path: Path) -> None:
+    (tmp_path / "admin.js").write_text((APP_DIR / "admin.js").read_text(encoding="utf-8"), encoding="utf-8")
+    script = """
+const { pendingSent } = await import('./admin.js');
+const now = Date.parse('2026-11-16T20:00:00Z');
+const stored = {
+  '07506339398427': '2026-11-16T19:39:00Z',  // enviado hoy, la cola es de antes: sigue oculto
+  '07421000800231': '2026-11-16T04:51:00Z',  // la cola ya se generó después: se suelta
+  '00000000000001': '2026-11-01T00:00:00Z',  // más de 7 días: se suelta
+  'abc': '2026-11-16T19:00:00Z',              // código inválido
+  '07702006207737': 'no-es-fecha',
+};
+const before = pendingSent(stored, { generated_utc: '2026-11-16T18:58:52Z' }, now);
+const margin = pendingSent({ '07506339398427': '2026-11-16T19:39:00Z' }, { generated_utc: '2026-11-16T19:45:00Z' }, now);
+const after = pendingSent({ '07506339398427': '2026-11-16T19:39:00Z' }, { generated_utc: '2026-11-16T19:55:00Z' }, now);
+console.log(JSON.stringify({ before: Object.keys(before), margin: Object.keys(margin), after: Object.keys(after),
+  noQueue: Object.keys(pendingSent(stored, null, now)), junk: pendingSent('x', null, now) }));
+"""
+    result = json.loads(_node(script, tmp_path))
+    assert result["before"] == ["07506339398427"]
+    assert result["margin"] == ["07506339398427"]  # cola armada a 6 min del envío: todavía no se confía
+    assert result["after"] == []
+    assert result["noQueue"] == ["07506339398427", "07421000800231"]
+    assert result["junk"] == {}
+    admin = (APP_DIR / "admin.js").read_text(encoding="utf-8")
+    assert 'const open = items.filter((item) => !review.sent.has(item.gtin));' in admin
+    assert "writeSent(review.sentAt);" in admin
+
+
 def test_size_review_panel_sends_only_validated_decisions_to_github(tmp_path: Path) -> None:
     (tmp_path / "admin.js").write_text((APP_DIR / "admin.js").read_text(encoding="utf-8"), encoding="utf-8")
     script = """
