@@ -827,7 +827,7 @@ console.log(JSON.stringify({ session, local, back, none, progress: reviewProgres
 def test_size_review_hides_sent_codes_until_a_newer_queue_reflects_them(tmp_path: Path) -> None:
     (tmp_path / "admin.js").write_text((APP_DIR / "admin.js").read_text(encoding="utf-8"), encoding="utf-8")
     script = """
-const { pendingSent } = await import('./admin.js');
+const { pendingSent, photoNotice } = await import('./admin.js');
 const now = Date.parse('2026-11-16T20:00:00Z');
 const stored = {
   '07506339398427': '2026-11-16T19:39:00Z',  // enviado hoy, la cola es de antes: sigue oculto
@@ -840,7 +840,9 @@ const before = pendingSent(stored, { generated_utc: '2026-11-16T18:58:52Z' }, no
 const margin = pendingSent({ '07506339398427': '2026-11-16T19:39:00Z' }, { generated_utc: '2026-11-16T19:45:00Z' }, now);
 const after = pendingSent({ '07506339398427': '2026-11-16T19:39:00Z' }, { generated_utc: '2026-11-16T19:55:00Z' }, now);
 console.log(JSON.stringify({ before: Object.keys(before), margin: Object.keys(margin), after: Object.keys(after),
-  noQueue: Object.keys(pendingSent(stored, null, now)), junk: pendingSent('x', null, now) }));
+  noQueue: Object.keys(pendingSent(stored, null, now)), junk: pendingSent('x', null, now),
+  notes: [photoNotice(null), photoNotice({ fotos_error: null }), photoNotice({ fotos_error: 'HTTPError 429', fotos_fuente: 'cola_anterior' }),
+    photoNotice({ fotos_error: 'HTTPError 429', fotos_fuente: 'ninguna' })] }));
 """
     result = json.loads(_node(script, tmp_path))
     assert result["before"] == ["07506339398427"]
@@ -848,6 +850,8 @@ console.log(JSON.stringify({ before: Object.keys(before), margin: Object.keys(ma
     assert result["after"] == []
     assert result["noQueue"] == ["07506339398427", "07421000800231"]
     assert result["junk"] == {}
+    assert result["notes"][:2] == ["", ""]
+    assert "las de la anterior" in result["notes"][2] and "vuelve a intentar" in result["notes"][3]
     admin = (APP_DIR / "admin.js").read_text(encoding="utf-8")
     assert 'const open = items.filter((item) => !review.sent.has(item.gtin));' in admin
     assert "writeSent(review.sentAt);" in admin

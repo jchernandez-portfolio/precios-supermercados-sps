@@ -388,6 +388,47 @@ def test_queue_offers_carry_their_card_photo_and_who_it_came_from() -> None:
     assert cola.photo_url(f"{key_b}-2222222222", 320).endswith(f"/320/bb/{key_b}-2222222222.webp")
 
 
+def test_queue_reuses_previous_photos_and_retries_rate_limits(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import io
+    import urllib.error
+
+    name = "a" * 24 + "-1111111111"
+    previous = tmp_path / "cola.json"
+    previous.write_text(json.dumps({"schema": cola.QUEUE_SCHEMA, "items": [{"offers": [
+        {"ref": "colonial:3", "foto": name, "foto_de": "colonial"}, {"ref": "walmart:5", "foto": "../x"},
+        {"ref": "paiz:6"}]}], "resueltas_motor": [{"offers": [{"ref": "la_colonia:9", "foto": name}]}]}), encoding="utf-8")
+    assert cola.previous_photos(previous) == {"colonial:3": (name, "colonial"), "la_colonia:9": (name, None)}
+    assert cola.previous_photos(tmp_path / "nada.json") == {} and cola.previous_photos(None) == {}
+    (tmp_path / "otro.json").write_text('{"schema": "otro"}', encoding="utf-8")
+    assert cola.previous_photos(tmp_path / "otro.json") == {}
+    link = tmp_path / "enlace.json"
+    link.symlink_to(previous)
+    assert cola.previous_photos(link) == {}
+
+    def limited(code: int) -> urllib.error.HTTPError:
+        return urllib.error.HTTPError("https://raw.githubusercontent.com/x/cities.json", code, "x", {}, io.BytesIO())
+
+    calls: list[int] = []
+    answers = [limited(429), limited(503), io.BytesIO(b'{"ok": 1}')]
+
+    def fake_urlopen(request, timeout):  # noqa: ANN001, ARG001
+        calls.append(1)
+        answer = answers.pop(0)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    monkeypatch.setattr(cola.urllib.request, "urlopen", fake_urlopen)
+    waits: list[float] = []
+    assert cola._fetch_json("https://example.test/a.json", sleep=waits.append) == {"ok": 1}
+    assert len(calls) == 3 and waits == [5, 20]
+    answers[:] = [limited(404)]
+    with pytest.raises(urllib.error.HTTPError):
+        cola._fetch_json("https://example.test/a.json", sleep=waits.append)
+    assert cola.photo_error_text(limited(429)) == "HTTPError 429 raw.githubusercontent.com"
+    assert cola.photo_error_text(ValueError("x")) == "ValueError"
+
+
 def test_claude_engine_also_never_replaces_a_human_decision() -> None:
     connection = database()
     store = SQLiteMasterStore(connection)

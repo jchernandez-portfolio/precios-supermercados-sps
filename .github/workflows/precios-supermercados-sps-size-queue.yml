@@ -86,7 +86,10 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf /tmp/cola
-          python source/precios-supermercados-sps/scripts/exportar_cola_tamanos.py --output-dir /tmp/cola
+          if [ -L cola/cola.json ]; then echo "cola_symlink_boundary_invalid:cola.json" >&2; exit 1; fi
+          # Si el índice de fotos no responde, se reusan las fotos de la cola anterior.
+          python source/precios-supermercados-sps/scripts/exportar_cola_tamanos.py --output-dir /tmp/cola \
+            --previous-queue cola/cola.json
 
       - name: Sugerencias de tamaño con IA (Claude, respaldo Gemini)
         continue-on-error: true

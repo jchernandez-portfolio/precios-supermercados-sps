@@ -11,7 +11,7 @@
 // GitHub la rechaza (401/403). Sólo viaja en el encabezado Authorization a api.github.com.
 import {
   RETAILER_NAMES, SIZE_DECISIONS_RUNS_URL, SIZE_UNITS, loadSizeQueue, sendSizeDecisions,
-} from "./data.js?v=20261116-9";
+} from "./data.js?v=20261116-10";
 
 const TOKEN_KEY = "super-compras-admin-github-token";
 // Códigos ya enviados en este dispositivo: {gtin: ISO de envío}. Se ocultan de la cola
@@ -90,6 +90,14 @@ function writeSent(map) {
   try {
     if (Object.keys(map).length) localStorage.setItem(SENT_KEY, JSON.stringify(map)); else localStorage.removeItem(SENT_KEY);
   } catch { /* sin almacenamiento: se recuerda sólo en esta pestaña */ }
+}
+
+// Aviso cuando la última cola no pudo leer el índice de fotos.
+export function photoNotice(queue) {
+  if (!queue?.fotos_error) return "";
+  return queue.fotos_fuente === "cola_anterior"
+    ? "Las fotos no cargaron en esta actualización: se muestran las de la anterior."
+    : "Las fotos no cargaron en esta actualización. La próxima actualización lo vuelve a intentar.";
 }
 
 // Progreso real de la revisión: decididos (persona + IA, según la cola publicada) más
@@ -240,6 +248,7 @@ export function mountSizeReview(main, { h, fill }) {
   const forgetToken = () => { token.value = ""; remember.checked = false; writeToken(""); };
   forget.addEventListener("click", () => { forgetToken(); token.focus(); });
   const progressText = h("span", { class: "rv-progress-text" });
+  const photoNote = h("p", { class: "rv-status warn small", role: "status", hidden: true });
   const progressFill = h("span", { class: "rv-progress-fill" });
   const progressTrack = h("span", {
     class: "rv-progress-track", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100", "aria-label": "Progreso de revisión",
@@ -384,6 +393,9 @@ export function mountSizeReview(main, { h, fill }) {
   }
 
   function renderList() {
+    const notice = photoNotice(review.queue);
+    photoNote.textContent = notice;
+    photoNote.hidden = !notice;
     if (review.error) {
       fill(list, h("p", { class: "rv-status warn" }, review.error));
     } else if (!review.queue) {
@@ -436,6 +448,7 @@ export function mountSizeReview(main, { h, fill }) {
         h("p", { class: "rv-hint muted small" },
           "Usa una llave fine-grained sólo para este repositorio, con permiso de Actions y vencimiento corto."))),
     h("div", { class: "rv-progress" }, progressText, progressTrack),
+    photoNote,
     h("div", { class: "rv-chips", role: "group", "aria-label": "Filtrar" }, chips),
     list,
     h("div", { class: "rv-bar" }, h("div", { class: "rv-bar-in" }, count, status, send)));

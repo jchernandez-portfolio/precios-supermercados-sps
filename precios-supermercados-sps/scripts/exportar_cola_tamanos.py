@@ -22,6 +22,9 @@ import json
 import os
 import re
 import sys
+import time
+import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
@@ -132,10 +135,60 @@ def load_photos(fetch: Callable[[str], object]) -> dict[str, tuple[str, str | No
     return photo_names(cities, index if isinstance(index, Mapping) else {})
 
 
-def _fetch_json(url: str) -> object:
+# Cargar las fotos pide ~1,600 archivos públicos; raw.githubusercontent.com y r2.dev
+# responden 429/5xx de vez en cuando (el 16-nov dos de tres corridas salieron sin fotos).
+RETRY_WAITS = (5, 20, 60)
+
+
+def _fetch_json(url: str, *, waits: Sequence[float] = RETRY_WAITS, sleep: Callable[[float], None] = time.sleep) -> object:
     request = urllib.request.Request(url, headers={"User-Agent": "precios-sps-cola-tamanos/1.0"})
-    with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310 - URLs fijas https
-        return json.loads(response.read().decode("utf-8"))
+    for attempt in range(len(waits) + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310 - URLs fijas https
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            if attempt == len(waits) or not (error.code == 429 or error.code >= 500):
+                raise
+            retry_after = error.headers.get("Retry-After", "") if error.headers else ""
+            sleep(min(120.0, float(retry_after)) if retry_after.isdigit() else waits[attempt])
+        except (urllib.error.URLError, TimeoutError):
+            if attempt == len(waits):
+                raise
+            sleep(waits[attempt])
+    raise RuntimeError("unreachable")  # pragma: no cover
+
+
+def photo_error_text(error: BaseException) -> str:
+    """``HTTPError 429 raw.githubusercontent.com``: lo justo para saber qué falló, sin la URL completa."""
+    parts = [type(error).__name__]
+    if isinstance(error, urllib.error.HTTPError):
+        parts.append(str(error.code))
+        host = urllib.parse.urlsplit(str(getattr(error, "url", "") or "")).hostname
+        if host:
+            parts.append(host)
+    return " ".join(parts)
+
+
+def previous_photos(path: Path | None) -> dict[str, tuple[str, str | None]]:
+    """Fotos de la cola publicada anterior (``ref`` → nombre, súper), para no publicar sin fotos."""
+    if path is None or path.is_symlink() or not path.is_file():
+        return {}
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(document, Mapping) or document.get("schema") != QUEUE_SCHEMA:
+        return {}
+    result: dict[str, tuple[str, str | None]] = {}
+    for key in ("items", "resueltas_motor"):
+        for item in document.get(key) or []:
+            for offer in (item.get("offers") or []) if isinstance(item, Mapping) else []:
+                if not isinstance(offer, Mapping):
+                    continue
+                ref, name, store = offer.get("ref"), offer.get("foto"), offer.get("foto_de")
+                if isinstance(ref, str) and isinstance(name, str) and _PHOTO_NAME.fullmatch(name):
+                    result.setdefault(ref, (name, store if isinstance(store, str) else None))
+    return result
 
 
 def offer_size(profile: ProductProfile) -> dict[str, object] | None:
@@ -214,7 +267,7 @@ def queue_items(groups: Sequence[Mapping[str, object]], skip: set[str]) -> list[
     return items[:MAX_ITEMS]
 
 
-def build_queue(db, fetch: Callable[[str], object] | None = None) -> dict[str, object]:
+def build_queue(db, fetch: Callable[[str], object] | None = None, previous: Path | None = None) -> dict[str, object]:
     reader = ReadOnly(db)
     products = fetch_all_products(reader)
     specs = fetch_spec_attributes(reader)
@@ -226,18 +279,23 @@ def build_queue(db, fetch: Callable[[str], object] | None = None) -> dict[str, o
     items = queue_items(groups, set(decided))
     by_engine = engine_items(groups, engine_rows(reader))
     photos_error = None
+    photos_source = "indice"
     try:  # sin fotos la cola se publica igual
         photos = load_photos(fetch or _fetch_json)
-        attach_photos(items, photos)
-        attach_photos(by_engine, photos)
     except Exception as error:  # noqa: BLE001
-        photos_error = type(error).__name__
+        # Mejor las fotos de la cola anterior (mismas tarjetas casi siempre) que ninguna.
+        photos_error = photo_error_text(error)
+        photos = previous_photos(previous)
+        photos_source = "cola_anterior" if photos else "ninguna"
+    attach_photos(items, photos)
+    attach_photos(by_engine, photos)
     return {
         "schema": QUEUE_SCHEMA,
         "generated_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "decided": len(decided),
         "decididas_ia": sorted(gtin for gtin, by in decided.items() if by.startswith("engine:")),
         "fotos_error": photos_error,
+        "fotos_fuente": photos_source,
         "counts": {
             "empate": sum(item["kind"] == "empate" for item in items),
             "atipico": sum(item["kind"] == "atipico" for item in items),
@@ -250,6 +308,7 @@ def build_queue(db, fetch: Callable[[str], object] | None = None) -> dict[str, o
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--previous-queue", type=Path, help="cola publicada anterior: respaldo de fotos")
     args = parser.parse_args(argv)
     from exportar_modelo_analitico import TursoBackend  # noqa: PLC0415
 
@@ -257,12 +316,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     token = os.environ.get("TURSO_AUTH_TOKEN", "")
     if not url.strip() or not token.strip():
         raise SystemExit("turso_credentials_missing")
-    queue = build_queue(TursoBackend(url, token))
+    queue = build_queue(TursoBackend(url, token), previous=args.previous_queue)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     (args.output_dir / QUEUE_FILE).write_text(
         json.dumps(queue, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8"
     )
-    print(json.dumps({"decided": queue["decided"], **queue["counts"]}, ensure_ascii=False))
+    print(json.dumps({"decided": queue["decided"], **queue["counts"], "fotos_error": queue["fotos_error"],
+                      "fotos_fuente": queue["fotos_fuente"]}, ensure_ascii=False))
     return 0
 
 
