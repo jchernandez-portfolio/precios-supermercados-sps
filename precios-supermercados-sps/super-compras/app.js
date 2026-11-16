@@ -4,8 +4,8 @@
 import {
   Catalog, RETAILER_COLORS, rowKey, RETAILER_NAMES, countText, listText, loadCart, loadCities, loadCitySlug,
   migrateCartLines, money, photoSrcset, photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, storeLabel,
-} from "./data.js?v=20261114-3";
-import { productIllustration } from "./illustration.js?v=20261114-3";
+} from "./data.js?v=20261116-1";
+import { productIllustration } from "./illustration.js?v=20261116-1";
 
 // Foto real si existe; si no hay o falla al cargar, la ilustración de siempre.
 // Tarjetas y miniaturas usan 320 px; el detalle deja que el navegador elija 320 u
@@ -783,6 +783,13 @@ function publishedNote(offer, label) {
   return null;
 }
 
+// PriceSmart: varias variantes (SKU) con el mismo nombre se publican como una, la más barata.
+function variantsNote(offer) {
+  const count = offer.variants;
+  if (!Number.isInteger(count) || count < 2) return null;
+  return h("span", { class: "muted small" }, `${count} variantes con este nombre · precio de la más barata`);
+}
+
 function renderProduct(product, container, code = "") {
   const catalog = state.catalog;
   if (!product) return h("div", { class: "page empty" }, h("h1", {}, "Este producto ya no está en el catálogo de hoy."), h("a", { class: "primary", href: "#/" }, "Volver al inicio"));
@@ -837,6 +844,7 @@ function renderProduct(product, container, code = "") {
               best ? h("span", { class: "badge-best" }, "MÁS BARATO") : null),
             unitPrice ? h("span", { class: "muted small" }, `${money(unitPrice.amount)} por ${unitPrice.per}`) : null,
             publishedNote(offer, label),
+            variantsNote(offer),
             staleSince ? h("span", { class: "stale" }, `Precio del ${shortDate(staleSince)} · puede haber cambiado`) : null),
           h("div", { class: "bar-track", "aria-hidden": "true" }, h("span", { class: "bar", style: { width: `${barWidth(price, minimum, maximum)}%` } })),
           h("div", { class: "bar-price" },
@@ -1176,7 +1184,7 @@ async function renderAdmin(main) {
   main.dataset.view = "admin";
   fill(main, loadingPage("Abriendo el panel de revisión…"));
   try {
-    adminModule = adminModule || await import("./admin.js?v=20261114-3");
+    adminModule = adminModule || await import("./admin.js?v=20261116-1");
     if (route().path.startsWith(ADMIN_ROUTE) && main.dataset.view === "admin") adminModule.mountSizeReview(main, { h, fill });
   } catch (error) {
     delete main.dataset.view;
@@ -1286,7 +1294,7 @@ async function start() {
 let scannerModule = null;
 async function startScanner(opener) {
   try {
-    scannerModule = scannerModule || await import("./scanner.js?v=20261114-3");
+    scannerModule = scannerModule || await import("./scanner.js?v=20261116-1");
     scannerModule.openScanner({
       h, opener,
       onCode: (code, format) => {
