@@ -383,7 +383,6 @@ def test_claude_refusal_or_bad_json_leaves_the_photo_unread() -> None:
         ((400, "Your credit balance is too low to access the Anthropic API."), "claude_sin_credito"),
         ((402, "billing"), "claude_sin_credito"),
         ((401, "invalid x-api-key"), "claude_llave_invalida_401"),
-        ((404, "model: claude-haiku-5-5"), "claude_modelo_no_disponible"),
     ],
 )
 def test_claude_fatal_errors_fail_fast_without_retries(error: tuple, reason: str) -> None:
@@ -392,6 +391,19 @@ def test_claude_fatal_errors_fail_fast_without_retries(error: tuple, reason: str
     with pytest.raises(ia.ProviderFailed, match=reason):
         client.read_labels("x", "Foto 1 = Paiz", [b"img"])
     assert "k" not in (client.last_error or "").split()
+
+
+def test_claude_retired_model_404_moves_to_the_next_claude_before_gemini() -> None:
+    opener, calls = claude_opener({1: (404, "model: claude-sonnet-5-5")})
+    client = ia.Claude("k", opener=opener, sleep=lambda _: pytest.fail("un 404 no se reintenta"))
+    assert client.read_labels("x", "Foto 1 = Paiz", [b"img"])["readings"][0]["value"] == 240
+    sent = [json.loads(call.data)["model"] for call in calls if call.full_url.endswith("/messages")]
+    assert sent == ["claude-sonnet-5-5", "claude-haiku-5-5"] and client.model == "claude-haiku-5-5"
+    assert client.queries == 1  # el 404 no gasta otra consulta del tope
+    # Sin otro Claude: la cadena pasa a Gemini.
+    opener, _ = claude_opener({1: (404, "model: claude-sonnet-5-5")}, models=("claude-sonnet-5-5",))
+    with pytest.raises(ia.ProviderFailed, match="claude_modelo_no_disponible"):
+        ia.Claude("k", opener=opener, sleep=lambda _: None).read_labels("x", "Foto 1 = Paiz", [b"img"])
 
 
 def test_claude_overloaded_529_is_retried_with_waits_before_giving_up() -> None:

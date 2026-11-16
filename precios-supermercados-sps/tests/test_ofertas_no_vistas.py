@@ -39,10 +39,10 @@ RUN_AT = "2026-09-20T10:00:00Z"
 # --------------------------------------------------------------------- política
 
 
-def test_versioned_policy_measures_but_never_hides_yet() -> None:
-    # Paso 1 aprobado por el dueño: se mide, todavía no se oculta nada.
+def test_versioned_policy_hides_unseen_offers_with_the_safety_cap() -> None:
+    # Paso 2 aprobado por el dueño (16-nov-2026): se oculta lo no visto, con tope del 50 %.
     policy = cm.load_policy(cm.POLICY_PATH)
-    assert policy == cm.UnseenOffersPolicy(True, False, 0.5)
+    assert policy == cm.UnseenOffersPolicy(True, True, 0.5)
 
 
 def test_without_the_switch_nothing_is_recorded() -> None:

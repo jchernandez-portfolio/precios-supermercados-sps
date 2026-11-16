@@ -227,6 +227,26 @@ particiones: +1.0–1.2 % en bytes y +3.1–3.9 % gzip; del catálogo publicado 
 +0.7–0.9 % bytes y +1.6–2.0 % gzip (TGU +1.0–1.2 % y +2.1–2.6 %). Una partición
 crece ≈ 0.3 KB gzip en promedio.
 
+## Variantes de PriceSmart (campo aditivo `variants`, 2026-11-16)
+
+PriceSmart se captura una fila por SKU/variante (`source_key` = `26181`,
+`26181-0132029951206`…; el `pid` es lo que va antes del primer `-`). Las ofertas de
+PriceSmart **sin identidad comparable** (sin GTIN, vínculo curado ni single_source
+promovido) que comparten `pid`, ubicación y título normalizado (sin acentos,
+mayúsculas ni puntuación) se publican como **una sola oferta**: la comprable más
+barata (empate: el SKU base y luego el SKU menor). Títulos distintos (tallas,
+colores, sabores con su nombre) siguen separados y las ofertas comparables no se
+tocan. No cambia identidad, historia ni Turso: es una regla de publicación del
+exportador (`collapse_same_title_variants` en `scripts/exportar_consumer_catalog.py`).
+
+| Campo (en `offers[]`) | Tipo | Definición |
+| --- | --- | --- |
+| `variants` | entero ≥ 2, opcional | variantes comprables (con precio, no agotadas) con ese título que representa esta oferta |
+
+La llave fuente se lee en la misma consulta de ofertas sólo cuando existe la tabla
+`capture_membership` (activa en producción); sin ella no se une nada. El stderr
+del exportador reporta `same_title_variants` (`groups`, `collapsed_offers`).
+
 ## Índice de búsqueda `search.json` (aditivo, 2026-10-10)
 
 `manifest.search_file = "search.json"`, listado en `files` con SHA-256. Esquema

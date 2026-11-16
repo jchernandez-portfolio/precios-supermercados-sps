@@ -44,6 +44,16 @@ export function listText(items) {
   return names.length > 1 ? `${names.slice(0, -1).join(", ")} y ${names.at(-1)}` : names.join("");
 }
 
+// Precio por unidad en texto: kg y L se muestran por 100 g y 100 ml ("L 3.76 por 100 ml").
+// Sólo cambia el texto; el orden por precio unitario usa los valores publicados.
+export function unitPriceText(amount, per) {
+  const value = Number(amount);
+  if (!Number.isFinite(value) || value <= 0 || !per) return "";
+  if (per === "kg") return `${money(value / 10)} por 100 g`;
+  if (per === "L") return `${money(value / 10)} por 100 ml`;
+  return `${money(value)} por ${per}`;
+}
+
 export function money(value) {
   const number = Number(value);
   return Number.isFinite(number) ? `L ${number.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—";
@@ -87,7 +97,8 @@ export function presentationLabel(product) {
   if (!pack || !text) return text;
   const presentation = String(product?.presentation ?? "").trim();
   const total = packTotalText(pack[1], product?.unit_per);
-  if (presentation.startsWith(`${pack[0]} × `)) return `${presentation} (${total})`;
+  // "3 × 439 g" se muestra como "3 Pack (1.32 kg)": el total es lo que se compra.
+  if (presentation.startsWith(`${pack[0]} × `)) return `${pack[0]} Pack (${total})`;
   return presentation === pack[1] ? `${pack[0]} Pack (${total})` : text;
 }
 
@@ -1026,5 +1037,7 @@ export async function sendSizeDecisions(token, decisions) {
     404: "GitHub no encontró el workflow con esta llave (¿repositorio correcto?).",
     422: "GitHub rechazó el envío (el workflow debe estar en main).",
   };
-  throw new Error(reasons[response.status] || `GitHub respondió ${response.status}.`);
+  const error = new Error(reasons[response.status] || `GitHub respondió ${response.status}.`);
+  error.status = response.status;
+  throw error;
 }

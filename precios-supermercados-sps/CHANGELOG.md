@@ -8,6 +8,7 @@ número son cambios directos. El detalle de cada incidente vive en
 ## 2026-11-16
 
 - Historial de 30 días: el catálogo v3 publica `history_30d` (puntos de cambio `[días_atrás, "precio"]`, sólo en ofertas que cambiaron de precio en 30 días, desde los mismos periodos de `historical_summary`) y la ficha dibuja una sparkline SVG de la oferta más barata. Crecimiento medido: +1.6–2.0 % gzip del catálogo SPS.
+- PriceSmart: las variantes (SKU) sin identidad comparable con el mismo `pid`, ubicación y título salen en una sola tarjeta con la oferta más barata y el campo aditivo `variants` (la ficha dice «N variantes con este nombre»); títulos distintos siguen separados.
 
 ## 2026-11-14
 
