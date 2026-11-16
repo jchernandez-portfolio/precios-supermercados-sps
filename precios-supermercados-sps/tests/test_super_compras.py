@@ -853,8 +853,42 @@ console.log(JSON.stringify({ before: Object.keys(before), margin: Object.keys(ma
     assert result["notes"][:2] == ["", ""]
     assert "las de la anterior" in result["notes"][2] and "vuelve a intentar" in result["notes"][3]
     admin = (APP_DIR / "admin.js").read_text(encoding="utf-8")
-    assert 'const open = items.filter((item) => !review.sent.has(item.gtin));' in admin
+    assert "const open = (queue?.items || []).filter((item) => !sent.has(item.gtin));" in admin
     assert "writeSent(review.sentAt);" in admin
+
+
+def test_size_review_tabs_filter_the_queue_and_count_each_tab(tmp_path: Path) -> None:
+    (tmp_path / "admin.js").write_text((APP_DIR / "admin.js").read_text(encoding="utf-8"), encoding="utf-8")
+    script = """
+const { itemsFor, filterCounts, FILTERS } = await import('./admin.js');
+const queue = {
+  items: [
+    { gtin: '1', kind: 'empate' }, { gtin: '2', kind: 'empate' }, { gtin: '3', kind: 'atipico' },
+    { gtin: '4', kind: 'atipico' }, { gtin: '5', kind: 'atipico' },
+  ],
+  decididas_ia: ['9', '10'],
+  auto_resueltas: [{ gtin: '9', kind: 'atipico' }, { gtin: '10', kind: 'resuelto_ia' }, { gtin: '11', kind: 'empate' }],
+};
+const decisions = { 3: { value: '100', unit: 'g' }, 4: { value: '', unit: 'g' } };
+const sent = new Set(['5']);
+const ids = (key) => itemsFor(key, queue, decisions, sent).map((x) => x.gtin);
+console.log(JSON.stringify({
+  keys: FILTERS.map(([key]) => key), todos: ids('todos'), empate: ids('empate'), atipico: ids('atipico'),
+  pendiente: ids('pendiente'), ia: ids('ia'), counts: filterCounts(queue, decisions, sent),
+  noList: itemsFor('ia', { auto_resueltas: [{ gtin: '11' }] }).map((x) => x.gtin), empty: filterCounts(null),
+}));
+"""
+    result = json.loads(_node(script, tmp_path))
+    assert result["keys"] == ["todos", "empate", "atipico", "pendiente", "ia"]
+    assert result["todos"] == ["1", "2", "3", "4"]  # lo ya enviado no se vuelve a revisar
+    assert result["empate"] == ["1", "2"] and result["atipico"] == ["3", "4"]
+    assert result["pendiente"] == ["1", "2", "4"]  # el 3 ya tiene tamaño marcado; el 4 está incompleto
+    assert result["ia"] == ["9", "10"]  # sólo lo que size_decisions tiene como engine:*
+    assert result["counts"] == {"todos": 4, "empate": 2, "atipico": 2, "pendiente": 3, "ia": 2}
+    assert result["noList"] == ["11"]  # cola vieja sin decididas_ia: se muestra todo lo resuelto
+    assert result["empty"] == {"todos": 0, "empate": 0, "atipico": 0, "pendiente": 0, "ia": 0}
+    admin = (APP_DIR / "admin.js").read_text(encoding="utf-8")
+    assert 'h("span", { class: "rv-chip-count" }' in admin and "chipsBar.scrollIntoView" in admin
 
 
 def test_size_review_panel_sends_only_validated_decisions_to_github(tmp_path: Path) -> None:

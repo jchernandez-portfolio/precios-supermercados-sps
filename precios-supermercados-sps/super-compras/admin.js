@@ -11,7 +11,7 @@
 // GitHub la rechaza (401/403). Sólo viaja en el encabezado Authorization a api.github.com.
 import {
   RETAILER_NAMES, SIZE_DECISIONS_RUNS_URL, SIZE_UNITS, loadSizeQueue, sendSizeDecisions,
-} from "./data.js?v=20261116-29";
+} from "./data.js?v=20261116-30";
 
 const TOKEN_KEY = "super-compras-admin-github-token";
 // Códigos ya enviados en este dispositivo: {gtin: ISO de envío}. Se ocultan de la cola
@@ -90,6 +90,29 @@ function writeSent(map) {
   try {
     if (Object.keys(map).length) localStorage.setItem(SENT_KEY, JSON.stringify(map)); else localStorage.removeItem(SENT_KEY);
   } catch { /* sin almacenamiento: se recuerda sólo en esta pestaña */ }
+}
+
+// Pestañas del panel: qué lista muestra cada una. Todo sale de la cola publicada más
+// lo que la persona marcó (decisions) o ya envió (sent) en este dispositivo.
+export const FILTERS = [
+  ["todos", "Todos"], ["empate", "Empate"], ["atipico", "Un súper distinto"], ["pendiente", "Sin decidir"],
+  ["ia", "Resueltos por IA"],
+];
+
+export function itemsFor(filter, queue, decisions = {}, sent = new Set()) {
+  if (filter === "ia") {
+    // Sólo lo que la IA decidió sola (engine:* en size_decisions según la cola).
+    const engine = Array.isArray(queue?.decididas_ia) ? new Set(queue.decididas_ia) : null;
+    return (queue?.auto_resueltas || []).filter((item) => !engine || engine.has(item.gtin));
+  }
+  const open = (queue?.items || []).filter((item) => !sent.has(item.gtin));  // lo enviado ya no se revisa
+  if (filter === "todos") return open;
+  if (filter === "pendiente") return open.filter((item) => !decisionOf(decisions[item.gtin]));
+  return open.filter((item) => item.kind === filter);
+}
+
+export function filterCounts(queue, decisions = {}, sent = new Set()) {
+  return Object.fromEntries(FILTERS.map(([key]) => [key, itemsFor(key, queue, decisions, sent).length]));
 }
 
 // Aviso cuando la última cola no pudo leer el índice de fotos.
@@ -254,18 +277,30 @@ export function mountSizeReview(main, { h, fill }) {
     class: "rv-progress-track", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100", "aria-label": "Progreso de revisión",
   }, progressFill);
 
-  const chips = [
-    ["todos", "Todos"], ["empate", "Empate"], ["atipico", "Un súper distinto"], ["pendiente", "Sin decidir"],
-    ["ia", "Resueltos por IA"],
-  ].map(([key, label]) => {
-    const chip = h("button", { type: "button", class: "rv-chip", "aria-pressed": String(review.filter === key) }, label);
+  const HINT = {
+    todos: "Todo lo pendiente de la cola",
+    empate: "Mismo código, los súper publican tamaños distintos y ninguno tiene mayoría",
+    atipico: "Un súper publica un tamaño distinto al resto",
+    pendiente: "Pendientes a los que todavía no les marcaste tamaño aquí",
+    ia: "Lo que la IA resolvió sola (para auditar)",
+  };
+  const chipCounts = {};
+  const chips = FILTERS.map(([key, label]) => {
+    const badge = h("span", { class: "rv-chip-count" }, "…");
+    chipCounts[key] = badge;
+    const chip = h("button", { type: "button", class: "rv-chip", title: HINT[key], "aria-pressed": String(review.filter === key) },
+      label, " ", badge);
     chip.addEventListener("click", () => {
       review.filter = key;
       for (const other of chips) other.setAttribute("aria-pressed", String(other === chip));
       renderList();
+      // La lista cambia arriba de lo que se estaba viendo: volver al inicio de la lista.
+      if (chipsBar.getBoundingClientRect().top < 0) chipsBar.scrollIntoView({ block: "start" });
     });
     return chip;
   });
+  const chipsBar = h("div", { class: "rv-chips", role: "group", "aria-label": "Filtrar" }, chips);
+  const showing = h("p", { class: "rv-showing muted small", role: "status", "aria-live": "polite" });
 
   function copyButton(text, label = "Copiar") {
     const button = h("button", { type: "button", class: "rv-copy", title: `Copiar ${text}` }, label);
@@ -368,12 +403,7 @@ export function mountSizeReview(main, { h, fill }) {
   }
 
   function visibleItems() {
-    const items = review.queue?.items || [];
-    if (review.filter === "ia") return review.queue?.auto_resueltas || [];
-    const open = items.filter((item) => !review.sent.has(item.gtin));  // lo enviado ya no se revisa
-    if (review.filter === "todos") return open;
-    if (review.filter === "pendiente") return open.filter((item) => !decisionOf(review.decisions[item.gtin]));
-    return open.filter((item) => item.kind === review.filter);
+    return itemsFor(review.filter, review.queue, review.decisions, review.sent);
   }
 
   function renderCount() {
@@ -382,6 +412,8 @@ export function mountSizeReview(main, { h, fill }) {
     const waiting = items.filter((item) => review.sent.has(item.gtin)).length;
     const total = items.length - waiting;
     const auto = review.queue?.auto_resueltas?.length || 0;
+    const counts = review.queue ? filterCounts(review.queue, review.decisions, review.sent) : null;
+    for (const [key, badge] of Object.entries(chipCounts)) badge.textContent = counts ? counts[key].toLocaleString("es-HN") : "…";
     count.textContent = `${pending} por enviar · ${review.sent.size} enviados · ${total} en la cola · ${auto} resueltos por IA`;
     send.disabled = review.sending || pending === 0;
     const progress = reviewProgress(review.queue, waiting);
@@ -402,6 +434,8 @@ export function mountSizeReview(main, { h, fill }) {
       fill(list, h("p", { class: "muted" }, "Cargando la cola…"));
     } else {
       const items = visibleItems();
+      const label = FILTERS.find(([key]) => key === review.filter)?.[1] || "";
+      showing.textContent = `Mostrando ${items.length.toLocaleString("es-HN")} · ${label}`;
       fill(list, items.length ? items.map(rowFor) : h("p", { class: "muted" }, "No hay productos en esta vista."));
     }
     renderCount();
@@ -449,7 +483,8 @@ export function mountSizeReview(main, { h, fill }) {
           "Usa una llave fine-grained sólo para este repositorio, con permiso de Actions y vencimiento corto."))),
     h("div", { class: "rv-progress" }, progressText, progressTrack),
     photoNote,
-    h("div", { class: "rv-chips", role: "group", "aria-label": "Filtrar" }, chips),
+    chipsBar,
+    showing,
     list,
     h("div", { class: "rv-bar" }, h("div", { class: "rv-bar-in" }, count, status, send)));
   fill(main, page);

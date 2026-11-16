@@ -576,6 +576,9 @@ dialog.scanner::backdrop { background: rgba(16, 32, 26, .7); }
 .rv-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .rv-chip { padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-size: .85rem; font-weight: 600; cursor: pointer; }
 .rv-chip[aria-pressed="true"] { background: var(--good); border-color: var(--good); color: var(--on-good); }
+.rv-chip-count { display: inline-block; min-width: 22px; margin-left: 2px; padding: 1px 7px; border-radius: 999px; background: var(--line); color: var(--ink); font-size: .78rem; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.rv-chip[aria-pressed="true"] .rv-chip-count { background: var(--surface); color: var(--good); }
+.rv-showing { margin: 0; }
 .rv-list { display: grid; gap: 12px; }
 .rv-row { display: grid; grid-template-columns: 1fr; gap: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
 .rv-row.done { border-color: var(--good); box-shadow: inset 4px 0 0 var(--good); }
