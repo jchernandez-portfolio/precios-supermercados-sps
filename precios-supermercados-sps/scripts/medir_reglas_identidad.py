@@ -408,7 +408,7 @@ def _presentation_text(profile: ProductProfile) -> str | None:
     if value is None:
         return None
     total = format(value.total_base.normalize(), "f")
-    return f"{value.pack_count}×{total} {value.dimension}" if value.pack_count > 1 else f"{total} {value.dimension}"
+    return f"{value.pack_count}×{total} {value.dimension}" if value.display_pack_count > 1 else f"{total} {value.dimension}"
 
 
 def _published(profile: ProductProfile) -> str:
