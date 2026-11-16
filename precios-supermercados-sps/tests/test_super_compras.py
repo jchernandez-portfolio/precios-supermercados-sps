@@ -944,6 +944,50 @@ console.log(JSON.stringify(out));
     assert 'if (main.dataset.view === "admin") return;' in app
 
 
+def test_sparkline_turns_history_30d_into_a_step_path(tmp_path: Path) -> None:
+    script = """
+import { sparklineGeometry, sparklineLabel } from './data.js';
+const g = (points) => sparklineGeometry(points);
+const three = g([[30, '12.00'], [20, '11.00'], [0, '10.00']]);
+const two = g([[30, '12.00'], [5, '10.00']]);
+const unsorted = g([[5, '10.00'], [30, '12.00'], [40, '9.00'], [7, 'x'], [12.5, '8.00']]);
+console.log(JSON.stringify({
+  three: [three.coords, three.end, three.path, three.minimum, three.maximum, three.current],
+  two: [two.path, two.end],
+  unsorted: unsorted && unsorted.path,
+  none: [g(undefined), g([]), g([[3, '10.00']]), g([[30, '10.00'], [3, '10.00']]), g('x')],
+  label: sparklineLabel(two, 'Walmart'),
+  bounds: three.coords.every(([x, y]) => x >= 0 && x <= three.width && y >= 0 && y <= three.height),
+}));
+"""
+    result = json.loads(_node(script, tmp_path))
+    # 30 días atrás a la izquierda (x = 8), hoy a la derecha (x = 292); precio más alto arriba.
+    assert result["three"] == [[[8, 8], [102.7, 36], [292, 64]], [292, 64], "M8 8H102.7V36H292V64", 10, 12, 10]
+    # El último precio se mantiene hasta hoy: la línea sigue hasta el borde derecho.
+    assert result["two"] == ["M8 8H244.7V64H292", [292, 64]]
+    # Ordena del más viejo al actual y descarta puntos inválidos (días fuera de 0–30, precio no numérico).
+    assert result["unsorted"] == "M8 8H244.7V64H292"
+    # Sin datos, un solo punto o sin cambio de precio: no se dibuja.
+    assert result["none"] == [None, None, None, None, None]
+    assert result["label"] == (
+        "Precio en Walmart en los últimos 30 días: mínimo 10.00 lempiras, máximo 12.00 lempiras, hoy 10.00 lempiras."
+    )
+    assert result["bounds"] is True
+
+
+def test_product_page_draws_the_sparkline_with_svg_nodes_only() -> None:
+    app = (APP_DIR / "app.js").read_text(encoding="utf-8")
+    block = app[app.index("function priceSparkline("):app.index("function viewProduct(")]
+    assert "document.createElementNS(SVG_NS, tag)" in app
+    assert 'role: "img"' in block and '"aria-label": sparklineLabel(' in block
+    assert "spark = priceSparkline(offer)" in block and "innerHTML" not in block
+    styles = (APP_DIR / "styles.css").read_text(encoding="utf-8")
+    spark_css = styles[styles.index(".spark-box"):styles.index("@keyframes spark-in")]
+    for token in ("var(--lime)", "var(--good)", "var(--charcoal)"):
+        assert token in spark_css, token
+    assert "@media (prefers-reduced-motion: reduce) { .spark { animation: none; } }" in styles
+
+
 def test_stylesheet_braces_balance_and_scanner_media_query() -> None:
     # Una "}" suelta (rediseño Lima) cerraba antes de tiempo el escáner de escritorio y
     # anulaba reglas siguientes como `.rv-page { display: grid }`.

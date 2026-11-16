@@ -339,6 +339,20 @@ button.link { background: none; border: 0; padding: 0; min-height: 44px; color: 
 .range-mark { position: absolute; top: -5px; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%; background: var(--surface); border: 3px solid var(--ink); }
 .range-labels { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-top: 8px; }
 .box p { margin: 10px 0 0; }
+/* sparkline de 30 días (ficha): línea escalonada, punto lima en el precio de hoy */
+.spark-box { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.box > h2 + .spark-box { margin-top: 10px; padding-top: 0; border-top: 0; }
+.spark-box h3 { margin: 0 0 8px; font-size: 14px; color: var(--muted); font-weight: 600; }
+.spark { display: block; width: 100%; max-width: 440px; height: auto; overflow: visible; animation: spark-in 400ms ease-out; }
+.spark-line, .spark-end { vector-effect: non-scaling-stroke; }
+.spark-area { fill: var(--good-soft); stroke: none; }
+.spark-line { fill: none; stroke: var(--good); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.spark-end { fill: var(--lime); stroke: var(--charcoal); stroke-width: 2.5; }
+.spark-labels { max-width: 440px; display: flex; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+.box .spark-range { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+.spark-labels strong { color: var(--ink); font-family: var(--font-display); }
+@keyframes spark-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .spark { animation: none; } }
 .product-extra > section { margin-top: 24px; }
 .row-scroll { display: grid; grid-auto-flow: column; grid-auto-columns: 46%; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; margin: 0 -16px; padding: 0 16px 6px; scrollbar-width: none; }
 .row-scroll::-webkit-scrollbar { display: none; }
