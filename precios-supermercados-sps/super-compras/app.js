@@ -5,8 +5,8 @@ import {
   Catalog, RETAILER_COLORS, rowKey, RETAILER_NAMES, countText, listText, loadCart, loadCities, loadCitySlug,
   migrateCartLines, money, photoSrcset, photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, sparklineGeometry,
   sparklineLabel, storeLabel, unitPriceText,
-} from "./data.js?v=20261116-10";
-import { productIllustration } from "./illustration.js?v=20261116-10";
+} from "./data.js?v=20261116-29";
+import { productIllustration } from "./illustration.js?v=20261116-29";
 
 // Foto real si existe; si no hay o falla al cargar, la ilustración de siempre.
 // Tarjetas y miniaturas usan 320 px; el detalle deja que el navegador elija 320 u
@@ -1282,7 +1282,7 @@ async function renderAdmin(main) {
   main.dataset.view = "admin";
   fill(main, loadingPage("Abriendo el panel de revisión…"));
   try {
-    adminModule = adminModule || await import("./admin.js?v=20261116-10");
+    adminModule = adminModule || await import("./admin.js?v=20261116-29");
     if (route().path.startsWith(ADMIN_ROUTE) && main.dataset.view === "admin") adminModule.mountSizeReview(main, { h, fill });
   } catch (error) {
     delete main.dataset.view;
@@ -1392,7 +1392,7 @@ async function start() {
 let scannerModule = null;
 async function startScanner(opener) {
   try {
-    scannerModule = scannerModule || await import("./scanner.js?v=20261116-10");
+    scannerModule = scannerModule || await import("./scanner.js?v=20261116-29");
     scannerModule.openScanner({
       h, opener,
       onCode: (code, format) => {

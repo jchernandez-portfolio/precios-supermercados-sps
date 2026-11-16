@@ -1,7 +1,8 @@
-"""Súper Compras: contraste AA de los tokens «Lima» en tema claro y oscuro.
+"""Súper Compras: contraste AA de los tokens «Lima» (sólo tema claro).
 
-Lee los tokens de ``super-compras/styles.css`` (``:root`` y el ``:root`` dentro de
-``@media (prefers-color-scheme: dark)``) y verifica WCAG 2.x:
+Lee los tokens de ``:root`` en ``super-compras/styles.css`` y verifica WCAG 2.x.
+El modo oscuro automático se quitó el 16-nov a pedido del dueño: la página se ve
+siempre con la paleta clara aunque el sistema esté en modo oscuro.
 
 * texto normal ≥ 4.5:1;
 * elementos gráficos y anillos de foco ≥ 3:1.
@@ -88,14 +89,7 @@ def load_themes(css: str | None = None) -> dict[str, dict[str, str]]:
     css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
     light_root = re.search(r"(?m)^:root\s*\{", css)
     assert light_root, ":root del tema claro"
-    light = _declarations(_block_after(css, light_root.start()))
-    dark_media = re.search(r"@media\s*\(prefers-color-scheme:\s*dark\)\s*\{", css)
-    assert dark_media, "falta @media (prefers-color-scheme: dark)"
-    media = _block_after(css, dark_media.start())
-    dark_root = re.search(r":root\s*\{", media)
-    assert dark_root, ":root del tema oscuro"
-    dark = {**light, **_declarations(_block_after(media, dark_root.start()))}
-    return {"claro": light, "oscuro": dark}
+    return {"claro": _declarations(_block_after(css, light_root.start()))}
 
 
 def resolve(tokens: dict[str, str], name: str, seen: frozenset[str] = frozenset()) -> str:
@@ -137,7 +131,7 @@ def test_contrast_formula_matches_wcag_reference_values() -> None:
     assert round(contrast("#777777", "#FFFFFF"), 2) == 4.48
 
 
-@pytest.mark.parametrize("theme", ["claro", "oscuro"])
+@pytest.mark.parametrize("theme", ["claro"])
 @pytest.mark.parametrize(("fg", "bg", "minimum", "use"), PAIRS, ids=[f"{fg}/{bg}-{'texto' if m == TEXT_AA else 'grafico'}" for fg, bg, m, _ in PAIRS])
 def test_token_pair_meets_aa(theme: str, fg: str, bg: str, minimum: float, use: str) -> None:
     tokens = load_themes()[theme]
@@ -145,26 +139,23 @@ def test_token_pair_meets_aa(theme: str, fg: str, bg: str, minimum: float, use: 
     assert ratio >= minimum, f"{theme}: --{fg} sobre --{bg} ({use}) = {ratio:.2f}:1 < {minimum}:1"
 
 
-def test_dark_theme_keeps_lima_identity_and_white_photo_box() -> None:
-    themes = load_themes()
-    light, dark = themes["claro"], themes["oscuro"]
-    assert light["lime"].upper() == dark["lime"].upper() == "#C6F432"
-    assert light["photo-bg"].upper() == dark["photo-bg"].upper() == "#FFFFFF"
-    assert dark["bg"].upper() == "#1C1F1D"  # fondo carbón
-    assert contrast(resolve(dark, "surface"), "#FFFFFF") < contrast(resolve(dark, "bg"), "#FFFFFF")  # superficie más clara
+def test_only_the_light_lima_palette_ships() -> None:
+    light = load_themes()["claro"]
+    assert light["lime"].upper() == "#C6F432" and light["bg"].upper() == "#F4F5F0"
+    assert light["photo-bg"].upper() == "#FFFFFF"
     css = STYLES.read_text(encoding="utf-8")
-    assert "color-scheme: light;" in css and "color-scheme: dark;" in css
+    assert "prefers-color-scheme" not in css and "color-scheme: dark" not in css
+    assert "color-scheme: light;" in css
     assert '"Space Grotesk"' in light["font-display"] and "Inter" in light["font-body"]
+    # Se conservan los esqueletos y el movimiento del pulido (#117).
+    assert "@keyframes skel" in css and "@keyframes card-in" in css and "prefers-reduced-motion" in css
 
 
-def test_theme_color_meta_follows_both_schemes() -> None:
+def test_theme_color_meta_is_light_only() -> None:
     html = (APP_DIR / "index.html").read_text(encoding="utf-8")
-    metas = re.findall(r'<meta name="theme-color" content="(#[0-9A-Fa-f]{6})" media="\(prefers-color-scheme: (\w+)\)">', html)
-    themes = load_themes()
-    assert dict((scheme, color) for color, scheme in metas) == {
-        "light": resolve(themes["claro"], "charcoal"),
-        "dark": resolve(themes["oscuro"], "charcoal"),
-    }
+    assert '<meta name="color-scheme" content="light">' in html
+    metas = re.findall(r'<meta name="theme-color" content="(#[0-9A-Fa-f]{6})"( media="[^"]*")?>', html)
+    assert metas == [(resolve(load_themes()["claro"], "charcoal"), "")]
 
 
 def test_no_hard_coded_colors_that_ignore_the_theme() -> None:

@@ -11,7 +11,7 @@
 // GitHub la rechaza (401/403). Sólo viaja en el encabezado Authorization a api.github.com.
 import {
   RETAILER_NAMES, SIZE_DECISIONS_RUNS_URL, SIZE_UNITS, loadSizeQueue, sendSizeDecisions,
-} from "./data.js?v=20261116-10";
+} from "./data.js?v=20261116-29";
 
 const TOKEN_KEY = "super-compras-admin-github-token";
 // Códigos ya enviados en este dispositivo: {gtin: ISO de envío}. Se ocultan de la cola
