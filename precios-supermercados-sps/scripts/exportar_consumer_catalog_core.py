@@ -145,6 +145,10 @@ class VisibleOffer:
     # Llave fuente (``source_key_type`` + ``source_key``) para saber si la oferta
     # salió en la última captura aceptada; sólo se lee si existe la membresía.
     capture_key: str | None = None
+    # ``products.source_key`` (misma lectura que ``capture_key``). PriceSmart guarda
+    # aquí el SKU de la variante (``26181-0132029951206``); el ``pid`` es lo que va
+    # antes del primer ``-``. Sólo une variantes con el mismo título (fachada).
+    source_key: str | None = None
     # Motor v2.10 ("corrige con evidencia"): lo que publica el súper cuando la
     # evidencia de foto corrigió su tamaño (``presentation`` ya es el oficial).
     published_as: str | None = None
@@ -315,11 +319,12 @@ def fetch_visible_offers(
         page_size=VISIBLE_OFFERS_PAGE_SIZE,
     )
     for row in rows:
-        offer_capture_key = None
+        offer_capture_key = offer_source_key = None
         if with_keys:
             *row, source_key_type, source_key = row
             if isinstance(source_key_type, str) and isinstance(source_key, str):
                 offer_capture_key = capture_membership.capture_key(source_key_type, source_key)
+                offer_source_key = _text(source_key)
         (
             product_id, supermarket_id, name, brand, presentation,
             location_id, current_price, regular_price, is_promotion, availability,
@@ -369,6 +374,7 @@ def fetch_visible_offers(
                 comparison_status=str(comparison_status),
                 source_category=_text(source_category),
                 capture_key=offer_capture_key,
+                source_key=offer_source_key,
                 published_as=published_size(
                     comparison_status, presentation_dimension, presentation_total_base, normalized_quantity,
                     normalized_unit, normalized_pack_count, canonical_total,
