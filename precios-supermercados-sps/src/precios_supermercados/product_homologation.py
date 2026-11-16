@@ -164,6 +164,17 @@ class PresentationSignature:
         ):
             raise ProductHomologationError("presentation_declared_ounces_invalid")
 
+    @property
+    def display_pack_count(self) -> int:
+        """Envases que se muestran: un conteo suelto ("10und", "50un") es 1 envase.
+
+        La firma de conteo guarda ``pack_count = N`` y ``unit_amount_base = 1``
+        (así compara y así entra en las huellas de las decisiones humanas), pero
+        para mostrarla son N unidades, nunca "N × N" ni "N × 1".
+        """
+
+        return 1 if self.dimension == "count" else self.pack_count
+
 
 @dataclass(frozen=True, slots=True)
 class ProductProfile:

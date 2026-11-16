@@ -7,6 +7,13 @@ Sistema que **captura, valida, homologa y publica todos los días** los precios 
 - **Registro público de errores:** rama [`calidad-datos`](https://github.com/jchernandez-portfolio/precios-supermercados-sps/tree/calidad-datos)
 - **Estado operativo vigente:** [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md)
 
+<p align="center">
+  <img src="docs/capturas/super-compras-inicio.webp" alt="Inicio: ofertas del día y precio en cada súper" width="200">
+  <img src="docs/capturas/super-compras-busqueda.webp" alt="Búsqueda con tamaño y precio por unidad" width="200">
+  <img src="docs/capturas/super-compras-ficha.webp" alt="Ficha: precio en cada supermercado, el más barato marcado" width="200">
+  <img src="docs/capturas/super-compras-ofertas.webp" alt="Ofertas del día" width="200">
+</p>
+
 ## Cobertura
 
 | Ciudad | Supermercados / sucursales |
@@ -14,16 +21,18 @@ Sistema que **captura, valida, homologa y publica todos los días** los precios 
 | San Pedro Sula | La Colonia, Colonial, Walmart, PriceSmart, Comisariato Los Andes |
 | Tegucigalpa | La Colonia, Walmart FFAA, Walmart El Sauce, PriceSmart Florencia, Paiz Multiplaza, Paiz Próceres |
 
-Seis cadenas, once sucursales. Corte publicado el **2026-10-24**: 33,672 productos visibles en San Pedro Sula y 33,705 en Tegucigalpa. Las cifras cambian cada día; el valor vigente está en el `manifest.json` de cada ciudad (rama `portfolio-data`) y en el resumen de `calidad-datos`.
+Seis cadenas, once sucursales. Corte publicado el **2026-11-16**: 34,066 productos visibles en San Pedro Sula y 27,075 en Tegucigalpa. Las cifras cambian cada día; el valor vigente está en el `manifest.json` de cada ciudad (rama `portfolio-data`) y en el resumen de `calidad-datos`.
 
 ## Súper Compras
 
-La app vive en [`super-compras/`](super-compras/) y se publica sola en GitHub Pages de este repositorio en cada cambio (workflow `precios-supermercados-sps-pages.yml`, rama `gh-pages`); el portafolio enlaza ahí y la dirección anterior redirige. Es JavaScript sin framework, instalable (PWA) y funciona sin conexión con lo último que cargó.
+La app vive en [`super-compras/`](super-compras/) y se publica sola en GitHub Pages de este repositorio en cada cambio (workflow `precios-supermercados-sps-pages.yml`, rama `gh-pages`; Pages sirve esa rama desde la raíz); el portafolio enlaza ahí y la dirección anterior redirige. Es JavaScript sin framework ni dependencias, instalable (PWA) y funciona sin conexión con lo último que cargó. Diseño «Lima» (carbón y lima, Space Grotesk + Inter servidas desde el propio sitio), con esqueletos de carga y movimiento que respeta «reducir movimiento».
 
 - **Inicio:** ofertas del día y hora de la última actualización; si una sucursal no se capturó hoy, lo dice con la fecha de ese precio.
 - **Buscar:** búsqueda por producto o marca, filtros por súper y orden por precio; cada tarjeta muestra tamaño y precio por kg, L, libra o unidad.
 - **Producto:** el mismo artículo en cada supermercado, con el más barato marcado y otras presentaciones para comparar.
 - **Mi compra:** la lista completa con su costo en cada supermercado y comprando cada cosa donde está más barata. Se guarda en el dispositivo.
+- **Escanear:** lee el código de barras con la cámara del teléfono (BarcodeDetector o un lector ZXing propio, sin servicios externos) y abre dónde está más barato.
+- **Revisión de tamaños** (`#/admin/revision`, interno): mismo código de barras con tamaños distintos entre súper. La IA lee las fotos (Claude primero, Gemini de respaldo) y resuelve lo claro; una persona decide el resto, y su decisión siempre reemplaza a la de la IA.
 
 La app solo lee archivos estáticos ya publicados (`portfolio-data`, `product-images`). No consulta Turso ni sitios de supermercados desde el navegador, no pide cuenta ni datos personales y tiene una política de seguridad de contenido estricta. La carga inicial pesa ~48 KB (~9 KB gzip, 2 requests) más la portada del catálogo (`home.json`, ~11 KB gzip); el índice de búsqueda (~1.4 MB gzip) baja en segundo plano y las fichas por partición bajo demanda.
 
@@ -47,6 +56,7 @@ Auditoría de calidad (3 veces al día) → calidad-datos
 
 - **Disparo:** 05:17 Honduras desde un Worker de Cloudflare (`edge/daily-trigger`); si no llega, el operador arranca el corte a las 08:17.
 - **Reintentos:** si una cadena falla, solo esa se reintenta a las 08:17 y 12:17 (máximo tres intentos).
+- **Tamaños:** después de cada refresco se arma la cola de revisión de tamaños (`revision-tamanos`); las decisiones guardadas se aplican en el siguiente refresco y corrigen con evidencia de las fotos («X lo publica como N»).
 - **Persistencia parcial:** las cadenas aceptadas se guardan y publican aunque otra falle; la fallida queda STALE y la app muestra la fecha de su último precio.
 - **Tolerancias medidas:** el sitemap de Colonial puede llegar atrasado (se acepta hasta 1 % de desfase; `products.json` y las tarjetas siguen exigiendo coincidencia exacta). Un producto de Los Andes con precios contradictorios queda fuera ese día con evidencia (máximo 0.5 % del catálogo). Más allá de esos límites, la captura falla cerrada.
 

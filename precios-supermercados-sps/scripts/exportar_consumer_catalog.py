@@ -79,6 +79,9 @@ SOURCE_POUND_SQL = (
 # (o "COLONIAL Encurtido Rojo und": termina en unidad).
 # Un paquete cerrado sin libra en el nombre ("MH ShortRib AsadoTira CoreanoPaq" a L 719.99)
 # o una bandeja con N unidades ("Torta p/hamburguesa bandeja 4und") también va por unidad.
+# Walmart vende fruta y verdura por libra y lo aclara en el nombre: "Banano Maduro Libra -
+# 3 Unidades Por Lb. Aproximadamente" a L 8.80 la libra (no 3 unidades a L 2.93 c/u).
+_UNITS_PER_POUND_NAME = re.compile(r"\bunidad(?:es)?\s+por\s+(?:lb|libra)s?\b", re.IGNORECASE)
 _PER_UNIT_NAME = re.compile(
     r"precio\s+por\s+unidad|\s(?:und|unds|unid|unidad|un|c/u)\.?\s*$|paq(?:uete)?\.?\s*$|\d\s*(?:und|unds|unidades)\b",
     re.IGNORECASE,
@@ -543,6 +546,14 @@ def _pound_key(offer: dict[str, object]) -> str:
 def _price_per_pound(row: dict[str, object]) -> None:
     """Ofertas de producto pesado en tienda: precio por libra, no por paquete."""
     offers = [offer for offer in row.get("offers") or () if isinstance(offer, dict)]
+    if (_UNITS_PER_POUND_NAME.search(str(row.get("product_name") or "")) and _weighed_type(row)
+            and offers and len({str(offer.get("source_product_id")).split(":", 1)[0] for offer in offers}) == 1):
+        # El súper declara en el nombre que el precio es por libra (un solo súper en la fila).
+        for offer in offers:
+            price = offer.get("current_price")
+            offer["unit_price"] = {"amount": price, "per": "libra"} if price else None
+        row["presentation"] = "por libra"
+        return
     source = [offer for offer in offers if _pound_key(offer) in SOURCE_POUND]
     coded = [offer for offer in offers if _pound_key(offer) in WEIGHED_BY_POUND
              and offer not in source] if _weighed_type(row) else []
