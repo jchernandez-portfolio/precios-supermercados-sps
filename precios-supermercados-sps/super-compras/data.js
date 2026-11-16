@@ -540,6 +540,42 @@ export function barcodeCandidates(raw, format = "") {
   return found;
 }
 
+// Historial de 30 días de una oferta (`history_30d`: [[días_atrás, "precio"], …], del
+// más viejo al actual) → geometría de una línea escalonada: el precio se mantiene hasta
+// el siguiente cambio y el último llega hasta hoy (borde derecho). x = 30 días atrás a
+// la izquierda; y = precio (más alto arriba). null si no hay al menos 2 precios distintos.
+export const SPARK_DAYS = 30;
+
+export function sparklineGeometry(points, { width = 300, height = 72, pad = 8 } = {}) {
+  if (!Array.isArray(points)) return null;
+  const clean = points
+    .filter((point) => Array.isArray(point) && Number.isInteger(point[0]) && point[0] >= 0 && point[0] <= SPARK_DAYS)
+    .map(([days, price]) => [days, Number(price)])
+    .filter(([, price]) => Number.isFinite(price) && price > 0)
+    .sort((a, b) => b[0] - a[0]);
+  if (clean.length < 2) return null;
+  const prices = clean.map(([, price]) => price);
+  const minimum = Math.min(...prices);
+  const maximum = Math.max(...prices);
+  if (!(maximum > minimum)) return null;
+  const round = (value) => Math.round(value * 10) / 10;
+  const x = (days) => round(pad + ((SPARK_DAYS - days) / SPARK_DAYS) * (width - 2 * pad));
+  const y = (price) => round(pad + ((maximum - price) / (maximum - minimum)) * (height - 2 * pad));
+  const coords = clean.map(([days, price]) => [x(days), y(price)]);
+  const end = [x(0), coords.at(-1)[1]];
+  let path = `M${coords[0][0]} ${coords[0][1]}`;
+  for (const [px, py] of coords.slice(1)) path += `H${px}V${py}`;
+  if (end[0] !== coords.at(-1)[0]) path += `H${end[0]}`;
+  return { width, height, coords, end, path, minimum, maximum, current: prices.at(-1), start: clean[0][0] };
+}
+
+// Texto accesible de la sparkline: mínimo, máximo y actual en lempiras.
+export function sparklineLabel(geometry, store = "") {
+  const lempiras = (value) => `${Number(value).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} lempiras`;
+  const where = store ? ` en ${store}` : "";
+  return `Precio${where} en los últimos ${SPARK_DAYS} días: mínimo ${lempiras(geometry.minimum)}, máximo ${lempiras(geometry.maximum)}, hoy ${lempiras(geometry.current)}.`;
+}
+
 // id público = row_id sin su prefijo ("source-…", "canonical-…").
 export function rowKey(rowId) {
   const text = String(rowId ?? "");

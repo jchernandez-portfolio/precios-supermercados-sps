@@ -3,9 +3,10 @@
 // (panel interno de tamaños) se carga aparte sólo cuando se abre.
 import {
   Catalog, RETAILER_COLORS, rowKey, RETAILER_NAMES, countText, listText, loadCart, loadCities, loadCitySlug,
-  migrateCartLines, money, photoSrcset, photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, storeLabel,
-} from "./data.js?v=20261114-3";
-import { productIllustration } from "./illustration.js?v=20261114-3";
+  migrateCartLines, money, photoSrcset, photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, sparklineGeometry,
+  sparklineLabel, storeLabel,
+} from "./data.js?v=20261116-1";
+import { productIllustration } from "./illustration.js?v=20261116-1";
 
 // Foto real si existe; si no hay o falla al cargar, la ilustración de siempre.
 // Tarjetas y miniaturas usan 320 px; el detalle deja que el navegador elija 320 u
@@ -714,12 +715,46 @@ function resultGrid(items, query, related) {
   ];
 }
 
+// Sparkline de 30 días (SVG a mano, sin librerías): línea escalonada del precio de la
+// oferta y un punto en el precio de hoy. Sin `history_30d` o sin cambios no se muestra.
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function svgNode(tag, attrs = {}) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value));
+  return node;
+}
+
+function priceSparkline(offer) {
+  const geometry = sparklineGeometry(offer?.history_30d);
+  if (!geometry) return null;
+  const { width, height, coords, end, path } = geometry;
+  const store = RETAILER_NAMES[offer.supermarket_id] || "";
+  const svg = svgNode("svg", {
+    class: "spark", viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": sparklineLabel(geometry, store),
+  });
+  svg.append(
+    svgNode("path", { class: "spark-area", d: `${path}V${height}H${coords[0][0]}Z` }),
+    svgNode("path", { class: "spark-line", d: path }),
+    svgNode("circle", { class: "spark-end", cx: end[0], cy: end[1], r: 5 }));
+  return h("div", { class: "spark-box" },
+    h("h3", {}, "Últimos 30 días"),
+    svg,
+    h("div", { class: "spark-labels", "aria-hidden": "true" },
+      h("span", {}, "hace 30 días"),
+      h("strong", {}, `hoy ${money(geometry.current)}`)),
+    h("p", { class: "spark-range", "aria-hidden": "true" }, `Entre ${money(geometry.minimum)} y ${money(geometry.maximum)}`));
+}
+
 function historyBlock(offer) {
   const summary = offer?.historical_summary;
   const average = summary?.windows?.["30d"]?.average;
   const minimum = summary?.observed_minimum;
   const maximum = summary?.observed_maximum;
-  if (!summary || !average || !minimum || !maximum || Number(maximum) <= Number(minimum)) return null;
+  const spark = priceSparkline(offer);
+  if (!summary || !average || !minimum || !maximum || Number(maximum) <= Number(minimum)) {
+    return spark ? h("section", { class: "box" }, h("h2", {}, "¿Cómo ha cambiado su precio?"), spark) : null;
+  }
   const current = Number(offer.current_price);
   const position = Math.min(100, Math.max(0, ((current - Number(minimum)) / (Number(maximum) - Number(minimum))) * 100));
   const verdict = current < Number(average) ? `Está por debajo de su precio usual en ${RETAILER_NAMES[offer.supermarket_id]}.`
@@ -735,7 +770,8 @@ function historyBlock(offer) {
       h("div", { class: "range-fill", style: { width: `${position}%` } }),
       h("div", { class: "range-mark", style: { left: `${position}%` } })),
     h("div", { class: "range-labels" }, h("span", {}, `Más bajo ${money(minimum)}`), h("span", {}, `Más alto ${money(maximum)}`)),
-    h("p", { class: "muted" }, verdict));
+    h("p", { class: "muted" }, verdict),
+    spark);
 }
 
 function viewProduct(id, container, code = "") {
@@ -1176,7 +1212,7 @@ async function renderAdmin(main) {
   main.dataset.view = "admin";
   fill(main, loadingPage("Abriendo el panel de revisión…"));
   try {
-    adminModule = adminModule || await import("./admin.js?v=20261114-3");
+    adminModule = adminModule || await import("./admin.js?v=20261116-1");
     if (route().path.startsWith(ADMIN_ROUTE) && main.dataset.view === "admin") adminModule.mountSizeReview(main, { h, fill });
   } catch (error) {
     delete main.dataset.view;
@@ -1286,7 +1322,7 @@ async function start() {
 let scannerModule = null;
 async function startScanner(opener) {
   try {
-    scannerModule = scannerModule || await import("./scanner.js?v=20261114-3");
+    scannerModule = scannerModule || await import("./scanner.js?v=20261116-1");
     scannerModule.openScanner({
       h, opener,
       onCode: (code, format) => {

@@ -195,6 +195,38 @@ validada: holdout ciego de 94 pares 98.5 % ponderado por estrato y revisión del
 responsable de 50 pares al azar. Un fallo de la regla no bloquea la publicación:
 el catálogo sale sin el campo y el motivo queda en stderr del exportador.
 
+## Historial de 30 días `history_30d` (campo aditivo, 2026-11-16)
+
+`history_30d` es opcional **por oferta** y sólo aparece cuando el precio de esa
+oferta exacta cambió al menos una vez en los últimos 30 días (≥ 2 puntos con
+precios distintos); si no, la oferta no lleva el campo. Es una lista de puntos de
+cambio `[días_atrás, "precio"]`, del más viejo al más reciente:
+
+```json
+"history_30d": [[30, "12.00"], [20, "11.00"], [0, "10.00"]]
+```
+
+- `días_atrás`: entero 0–30, días completos entre el inicio del periodo y `as_of`
+  del manifiesto. El primer punto es el precio vigente al abrir la ventana (`30`)
+  o, si la oferta es más nueva, su primer periodo visto.
+- `"precio"`: decimal-texto de `current_price` de ese periodo. El último punto es
+  siempre el precio actual de la oferta (si no coincide, se omite el campo).
+- Periodos nuevos sin cambio de precio (promoción, disponibilidad) no agregan
+  punto; dos cambios el mismo día dejan el último.
+
+Se arma en Python (`history_30d` en `scripts/exportar_consumer_catalog_core.py`)
+con los mismos periodos de `price_history` que `historical_summary`: no agrega
+lecturas a Turso. Es sólo para dibujar la línea de precio de la ficha; no entra a
+ranking, mejor precio, PCI, canastas ni Mi Compra, y no se copia a `search.json`
+ni `home.json`. El manifiesto cuenta `offers_with_history_30d`.
+
+Medición con el catálogo publicado del 16-nov (SPS 42,187 ofertas, TGU 65,690;
+sin Turso, desde `historical_summary.windows.30d`): 9,464 ofertas SPS y 15,594 TGU
+cambiaron de precio en 30 días; 18.9–26.9 mil puntos SPS. Crecimiento de las
+particiones: +1.0–1.2 % en bytes y +3.1–3.9 % gzip; del catálogo publicado completo,
++0.7–0.9 % bytes y +1.6–2.0 % gzip (TGU +1.0–1.2 % y +2.1–2.6 %). Una partición
+crece ≈ 0.3 KB gzip en promedio.
+
 ## Índice de búsqueda `search.json` (aditivo, 2026-10-10)
 
 `manifest.search_file = "search.json"`, listado en `files` con SHA-256. Esquema
