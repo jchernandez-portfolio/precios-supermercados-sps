@@ -6,11 +6,12 @@
 // producto). La búsqueda en la web del súper queda como respaldo. "Guardar" lanza el workflow que valida y guarda la decisión; el
 // motor la aplica en el siguiente refresco: las ofertas con el tamaño oficial
 // comparan y las demás quedan aparte.
-// La llave de GitHub se guarda sólo en esta pestaña (sessionStorage) y sólo viaja
-// en el encabezado Authorization a api.github.com.
+// La llave de GitHub se guarda en esta pestaña (sessionStorage) o, si la persona marca
+// «Recordar en este dispositivo», en localStorage; se borra con «Olvidar llave» o si
+// GitHub la rechaza (401/403). Sólo viaja en el encabezado Authorization a api.github.com.
 import {
   RETAILER_NAMES, SIZE_DECISIONS_RUNS_URL, SIZE_UNITS, loadSizeQueue, sendSizeDecisions,
-} from "./data.js?v=20261116-1";
+} from "./data.js?v=20261116-3";
 
 const TOKEN_KEY = "super-compras-admin-github-token";
 const UNIT_LABEL = { g: "g", ml: "ml", oz: "oz", lb: "lb", unit: "unidades" };
@@ -33,14 +34,37 @@ const PHOTO_NAME = /^[0-9a-f]{24}-[0-9a-f]{6,64}$/;
 
 const review = { queue: null, error: null, loading: null, filter: "todos", decisions: {}, sent: new Set(), status: null, sending: false };
 
-function readToken() {
-  try { return sessionStorage.getItem(TOKEN_KEY) || ""; } catch { return ""; }
+function storage(kind) {
+  try { return kind === "local" ? localStorage : sessionStorage; } catch { return null; }
 }
 
-function writeToken(value) {
-  try {
-    if (value) sessionStorage.setItem(TOKEN_KEY, value); else sessionStorage.removeItem(TOKEN_KEY);
-  } catch { /* sin almacenamiento: la llave vive sólo en el campo */ }
+function rememberedToken() {
+  try { return storage("local")?.getItem(TOKEN_KEY) || ""; } catch { return ""; }
+}
+
+function readToken() {
+  try { return rememberedToken() || storage("session")?.getItem(TOKEN_KEY) || ""; } catch { return ""; }
+}
+
+// Una sola copia: en localStorage si se recuerda, si no en sessionStorage; vacío = borrar ambas.
+export function writeToken(value, remember = false) {
+  for (const kind of ["local", "session"]) {
+    try {
+      const store = storage(kind);
+      if (!store) continue;
+      if (value && (kind === "local") === remember) store.setItem(TOKEN_KEY, value); else store.removeItem(TOKEN_KEY);
+    } catch { /* sin almacenamiento: la llave vive sólo en el campo */ }
+  }
+}
+
+// Progreso real de la revisión: decididos (persona + IA, según la cola publicada) más
+// lo enviado en esta sesión, sobre el total (decididos + pendientes en la cola).
+export function reviewProgress(queue, sent = 0) {
+  const decided = Number.isInteger(queue?.decided) && queue.decided > 0 ? queue.decided : 0;
+  const pending = Array.isArray(queue?.items) ? queue.items.length : 0;
+  const total = decided + pending;
+  const done = Math.min(total, decided + Math.max(0, sent));
+  return { done, total, pct: total ? Math.round((done / total) * 100) : 0 };
 }
 
 // Formas del código para buscar en el súper. El GTIN guardado tiene 14 dígitos y
@@ -174,9 +198,17 @@ export function mountSizeReview(main, { h, fill }) {
   const token = h("input", {
     id: "rv-token", type: "password", autocomplete: "off", spellcheck: "false", placeholder: "github_pat_…", value: readToken(),
   });
-  token.addEventListener("input", () => writeToken(token.value.trim()));
+  const remember = h("input", { id: "rv-remember", type: "checkbox", checked: Boolean(rememberedToken()) });
+  token.addEventListener("input", () => writeToken(token.value.trim(), remember.checked));
+  remember.addEventListener("change", () => writeToken(token.value.trim(), remember.checked));
   const forget = h("button", { type: "button", class: "rv-link" }, "Olvidar llave");
-  forget.addEventListener("click", () => { token.value = ""; writeToken(""); token.focus(); });
+  const forgetToken = () => { token.value = ""; remember.checked = false; writeToken(""); };
+  forget.addEventListener("click", () => { forgetToken(); token.focus(); });
+  const progressText = h("span", { class: "rv-progress-text" });
+  const progressFill = h("span", { class: "rv-progress-fill" });
+  const progressTrack = h("span", {
+    class: "rv-progress-track", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100", "aria-label": "Progreso de revisión",
+  }, progressFill);
 
   const chips = [
     ["todos", "Todos"], ["empate", "Empate"], ["atipico", "Un súper distinto"], ["pendiente", "Sin decidir"],
@@ -305,6 +337,12 @@ export function mountSizeReview(main, { h, fill }) {
     const auto = review.queue?.auto_resueltas?.length || 0;
     count.textContent = `${pending} por enviar · ${review.sent.size} enviados · ${total} en la cola · ${auto} resueltos por IA`;
     send.disabled = review.sending || pending === 0;
+    const progress = reviewProgress(review.queue, review.sent.size);
+    progressText.textContent = review.queue
+      ? `Progreso de revisión: ${progress.done.toLocaleString("es-HN")}/${progress.total.toLocaleString("es-HN")} productos (${progress.pct}%)`
+      : "Progreso de revisión: cargando…";
+    progressFill.style.width = `${progress.pct}%`;
+    progressTrack.setAttribute("aria-valuenow", String(progress.pct));
   }
 
   function renderList() {
@@ -320,7 +358,8 @@ export function mountSizeReview(main, { h, fill }) {
   }
 
   function showStatus(text, kind = "", link = null) {
-    fill(status, text, link ? [" ", h("a", { href: link, target: "_blank", rel: "noopener noreferrer" }, "Ver ejecución ↗")] : null);
+    const check = kind === "ok" ? h("span", { class: "rv-check", "aria-hidden": "true" }, "✓") : null;
+    fill(status, check, text, link ? [" ", h("a", { href: link, target: "_blank", rel: "noopener noreferrer" }, "Ver ejecución ↗")] : null);
     status.className = `rv-status ${kind}`;
   }
 
@@ -335,6 +374,8 @@ export function mountSizeReview(main, { h, fill }) {
       for (const item of decisions) review.sent.add(item.gtin);
       showStatus(`Listo: ${result.sent} decisiones enviadas. GitHub las valida y lanza el refresco (unos minutos).`, "ok", SIZE_DECISIONS_RUNS_URL);
     } catch (error) {
+      // Llave rechazada: no se guarda una llave que no sirve.
+      if (error.status === 401 || error.status === 403) forgetToken();
       showStatus(error.message, "warn");
     } finally {
       review.sending = false;
@@ -348,8 +389,13 @@ export function mountSizeReview(main, { h, fill }) {
         h("h1", {}, "Revisión de tamaños"),
         h("p", { class: "muted" }, "Mismo código de barras, distinto tamaño publicado. Lo claro lo resolvió la IA; aquí queda lo que no pudo leer o tiene conflicto. Mira las fotos y elige el tamaño correcto.")),
       h("div", { class: "rv-auth" },
-        h("label", { for: "rv-token" }, "Llave de GitHub (sólo esta pestaña)"),
-        token, forget)),
+        h("label", { for: "rv-token" }, "Llave de GitHub"),
+        token,
+        h("label", { class: "rv-remember", for: "rv-remember" }, remember, " Recordar en este dispositivo"),
+        forget,
+        h("p", { class: "rv-hint muted small" },
+          "Usa una llave fine-grained sólo para este repositorio, con permiso de Actions y vencimiento corto."))),
+    h("div", { class: "rv-progress" }, progressText, progressTrack),
     h("div", { class: "rv-chips", role: "group", "aria-label": "Filtrar" }, chips),
     list,
     h("div", { class: "rv-bar" }, h("div", { class: "rv-bar-in" }, count, status, send)));

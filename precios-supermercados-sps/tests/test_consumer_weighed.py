@@ -124,3 +124,30 @@ def test_tegucigalpa_offers_with_branch_suffix_are_priced_per_pound() -> None:
     MODULE._price_per_pound(other)
     assert other["presentation"] == "5 lb"
     MODULE.WEIGHED_BY_POUND.clear()
+
+
+def test_walmart_produce_sold_by_the_pound_with_units_per_pound_in_the_name() -> None:
+    # Publicado el 16-nov-2026 como "3 unidades · L 2.93 por unidad"; el precio es por libra.
+    MODULE.WEIGHED_BY_POUND.clear()
+    item = row(("walmart:9001", "8.80"), product_type="Frutas")
+    item["product_name"] = "Banano Maduro Libra Banano Maduro Libra - 3 Unidades Por Lb. Aproximadamente"
+    item["presentation"] = "3 unidades"
+    MODULE._price_per_pound(item)
+    assert item["presentation"] == "por libra"
+    assert item["offers"][0]["unit_price"] == {"amount": "8.80", "per": "libra"}
+    manzana = row(("walmart:9002", "49.00"), product_type="Frutas y verduras")
+    manzana["product_name"] = "Manzana Roja Infantil - 4 Unidades Por Lb Aproximadamente"
+    MODULE._price_per_pound(manzana)
+    assert manzana["presentation"] == "por libra"
+
+
+def test_units_per_pound_needs_a_weighed_type_and_a_single_store() -> None:
+    MODULE.WEIGHED_BY_POUND.clear()
+    toy = row(("walmart:9003", "99.00"), product_type="Juguetes")
+    toy["product_name"] = "Pelotas 3 Unidades Por Libra"
+    MODULE._price_per_pound(toy)
+    assert toy["presentation"] == "5 lb"
+    mixed = row(("walmart:9004", "8.80"), ("colonial:7", "11.49"), product_type="Frutas")
+    mixed["product_name"] = "Banano Maduro - 3 Unidades Por Lb. Aproximadamente"
+    MODULE._price_per_pound(mixed)
+    assert mixed["presentation"] == "5 lb"

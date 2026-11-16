@@ -429,7 +429,7 @@ const l = (presentation, pack, unit_per) => presentationLabel({ presentation, pa
 const labels = [l('4 × 92 g', [4, '368 g']), l('6 × 200 ml', [6, '1.2 L']), l('2 × 7 oz', [2, '14 oz'], '100 g'),
   l('25 × 453.59 g', [25, '11.34 kg']), l('368 g', [4, '368 g']), l('4 × 92 g', null), l('4 × 92 g', 0),
   l('4 × 92 g', [1, '92 g']), l('4 × 92 g', ['4', '368 g']), l('por libra', [4, '368 g']), l('', [4, '368 g']),
-  l('—', [4, '368 g']), l('12 × 22 g', [12, '264 g'])];
+  l('—', [4, '368 g']), l('12 × 22 g', [12, '264 g']), l('3 × 439 g', [3, '1.317 kg'], 'kg')];
 const old = ['id','product_name','brand','presentation','category','product_type','partition','best_price','unit_amount','unit_per','retailers','promo','other_presentations','comparability','photo'];
 const row = ['a1', 'Pudín 4 Unidades / 92 g', 'Snack Pack', '4 × 92 g', 'Alimentos', 'Postre', 0, '75.20', '20.43', '100 g', [0], 0, 0, 'i', 0];
 const c = new Catalog('https://x.test/manifest.json');
@@ -442,13 +442,29 @@ console.log(JSON.stringify({ labels, before: [presentationLabel(before), before.
 """
     result = json.loads(_node(script, tmp_path))
     assert result["labels"] == [
-        "4 × 92 g (368 g)", "6 × 200 ml (1.2 L)", "2 × 7 oz (14 oz)", "25 × 453.59 g (11.34 kg)", "4 Pack (368 g)",
-        "4 × 92 g", "4 × 92 g", "4 × 92 g", "4 × 92 g", "por libra", "", "—", "12 × 22 g (264 g)",
+        "4 Pack (368 g)", "6 Pack (1.2 L)", "2 Pack (14 oz)", "25 Pack (11.34 kg)", "4 Pack (368 g)",
+        "4 × 92 g", "4 × 92 g", "4 × 92 g", "4 × 92 g", "por libra", "", "—", "12 Pack (264 g)",
+        "3 Pack (1.32 kg)",  # Zamorano Mantequilla Crema 3 Unidades / 439 g (PriceSmart)
     ]
     # Catálogo viejo sin columna: comportamiento actual. Presentación y precio unitario no cambian.
     assert result["before"] == ["4 × 92 g", "4 × 92 g", "20.43"]
-    assert result["after"] == ["4 × 92 g (368 g)", "4 × 92 g", "20.43"]
+    assert result["after"] == ["4 Pack (368 g)", "4 × 92 g", "20.43"]
     assert result["zero"] == "4 × 92 g"
+
+
+def test_unit_price_text_uses_100_g_and_100_ml(tmp_path: Path) -> None:
+    script = """
+import { unitPriceText } from './data.js';
+console.log(JSON.stringify([unitPriceText('37.60', 'L'), unitPriceText('106.26', 'kg'), unitPriceText('3.76', '100 ml'),
+  unitPriceText('20.43', '100 g'), unitPriceText('6.30', 'unidad'), unitPriceText('8.80', 'libra'),
+  unitPriceText(null, 'kg'), unitPriceText('5', null)]));
+"""
+    texts = json.loads(_node(script, tmp_path))
+    nbsp = "\u00a0"  # toLocaleString puede usar espacio fijo; se compara sin él
+    assert [text.replace(nbsp, " ") for text in texts] == [
+        "L 3.76 por 100 ml", "L 10.63 por 100 g", "L 3.76 por 100 ml", "L 20.43 por 100 g", "L 6.30 por unidad",
+        "L 8.80 por libra", "", "",
+    ]
 
 
 def test_store_labels_name_branches_only_when_a_chain_has_several(tmp_path: Path) -> None:
@@ -777,6 +793,37 @@ console.log(JSON.stringify(out));
     assert result["missing"] is None and result["noFile"] is None
 
 
+def test_size_review_token_storage_and_progress(tmp_path: Path) -> None:
+    (tmp_path / "admin.js").write_text((APP_DIR / "admin.js").read_text(encoding="utf-8"), encoding="utf-8")
+    script = """
+const store = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)),
+  removeItem: (k) => m.delete(k), has: (k) => m.has(k) }; };
+globalThis.localStorage = store(); globalThis.sessionStorage = store();
+const { writeToken, reviewProgress } = await import('./admin.js');
+const KEY = 'super-compras-admin-github-token';
+const where = () => [sessionStorage.has(KEY), localStorage.has(KEY)];
+writeToken('github_pat_x'); const session = where();
+writeToken('github_pat_x', true); const local = where();
+writeToken('github_pat_x', false); const back = where();
+writeToken(''); const none = where();
+const queue = { decided: 253, items: new Array(727).fill({}) };
+console.log(JSON.stringify({ session, local, back, none, progress: reviewProgress(queue), sent: reviewProgress(queue, 47),
+  empty: reviewProgress(null), over: reviewProgress({ decided: 1, items: [{}] }, 5) }));
+"""
+    result = json.loads(_node(script, tmp_path))
+    assert result["session"] == [True, False] and result["local"] == [False, True]
+    assert result["back"] == [True, False] and result["none"] == [False, False]
+    assert result["progress"] == {"done": 253, "total": 980, "pct": 26}
+    assert result["sent"] == {"done": 300, "total": 980, "pct": 31}
+    assert result["empty"] == {"done": 0, "total": 0, "pct": 0}
+    assert result["over"] == {"done": 2, "total": 2, "pct": 100}
+    admin = (APP_DIR / "admin.js").read_text(encoding="utf-8")
+    assert "if (error.status === 401 || error.status === 403) forgetToken();" in admin
+    assert "fine-grained" in admin and "Recordar en este dispositivo" in admin
+    css = (APP_DIR / "styles.css").read_text(encoding="utf-8")
+    assert ".rv-check { animation: none; }" in css  # prefers-reduced-motion
+
+
 def test_size_review_panel_sends_only_validated_decisions_to_github(tmp_path: Path) -> None:
     (tmp_path / "admin.js").write_text((APP_DIR / "admin.js").read_text(encoding="utf-8"), encoding="utf-8")
     script = """
@@ -888,7 +935,8 @@ console.log(JSON.stringify(out));
     html = (APP_DIR / "index.html").read_text(encoding="utf-8")
     assert "connect-src 'self' https://raw.githubusercontent.com https://api.github.com;" in html
     admin = (APP_DIR / "admin.js").read_text(encoding="utf-8")
-    assert "sessionStorage" in admin and "localStorage" not in admin
+    # La llave vive en sessionStorage salvo que la persona marque «Recordar» (apagado por defecto).
+    assert "sessionStorage" in admin and 'id: "rv-remember", type: "checkbox", checked: Boolean(rememberedToken())' in admin
     assert "searchVariants(item.gtin)" in admin and "navigator.clipboard.writeText" in admin
     app = (APP_DIR / "app.js").read_text(encoding="utf-8")
     assert 'const ADMIN_ROUTE = "/admin/revision";' in app and 'await import("./admin.js?v=' in app
