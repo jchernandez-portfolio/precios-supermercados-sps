@@ -526,7 +526,7 @@ dialog.scanner::backdrop { background: rgba(16, 32, 26, .7); }
   .scan-button { width: 40px; padding: 0; justify-content: center; }
   .scan-text { display: none; }
 }
-
+@media (min-width: 640px) {
   dialog.scanner { width: min(520px, calc(100% - 32px)); height: auto; max-height: calc(100% - 32px); margin: auto; border-radius: 22px; }
   .scanner-viewport { aspect-ratio: 4 / 3; }
 }
