@@ -27,8 +27,8 @@
   <meta name="apple-mobile-web-app-title" content="Súper Compras">
   <link rel="preload" href="fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fonts/space-grotesk-700.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="styles.css?v=20261116-1">
-  <script type="module" src="app.js?v=20261116-1"></script>
+  <link rel="stylesheet" href="styles.css?v=20261116-4">
+  <script type="module" src="app.js?v=20261116-4"></script>
 </head>
 <body>
   <div class="intro" aria-hidden="true">
@@ -73,9 +73,15 @@
   </header>
 
   <main id="main" tabindex="-1">
-    <div class="page loading" aria-busy="true">
-      <div class="spinner" aria-hidden="true"></div>
-      <p>Cargando los precios de hoy…</p>
+    <div class="page loading-skel" aria-busy="true">
+      <p class="sr-only" role="status">Cargando los precios de hoy…</p>
+      <span class="skel skel-title" aria-hidden="true"></span>
+      <div class="results" aria-hidden="true">
+        <div class="result skel-card"><span class="thumb skel"></span><span class="result-body"><span class="skel skel-text w-30"></span><span class="skel skel-text w-80"></span><span class="skel skel-text w-50"></span></span><span class="result-price"><span class="skel skel-price"></span></span></div>
+        <div class="result skel-card"><span class="thumb skel"></span><span class="result-body"><span class="skel skel-text w-30"></span><span class="skel skel-text w-80"></span><span class="skel skel-text w-50"></span></span><span class="result-price"><span class="skel skel-price"></span></span></div>
+        <div class="result skel-card"><span class="thumb skel"></span><span class="result-body"><span class="skel skel-text w-30"></span><span class="skel skel-text w-80"></span><span class="skel skel-text w-50"></span></span><span class="result-price"><span class="skel skel-price"></span></span></div>
+        <div class="result skel-card"><span class="thumb skel"></span><span class="result-body"><span class="skel skel-text w-30"></span><span class="skel skel-text w-80"></span><span class="skel skel-text w-50"></span></span><span class="result-price"><span class="skel skel-price"></span></span></div>
+      </div>
     </div>
   </main>
 
