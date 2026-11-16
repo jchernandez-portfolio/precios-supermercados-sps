@@ -894,3 +894,16 @@ console.log(JSON.stringify(out));
     assert 'const ADMIN_ROUTE = "/admin/revision";' in app and 'await import("./admin.js?v=' in app
     # Un fallo al cargar el catálogo no tapa el panel (lo encontró la vista previa del 12-nov).
     assert 'if (main.dataset.view === "admin") return;' in app
+
+
+def test_stylesheet_braces_balance_and_scanner_media_query() -> None:
+    # Una "}" suelta (rediseño Lima) cerraba antes de tiempo el escáner de escritorio y
+    # anulaba reglas siguientes como `.rv-page { display: grid }`.
+    css = (APP_DIR / "styles.css").read_text(encoding="utf-8")
+    depth = 0
+    for line_number, line in enumerate(css.splitlines(), 1):
+        for char in line:
+            depth += (char == "{") - (char == "}")
+            assert depth >= 0, f"llave de cierre sobrante en styles.css:{line_number}"
+    assert depth == 0
+    assert "@media (min-width: 640px) {\n  dialog.scanner { width: min(520px" in css
