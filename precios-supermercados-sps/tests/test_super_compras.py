@@ -944,6 +944,64 @@ console.log(JSON.stringify(out));
     assert 'if (main.dataset.view === "admin") return;' in app
 
 
+def test_loose_produce_same_name_elsewhere(tmp_path: Path) -> None:
+    """Fruta y verdura suelta: «En otros súper» por nombre + forma de venta, sin fusionar filas."""
+    script = """
+import { Catalog, displayFields, looseProduceKey } from './data.js';
+let n = 0;
+const p = (name, retailer, price, type = 'Verduras', presentation = null) => {
+  const product = { id: `id${n++}`, product_name: name, brand: null, presentation, category: 'Alimentos',
+    product_type: type, best_price: price, unit_amount: null, unit_per: null, retailers: [retailer] };
+  return Object.assign(product, displayFields(product));
+};
+const ginger = [
+  p('JENGIBRE X Libra', 'colonial', '37.39'), p('Jengibre libra', 'comisariato_los_andes', '39.50'),
+  p('Jengibre X Lb', 'la_colonia', '34.40'),
+  p('Jengibre Libra - 5 Unidades Por Lb. Aproximadamente', 'walmart', '29.70', 'Verduras', '5 unidades'),
+];
+const tomato = [p('TOMATE Manzano X Libra', 'colonial', '21.49'), p('Tomate pera libra', 'comisariato_los_andes', '26.90'),
+  p('Tomate Manzano X Unidad', 'la_colonia', '9.80')];
+const broccoli = [p('BROCOLI X Libra', 'colonial', '39.99'), p('Brocoli Importado Lb', 'la_colonia', '148.70'),
+  p('Brocoli libra', 'comisariato_los_andes', '29.50')];
+const outlier = [p('Malanga X Libra', 'colonial', '16.49'), p('Malanga libra', 'comisariato_los_andes', '16.90'),
+  p('Malanga Lb', 'la_colonia', '61.00')];
+const packaged = [p('Limon Amarillo 33 Libras', 'walmart', '47.00', 'Frutas'),
+  p('Limon amarillo libra', 'colonial', '45.00', 'Frutas'), p('Tomate cherry 1/2 libra', 'comisariato_los_andes', '29.50'),
+  p('Albahaca Guacamaya Bolsa 30 Gr', 'walmart', '30.90', 'Hierbas y montes')];
+const pair = [p('Kiwi libra', 'comisariato_los_andes', '153.95', 'Frutas'), p('KIWI X Libra', 'colonial', '50.00', 'Frutas')];
+const c = Object.create(Catalog.prototype);
+c.products = [...ginger, ...tomato, ...broccoli, ...outlier, ...packaged, ...pair];
+c.ready = true;
+const names = (product) => c.sameNameElsewhere(product).map((x) => x.product_name);
+console.log(JSON.stringify({
+  ginger: ginger.map(looseProduceKey), walmart: [ginger[3].presentation, ginger[3].unit_amount, ginger[3].unit_per],
+  gingerOthers: names(ginger[0]), tomato: tomato.map(looseProduceKey), tomatoOthers: tomato.map(names),
+  broccoli: broccoli.map(looseProduceKey), broccoliOthers: names(broccoli[0]), imported: names(broccoli[1]),
+  outlier: outlier.map(names), packaged: packaged.map(looseProduceKey), pair: pair.map(names), rows: c.products.length,
+}));
+"""
+    result = json.loads(_node(script, tmp_path))
+    assert result["ginger"] == ["libra|jengibre"] * 4
+    # Walmart publica "5 unidades" pero vende por libra: se muestra y compara por libra.
+    assert result["walmart"] == ["por libra", "29.70", "libra"]
+    assert result["gingerOthers"] == ["Jengibre Libra - 5 Unidades Por Lb. Aproximadamente", "Jengibre X Lb", "Jengibre libra"]
+    # Variedades distintas y libra contra unidad nunca se juntan.
+    assert result["tomato"] == ["libra|manzano tomate", "libra|pera tomate", "unidad|manzano tomate"]
+    assert result["tomatoOthers"] == [[], [], []]
+    # «Importado» es parte de la clave: no se junta con el nacional.
+    assert result["broccoli"] == ["libra|brocoli", "libra|brocoli importado", "libra|brocoli"]
+    assert result["broccoliOthers"] == ["Brocoli libra"] and result["imported"] == []
+    # Fuera de 0.5×–2× la mediana: ni aparece ni recibe la sección.
+    assert result["outlier"] == [["Malanga libra"], ["Malanga X Libra"], []]
+    # Peso de paquete en el nombre: ya no es suelto.
+    assert result["packaged"] == [None, "libra|amarillo limon", None, None]
+    # Pareja que difiere más del doble: con la mediana baja no se muestra.
+    assert result["pair"] == [[], []]
+    assert result["rows"] == 19  # nada se fusiona
+    app = (APP_DIR / "app.js").read_text(encoding="utf-8")
+    assert "catalog.sameNameElsewhere(product)" in app and "Es una comparación por nombre" in app
+
+
 def test_sparkline_turns_history_30d_into_a_step_path(tmp_path: Path) -> None:
     script = """
 import { sparklineGeometry, sparklineLabel } from './data.js';

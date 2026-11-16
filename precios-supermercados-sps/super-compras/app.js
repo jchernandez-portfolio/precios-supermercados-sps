@@ -5,8 +5,8 @@ import {
   Catalog, RETAILER_COLORS, rowKey, RETAILER_NAMES, countText, listText, loadCart, loadCities, loadCitySlug,
   migrateCartLines, money, photoSrcset, photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, sparklineGeometry,
   sparklineLabel, storeLabel, unitPriceText,
-} from "./data.js?v=20261116-7";
-import { productIllustration } from "./illustration.js?v=20261116-7";
+} from "./data.js?v=20261116-8";
+import { productIllustration } from "./illustration.js?v=20261116-8";
 
 // Foto real si existe; si no hay o falla al cargar, la ilustración de siempre.
 // Tarjetas y miniaturas usan 320 px; el detalle deja que el navegador elija 320 u
@@ -825,11 +825,13 @@ function barWidth(price, minimum, maximum) {
   return 40 + (60 * (price - minimum)) / (maximum - minimum);
 }
 
-function offerNotes(offers, catalog) {
+function offerNotes(offers, catalog, sameName = false) {
   const present = new Set(offers.map((offer) => offer.supermarket_id));
   const absent = catalog.retailers.filter((id) => !present.has(id)).map((id) => RETAILER_NAMES[id] || id);
   const notes = [];
-  if (absent.length && offers.length) notes.push(`Hoy no lo encontramos en ${listText(absent)}.`);
+  if (absent.length && offers.length) {
+    notes.push(`Hoy no lo encontramos en ${listText(absent)}.${sameName ? " Abajo, en «En otros súper», hay sueltos con el mismo nombre." : ""}`);
+  }
   for (const offer of offers) {
     const discount = discountOf(offer);
     const label = storeLabel(offer, offers);
@@ -886,6 +888,7 @@ function renderProduct(product, container, code = "") {
     const offersBox = page.querySelector(".offers");
     if (!row) { fill(offersBox, h("h2", {}, "Precio en cada súper"), h("p", {}, "No pudimos cargar los precios.")); return; }
     const offers = liveOffers(row);
+    const elsewhere = catalog.sameNameElsewhere(product);
     const cheapest = offers[0];
     const cheapestLabel = cheapest ? storeLabel(cheapest, offers) : "";
     const prices = offers.map((offer) => Number(offer.current_price));
@@ -920,7 +923,7 @@ function renderProduct(product, container, code = "") {
             onclick: () => addToCart(product.id, offer.location_id, label),
           }, icon("plus", 18)));
       })) : h("p", {}, "Hoy ningún súper lo tiene con precio."),
-      offerNotes(offers, catalog).map((note) => h("p", { class: "bar-note" }, note)),
+      offerNotes(offers, catalog, elsewhere.length > 0).map((note) => h("p", { class: "bar-note" }, note)),
       h("p", { class: "muted small" }, offers.some((offer) => catalog.staleSince(offer))
         ? "Precios en línea; los marcados con fecha no se pudieron actualizar hoy. Pueden variar en tienda."
         : "Precios en línea de hoy; pueden variar en tienda. Usa + para elegir en qué súper comprarlo."));
@@ -949,6 +952,7 @@ function renderProduct(product, container, code = "") {
     const alternatives = catalog.alternatives(product);
     fill(extra,
       priceHistory,
+      elsewhere.length ? sameNameSection(product, elsewhere) : null,
       others.length ? h("section", {},
         sectionHeader("Otros tamaños", h("span", { class: "muted small" }, "precio por unidad para comparar tamaños")),
         h("div", { class: "row-scroll sizes" }, others.map(({ other, otherProduct }) => {
@@ -976,6 +980,32 @@ function renderProduct(product, container, code = "") {
       h("button", { type: "button", class: "primary", onclick: () => render() }, "Reintentar"));
   });
   return null;
+}
+
+// «En otros súper» (fruta y verdura suelta): mismo nombre y misma forma de venta en
+// otros súper. No es el comparador (sin código de barras no hay identidad fuerte):
+// va aparte, no cambia «Precio en cada súper» y lo dice en el texto.
+function sameNameSection(product, others) {
+  const per = product.unit_per;
+  const price = (item) => Number(item.best_price);
+  const minimum = Math.min(price(product), ...others.map(price));
+  return h("section", { class: "same-name" },
+    sectionHeader("En otros súper", h("span", { class: "muted small" }, `mismo nombre, precio por ${per}`)),
+    h("p", { class: "muted small same-name-note" },
+      "La fruta y verdura suelta no trae código de barras: aquí la juntamos sólo por el nombre y la forma de venta. ",
+      "Es una comparación por nombre, no el mismo producto confirmado; revisa la variedad en tienda."),
+    h("div", { class: "alt-list" }, others.map((other) => {
+      const best = price(other) === minimum;
+      const stores = other.retailers.map((id) => RETAILER_NAMES[id] || id);
+      return h("a", { class: `alt${best ? " best" : ""}`, href: `#/p/${other.id}` },
+        h("span", { class: "alt-tile" }, productVisual(other, { size: 52 })),
+        h("span", { class: "alt-main" },
+          h("span", { class: "bar-name" }, storeDot(other.retailers[0]), h("strong", {}, listText(stores)),
+            best ? h("span", { class: "badge-best" }, "MÁS BARATO") : null),
+          h("span", { class: "muted small" }, productName(other))),
+        h("span", { class: "alt-price" }, priceTag(other.best_price), h("span", { class: "muted small" }, `por ${per}`)));
+    })),
+    price(product) === minimum ? h("p", { class: "bar-note" }, `El de esta página es el más barato por ${per} entre los que se llaman igual.`) : null);
 }
 
 // Después de escanear: el código leído y dónde está más barato, arriba de las ofertas.
@@ -1252,7 +1282,7 @@ async function renderAdmin(main) {
   main.dataset.view = "admin";
   fill(main, loadingPage("Abriendo el panel de revisión…"));
   try {
-    adminModule = adminModule || await import("./admin.js?v=20261116-7");
+    adminModule = adminModule || await import("./admin.js?v=20261116-8");
     if (route().path.startsWith(ADMIN_ROUTE) && main.dataset.view === "admin") adminModule.mountSizeReview(main, { h, fill });
   } catch (error) {
     delete main.dataset.view;
@@ -1362,7 +1392,7 @@ async function start() {
 let scannerModule = null;
 async function startScanner(opener) {
   try {
-    scannerModule = scannerModule || await import("./scanner.js?v=20261116-7");
+    scannerModule = scannerModule || await import("./scanner.js?v=20261116-8");
     scannerModule.openScanner({
       h, opener,
       onCode: (code, format) => {
