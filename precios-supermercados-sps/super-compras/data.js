@@ -244,12 +244,109 @@ export function isProduce(product) {
   return PRODUCE_TYPES.has(fold(product?.product_type));
 }
 
+// Walmart vende la fruta y verdura suelta por libra y da las piezas sólo como guía
+// ("Jengibre Libra - 5 Unidades Por Lb. Aproximadamente"): el precio es por libra.
+const PIECES_PER_POUND = /unidades\s+(?:por\s+(?:lb|libra)\.?\s+)?aproximadamente/i;
+const POUND_NAMED = /(?:^|\s)(?:lb|libra)(?:[\s.]|$)/i;
+const PRICE_PER_POUND = /precio\s+indicado\s+por\s+(?:lb|libra)/i;
+
+function soldByPound(name) {
+  return PRICE_PER_POUND.test(name) || (PIECES_PER_POUND.test(name) && POUND_NAMED.test(name));
+}
+
+// «En otros súper» (fruta y verdura suelta). Sin código de barras no hay identidad
+// fuerte: nunca se fusionan filas ni entra al comparador. Sólo se listan aparte las
+// piezas sueltas de otros súper con el mismo nombre limpio y la misma forma de venta
+// (libra o unidad, nunca mezcladas). La clave es "libra|jengibre".
+const LOOSE_NOISE = new Set([
+  "x", "lb", "lbs", "libra", "libras", "und", "unds", "unid", "ud", "uds", "un", "u", "unidad", "unidades", "c", "cu",
+  "aproximadamente", "aprox", "hortifruti", "fresco", "fresca", "frescos", "frescas", "suelto", "suelta", "sueltos",
+  "sueltas", "entero", "entera", "precio", "indicado", "por", "de", "del", "el", "la", "los", "las", "en",
+]);
+const RETAILER_PHRASES = Object.values(RETAILER_NAMES).map((name) => fold(name));
+// Peso de paquete en el nombre ("Limon Amarillo 33 Libras", "Tomate cherry 1/2 libra",
+// "Bolsa 30 Gr"): ya no es suelto. "Contiene 1.5lb aproximadamente" (Walmart) es el
+// peso de una pieza, no de un paquete.
+const APPROX_WEIGHT = /contiene\s+\d+(?:[.,]\d+)?\s*(?:lb|lbs|libras?)\.?\s+aproximadamente/gi;
+const PACKAGE_WEIGHT = /\d\s*(?:g|gr|grs|grm|grms|gramos?|kg|kgs|kilos?|oz|onz|onzas?|ml|l|lt|lts|litros?|lb|lbs|libras?)(?![a-z])|(?:^|\s)media\s+(?:lb|libra)(?![a-z])/i;
+
+// Plural simple, igual a ambos lados: limones → limon, coliflores → coliflor, papas → papa.
+function singular(word) {
+  if (word.length > 4 && /[nr]es$/.test(word)) return word.slice(0, -2);
+  if (word.length > 3 && word.endsWith("s")) return word.slice(0, -1);
+  return word;
+}
+
+export function looseUnit(product) {
+  if (!isProduce(product) || !(Number(product?.best_price) > 0)) return null;
+  const presentation = String(product.presentation ?? "");
+  if (presentation === "por libra" && product.unit_per === "libra") return "libra";
+  if (/^1 unidad(?:es)?$/.test(presentation) && product.unit_per === "unidad") return "unidad";
+  return null;
+}
+
+export function looseProduceKey(product) {
+  const unit = looseUnit(product);
+  if (!unit) return null;
+  const raw = String(product.product_name ?? "").replace(APPROX_WEIGHT, " ");
+  if (PACKAGE_WEIGHT.test(raw)) return null;
+  // Lo que va después de " - " es una nota del súper ("- Precio indicado por bandeja").
+  let text = ` ${fold(raw.split(/\s+-\s*/)[0])} `;
+  for (const phrase of RETAILER_PHRASES) text = text.replaceAll(` ${phrase} `, " ");
+  const words = new Set();
+  for (const word of text.split(" ")) {
+    if (word && !LOOSE_NOISE.has(word) && !LOOSE_NOISE.has(singular(word))) words.add(singular(word));
+  }
+  return words.size ? `${unit}|${[...words].sort().join(" ")}` : null;
+}
+
+// Mediana del grupo; fuera de 0.5×–2× es otro producto o un precio mal publicado
+// ("Brocoli Importado Lb" a L 148.70 contra L 29–40).
+function looseInRange(price, median) {
+  const ratio = Number(price) / median;
+  return ratio >= 0.5 && ratio <= 2;
+}
+
+// Mediana baja: con un número par se toma el menor de los dos del medio, así una
+// pareja que difiere más del doble (L 40 contra L 114.50) no se muestra.
+function lowMedian(values) {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor((sorted.length - 1) / 2)];
+}
+
+// Productos de otros súper con la misma clave, del más barato al más caro; [] si no
+// hay o si el propio producto queda fuera de rango.
+export function looseMatches(product, groups) {
+  const key = looseProduceKey(product);
+  if (!key || product.suspect) return [];
+  const group = groups.get(key) || [];
+  const median = lowMedian(group.map((item) => Number(item.best_price)));
+  if (!looseInRange(product.best_price, median)) return [];
+  const own = new Set(product.retailers || []);
+  return group.filter((item) => item !== product && looseInRange(item.best_price, median)
+    && (item.retailers || []).some((id) => !own.has(id)))
+    .sort((a, b) => Number(a.best_price) - Number(b.best_price));
+}
+
+export function looseGroups(products) {
+  const groups = new Map();
+  for (const product of products) {
+    const key = product.suspect ? null : looseProduceKey(product);
+    if (key) (groups.get(key) || groups.set(key, []).get(key)).push(product);
+  }
+  return groups;
+}
+
 // Nombre, presentación y marca para mostrar; la búsqueda sigue usando el nombre del súper.
 export function displayFields(product, basis = null) {
   let name = String(product.product_name ?? "").trim();
   let presentation = product.presentation;
   let unitAmount = product.unit_amount;
   let unitPer = product.unit_per;
+  // Publicado como "5 unidades" pero vendido por libra (ver soldByPound): por libra,
+  // y las ofertas también (repaired con total 1 = el precio es por libra).
+  const byPound = isProduce(product) && soldByPound(name) && (!presentation || /^\d+ unidad(?:es)?$/.test(presentation));
+  if (byPound) [presentation, unitAmount, unitPer] = ["por libra", null, null];
   if (!presentation && UNIT_TAIL.test(name)) {
     name = name.replace(UNIT_TAIL, "");
     presentation = "1 unidad";
@@ -293,6 +390,7 @@ export function displayFields(product, basis = null) {
   return {
     display_name: name || product.product_name, presentation, brand, brand_label: brandLabel,
     unit_amount: unitAmount, unit_per: unitPer,
+    ...(byPound ? { repaired: { from: product.presentation, reason: "se vende por libra", total: 1, factor: 1 } } : {}),
   };
 }
 
@@ -630,6 +728,7 @@ export class Catalog {
     this.products = products;
     this.rowCount = products.length;
     this.byId = new Map(products.map((product) => [product.id, product]));
+    this.looseIndex = null;
     this.ready = true;
     return this;
   }
@@ -807,6 +906,14 @@ export class Catalog {
   // Precio "por unidad" sólo se compara entre productos con conteo publicado ("12
   // unidades") y de un tipo concreto: "1 unidad" es el precio de la pieza, y en un tipo
   // genérico (Abarrotes) una tortilla y una semita no son alternativas.
+  // «En otros súper»: fruta y verdura suelta de otros súper con el mismo nombre y la
+  // misma forma de venta (ver looseProduceKey). Grupos calculados una vez por índice.
+  sameNameElsewhere(product) {
+    if (!this.ready) return [];
+    if (!this.looseIndex) this.looseIndex = looseGroups(this.products);
+    return looseMatches(product, this.looseIndex);
+  }
+
   alternatives(product, limit = 6) {
     if (!product.product_type || !product.unit_per) return [];
     const perPiece = (item) => item.unit_per === "unidad"
