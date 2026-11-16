@@ -5,6 +5,11 @@ número son cambios directos. El detalle de cada incidente vive en
 [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md) y el de cada error de datos en
 [`docs/calidad/errores-confirmados.csv`](docs/calidad/errores-confirmados.csv).
 
+## 2026-11-16
+
+- Historial de 30 días: el catálogo v3 publica `history_30d` (puntos de cambio `[días_atrás, "precio"]`, sólo en ofertas que cambiaron de precio en 30 días, desde los mismos periodos de `historical_summary`) y la ficha dibuja una sparkline SVG de la oferta más barata. Crecimiento medido: +1.6–2.0 % gzip del catálogo SPS.
+- PriceSmart: las variantes (SKU) sin identidad comparable con el mismo `pid`, ubicación y título salen en una sola tarjeta con la oferta más barata y el campo aditivo `variants` (la ficha dice «N variantes con este nombre»); títulos distintos siguen separados.
+
 ## 2026-11-14
 
 - Motor de identidad v2.10 "corrige con evidencia": las decisiones de tamaño traen la lectura de la foto de cada súper (`evidence`, tabla derivada `size_offer_evidence`) y `apply: "evidence" | "all"`; con ≥ 2 fotos que confirman y son mayoría el tamaño oficial se aplica a todas las ofertas del GTIN, con una sola se corrigen las de foto propia y un empate no corrige nada. El catálogo publica `published_as` (lo que publica el súper) y `other_presentation`; la medición de identidad lista las fichas que cambian (`evidencia-grupos.csv`).

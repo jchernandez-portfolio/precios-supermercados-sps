@@ -17,7 +17,9 @@
   <meta property="og:image:height" content="512">
   <meta property="og:image:alt" content="Logo de Súper Compras">
   <meta name="twitter:card" content="summary">
-  <meta name="theme-color" content="#1C1F1D">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#1C1F1D" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#2E332F" media="(prefers-color-scheme: dark)">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data: https://raw.githubusercontent.com https://pub-0dcb2204775c484dbe6681e659eee236.r2.dev; connect-src 'self' https://raw.githubusercontent.com https://api.github.com; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
@@ -27,8 +29,8 @@
   <meta name="apple-mobile-web-app-title" content="Súper Compras">
   <link rel="preload" href="fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fonts/space-grotesk-700.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="styles.css?v=20261116-1">
-  <script type="module" src="app.js?v=20261116-1"></script>
+  <link rel="stylesheet" href="styles.css?v=20261116-8">
+  <script type="module" src="app.js?v=20261116-8"></script>
 </head>
 <body>
   <div class="intro" aria-hidden="true">
@@ -73,9 +75,15 @@
   </header>
 
   <main id="main" tabindex="-1">
-    <div class="page loading" aria-busy="true">
-      <div class="spinner" aria-hidden="true"></div>
-      <p>Cargando los precios de hoy…</p>
+    <div class="page loading-skel" aria-busy="true">
+      <p class="sr-only" role="status">Cargando los precios de hoy…</p>
+      <span class="skel skel-title" aria-hidden="true"></span>
+      <div class="results" aria-hidden="true">
+        <div class="result skel-card"><span class="thumb skel"></span><span class="result-body"><span class="skel skel-text w-30"></span><span class="skel skel-text w-80"></span><span class="skel skel-text w-50"></span></span><span class="result-price"><span class="skel skel-price"></span></span></div>
+        <div class="result skel-card"><span class="thumb skel"></span><span class="result-body"><span class="skel skel-text w-30"></span><span class="skel skel-text w-80"></span><span class="skel skel-text w-50"></span></span><span class="result-price"><span class="skel skel-price"></span></span></div>
+        <div class="result skel-card"><span class="thumb skel"></span><span class="result-body"><span class="skel skel-text w-30"></span><span class="skel skel-text w-80"></span><span class="skel skel-text w-50"></span></span><span class="result-price"><span class="skel skel-price"></span></span></div>
+        <div class="result skel-card"><span class="thumb skel"></span><span class="result-body"><span class="skel skel-text w-30"></span><span class="skel skel-text w-80"></span><span class="skel skel-text w-50"></span></span><span class="result-price"><span class="skel skel-price"></span></span></div>
+      </div>
     </div>
   </main>
 

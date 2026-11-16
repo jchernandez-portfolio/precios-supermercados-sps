@@ -1,6 +1,6 @@
 # Ofertas no vistas en la última captura aceptada ("ofertas fantasma")
 
-Estado: **código listo, apagado por defecto**. Activarlo requiere permiso del dueño
+Estado: **activo desde el 16-nov-2026** (paso 2, `hide_unseen_offers=true`, con permiso del dueño). Antes: código listo y apagado; activarlo requería permiso del dueño
 porque crea una tabla derivada nueva en Turso (`capture_membership`) desde la
 persistencia diaria. Interruptor: `config/catalog/unseen-offers-v1.json`.
 

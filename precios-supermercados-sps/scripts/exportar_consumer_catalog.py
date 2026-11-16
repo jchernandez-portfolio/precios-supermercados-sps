@@ -79,6 +79,9 @@ SOURCE_POUND_SQL = (
 # (o "COLONIAL Encurtido Rojo und": termina en unidad).
 # Un paquete cerrado sin libra en el nombre ("MH ShortRib AsadoTira CoreanoPaq" a L 719.99)
 # o una bandeja con N unidades ("Torta p/hamburguesa bandeja 4und") también va por unidad.
+# Walmart vende fruta y verdura por libra y lo aclara en el nombre: "Banano Maduro Libra -
+# 3 Unidades Por Lb. Aproximadamente" a L 8.80 la libra (no 3 unidades a L 2.93 c/u).
+_UNITS_PER_POUND_NAME = re.compile(r"\bunidad(?:es)?\s+por\s+(?:lb|libra)s?\b", re.IGNORECASE)
 _PER_UNIT_NAME = re.compile(
     r"precio\s+por\s+unidad|\s(?:und|unds|unid|unidad|un|c/u)\.?\s*$|paq(?:uete)?\.?\s*$|\d\s*(?:und|unds|unidades)\b",
     re.IGNORECASE,
@@ -261,6 +264,72 @@ def ounce_as_mass(offer: VisibleOffer) -> VisibleOffer:
     return _core.replace(offer, presentation_dimension="mass_g", presentation_total_base=format(grams.normalize(), "f"))
 
 
+# PriceSmart publica una fila por SKU/variante (``26181``, ``26181-0132029951206``…):
+# 391 productos traían 2+ variantes con precio y el mismo título (16-nov-2026), y el
+# catálogo mostraba tarjetas idénticas repetidas.
+VARIANT_SUPERMARKETS = frozenset({"pricesmart"})
+
+
+def _variant_key(offer: VisibleOffer, promoted: set[str]) -> tuple[str, str, str, str] | None:
+    """Llave ``súper + ubicación + pid + título normalizado`` de una variante sin identidad.
+
+    Sólo ofertas sin llave de grupo comparable (GTIN/vínculo curado/single_source
+    promovido): esas siguen exactamente igual. Sin ``source_key`` no se une nada.
+    """
+    if offer.supermarket_id not in VARIANT_SUPERMARKETS or not offer.source_key:
+        return None
+    if _core.master_group_key(offer, promoted) is not None:
+        return None
+    pid = offer.source_key.split("-", 1)[0].strip()
+    title = _fold_public(offer.product_name)
+    if not pid or not title:
+        return None
+    return (offer.supermarket_id, offer.location_id, pid, title)
+
+
+def collapse_same_title_variants(
+    offers: Sequence[VisibleOffer],
+) -> tuple[tuple[VisibleOffer, ...], dict[tuple[str, str], int]]:
+    """Una sola oferta por ``pid`` + ubicación + título igual: la más barata comprable.
+
+    Títulos distintos (tallas, colores, sabores con su nombre) quedan separados.
+    Devuelve las ofertas que siguen (mismo orden) y, para la que representa a 2+
+    variantes comprables, cuántas son: ``(source_product_id, location_id) → N``.
+    """
+    values = tuple(offers)
+    promoted = {offer.master_group_key for offer in values if offer.master_group_key}
+    groups: dict[tuple[str, str, str, str], list[VisibleOffer]] = {}
+    for offer in values:
+        key = _variant_key(offer, promoted)
+        if key is not None:
+            groups.setdefault(key, []).append(offer)
+    dropped: set[tuple[str, str]] = set()
+    variants: dict[tuple[str, str], int] = {}
+    for key, members in groups.items():
+        if len(members) < 2:
+            continue
+        pid = key[2]
+        chosen = min(
+            members,
+            key=lambda offer: (
+                not _core._comparison_eligible(offer),
+                offer.current_price_minor if offer.current_price_minor is not None else math.inf,
+                offer.source_key != pid,  # el SKU base primero ante un empate
+                str(offer.source_key),
+                offer.source_product_id,
+            ),
+        )
+        dropped.update((offer.source_product_id, offer.location_id) for offer in members if offer is not chosen)
+        buyable = sum(_core._comparison_eligible(offer) for offer in members)
+        if buyable >= 2:
+            variants[(chosen.source_product_id, chosen.location_id)] = buyable
+    if dropped:
+        print(json.dumps({"same_title_variants": {"groups": sum(len(m) >= 2 for m in groups.values()),
+                                                  "collapsed_offers": len(dropped)}}), file=sys.stderr)
+    kept = tuple(offer for offer in values if (offer.source_product_id, offer.location_id) not in dropped)
+    return kept, variants
+
+
 def build_rows(
     offers: Iterable[VisibleOffer],
     freshness_by_scope: dict[tuple[str, str], str],
@@ -270,6 +339,7 @@ def build_rows(
 ) -> list[dict[str, object]]:
     """Construye filas v3, limpia atributos públicos y añade otras presentaciones."""
     _core._derived_presentation = _derived_presentation
+    offers, variants = collapse_same_title_variants(tuple(offers))
     offers = tuple(ounce_as_mass(fix_name_measures(offer)) for offer in offers)
     offers_by_key = {(offer.source_product_id, offer.location_id): offer for offer in offers}
     rows = _ORIGINAL_BUILD_ROWS(
@@ -280,6 +350,11 @@ def build_rows(
     )
     visible: list[dict[str, object]] = []
     for row in rows:
+        for offer in row["offers"]:
+            # Campo aditivo: "N variantes" con este título en el súper (se publica la más barata).
+            count = variants.get((str(offer["source_product_id"]), str(offer["location_id"])))
+            if count:
+                offer["variants"] = count
         row["brand"] = canonical_brand(row.get("brand"), row.get("product_name"))
         if not row["brand"]:
             row["brand"] = _prefix_brand(row, offers_by_key)
@@ -471,6 +546,14 @@ def _pound_key(offer: dict[str, object]) -> str:
 def _price_per_pound(row: dict[str, object]) -> None:
     """Ofertas de producto pesado en tienda: precio por libra, no por paquete."""
     offers = [offer for offer in row.get("offers") or () if isinstance(offer, dict)]
+    if (_UNITS_PER_POUND_NAME.search(str(row.get("product_name") or "")) and _weighed_type(row)
+            and offers and len({str(offer.get("source_product_id")).split(":", 1)[0] for offer in offers}) == 1):
+        # El súper declara en el nombre que el precio es por libra (un solo súper en la fila).
+        for offer in offers:
+            price = offer.get("current_price")
+            offer["unit_price"] = {"amount": price, "per": "libra"} if price else None
+        row["presentation"] = "por libra"
+        return
     source = [offer for offer in offers if _pound_key(offer) in SOURCE_POUND]
     coded = [offer for offer in offers if _pound_key(offer) in WEIGHED_BY_POUND
              and offer not in source] if _weighed_type(row) else []

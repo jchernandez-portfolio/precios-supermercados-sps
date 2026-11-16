@@ -145,7 +145,7 @@ def offer_size(profile: ProductProfile) -> dict[str, object] | None:
     unit = UNIT[value.dimension]
     total = _amount(value.total_base)
     unit_amount = _amount(value.unit_amount_base)
-    text = f"{value.pack_count}×{unit_amount} {unit}" if value.pack_count > 1 else f"{total} {unit}"
+    text = f"{value.pack_count}×{unit_amount} {unit}" if value.display_pack_count > 1 else f"{total} {unit}"
     return {"value": total, "unit": unit, "text": text}
 
 
