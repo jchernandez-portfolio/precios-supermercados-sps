@@ -453,6 +453,7 @@ class Claude:
         self.last_error: str | None = None
         self.usage = {"entrada": 0, "salida": 0}
         self.compat = False  # sin salida estructurada (si la API rechazó output_config)
+        self.candidates: list[str] = []
 
     def _request(self, path: str, body: Mapping[str, object] | None = None) -> object:
         data = None if body is None else json.dumps(body).encode("utf-8")
@@ -495,20 +496,32 @@ class Claude:
             attempt += 1
 
     def pick_model(self) -> str:
-        """El modelo configurado si la cuenta lo ofrece; si no, el Sonnet o Haiku más nuevo con visión."""
+        """El modelo configurado si la cuenta lo ofrece; si no, el Sonnet o Haiku más nuevo con visión.
+
+        Guarda el resto (Sonnet y luego Haiku, más nuevo primero) como respaldo: si un
+        modelo responde 404 a mitad de corrida (retirado), se pasa al siguiente Claude
+        antes de dejar la corrida a Gemini.
+        """
         if self.model is None:
             listing = self._request("models?limit=1000")
             models = [item for item in (listing.get("data") or ()) if isinstance(item, Mapping)] \
                 if isinstance(listing, Mapping) else []
             vision = [str(item.get("id")) for item in models if _supports_images(item)]
-            if self.preferred in vision:
-                self.model = self.preferred
-            else:
-                fallback = [model for family in CLAUDE_FAMILIES for model in vision if family in model]
-                if not fallback:
-                    raise ProviderFailed("claude_modelo_no_disponible")
-                self.model = fallback[0]  # la API lista primero lo más nuevo
+            ranked = [model for family in CLAUDE_FAMILIES for model in vision if family in model]  # nuevo primero
+            candidates = ([self.preferred] if self.preferred in vision else []) + ranked
+            self.candidates = list(dict.fromkeys(candidates))
+            if not self.candidates:
+                raise ProviderFailed("claude_modelo_no_disponible")
+            self.model = self.candidates[0]
         return self.model
+
+    def _next_model(self) -> bool:
+        """Siguiente Claude de la lista tras un 404 de modelo; ``False`` si no queda ninguno."""
+        position = self.candidates.index(self.model) if self.model in self.candidates else len(self.candidates)
+        if position + 1 >= len(self.candidates):
+            return False
+        self.model = self.candidates[position + 1]
+        return True
 
     def read_labels(self, name: str, photos: str, images: Sequence[bytes]) -> object:
         if self.queries >= self.max_queries:
@@ -521,16 +534,21 @@ class Claude:
                                                         "data": base64.b64encode(image).decode("ascii")}})
         model = self.pick_model()
         self.queries += 1
-        try:
-            answer = self._request("messages", self._body(model, content))
-        except ProviderFailed as error:
-            # Un 400 que no es de crédito suele ser un parámetro que esta cuenta/modelo no
-            # acepta (salida estructurada o effort): se reintenta UNA vez en modo simple
-            # (JSON pedido en el texto) y, si funciona, se sigue así el resto de la corrida.
-            if str(error) != "claude_http_400" or self.compat:
-                raise
-            self.compat = True
-            answer = self._request("messages", self._body(model, content))
+        while True:
+            try:
+                answer = self._request("messages", self._body(model, content))
+                break
+            except ProviderFailed as error:
+                # Modelo retirado (404): el siguiente Claude de la lista, sin gastar otra consulta.
+                if str(error) == "claude_modelo_no_disponible" and self._next_model():
+                    model = self.model
+                    continue
+                # Un 400 que no es de crédito suele ser un parámetro que esta cuenta/modelo no
+                # acepta (salida estructurada o effort): se reintenta UNA vez en modo simple
+                # (JSON pedido en el texto) y, si funciona, se sigue así el resto de la corrida.
+                if str(error) != "claude_http_400" or self.compat:
+                    raise
+                self.compat = True
         if not isinstance(answer, Mapping):
             return None
         usage = answer.get("usage")
