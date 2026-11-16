@@ -66,42 +66,8 @@
   color-scheme: light;
 }
 
-/* Modo oscuro «Lima»: fondo carbón, superficies un poco más claras, lima de acento.
-   Las fotos conservan su recuadro blanco (--photo-bg). Contraste AA verificado por
-   tests/test_super_compras_contraste.py (lee estos mismos tokens). */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --skel: #2E332F;
-    --skel-hi: #3A403B;
-    --shadow-hover: 0 4px 14px rgba(0, 0, 0, .45);
-    --bg: #1C1F1D;
-    --surface: #262A27;
-    --ink: #EEF0E8;
-    --muted: #A5ACA3;
-    --line: #3A3F3B;
-    --charcoal: #2E332F;
-    --charcoal-2: #3A403B;
-    --good: #A3D65A;
-    --good-soft: #2B3A12;
-    --danger: #FF8A7A;
-    --warn-soft: #3A2A14;
-    --warn-ink: #F5B861;
-    --focus: #C6F432;
-    --edge: #C9CEC4;
-    --on-good: #1C1F1D;
-    --danger-soft: #3D1F1B;
-    --alert-edge: #F59E0B;
-    --alert-soft: #3A2A14;
-    --alert-soft-2: #33261A;
-    --alert-ink: #F5B861;
-    --ai-edge: #A78BFA;
-    --ai-soft: #2A2240;
-    --ai-soft-2: #3A2E5C;
-    --ai-ink: #C4B5FD;
-    --shadow: 0 1px 3px rgba(0, 0, 0, .45);
-    color-scheme: dark;
-  }
-}
+/* Sólo tema claro «Lima», aunque el sistema esté en modo oscuro (decisión del dueño,
+   16-nov): el modo oscuro automático del #109 cambiaba la paleta sin pedirlo. */
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -676,14 +642,6 @@ dialog.scanner::backdrop { background: rgba(16, 32, 26, .7); }
 }
 @media (min-width: 760px) { .rv-row { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 14px 20px; } }
 @media (min-width: 1024px) { .rv-bar { bottom: 0; } }
-
-/* Modo oscuro: ajustes de componentes (al final para ganar por orden). */
-@media (prefers-color-scheme: dark) {
-  /* Disco con foto: anillo lima sobre carbón (en claro es carbón sobre blanco). */
-  .circle-disc { border-color: var(--lime); }
-  /* Los colores de cada súper son oscuros: un aro claro los separa del carbón. */
-  .dot { box-shadow: 0 0 0 1.5px rgba(238, 240, 232, .55); }
-}
 
 /* ---------- esqueletos de carga (mismas medidas que el contenido final) ---------- */
 .skel { display: block; border-radius: var(--radius-sm); background: linear-gradient(90deg, var(--skel) 0%, var(--skel-hi) 50%, var(--skel) 100%); background-size: 200% 100%; animation: skel 1.3s ease-in-out infinite; }
