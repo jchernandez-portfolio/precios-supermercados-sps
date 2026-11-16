@@ -145,6 +145,10 @@ class VisibleOffer:
     # Llave fuente (``source_key_type`` + ``source_key``) para saber si la oferta
     # salió en la última captura aceptada; sólo se lee si existe la membresía.
     capture_key: str | None = None
+    # ``products.source_key`` (misma lectura que ``capture_key``). PriceSmart guarda
+    # aquí el SKU de la variante (``26181-0132029951206``); el ``pid`` es lo que va
+    # antes del primer ``-``. Sólo une variantes con el mismo título (fachada).
+    source_key: str | None = None
     # Motor v2.10 ("corrige con evidencia"): lo que publica el súper cuando la
     # evidencia de foto corrigió su tamaño (``presentation`` ya es el oficial).
     published_as: str | None = None
@@ -315,11 +319,12 @@ def fetch_visible_offers(
         page_size=VISIBLE_OFFERS_PAGE_SIZE,
     )
     for row in rows:
-        offer_capture_key = None
+        offer_capture_key = offer_source_key = None
         if with_keys:
             *row, source_key_type, source_key = row
             if isinstance(source_key_type, str) and isinstance(source_key, str):
                 offer_capture_key = capture_membership.capture_key(source_key_type, source_key)
+                offer_source_key = _text(source_key)
         (
             product_id, supermarket_id, name, brand, presentation,
             location_id, current_price, regular_price, is_promotion, availability,
@@ -369,6 +374,7 @@ def fetch_visible_offers(
                 comparison_status=str(comparison_status),
                 source_category=_text(source_category),
                 capture_key=offer_capture_key,
+                source_key=offer_source_key,
                 published_as=published_size(
                     comparison_status, presentation_dimension, presentation_total_base, normalized_quantity,
                     normalized_unit, normalized_pack_count, canonical_total,
@@ -602,6 +608,47 @@ def _historical_summary(
         "historical_position": position,
         "windows": {"30d": window_payload(30), "90d": window_payload(90)},
     }
+HISTORY_SPARKLINE_DAYS = 30
+
+
+def history_30d(
+    offer: VisibleOffer,
+    history: Sequence[HistoricalPoint],
+    *,
+    as_of_utc: datetime,
+) -> list[list[object]] | None:
+    """Puntos de cambio ``[días_atrás, "precio"]`` de los últimos 30 días (aditivo).
+
+    Usa los mismos periodos que ``_historical_summary`` (sin consultas nuevas). El
+    primero es el precio vigente al abrir la ventana (o el primer periodo visto, si
+    el producto es más nuevo); cada periodo siguiente que cambia el precio agrega un
+    punto y el último es el precio actual. Días enteros completos hacia atrás desde
+    ``as_of``; dos cambios el mismo día dejan el último. Sin ningún cambio de precio
+    en la ventana (menos de 2 puntos) devuelve ``None`` y la oferta no lleva el campo.
+    """
+    current = offer.current_price_minor
+    if current is None or current <= 0 or not history or history[-1].current_price_minor != current:
+        return None
+    as_of = as_of_utc.astimezone(UTC)
+    start = as_of - timedelta(days=HISTORY_SPARKLINE_DAYS)
+    ordered = sorted(history, key=lambda point: point.observed_at)
+    baseline = [point for point in ordered if point.observed_at <= start]
+    window = [point for point in ordered if start < point.observed_at <= as_of]
+    points: list[tuple[int, int]] = []
+    if baseline:
+        points.append((HISTORY_SPARKLINE_DAYS, baseline[-1].current_price_minor))
+    for point in window:
+        days_ago = min(HISTORY_SPARKLINE_DAYS, int((as_of - point.observed_at) / timedelta(days=1)))
+        if points and points[-1][0] == days_ago:
+            points.pop()  # mismo día: queda el último precio de ese día
+        if points and points[-1][1] == point.current_price_minor:
+            continue  # periodo nuevo sin cambio de precio (promoción, disponibilidad)
+        points.append((days_ago, point.current_price_minor))
+    if len(points) < 2 or points[-1][1] != current:
+        return None
+    return [[days_ago, _money(price)] for days_ago, price in points]
+
+
 def public_product_id(source_product_id: str) -> str:
     """``walmart:51@walmart_tgu_ffaa`` → ``walmart:51`` (sin sucursal)."""
     return source_product_id.split("@", 1)[0]
@@ -763,6 +810,9 @@ def build_rows(
         public_offers = []
         for offer in sorted(group, key=lambda item: EXPECTED_SCOPE.index((item.supermarket_id, item.location_id))):
             freshness = freshness_by_scope[(offer.supermarket_id, offer.location_id)]
+            history = history_by_offer.get((offer.source_product_id, offer.location_id), ())
+            offer_as_of = as_of_utc or _parse_utc(offer.observed_at, "consumer_catalog_offer_timestamp_invalid")
+            sparkline = history_30d(offer, history, as_of_utc=offer_as_of)
             public_offers.append(
                 {
                     "source_product_id": offer.source_product_id,
@@ -776,11 +826,9 @@ def build_rows(
                     "freshness_status": freshness,
                     "relative_price_state": states[offer.source_product_id],
                     "unit_price": _unit_price(offer, assignment.node),
-                    "historical_summary": _historical_summary(
-                        offer,
-                        history_by_offer.get((offer.source_product_id, offer.location_id), ()),
-                        as_of_utc=as_of_utc or _parse_utc(offer.observed_at, "consumer_catalog_offer_timestamp_invalid"),
-                    ),
+                    "historical_summary": _historical_summary(offer, history, as_of_utc=offer_as_of),
+                    # Aditivo (2026-11-16): sólo si el precio cambió en los últimos 30 días.
+                    **({"history_30d": sparkline} if sparkline else {}),
                     # v2.10 (opcionales): "Walmart lo publica como 148 g" / presentación distinta.
                     **({"published_as": offer.published_as} if offer.published_as else {}),
                     **({"other_presentation": True} if offer.other_presentation else {}),
@@ -1218,6 +1266,7 @@ def export_consumer_catalog(
             for row in rows
             for offer in row["offers"]
         ),
+        "offers_with_history_30d": sum("history_30d" in offer for row in rows for offer in row["offers"]),
         "retailer_offer_counts": retailer_offer_counts,
         "comparability_counts": mode_counts,
         "partition_count": len(partition_paths),

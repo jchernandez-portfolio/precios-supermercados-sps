@@ -44,6 +44,16 @@ export function listText(items) {
   return names.length > 1 ? `${names.slice(0, -1).join(", ")} y ${names.at(-1)}` : names.join("");
 }
 
+// Precio por unidad en texto: kg y L se muestran por 100 g y 100 ml ("L 3.76 por 100 ml").
+// Sólo cambia el texto; el orden por precio unitario usa los valores publicados.
+export function unitPriceText(amount, per) {
+  const value = Number(amount);
+  if (!Number.isFinite(value) || value <= 0 || !per) return "";
+  if (per === "kg") return `${money(value / 10)} por 100 g`;
+  if (per === "L") return `${money(value / 10)} por 100 ml`;
+  return `${money(value)} por ${per}`;
+}
+
 export function money(value) {
   const number = Number(value);
   return Number.isFinite(number) ? `L ${number.toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—";
@@ -87,7 +97,8 @@ export function presentationLabel(product) {
   if (!pack || !text) return text;
   const presentation = String(product?.presentation ?? "").trim();
   const total = packTotalText(pack[1], product?.unit_per);
-  if (presentation.startsWith(`${pack[0]} × `)) return `${presentation} (${total})`;
+  // "3 × 439 g" se muestra como "3 Pack (1.32 kg)": el total es lo que se compra.
+  if (presentation.startsWith(`${pack[0]} × `)) return `${pack[0]} Pack (${total})`;
   return presentation === pack[1] ? `${pack[0]} Pack (${total})` : text;
 }
 
@@ -540,6 +551,42 @@ export function barcodeCandidates(raw, format = "") {
   return found;
 }
 
+// Historial de 30 días de una oferta (`history_30d`: [[días_atrás, "precio"], …], del
+// más viejo al actual) → geometría de una línea escalonada: el precio se mantiene hasta
+// el siguiente cambio y el último llega hasta hoy (borde derecho). x = 30 días atrás a
+// la izquierda; y = precio (más alto arriba). null si no hay al menos 2 precios distintos.
+export const SPARK_DAYS = 30;
+
+export function sparklineGeometry(points, { width = 300, height = 72, pad = 8 } = {}) {
+  if (!Array.isArray(points)) return null;
+  const clean = points
+    .filter((point) => Array.isArray(point) && Number.isInteger(point[0]) && point[0] >= 0 && point[0] <= SPARK_DAYS)
+    .map(([days, price]) => [days, Number(price)])
+    .filter(([, price]) => Number.isFinite(price) && price > 0)
+    .sort((a, b) => b[0] - a[0]);
+  if (clean.length < 2) return null;
+  const prices = clean.map(([, price]) => price);
+  const minimum = Math.min(...prices);
+  const maximum = Math.max(...prices);
+  if (!(maximum > minimum)) return null;
+  const round = (value) => Math.round(value * 10) / 10;
+  const x = (days) => round(pad + ((SPARK_DAYS - days) / SPARK_DAYS) * (width - 2 * pad));
+  const y = (price) => round(pad + ((maximum - price) / (maximum - minimum)) * (height - 2 * pad));
+  const coords = clean.map(([days, price]) => [x(days), y(price)]);
+  const end = [x(0), coords.at(-1)[1]];
+  let path = `M${coords[0][0]} ${coords[0][1]}`;
+  for (const [px, py] of coords.slice(1)) path += `H${px}V${py}`;
+  if (end[0] !== coords.at(-1)[0]) path += `H${end[0]}`;
+  return { width, height, coords, end, path, minimum, maximum, current: prices.at(-1), start: clean[0][0] };
+}
+
+// Texto accesible de la sparkline: mínimo, máximo y actual en lempiras.
+export function sparklineLabel(geometry, store = "") {
+  const lempiras = (value) => `${Number(value).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} lempiras`;
+  const where = store ? ` en ${store}` : "";
+  return `Precio${where} en los últimos ${SPARK_DAYS} días: mínimo ${lempiras(geometry.minimum)}, máximo ${lempiras(geometry.maximum)}, hoy ${lempiras(geometry.current)}.`;
+}
+
 // id público = row_id sin su prefijo ("source-…", "canonical-…").
 export function rowKey(rowId) {
   const text = String(rowId ?? "");
@@ -990,5 +1037,7 @@ export async function sendSizeDecisions(token, decisions) {
     404: "GitHub no encontró el workflow con esta llave (¿repositorio correcto?).",
     422: "GitHub rechazó el envío (el workflow debe estar en main).",
   };
-  throw new Error(reasons[response.status] || `GitHub respondió ${response.status}.`);
+  const error = new Error(reasons[response.status] || `GitHub respondió ${response.status}.`);
+  error.status = response.status;
+  throw error;
 }
