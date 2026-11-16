@@ -1001,5 +1001,7 @@ export async function sendSizeDecisions(token, decisions) {
     404: "GitHub no encontró el workflow con esta llave (¿repositorio correcto?).",
     422: "GitHub rechazó el envío (el workflow debe estar en main).",
   };
-  throw new Error(reasons[response.status] || `GitHub respondió ${response.status}.`);
+  const error = new Error(reasons[response.status] || `GitHub respondió ${response.status}.`);
+  error.status = response.status;
+  throw error;
 }

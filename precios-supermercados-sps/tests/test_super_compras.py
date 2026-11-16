@@ -793,6 +793,37 @@ console.log(JSON.stringify(out));
     assert result["missing"] is None and result["noFile"] is None
 
 
+def test_size_review_token_storage_and_progress(tmp_path: Path) -> None:
+    (tmp_path / "admin.js").write_text((APP_DIR / "admin.js").read_text(encoding="utf-8"), encoding="utf-8")
+    script = """
+const store = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)),
+  removeItem: (k) => m.delete(k), has: (k) => m.has(k) }; };
+globalThis.localStorage = store(); globalThis.sessionStorage = store();
+const { writeToken, reviewProgress } = await import('./admin.js');
+const KEY = 'super-compras-admin-github-token';
+const where = () => [sessionStorage.has(KEY), localStorage.has(KEY)];
+writeToken('github_pat_x'); const session = where();
+writeToken('github_pat_x', true); const local = where();
+writeToken('github_pat_x', false); const back = where();
+writeToken(''); const none = where();
+const queue = { decided: 253, items: new Array(727).fill({}) };
+console.log(JSON.stringify({ session, local, back, none, progress: reviewProgress(queue), sent: reviewProgress(queue, 47),
+  empty: reviewProgress(null), over: reviewProgress({ decided: 1, items: [{}] }, 5) }));
+"""
+    result = json.loads(_node(script, tmp_path))
+    assert result["session"] == [True, False] and result["local"] == [False, True]
+    assert result["back"] == [True, False] and result["none"] == [False, False]
+    assert result["progress"] == {"done": 253, "total": 980, "pct": 26}
+    assert result["sent"] == {"done": 300, "total": 980, "pct": 31}
+    assert result["empty"] == {"done": 0, "total": 0, "pct": 0}
+    assert result["over"] == {"done": 2, "total": 2, "pct": 100}
+    admin = (APP_DIR / "admin.js").read_text(encoding="utf-8")
+    assert "if (error.status === 401 || error.status === 403) forgetToken();" in admin
+    assert "fine-grained" in admin and "Recordar en este dispositivo" in admin
+    css = (APP_DIR / "styles.css").read_text(encoding="utf-8")
+    assert ".rv-check { animation: none; }" in css  # prefers-reduced-motion
+
+
 def test_size_review_panel_sends_only_validated_decisions_to_github(tmp_path: Path) -> None:
     (tmp_path / "admin.js").write_text((APP_DIR / "admin.js").read_text(encoding="utf-8"), encoding="utf-8")
     script = """
@@ -904,7 +935,8 @@ console.log(JSON.stringify(out));
     html = (APP_DIR / "index.html").read_text(encoding="utf-8")
     assert "connect-src 'self' https://raw.githubusercontent.com https://api.github.com;" in html
     admin = (APP_DIR / "admin.js").read_text(encoding="utf-8")
-    assert "sessionStorage" in admin and "localStorage" not in admin
+    # La llave vive en sessionStorage salvo que la persona marque «Recordar» (apagado por defecto).
+    assert "sessionStorage" in admin and 'id: "rv-remember", type: "checkbox", checked: Boolean(rememberedToken())' in admin
     assert "searchVariants(item.gtin)" in admin and "navigator.clipboard.writeText" in admin
     app = (APP_DIR / "app.js").read_text(encoding="utf-8")
     assert 'const ADMIN_ROUTE = "/admin/revision";' in app and 'await import("./admin.js?v=' in app
