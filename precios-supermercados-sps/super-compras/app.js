@@ -4,8 +4,8 @@
 import {
   Catalog, RETAILER_COLORS, rowKey, RETAILER_NAMES, countText, listText, loadCart, loadCities, loadCitySlug,
   migrateCartLines, money, photoSrcset, photoUrl, presentationLabel, repairedUnitPrice, saveCart, saveCitySlug, storeLabel, unitPriceText,
-} from "./data.js?v=20261116-2";
-import { productIllustration } from "./illustration.js?v=20261116-2";
+} from "./data.js?v=20261116-3";
+import { productIllustration } from "./illustration.js?v=20261116-3";
 
 // Foto real si existe; si no hay o falla al cargar, la ilustración de siempre.
 // Tarjetas y miniaturas usan 320 px; el detalle deja que el navegador elija 320 u
@@ -430,8 +430,36 @@ function homeSections(catalog) {
   return { deals, compared };
 }
 
+// Esqueletos de carga: mismas medidas que el contenido final (tarjeta de resultado,
+// barra de precio, línea de Mi compra) para que nada salte al llegar los datos.
+function skeletonResults(count = 6) {
+  return h("div", { class: "results", "aria-hidden": "true" }, Array.from({ length: count }, () => h("div", { class: "result skel-card" },
+    h("span", { class: "thumb skel" }),
+    h("span", { class: "result-body" }, h("span", { class: "skel skel-text w-30" }), h("span", { class: "skel skel-text w-80" }),
+      h("span", { class: "skel skel-text w-50" })),
+    h("span", { class: "result-price" }, h("span", { class: "skel skel-price" })))));
+}
+
+function skeletonBars(count = 3) {
+  return h("div", { class: "bars", "aria-hidden": "true" }, Array.from({ length: count }, () => h("div", { class: "bar-row skel-card" },
+    h("div", { class: "bar-store" }, h("span", { class: "skel skel-text w-50" }), h("span", { class: "skel skel-text w-30" })),
+    h("div", { class: "bar-track" }, h("span", { class: "skel skel-track" })),
+    h("div", { class: "bar-price" }, h("span", { class: "skel skel-price" })),
+    h("span", { class: "skel skel-button" }))));
+}
+
+function skeletonLines(count = 3) {
+  return Array.from({ length: count }, () => h("div", { class: "line skel-card", "aria-hidden": "true" },
+    h("span", { class: "thumb thumb-line skel" }),
+    h("span", { class: "line-body" }, h("span", { class: "skel skel-text w-80" }), h("span", { class: "skel skel-text w-50" }),
+      h("span", { class: "skel skel-select" }))));
+}
+
 function loadingPage(text) {
-  return h("div", { class: "page loading", "aria-busy": "true" }, h("div", { class: "spinner", "aria-hidden": "true" }), h("p", {}, text));
+  return h("div", { class: "page loading-skel", "aria-busy": "true" },
+    h("p", { class: "sr-only", role: "status" }, text),
+    h("span", { class: "skel skel-title", "aria-hidden": "true" }),
+    skeletonResults());
 }
 
 // Vistas que necesitan el índice completo: lo piden y se vuelven a pintar al llegar.
@@ -805,7 +833,8 @@ function renderProduct(product, container, code = "") {
         h("div", { class: "pills" }, sizePill(product), unit ? h("span", { class: "muted small" }, unit) : null),
         h("span", { class: "muted small" }, [product.category, product.product_type].filter(Boolean).join(" › "))),
       h("p", { class: "product-from" }, h("span", {}, "desde"), h("strong", {}, money(product.best_price)))),
-    h("section", { class: "offers", "aria-busy": "true" }, h("h2", {}, "Precio en cada súper"), h("p", { class: "muted" }, "Cargando precios…")),
+    h("section", { class: "offers", "aria-busy": "true" }, h("h2", {}, "Precio en cada súper"),
+      h("p", { class: "sr-only", role: "status" }, "Cargando precios…"), skeletonBars()),
     h("div", { class: "add-bar", hidden: true }),
     h("div", { class: "product-extra" }));
   fill(container, page);
@@ -1026,7 +1055,8 @@ function viewCart(container) {
       h("h2", {}, "¿Dónde te sale más barata toda la lista?"),
       h("div", { class: "compare-cards" }, h("p", { class: "muted" }, "Calculando…"))),
     h("div", { class: "cart-table-slot" }),
-    h("section", { class: "cart-lines", "aria-label": "Productos de tu lista" }, h("p", { class: "muted" }, "Cargando precios…")),
+    h("section", { class: "cart-lines", "aria-label": "Productos de tu lista", "aria-busy": "true" },
+      h("p", { class: "sr-only", role: "status" }, "Cargando precios…"), skeletonLines(Math.min(3, Math.max(1, cartCount())))),
     h("section", { class: "cart-summary" }));
   fill(container, page);
 
@@ -1076,6 +1106,7 @@ function viewCart(container) {
               h("button", { type: "button", "aria-label": "Agregar uno", onclick: () => updateLine(line.index, { qty: line.qty + 1 }) }, "+")),
             h("span", { class: "line-total" }, h("strong", {}, used ? money(Number(used.current_price) * line.qty) : "—")))));
     });
+    page.querySelector(".cart-lines").removeAttribute("aria-busy");
     fill(page.querySelector(".cart-lines"), h("h2", {}, "Tu lista"), lineViews);
 
     const stores = [...perStore.entries()].filter(([, entry]) => entry.missing < loaded.length)
@@ -1106,6 +1137,7 @@ function viewCart(container) {
       h("p", { class: "muted small" }, `Total estimado con los precios públicos de hoy en ${cityName()}. Tu lista se guarda en este dispositivo.`));
   }).catch((error) => {
     if (!page.isConnected) return;
+    page.querySelector(".cart-lines").removeAttribute("aria-busy");
     fill(page.querySelector(".cart-lines"), h("p", {}, `No pudimos cargar los precios. ${errorText(error)}`),
       h("button", { type: "button", class: "primary", onclick: () => render() }, "Reintentar"));
     fill(page.querySelector(".compare-cards"), h("p", { class: "muted" }, "Sin precios no podemos calcular el total. Tu lista sigue guardada."));
@@ -1176,7 +1208,7 @@ async function renderAdmin(main) {
   main.dataset.view = "admin";
   fill(main, loadingPage("Abriendo el panel de revisión…"));
   try {
-    adminModule = adminModule || await import("./admin.js?v=20261116-2");
+    adminModule = adminModule || await import("./admin.js?v=20261116-3");
     if (route().path.startsWith(ADMIN_ROUTE) && main.dataset.view === "admin") adminModule.mountSizeReview(main, { h, fill });
   } catch (error) {
     delete main.dataset.view;
@@ -1286,7 +1318,7 @@ async function start() {
 let scannerModule = null;
 async function startScanner(opener) {
   try {
-    scannerModule = scannerModule || await import("./scanner.js?v=20261116-2");
+    scannerModule = scannerModule || await import("./scanner.js?v=20261116-3");
     scannerModule.openScanner({
       h, opener,
       onCode: (code, format) => {
