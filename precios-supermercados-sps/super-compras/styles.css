@@ -578,5 +578,17 @@ dialog.scanner::backdrop { background: rgba(16, 32, 26, .7); }
 .rv-status.ok { color: var(--good); }
 .rv-status.warn { color: var(--danger); }
 .rv-status a { color: var(--good); font-weight: 600; text-decoration: underline; }
+.rv-remember { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.rv-hint { flex-basis: 100%; margin: 0; }
+.rv-progress { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
+.rv-progress-text { font-size: .9rem; font-weight: 600; }
+.rv-progress-track { display: block; height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.rv-progress-fill { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--lime); box-shadow: inset 0 0 0 1px var(--good); transition: width 300ms ease; }
+.rv-check { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 6px; border-radius: 50%; background: var(--good); color: #fff; font-weight: 700; vertical-align: middle; animation: rv-check-pop 420ms cubic-bezier(.2, 1.4, .4, 1) both; }
+@keyframes rv-check-pop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .rv-check { animation: none; }
+  .rv-progress-fill { transition: none; }
+}
 @media (min-width: 760px) { .rv-row { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 14px 20px; } }
 @media (min-width: 1024px) { .rv-bar { bottom: 0; } }
