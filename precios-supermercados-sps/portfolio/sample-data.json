@@ -1,7 +1,7 @@
 {
   "comparison_policy": "fail_closed_strong_identity_and_commercial_consistency",
   "currency": "HNL",
-  "published_at_utc": "2026-11-16T20:02:44Z",
+  "published_at_utc": "2026-11-17T11:44:21Z",
   "row_count": 10,
   "rows": [
     {
@@ -347,8 +347,8 @@
     }
   ],
   "selection_rule": "highest_absolute_savings_within_safe_common_comparable_universe",
-  "source_as_of": "2026-11-16T19:55:20.333322Z",
-  "source_head_sha": "5ae9c1fd3be34b8503bd57755fc71ba0e8b173e0",
+  "source_as_of": "2026-11-17T11:37:32.838987Z",
+  "source_head_sha": "6be50f42f3c10a7bf3c3dfbcbe351803adabfd25",
   "source_schema": "rpi-consumer-mart/v2",
-  "source_workflow_run_id": 43944257931
+  "source_workflow_run_id": 44075661695
 }
