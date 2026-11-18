@@ -11,7 +11,7 @@
 // GitHub la rechaza (401/403). Sólo viaja en el encabezado Authorization a api.github.com.
 import {
   RETAILER_NAMES, SIZE_DECISIONS_RUNS_URL, SIZE_UNITS, loadSizeQueue, sendSizeDecisions,
-} from "./data.js?v=20261116-32";
+} from "./data.js?v=20261116-33";
 
 const TOKEN_KEY = "super-compras-admin-github-token";
 // Códigos ya enviados en este dispositivo: {gtin: ISO de envío}. Se ocultan de la cola
@@ -24,6 +24,7 @@ const UNIT_LABEL = { g: "g", ml: "ml", oz: "oz", lb: "lb", unit: "unidades" };
 const KIND_LABEL = {
   empate: "Empate: hoy no se compara",
   atipico: "Un súper distinto: quedó fuera de la comparación",
+  correccion_ia: "Corrección de IA: la web contradice lo que la IA guardó por las fotos",
 };
 // Búsqueda del código de barras en cada súper (Los Andes no tiene buscador por código).
 const STORE_SEARCH = {
@@ -96,7 +97,7 @@ function writeSent(map) {
 // lo que la persona marcó (decisions) o ya envió (sent) en este dispositivo.
 export const FILTERS = [
   ["todos", "Todos"], ["empate", "Empate"], ["atipico", "Un súper distinto"], ["pendiente", "Sin decidir"],
-  ["ia", "Resueltos por IA"],
+  ["correccion_ia", "Corrección de IA"], ["ia", "Resueltos por IA"],
 ];
 
 export function itemsFor(filter, queue, decisions = {}, sent = new Set()) {
@@ -231,9 +232,9 @@ export function aiSuggestion(item) {
   return { kind: "note", label: "🤖 No legible", title: AI_REASONS[ai.reason] || AI_REASONS.ilegible };
 }
 
-// Búsqueda web de Claude. Lo verificado ya se guardó solo y no llega aquí; lo que queda
+// Búsqueda web por GTIN. Lo verificado ya se guardó solo y no llega aquí; lo que queda
 // es sugerencia: un clic sólo llena el formulario. La URL va en el título y en un enlace.
-const MANUAL_NOTE = "🤖 Claude no pudo verificar el dato en la web. Requiere revisión humana";
+const MANUAL_NOTE = "🤖 No se pudo verificar el dato en la web. Requiere revisión humana";
 const safeUrl = (url) => (typeof url === "string" && /^https?:\/\/[^\s]+$/i.test(url) && url.length <= 500 ? url : "");
 export function webSuggestion(item) {
   const web = item?.web;
@@ -257,7 +258,7 @@ export function webSuggestion(item) {
       matches: matches.length,
     };
   }
-  if (web.status === "no_encontrado") return { kind: "note", label: MANUAL_NOTE, title: "La búsqueda web de Claude no encontró una fuente con el tamaño oficial de este código." };
+  if (web.status === "no_encontrado") return { kind: "note", label: MANUAL_NOTE, title: "La búsqueda web no encontró una fuente independiente con el tamaño oficial de este código." };
   return null;
 }
 
@@ -312,6 +313,7 @@ export function mountSizeReview(main, { h, fill }) {
     empate: "Mismo código, los súper publican tamaños distintos y ninguno tiene mayoría",
     atipico: "Un súper publica un tamaño distinto al resto",
     pendiente: "Pendientes a los que todavía no les marcaste tamaño aquí",
+    correccion_ia: "La IA los resolvió con las fotos, pero la búsqueda web dice otro tamaño",
     ia: "Lo que la IA resolvió sola (para auditar)",
   };
   const chipCounts = {};
@@ -439,6 +441,9 @@ export function mountSizeReview(main, { h, fill }) {
         h("p", { class: "rv-label" }, "Tamaño correcto"),
         item.ia?.status === "auto"
           ? h("p", { class: "rv-auto" }, "La IA guardó este tamaño sola. Si está mal, elige el correcto y guarda: tu decisión reemplaza la de la IA.")
+          : null,
+        item.kind === "correccion_ia" && typeof item.web?.nota === "string"
+          ? h("p", { class: "rv-auto" }, `⚠️ ${item.web.nota}`)
           : null,
         h("div", { class: "rv-picks" }, aiNode, webNode, picks, different),
         h("div", { class: "rv-manual" }, value, unit),

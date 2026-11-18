@@ -4,15 +4,16 @@ name: Precios SPS - Cola de revisión de tamaños
 # en conflicto (sólo SELECT en Turso) y publica `cola.json` en la rama pública
 # `revision-tamanos`, que lee el panel #/admin/revision. Sólo contiene datos ya
 # públicos (cadena, nombre y tamaño publicados). Omite los GTIN ya decididos.
-# IA (Claude, API de Anthropic): primero lee el contenido neto en la foto de cada
-# oferta (las mismas fotos del panel; sólo lo nuevo; se guarda en `ia-tamanos.json`).
-# Si todas las fotos confirman el tamaño de la mayoría, la decisión se guarda sola.
-# Después, para lo que siga en la cola (nunca el catálogo completo), Claude busca en
-# la web el peso oficial del fabricante; si la fuente lo cita y coincide con lo que
-# publica algún súper, también se guarda solo. Las dos con engine:claude_auto, nunca
-# sobre una decisión humana. Lo demás queda en la cola con la nota de revisión
-# humana. Lo buscado se publica en `web-tamanos.json`. La llave de Anthropic sólo
-# entra a esos dos pasos; los secretos de Turso, sólo a los pasos de Turso.
+# Resolución por GTIN (Gemini con Google Search): para lo que sigue en la cola (nunca
+# el catálogo completo) busca el peso oficial con marca, nombre y GTIN, sin leer fotos
+# e ignorando los súper de Honduras (dato circular). Si una fuente independiente lo
+# cita y coincide con lo que publica algún súper, se guarda solo (engine:gemini_auto,
+# nunca sobre una decisión humana); lo demás queda con la nota de revisión humana.
+# También re-audita lo que la IA resolvió con fotos: si la web dice otro tamaño, el
+# código vuelve a la cola como «Corrección de IA». Lo buscado va en `web-tamanos.json`.
+# Lectura de fotos con Claude: sólo si se pide a mano (`ia_minutos` > 0); por defecto
+# sólo aplica las lecturas guardadas. Cada llave de IA entra sólo a su paso; los
+# secretos de Turso, sólo a los pasos de Turso.
 on:
   workflow_run:
     workflows:
@@ -22,9 +23,9 @@ on:
   workflow_dispatch:
     inputs:
       ia_minutos:
-        description: "Minutos máximos de consultas a la IA (0 = sólo aplicar lo guardado)"
+        description: "Minutos de lectura de fotos nuevas con Claude (0 = sólo aplicar lo guardado)"
         required: false
-        default: "25"
+        default: "0"
         type: string
       claude_max:
         description: "Tope de lecturas de fotos con Claude por corrida (0 = no leer fotos nuevas)"
@@ -32,9 +33,14 @@ on:
         default: "200"
         type: string
       web_max:
-        description: "Búsquedas web máximas con Claude (0 = sólo aplicar lo guardado)"
+        description: "Búsquedas web por GTIN (Gemini) para la cola (0 = sólo aplicar lo guardado)"
         required: false
         default: "40"
+        type: string
+      web_auditar:
+        description: "Búsquedas para re-auditar lo que la IA resolvió con fotos (0 = no auditar)"
+        required: false
+        default: "20"
         type: string
       web_primero:
         description: "GTIN a buscar primero en la web, separados por coma (opcional)"
@@ -99,7 +105,7 @@ jobs:
         continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          IA_MINUTOS: ${{ inputs.ia_minutos || '25' }}
+          IA_MINUTOS: ${{ inputs.ia_minutos || '0' }}
           CLAUDE_MAX: ${{ inputs.claude_max || '200' }}
         run: |
           set -euo pipefail
@@ -119,32 +125,38 @@ jobs:
             exit 1
           fi
 
-      - name: Búsqueda web y auto-resolución (Claude)
+      - name: Búsqueda web por GTIN y auto-resolución (Gemini)
         continue-on-error: true
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           WEB_MAX: ${{ inputs.web_max || '40' }}
+          WEB_AUDITAR: ${{ inputs.web_auditar || '20' }}
           WEB_PRIMERO: ${{ inputs.web_primero || '' }}
         run: |
           set -euo pipefail
           case "$WEB_MAX" in (''|*[!0-9]*) echo "web_max_invalido" >&2; exit 1;; esac
+          case "$WEB_AUDITAR" in (''|*[!0-9]*) echo "web_auditar_invalido" >&2; exit 1;; esac
           if [ "$WEB_MAX" -gt 300 ]; then WEB_MAX=300; fi
+          if [ "$WEB_AUDITAR" -gt 300 ]; then WEB_AUDITAR=300; fi
           case "$WEB_PRIMERO" in (*[!0-9,]*) echo "web_primero_invalido" >&2; exit 1;; esac
           if [ -L cola/web-tamanos.json ]; then echo "web_cache_symlink_invalid" >&2; exit 1; fi
-          # Sólo los códigos de la cola (nunca el catálogo). Si falla, la cola sigue como estaba.
+          # Sólo los códigos de la cola y los ya resueltos por IA (nunca el catálogo).
+          # Si falla, la cola sigue como estaba.
           cp /tmp/cola/cola.json /tmp/cola/cola-sin-web.json
           if [ -f /tmp/cola/cola-con-auto.json ]; then cp /tmp/cola/cola-con-auto.json /tmp/cola/cola-con-auto-sin-web.json; fi
-          if ! python source/precios-supermercados-sps/scripts/buscar_tamanos_web.py \
+          if ! python source/precios-supermercados-sps/scripts/buscar_tamanos_web.py --provider gemini \
               --queue /tmp/cola/cola.json --queue-with-auto /tmp/cola/cola-con-auto.json \
               --auto-out /tmp/cola/auto-decisiones-web.json --cache-in cola/web-tamanos.json \
-              --cache-out /tmp/cola/web-tamanos.json --max "$WEB_MAX" --minutes 60 --first "$WEB_PRIMERO"; then
+              --cache-out /tmp/cola/web-tamanos.json --max "$WEB_MAX" --audit-max "$WEB_AUDITAR" \
+              --minutes 60 --first "$WEB_PRIMERO"; then
             cp /tmp/cola/cola-sin-web.json /tmp/cola/cola.json
             if [ -f /tmp/cola/cola-con-auto-sin-web.json ]; then
               cp /tmp/cola/cola-con-auto-sin-web.json /tmp/cola/cola-con-auto.json
             else
               rm -f /tmp/cola/cola-con-auto.json
             fi
-            rm -f /tmp/cola/web-tamanos.json /tmp/cola/auto-decisiones-web.json
+            rm -f /tmp/cola/web-tamanos.json /tmp/cola/auto-decisiones-web-gemini.json \
+              /tmp/cola/auto-decisiones-web-claude.json
             exit 1
           fi
 
@@ -158,7 +170,7 @@ jobs:
           # guardar, se publica la cola con esos códigos todavía adentro.
           saved_all=true
           for pair in "gemini_auto:auto-decisiones.json" "claude_auto:auto-decisiones-claude.json" \
-              "claude_auto:auto-decisiones-web.json"; do
+              "gemini_auto:auto-decisiones-web-gemini.json" "claude_auto:auto-decisiones-web-claude.json"; do
             engine="${pair%%:*}"; file="/tmp/cola/${pair#*:}"
             if [ ! -s "$file" ]; then echo "sin_decisiones_automaticas:$engine"; continue; fi
             if ! python source/precios-supermercados-sps/scripts/aplicar_decisiones_tamano.py --turso --apply \

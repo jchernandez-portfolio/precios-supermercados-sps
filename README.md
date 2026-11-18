@@ -4,7 +4,7 @@
 [![SQLite · Turso](https://img.shields.io/badge/SQLite-Turso%20(libSQL)-003B57?logo=sqlite&logoColor=white)](precios-supermercados-sps/docs/modelo-datos.md)
 [![Pruebas](https://github.com/jchernandez-portfolio/precios-supermercados-sps/actions/workflows/precios-supermercados-sps-tests.yml/badge.svg?branch=main)](https://github.com/jchernandez-portfolio/precios-supermercados-sps/actions/workflows/precios-supermercados-sps-tests.yml)
 [![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-captura%20diaria-2088FF?logo=githubactions&logoColor=white)](.github/workflows)
-[![Claude AI](https://img.shields.io/badge/Claude%20AI-visi%C3%B3n%20%2B%20b%C3%BAsqueda%20web-D97757?logo=anthropic&logoColor=white)](precios-supermercados-sps/docs/revision-tamanos.md)
+[![Gemini · Claude](https://img.shields.io/badge/IA-Gemini%20%2B%20Claude-8E75B2?logo=googlegemini&logoColor=white)](precios-supermercados-sps/docs/revision-tamanos.md)
 [![Sin dependencias en el sitio](https://img.shields.io/badge/web%20app-JS%20sin%20framework%20%C2%B7%20PWA-C6F432?labelColor=1C1F1D)](precios-supermercados-sps/super-compras/)
 
 Captura, validación, homologación y publicación diaria de precios públicos de seis cadenas de supermercados en San Pedro Sula y Tegucigalpa, con la web app **Súper Compras** para compararlos y saber en qué súper conviene hacer la compra.
@@ -30,7 +30,7 @@ Corte del **18 de noviembre de 2026**. 🟢 funciona solo · 🟡 funciona con t
 | --- | :---: | --- | --- |
 | Scrapers (6 cadenas, 11 sucursales) | 🟢 | `██████████` 100 % | Corte diario 05:17 con reintento por cadena; persistencia parcial si una falla. |
 | Base de datos (Turso / libSQL) | 🟢 | `██████████` 100 % | Último dato válido + histórico compacto; los workflows sólo leen salvo los pasos de guardado. |
-| Motor de IA (Claude, API de Anthropic) | 🟡 | `████████░░` 80 % | Lee las fotos y busca el peso oficial en la web; aprueba solo lo verificado. Falta la corrida masiva sobre la cola. |
+| Motor de IA (búsqueda por GTIN) | 🟡 | `███████░░░` 70 % | Gemini busca el peso oficial por GTIN, sin fotos, e ignora los súper de Honduras; aprueba solo lo verificado y re-audita lo resuelto con fotos. Depende de la cuota de Gemini. |
 | Panel de revisión de tamaños | 🟡 | `███░░░░░░░` 29 % | 284 de 980 códigos resueltos (216 por la IA, 68 por una persona); 696 en cola (244 empates, 452 atípicos). |
 | Frontend Súper Compras | 🟢 | `██████████` 100 % | Diseño Lima, PWA, escáner propio, esqueletos de carga; CSP estricta y cero dependencias. |
 | PriceSmart: códigos de barras | 🔴 | `█░░░░░░░░░` 2 % | De 1,823 tarjetas sólo 30 traen GTIN; la foto del catálogo es el frente del empaque. El código está en la galería (foto trasera): falta capturarla. |
@@ -42,9 +42,9 @@ flowchart LR
     S["🛒 Scrapers<br/>6 cadenas · 11 sucursales"] -->|captura validada| T[("Turso<br/>products · price_history")]
     T -->|refresco de homologación| H["Homologación<br/>GTIN · GS1 · maestro"]
     H -->|tamaños en conflicto| Q["Cola de revisión<br/>cola.json"]
-    Q -->|fotos R2| G["Claude<br/>visión + búsqueda web"]
-    G -->|Ley de la Mayoría o fuente citada| A{"¿Verificado?"}
-    A -->|sí| D[("size_decisions<br/>engine:claude_auto")]
+    Q -->|marca · nombre · GTIN| G["Gemini<br/>búsqueda por GTIN"]
+    G -->|fuente independiente citada| A{"¿Verificado?"}
+    A -->|sí| D[("size_decisions<br/>engine:gemini_auto")]
     A -->|no| P["Panel #/admin/revision<br/>decide una persona"]
     P -->|human:*| D
     D -->|siguiente refresco| H
@@ -59,25 +59,21 @@ sequenceDiagram
     autonumber
     participant R as Refresco de homologación
     participant C as Workflow de la cola
-    participant G as Claude
+    participant G as Gemini
     participant T as Turso
     participant P as Panel (persona)
     R->>C: terminó (workflow_run)
     C->>T: SELECT grupos GTIN en conflicto
-    C->>G: fotos de cada oferta (visión)
-    G-->>C: «NET WT 20 OZ (566 g)» por foto
-    alt todas las fotos coinciden y es el tamaño de la mayoría
-        C->>T: size_decisions (engine:claude_auto)
-    else conflicto, minoría o ilegible
-        C->>G: marca, nombre, GTIN y tamaños publicados
-        G-->>C: peso oficial + fuente citada (búsqueda web)
-        alt la cita trae el número y coincide con algún súper
-            C->>T: size_decisions (engine:claude_auto)
-        else no se pudo verificar
-            C-->>P: cola.json con la nota «Requiere revisión humana»
-            P->>T: decisión humana (reemplaza a la IA)
-        end
+    C->>G: marca, nombre y GTIN (sin fotos)
+    G-->>C: peso oficial + fuente citada (Google Search)
+    alt fuente independiente con el número y coincide con algún súper
+        C->>T: size_decisions (engine:gemini_auto)
+    else no se pudo verificar
+        C-->>P: cola.json con la nota «Requiere revisión humana»
+        P->>T: decisión humana (reemplaza a la IA)
     end
+    C->>G: re-auditoría de lo resuelto antes con fotos
+    G-->>C: si la web dice otro tamaño → «Corrección de IA» en la cola
     T-->>R: el próximo refresco aplica la decisión
 ```
 
@@ -147,8 +143,8 @@ erDiagram
 
 ## Cómo decide la IA
 
-- **[Ley de la Mayoría](precios-supermercados-sps/README.md#ley-de-la-mayoría):** la lectura de fotos guarda sola un tamaño sólo si todas las fotos dicen lo mismo y es el de más de la mitad de las ofertas.
-- **[Búsqueda web con Claude](precios-supermercados-sps/README.md#búsqueda-web-con-claude):** para el resto, se aprueba solo lo que una fuente citada confirma y coincide con algún súper; lo demás queda para una persona.
+- **[Búsqueda web por GTIN](precios-supermercados-sps/README.md#búsqueda-web-por-gtin):** se aprueba solo lo que una fuente independiente (no un súper de Honduras) cita y coincide con algún súper; lo demás queda para una persona.
+- **[Ley de la Mayoría](precios-supermercados-sps/README.md#ley-de-la-mayoría):** las lecturas de fotos ya guardadas sólo cuentan si todas dicen lo mismo y es el tamaño de más de la mitad de las ofertas.
 
 ## Sobre el repositorio
 

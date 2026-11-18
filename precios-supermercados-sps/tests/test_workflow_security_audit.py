@@ -112,6 +112,7 @@ base.ALLOWED_SECRET_REFERENCES[base.SIZE_QUEUE_WORKFLOW] = {
     base.TURSO_DATABASE_URL_SECRET,
     base.TURSO_AUTH_TOKEN_SECRET,
     "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
 }
 SIZE_QUEUE_CHECKOUTS = [
     {"ref": "main", "path": "source", "persist-credentials": "false"},
@@ -777,23 +778,34 @@ def test_size_decisions_workflow_is_owner_only_and_never_inlines_the_payload() -
     assert "fuente_invalida" in save["run"] and "claude_auto" not in raw and "gemini_auto" not in raw
 
 
-AI_STEPS = ["Lectura de fotos con IA (Claude)", "Búsqueda web y auto-resolución (Claude)"]
+AI_STEPS = ["Lectura de fotos con IA (Claude)", "Búsqueda web por GTIN y auto-resolución (Gemini)"]
 
 
-def test_size_queue_gives_the_anthropic_key_only_to_the_ai_steps() -> None:
+@pytest.mark.parametrize(("secret", "step_name", "script"), [
+    ("ANTHROPIC_API_KEY", AI_STEPS[0], "sugerir_tamanos_ia.py"),
+    ("GEMINI_API_KEY", AI_STEPS[1], "buscar_tamanos_web.py"),
+])
+def test_size_queue_gives_each_ai_key_only_to_its_step(secret: str, step_name: str, script: str) -> None:
     path = base.WORKFLOW_DIR / base.SIZE_QUEUE_WORKFLOW
     workflow = base.load_workflow(path)
     raw = path.read_text(encoding="utf-8")
-    assert "GEMINI_API_KEY" not in raw  # el motor es Claude (API de Anthropic)
-    with_key = [step for step in base.steps(workflow) if "ANTHROPIC_API_KEY" in str(step.get("env", {}))]
-    assert [step["name"] for step in with_key] == AI_STEPS
-    for step, script in zip(with_key, ("sugerir_tamanos_ia.py", "buscar_tamanos_web.py"), strict=True):
-        assert step["env"]["ANTHROPIC_API_KEY"] == "${{ secrets.ANTHROPIC_API_KEY }}"
-        assert script in step["run"] and "inputs." not in step["run"]
-        assert step["continue-on-error"] == "true"  # sin IA la cola se publica igual
-        assert "TURSO" not in str(step.get("env", {}))
-    assert "secrets.ANTHROPIC_API_KEY" not in raw.split("Lectura de fotos con IA")[0]
-    assert '--claude-max "$CLAUDE_MAX"' in with_key[0]["run"]
+    with_key = [step for step in base.steps(workflow) if secret in str(step.get("env", {}))]
+    assert [step["name"] for step in with_key] == [step_name]
+    step = with_key[0]
+    assert step["env"][secret] == f"${{{{ secrets.{secret} }}}}"
+    assert script in step["run"] and "inputs." not in step["run"]
+    assert step["continue-on-error"] == "true"  # sin IA la cola se publica igual
+    assert "TURSO" not in str(step.get("env", {}))
+    assert f"secrets.{secret}" not in raw.split("Lectura de fotos con IA")[0]
+
+
+def test_size_queue_reads_no_new_photos_unless_asked() -> None:
+    workflow = base.load_workflow(base.WORKFLOW_DIR / base.SIZE_QUEUE_WORKFLOW)
+    inputs = workflow["on"]["workflow_dispatch"]["inputs"]
+    assert inputs["ia_minutos"]["default"] == "0"
+    photos = next(step for step in base.steps(workflow) if step["name"] == AI_STEPS[0])
+    assert photos["env"]["IA_MINUTOS"] == "${{ inputs.ia_minutos || '0' }}"
+    assert '--claude-max "$CLAUDE_MAX"' in photos["run"]
     install = next(step for step in base.steps(workflow) if step["name"] == "Instalar dependencias fijadas")
     assert "anthropic==2.4.0" in install["run"]  # SDK oficial, versión fija
 
@@ -802,13 +814,14 @@ def test_size_queue_web_resolution_reads_only_the_queue_and_saves_before_publish
     workflow = base.load_workflow(base.WORKFLOW_DIR / base.SIZE_QUEUE_WORKFLOW)
     inputs = workflow["on"]["workflow_dispatch"]["inputs"]
     assert inputs["web_max"]["default"] == "40" and inputs["web_primero"]["default"] == ""
+    assert inputs["web_auditar"]["default"] == "20"
     names = [step["name"] for step in base.steps(workflow)]
     search = next(step for step in base.steps(workflow) if step["name"] == AI_STEPS[1])
-    # Lo que Claude verifica en la web se guarda en el mismo paso que lo de las fotos.
     assert names.index(AI_STEPS[0]) < names.index(AI_STEPS[1]) < names.index("Guardar decisiones automáticas de la IA") \
         < names.index("Publicar en un solo commit y push")
     assert search["env"]["WEB_MAX"] == "${{ inputs.web_max || '40' }}"
-    assert "--queue /tmp/cola/cola.json" in search["run"] and '--max "$WEB_MAX"' in search["run"]
+    assert "--provider gemini" in search["run"] and "--queue /tmp/cola/cola.json" in search["run"]
+    assert '--max "$WEB_MAX" --audit-max "$WEB_AUDITAR"' in search["run"]
     assert "--auto-out /tmp/cola/auto-decisiones-web.json" in search["run"]
     assert 'if [ "$WEB_MAX" -gt 300 ]; then WEB_MAX=300; fi' in search["run"]
     assert "web_primero_invalido" in search["run"] and "web_cache_symlink_invalid" in search["run"]
@@ -824,6 +837,7 @@ def test_size_queue_saves_ai_decisions_only_as_the_engine() -> None:
     assert set(with_turso) == {"Calcular cola (sólo lectura)", "Guardar decisiones automáticas de la IA"}
     save = with_turso["Guardar decisiones automáticas de la IA"]
     assert "claude_auto:auto-decisiones-claude.json" in save["run"] and '--engine "$engine"' in save["run"]
-    assert '"claude_auto:auto-decisiones-web.json"' in save["run"]
+    assert '"gemini_auto:auto-decisiones-web-gemini.json"' in save["run"]
+    assert '"claude_auto:auto-decisiones-web-claude.json"' in save["run"]
     assert "--actor" not in save["run"] and "inputs." not in save["run"]
-    assert "ANTHROPIC_API_KEY" not in str(save.get("env", {}))
+    assert "ANTHROPIC_API_KEY" not in str(save.get("env", {})) and "GEMINI_API_KEY" not in str(save.get("env", {}))
