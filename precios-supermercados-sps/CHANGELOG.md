@@ -7,6 +7,7 @@ número son cambios directos. El detalle de cada incidente vive en
 
 ## 2026-11-18
 
+- Motor de IA con Claude (API de Anthropic): lee las fotos y, para lo que siga en la cola, busca el peso oficial en la web (SDK `anthropic`, `web_search`); aprueba solo (`engine:claude_auto`) lo que una fuente citada confirma y coincide con algún súper. El README principal muestra insignias, estado y diagramas.
 - Cola de tamaños: las ofertas de «Member's Selection» (marca blanca de PriceSmart) no entran a la cola; si sin ellas no hay conflicto, el código no se lista.
 - README: insignias, estado por pieza (🟢🟡🔴), diagramas Mermaid (flujo, secuencia de revisión y modelo de datos) y tablas de la Ley de la Mayoría y la búsqueda con Grounding.
 - #122 Búsqueda web: el resumen `web` de la cola anota el error de cada modelo de Gemini (`errores_por_modelo`).

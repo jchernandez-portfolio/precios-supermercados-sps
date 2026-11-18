@@ -11,7 +11,7 @@
 // GitHub la rechaza (401/403). Sólo viaja en el encabezado Authorization a api.github.com.
 import {
   RETAILER_NAMES, SIZE_DECISIONS_RUNS_URL, SIZE_UNITS, loadSizeQueue, sendSizeDecisions,
-} from "./data.js?v=20261116-31";
+} from "./data.js?v=20261116-32";
 
 const TOKEN_KEY = "super-compras-admin-github-token";
 // Códigos ya enviados en este dispositivo: {gtin: ISO de envío}. Se ocultan de la cola
@@ -231,8 +231,9 @@ export function aiSuggestion(item) {
   return { kind: "note", label: "🤖 No legible", title: AI_REASONS[ai.reason] || AI_REASONS.ilegible };
 }
 
-// Sugerencia de la búsqueda web (Gemini con Google Search). Un clic sólo llena el
-// formulario: nunca se guarda sola. La URL va en el título (al pasar el mouse) y en un enlace.
+// Búsqueda web de Claude. Lo verificado ya se guardó solo y no llega aquí; lo que queda
+// es sugerencia: un clic sólo llena el formulario. La URL va en el título y en un enlace.
+const MANUAL_NOTE = "🤖 Claude no pudo verificar el dato en la web. Requiere revisión humana";
 const safeUrl = (url) => (typeof url === "string" && /^https?:\/\/[^\s]+$/i.test(url) && url.length <= 500 ? url : "");
 export function webSuggestion(item) {
   const web = item?.web;
@@ -250,12 +251,13 @@ export function webSuggestion(item) {
         typeof web.text === "string" && web.text ? `Dice: ${web.text}` : "",
         matches.length ? `Coincide con: ${matches.join(", ")}` : "No coincide con ningún título publicado.",
         sources.length ? `Google usó: ${sources.map((source) => source.title || source.url).join(", ")}` : "",
+        MANUAL_NOTE,
         "Revisa la fuente: al tocarlo sólo se llena el formulario.",
       ].filter(Boolean).join("\n"),
       matches: matches.length,
     };
   }
-  if (web.status === "no_encontrado") return { kind: "note", label: "🌐 Web: sin resultado", title: "La búsqueda web no encontró el tamaño oficial de este código." };
+  if (web.status === "no_encontrado") return { kind: "note", label: MANUAL_NOTE, title: "La búsqueda web de Claude no encontró una fuente con el tamaño oficial de este código." };
   return null;
 }
 

@@ -16,9 +16,9 @@ foto contra título la hace este script. Con esas lecturas:
 - **discrepancia**: lo leído no coincide con ningún título → revisión manual.
 - **no_legible** / **sin_foto** → revisión manual.
 
-Proveedor: **Gemini** (``GEMINI_API_KEY``), el único que usa el workflow. Claude
-(Messages API) sigue disponible sólo si se pide a mano con ``--claude-max N`` y
-``ANTHROPIC_API_KEY``; en ese caso va primero y Gemini de respaldo. Si Claude falla (sin crédito, llave inválida, 429,
+Proveedor: **Claude** (Messages API, ``ANTHROPIC_API_KEY``, tope ``--claude-max``), el que
+usa el workflow desde el 18-nov-2026. **Gemini** (``GEMINI_API_KEY``) sólo entra si
+existe esa llave; el workflow ya no la pasa (su cuenta no tiene cuota). Si Claude falla (sin crédito, llave inválida, 429,
 529/5xx tras reintentos, modelo no disponible o tope de consultas), la corrida sigue
 con Gemini y anota el motivo. Sin ninguna llave sólo se aplica lo guardado.
 
