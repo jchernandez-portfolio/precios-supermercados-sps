@@ -78,6 +78,8 @@ OFF_API = "https://world.openfoodfacts.org/api/v2/product/"
 OFF_PAGE = "https://world.openfoodfacts.org/product/"
 OFF_FIELDS = "code,product_name,brands,quantity,product_quantity,product_quantity_unit"
 OFF_UNITS = {"g": "g", "kg": "kg", "mg": None, "ml": "ml", "cl": None, "l": "l"}
+OFF_DELAY = 4.0  # GitHub comparte IPs: más lento que el límite público de 100 lecturas por minuto
+OFF_429_WAITS = (60.0, 120.0)
 OFF_USER_AGENT = "precios-sps-cola-tamanos/1.0 (+https://github.com/jchernandez-portfolio/precios-supermercados-sps)"
 DEFAULT_MODEL = "claude-sonnet-5-5"
 GEMINI_MAX_MODELS = 3
@@ -409,26 +411,34 @@ class OpenFoodFactsLookup:
     name = "off"
     model = "openfoodfacts-api-v2"
 
-    def __init__(self, *, opener: Callable = urllib.request.urlopen) -> None:
+    def __init__(self, *, opener: Callable = urllib.request.urlopen,
+                 sleep: Callable[[float], None] = time.sleep) -> None:
         self.opener = opener
+        self.sleep = sleep
         self.usage = {"entrada": 0, "salida": 0, "busquedas": 0}
         self.last_error: str | None = None
+        self.retries = 0
 
     def search(self, item: Mapping[str, object]) -> dict[str, object]:
         code = off_code(str(item.get("gtin")))
         request = urllib.request.Request(f"{OFF_API}{code}.json?fields={OFF_FIELDS}",
                                          headers={"User-Agent": OFF_USER_AGENT})
-        try:
-            with self.opener(request, timeout=30) as response:
-                document = json.loads(response.read(2_000_000).decode("utf-8"))
-        except urllib.error.HTTPError as error:
-            self.last_error = f"{error.code}: off"
-            if error.code == 404:
-                document = {"status": 0}
-            elif error.code == 429:
-                raise StopRun("off_http_429") from error
-            else:
-                raise
+        for wait in (*OFF_429_WAITS, None):
+            try:
+                with self.opener(request, timeout=30) as response:
+                    document = json.loads(response.read(2_000_000).decode("utf-8"))
+                break
+            except urllib.error.HTTPError as error:
+                self.last_error = f"{error.code}: off"
+                if error.code == 404:
+                    document = {"status": 0}
+                    break
+                if error.code != 429:
+                    raise
+                if wait is None:  # el límite sigue después de esperar: se guarda lo avanzado
+                    raise StopRun("off_http_429") from error
+                self.retries += 1
+                self.sleep(_retry_after(error, wait))
         self.usage["busquedas"] += 1
         return read_off(document, code)
 
@@ -456,6 +466,14 @@ def read_off(document: object, code: str) -> dict[str, object]:
               "url": page["url"], "confianza": "alta", "gtin_verificado": True}
     return {"text": json.dumps(answer), "results": [page], "citations": [{**page, "cited_text": cited[:150]}],
             "errors": [], "searches": 1, "usage": {}}
+
+
+def _retry_after(error: urllib.error.HTTPError, default: float) -> float:
+    try:
+        value = float(error.headers.get("Retry-After") or default) if error.headers else default
+    except (TypeError, ValueError):
+        value = default
+    return min(max(value, 1.0), 300.0)
 
 
 # ------------------------------------------------------------------ decisión
@@ -715,8 +733,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--minutes", type=float, default=DEFAULT_MINUTES)
     parser.add_argument("--first", default="", help="GTIN a buscar primero, separados por coma")
     parser.add_argument("--model", default=os.environ.get("CLAUDE_MODEL", "").strip() or DEFAULT_MODEL)
-    parser.add_argument("--delay", type=float, default=DEFAULT_DELAY)
+    parser.add_argument("--delay", type=float, help=f"pausa entre consultas (por defecto {OFF_DELAY} s con Open Food "
+                                                   f"Facts y {DEFAULT_DELAY} s con los modelos)")
     args = parser.parse_args(argv)
+    if args.delay is None:
+        args.delay = OFF_DELAY if args.provider == "off" else DEFAULT_DELAY
     first = [code.strip() for code in args.first.split(",") if code.strip()]
     if not 0 <= args.max <= HARD_MAX or not 0 <= args.audit_max <= HARD_MAX or not 0 <= args.minutes <= 120 \
             or args.delay < 0.5 or len(first) > 50 or not all(_GTIN.fullmatch(code) for code in first) \
