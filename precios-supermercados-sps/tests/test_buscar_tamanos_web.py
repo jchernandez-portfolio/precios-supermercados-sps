@@ -353,5 +353,19 @@ def test_open_food_facts_without_product_or_quantity_stays_for_a_person() -> Non
     def limited(request, timeout):
         raise urllib.error.HTTPError(request.full_url, 429, "slow", {}, None)
 
-    stats = web.search_new([heinz()], {}, client=web.OpenFoodFactsLookup(opener=limited), limit=5, minutes=5, now=NOW)
-    assert stats["detenido_por"] == "off_http_429"
+    waits: list[float] = []
+    stats = web.search_new([heinz()], {}, client=web.OpenFoodFactsLookup(opener=limited, sleep=waits.append),
+                           limit=5, minutes=5, now=NOW)
+    assert stats["detenido_por"] == "off_http_429" and waits == [60.0, 120.0]  # espera y reintenta antes de parar
+
+    calls: list[int] = []
+
+    def once(request, timeout):
+        calls.append(1)
+        if len(calls) == 1:
+            raise urllib.error.HTTPError(request.full_url, 429, "slow", {"Retry-After": "5"}, None)
+        return Response(json.dumps(OFF_HEINZ).encode())
+
+    pauses: list[float] = []
+    read = web.OpenFoodFactsLookup(opener=once, sleep=pauses.append).search(heinz())
+    assert pauses == [5.0] and web.parse_answer(read)["status"] == "encontrado"
