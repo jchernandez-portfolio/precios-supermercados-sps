@@ -621,6 +621,11 @@ dialog.scanner::backdrop { background: rgba(16, 32, 26, .7); }
 .rv-pick[aria-pressed="true"] { border-color: var(--good); background: var(--good-soft); }
 .rv-ai { border-color: var(--ai-edge); background: var(--ai-soft); }
 .rv-ai[aria-pressed="true"] { border-color: var(--ai-edge); background: var(--ai-soft-2); }
+.rv-web { border-color: var(--good); border-style: dashed; background: var(--surface); color: var(--ink); }
+.rv-web[aria-pressed="true"] { border-style: solid; background: var(--good-soft); }
+.rv-web-wrap { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rv-web-source { font-size: .8rem; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+.rv-web-source:hover, .rv-web-source:focus-visible { color: var(--ink); }
 .rv-ai-note { display: inline-flex; align-items: center; padding: 6px 10px; border: 1px dashed var(--line); border-radius: 8px; color: var(--muted); font-size: .85rem; cursor: help; }
 .rv-manual { display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 8px; }
 .rv-sent { margin: 0; color: var(--good); font-weight: 600; font-size: .9rem; }

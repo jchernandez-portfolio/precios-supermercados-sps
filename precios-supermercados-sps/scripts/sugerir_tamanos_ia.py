@@ -16,9 +16,9 @@ foto contra título la hace este script. Con esas lecturas:
 - **discrepancia**: lo leído no coincide con ningún título → revisión manual.
 - **no_legible** / **sin_foto** → revisión manual.
 
-Proveedores (misma salida por foto: legible, mismo producto, valor, unidad, texto):
-**Claude** (Messages API, si existe ``ANTHROPIC_API_KEY``) primero y **Gemini**
-(``GEMINI_API_KEY``) de respaldo. Si Claude falla (sin crédito, llave inválida, 429,
+Proveedor: **Gemini** (``GEMINI_API_KEY``), el único que usa el workflow. Claude
+(Messages API) sigue disponible sólo si se pide a mano con ``--claude-max N`` y
+``ANTHROPIC_API_KEY``; en ese caso va primero y Gemini de respaldo. Si Claude falla (sin crédito, llave inválida, 429,
 529/5xx tras reintentos, modelo no disponible o tope de consultas), la corrida sigue
 con Gemini y anota el motivo. Sin ninguna llave sólo se aplica lo guardado.
 
@@ -870,8 +870,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--auto-out-claude", type=Path,
                         help="decisiones automáticas leídas por Claude (por defecto <auto-out>-claude.json)")
     parser.add_argument("--claude-model", default=os.environ.get("CLAUDE_MODEL", "").strip() or CLAUDE_DEFAULT_MODEL)
-    parser.add_argument("--claude-max", type=int, default=CLAUDE_DEFAULT_MAX_QUERIES,
-                        help="tope de consultas a Claude por corrida")
+    parser.add_argument("--claude-max", type=int, default=0,
+                        help="tope de consultas a Claude por corrida (0 = sólo Gemini, lo normal)")
     parser.add_argument("--minutes", type=float, default=DEFAULT_MINUTES)
     parser.add_argument("--delay", type=float, default=DEFAULT_DELAY)
     args = parser.parse_args(argv)

@@ -111,7 +111,6 @@ base.EXPECTED_TRIGGERS[base.SIZE_QUEUE_WORKFLOW] = {"workflow_run", "workflow_di
 base.ALLOWED_SECRET_REFERENCES[base.SIZE_QUEUE_WORKFLOW] = {
     base.TURSO_DATABASE_URL_SECRET,
     base.TURSO_AUTH_TOKEN_SECRET,
-    "ANTHROPIC_API_KEY",
     "GEMINI_API_KEY",
 }
 SIZE_QUEUE_CHECKOUTS = [
@@ -767,7 +766,7 @@ def test_size_decisions_workflow_is_owner_only_and_never_inlines_the_payload() -
     # regenera directo (sin IA) para que lo decidido salga del panel en minutos.
     queue = next(step for step in base.steps(workflow) if "size-queue.yml" in str(step.get("run", "")))
     assert "gh workflow run precios-supermercados-sps-size-queue.yml" in queue["run"]
-    assert "-f ia_minutos=0" in queue["run"] and "TURSO" not in str(queue.get("env", {}))
+    assert "-f ia_minutos=0 -f web_max=0" in queue["run"] and "TURSO" not in str(queue.get("env", {}))
     assert queue["env"] == {"GH_TOKEN": "${{ github.token }}"}
     # Fuente: lista cerrada; claude_sesion sólo como motor aprobado por el dueño.
     fuente = workflow["on"]["workflow_dispatch"]["inputs"]["fuente"]
@@ -778,18 +777,41 @@ def test_size_decisions_workflow_is_owner_only_and_never_inlines_the_payload() -
     assert "fuente_invalida" in save["run"] and "claude_auto" not in raw and "gemini_auto" not in raw
 
 
-@pytest.mark.parametrize("secret", ["GEMINI_API_KEY", "ANTHROPIC_API_KEY"])
-def test_size_queue_gives_the_ai_keys_only_to_the_suggestion_step(secret: str) -> None:
+AI_STEPS = ["Sugerencias de tamaño con IA (Gemini)", "Búsqueda web de tamaños (Gemini con Google Search)"]
+
+
+def test_size_queue_gives_the_gemini_key_only_to_the_ai_steps() -> None:
     path = base.WORKFLOW_DIR / base.SIZE_QUEUE_WORKFLOW
     workflow = base.load_workflow(path)
-    with_key = [step for step in base.steps(workflow) if secret in str(step.get("env", {}))]
-    assert [step["name"] for step in with_key] == ["Sugerencias de tamaño con IA (Claude, respaldo Gemini)"]
-    step = with_key[0]
-    assert step["env"][secret] == f"${{{{ secrets.{secret} }}}}"
-    assert "sugerir_tamanos_ia.py" in step["run"] and "inputs." not in step["run"]
-    assert step["continue-on-error"] == "true"  # sin IA la cola se publica igual
-    assert f"secrets.{secret}" not in path.read_text(encoding="utf-8").split("Sugerencias de tamaño")[0]
-    assert "TURSO" not in str(step.get("env", {}))
+    raw = path.read_text(encoding="utf-8")
+    assert "ANTHROPIC_API_KEY" not in raw and "claude_max" not in raw  # sólo Gemini
+    with_key = [step for step in base.steps(workflow) if "GEMINI_API_KEY" in str(step.get("env", {}))]
+    assert [step["name"] for step in with_key] == AI_STEPS
+    for step, script in zip(with_key, ("sugerir_tamanos_ia.py", "buscar_tamanos_web.py"), strict=True):
+        assert step["env"]["GEMINI_API_KEY"] == "${{ secrets.GEMINI_API_KEY }}"
+        assert script in step["run"] and "inputs." not in step["run"]
+        assert step["continue-on-error"] == "true"  # sin IA la cola se publica igual
+        assert "TURSO" not in str(step.get("env", {}))
+    assert "secrets.GEMINI_API_KEY" not in raw.split("Sugerencias de tamaño")[0]
+    assert "--claude-max 0" in with_key[0]["run"]
+
+
+def test_size_queue_web_search_only_reads_the_queue_and_is_capped() -> None:
+    workflow = base.load_workflow(base.WORKFLOW_DIR / base.SIZE_QUEUE_WORKFLOW)
+    inputs = workflow["on"]["workflow_dispatch"]["inputs"]
+    assert inputs["web_max"]["default"] == "40" and inputs["web_primero"]["default"] == ""
+    names = [step["name"] for step in base.steps(workflow)]
+    search = next(step for step in base.steps(workflow) if step["name"] == AI_STEPS[1])
+    # Después de guardar lo automático (lo de la web nunca se guarda solo) y antes de publicar.
+    assert names.index("Guardar decisiones automáticas de la IA") < names.index(AI_STEPS[1]) \
+        < names.index("Publicar en un solo commit y push")
+    assert search["env"]["WEB_MAX"] == "${{ inputs.web_max || '40' }}"
+    assert '--queue /tmp/cola/cola.json' in search["run"] and '--max "$WEB_MAX"' in search["run"]
+    assert 'if [ "$WEB_MAX" -gt 200 ]; then WEB_MAX=200; fi' in search["run"]
+    assert "web_primero_invalido" in search["run"] and "web_cache_symlink_invalid" in search["run"]
+    assert "aplicar_decisiones_tamano.py" not in search["run"]
+    publish = next(step for step in base.steps(workflow) if step["name"] == "Publicar en un solo commit y push")
+    assert "for name in cola.json ia-tamanos.json web-tamanos.json; do" in publish["run"]
 
 
 def test_size_queue_saves_ai_decisions_only_as_the_engine() -> None:
@@ -800,4 +822,4 @@ def test_size_queue_saves_ai_decisions_only_as_the_engine() -> None:
     save = with_turso["Guardar decisiones automáticas de la IA"]
     assert "gemini_auto:" in save["run"] and "claude_auto:" in save["run"] and '--engine "$engine"' in save["run"]
     assert "--actor" not in save["run"] and "inputs." not in save["run"]
-    assert "GEMINI_API_KEY" not in str(save.get("env", {})) and "ANTHROPIC_API_KEY" not in str(save.get("env", {}))
+    assert "GEMINI_API_KEY" not in str(save.get("env", {}))

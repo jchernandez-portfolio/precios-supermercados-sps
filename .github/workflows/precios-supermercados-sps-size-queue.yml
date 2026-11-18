@@ -4,13 +4,15 @@ name: Precios SPS - Cola de revisión de tamaños
 # en conflicto (sólo SELECT en Turso) y publica `cola.json` en la rama pública
 # `revision-tamanos`, que lee el panel #/admin/revision. Sólo contiene datos ya
 # públicos (cadena, nombre y tamaño publicados). Omite los GTIN ya decididos.
-# IA: Claude (si existe ANTHROPIC_API_KEY) y, de respaldo, Gemini leen el contenido
-# neto en la foto de cada oferta (las mismas fotos del panel; sólo lo nuevo; lo leído
-# se guarda en `ia-tamanos.json` con proveedor y modelo). Si Claude falla (crédito,
-# llave, 429, 529) la corrida sigue con Gemini. Si todas las fotos confirman el tamaño
-# de la mayoría, la decisión se guarda sola (engine:claude_auto o engine:gemini_auto,
-# nunca sobre una humana) y el código sale de la cola. Las llaves de IA sólo entran
-# al paso de lectura; los secretos de Turso, sólo a los pasos de Turso.
+# IA (sólo Gemini): lee el contenido neto en la foto de cada oferta (las mismas
+# fotos del panel; sólo lo nuevo; lo leído se guarda en `ia-tamanos.json`). Si todas
+# las fotos confirman el tamaño de la mayoría, la decisión se guarda sola
+# (engine:gemini_auto, nunca sobre una humana) y el código sale de la cola.
+# Búsqueda web (Gemini con Google Search): SÓLO para los códigos que siguen en la
+# cola (empates y lo que la foto no resolvió), nunca el catálogo completo. Lo
+# encontrado se publica en `web-tamanos.json` y el panel lo muestra como sugerencia
+# con su fuente; nunca se guarda solo. La llave de Gemini sólo entra a esos dos
+# pasos; los secretos de Turso, sólo a los pasos de Turso.
 on:
   workflow_run:
     workflows:
@@ -24,19 +26,16 @@ on:
         required: false
         default: "25"
         type: string
-      claude_max:
-        description: "Tope de consultas a Claude por corrida (0 = sólo Gemini)"
+      web_max:
+        description: "Búsquedas web máximas (Gemini con Google Search; 0 = sólo aplicar lo guardado)"
         required: false
-        default: "200"
+        default: "40"
         type: string
-      claude_model:
-        description: "Modelo de Claude que lee las fotos"
+      web_primero:
+        description: "GTIN a buscar primero en la web, separados por coma (opcional)"
         required: false
-        default: claude-sonnet-5-5
-        type: choice
-        options:
-          - claude-sonnet-5-5
-          - claude-haiku-5-5
+        default: ""
+        type: string
 
 permissions:
   contents: write
@@ -91,25 +90,20 @@ jobs:
           python source/precios-supermercados-sps/scripts/exportar_cola_tamanos.py --output-dir /tmp/cola \
             --previous-queue cola/cola.json
 
-      - name: Sugerencias de tamaño con IA (Claude, respaldo Gemini)
+      - name: Sugerencias de tamaño con IA (Gemini)
         continue-on-error: true
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           IA_MINUTOS: ${{ inputs.ia_minutos || '25' }}
-          CLAUDE_MAX: ${{ inputs.claude_max || '200' }}
-          CLAUDE_MODEL: ${{ inputs.claude_model || 'claude-sonnet-5-5' }}
         run: |
           set -euo pipefail
           case "$IA_MINUTOS" in (''|*[!0-9]*) echo "ia_minutos_invalido" >&2; exit 1;; esac
-          case "$CLAUDE_MAX" in (''|*[!0-9]*) echo "claude_max_invalido" >&2; exit 1;; esac
           if [ "$IA_MINUTOS" -gt 120 ]; then IA_MINUTOS=120; fi
-          if [ "$CLAUDE_MAX" -gt 2000 ]; then CLAUDE_MAX=2000; fi
           if [ -L cola/ia-tamanos.json ]; then echo "ia_cache_symlink_invalid" >&2; exit 1; fi
           cp /tmp/cola/cola.json /tmp/cola/cola-sin-ia.json
           if ! python source/precios-supermercados-sps/scripts/sugerir_tamanos_ia.py \
               --queue /tmp/cola/cola.json --cache-in cola/ia-tamanos.json \
-              --cache-out /tmp/cola/ia-tamanos.json --minutes "$IA_MINUTOS" --claude-max "$CLAUDE_MAX" \
+              --cache-out /tmp/cola/ia-tamanos.json --minutes "$IA_MINUTOS" --claude-max 0 \
               --auto-out /tmp/cola/auto-decisiones.json --auto-out-claude /tmp/cola/auto-decisiones-claude.json \
               --queue-with-auto /tmp/cola/cola-con-auto.json; then
             cp /tmp/cola/cola-sin-ia.json /tmp/cola/cola.json
@@ -140,13 +134,35 @@ jobs:
             echo "decisiones_automaticas_no_guardadas" >&2
           fi
 
+      - name: Búsqueda web de tamaños (Gemini con Google Search)
+        continue-on-error: true
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          WEB_MAX: ${{ inputs.web_max || '40' }}
+          WEB_PRIMERO: ${{ inputs.web_primero || '' }}
+        run: |
+          set -euo pipefail
+          case "$WEB_MAX" in (''|*[!0-9]*) echo "web_max_invalido" >&2; exit 1;; esac
+          if [ "$WEB_MAX" -gt 200 ]; then WEB_MAX=200; fi
+          case "$WEB_PRIMERO" in (*[!0-9,]*) echo "web_primero_invalido" >&2; exit 1;; esac
+          if [ -L cola/web-tamanos.json ]; then echo "web_cache_symlink_invalid" >&2; exit 1; fi
+          # Sólo los códigos de la cola (nunca el catálogo). Si falla, la cola sigue sin anotar.
+          cp /tmp/cola/cola.json /tmp/cola/cola-sin-web.json
+          if ! python source/precios-supermercados-sps/scripts/buscar_tamanos_web.py \
+              --queue /tmp/cola/cola.json --cache-in cola/web-tamanos.json \
+              --cache-out /tmp/cola/web-tamanos.json --max "$WEB_MAX" --first "$WEB_PRIMERO"; then
+            cp /tmp/cola/cola-sin-web.json /tmp/cola/cola.json
+            rm -f /tmp/cola/web-tamanos.json
+            exit 1
+          fi
+
       - name: Publicar en un solo commit y push
         env:
           SOURCE_RUN_ID: ${{ github.event.workflow_run.id || github.run_id }}
         run: |
           set -euo pipefail
           repository="$GITHUB_WORKSPACE/cola"
-          for name in cola.json ia-tamanos.json; do
+          for name in cola.json ia-tamanos.json web-tamanos.json; do
             if [ -L "$repository/$name" ]; then echo "cola_symlink_boundary_invalid:$name" >&2; exit 1; fi
           done
           # Sólo se publica si cambian los códigos o el resumen de la IA (no sólo la fecha).
@@ -154,11 +170,15 @@ jobs:
               --anterior "$repository/cola.json" --nueva /tmp/cola/cola.json; then
             cp /tmp/cola/cola.json "$repository/cola.json"
           fi
-          if [ -f /tmp/cola/ia-tamanos.json ]; then cp /tmp/cola/ia-tamanos.json "$repository/ia-tamanos.json"; fi
+          for name in ia-tamanos.json web-tamanos.json; do
+            if [ -f "/tmp/cola/$name" ]; then cp "/tmp/cola/$name" "$repository/$name"; fi
+          done
           git -C "$repository" config user.name "github-actions[bot]"
           git -C "$repository" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git -C "$repository" add -- cola.json
-          if [ -f "$repository/ia-tamanos.json" ]; then git -C "$repository" add -- ia-tamanos.json; fi
+          for name in ia-tamanos.json web-tamanos.json; do
+            if [ -f "$repository/$name" ]; then git -C "$repository" add -- "$name"; fi
+          done
           if git -C "$repository" diff --cached --quiet; then
             echo "cola_already_current=true"
             exit 0
