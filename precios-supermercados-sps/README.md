@@ -28,18 +28,18 @@ Cómo decide la lectura de fotos (`scripts/sugerir_tamanos_ia.py`; desde el 18-n
 | Foto ilegible, de otro producto o sin foto | — | `no_legible` / `sin_foto`: decide una persona |
 | Ya existe una decisión humana | — | La IA nunca la reemplaza; la persona sí reemplaza a la IA |
 
-## Búsqueda web por GTIN
+## Búsqueda por GTIN
 
-Para los códigos de la cola, Gemini (Grounding with Google Search) busca el peso oficial con marca, nombre y GTIN, **sin leer fotos** (`scripts/buscar_tamanos_web.py`; Claude con `web_search` queda como alternativa con `--provider claude`).
+Para los códigos de la cola, `scripts/buscar_tamanos_web.py` busca el contenido neto del **código exacto**, sin leer fotos. Fuente por defecto: **Open Food Facts** (datos abiertos, gratis, sin llave). Alternativas: Gemini con Google Search (`--provider gemini`; el plan gratuito de Gemini no incluye búsqueda) y Claude con `web_search` (`--provider claude`).
 
 | Regla | Cómo se cumple |
 | --- | --- |
-| Sólo la cola, nunca el catálogo | Lee `cola.json` en su orden (empates primero; antes, los GTIN de `web_primero`). Tope de 40 consultas por corrida (máximo 300) y 60 minutos. |
-| Qué se pregunta | «Busca el peso oficial del producto [Marca] [Nombre] con GTIN [GTIN]. Revisa fabricantes, GS1, Open Food Facts y supermercados de Centroamérica. Ignora los supermercados de Honduras». Sin los tamaños de los súper, para no sesgar. |
-| Se aprueba sola (`engine:gemini_auto`) | Confianza alta o media, la fuente salió de la búsqueda y **no es un súper de Honduras**, un pasaje citado de una fuente independiente trae el número, y el tamaño coincide con el que publica al menos un súper. Nunca sobre una decisión humana. |
+| Sólo la cola, nunca el catálogo | Lee `cola.json` en su orden (empates primero; antes, los GTIN de `web_primero`). Tope de 40 consultas por corrida (máximo 300), una a la vez con pausa. |
+| Qué se busca | Open Food Facts: la ficha del GTIN (`product_quantity` con unidad de masa o volumen). Gemini/Claude: «Busca el peso oficial del producto [Marca] [Nombre] con GTIN [GTIN]… Ignora los supermercados de Honduras». |
+| Se aprueba sola (`engine:off_auto`, `gemini_auto` o `claude_auto`) | Confianza alta o media, la fuente salió de la consulta y **no es un súper de Honduras**, el pasaje citado trae el número, y el tamaño coincide con el que publica al menos un súper. Una porción guardada como si fuera el paquete no coincide con nadie y no pasa. Nunca sobre una decisión humana. |
 | Si no se puede verificar | Se queda en la cola con «🤖 No se pudo verificar el dato en la web. Requiere revisión humana»; si encontró algo, el panel lo muestra como «🌐 Sugerencia Web» con su fuente. |
-| Re-auditoría | Lo que la IA resolvió con fotos también se busca (`web_auditar`, 20 por corrida). Si una fuente verificada dice otro tamaño, vuelve a la cola como «Corrección de IA» (la decisión de la IA sigue hasta que una persona decida). |
-| Caché y cuota | `web-tamanos.json` en la rama `revision-tamanos`; lo no resuelto se reintenta a los 30 días. Sin cuota prueba 3 modelos como mucho y para, guardando lo avanzado. |
+| Re-auditoría | Lo que la IA resolvió con fotos también se consulta (`web_auditar`, 20 por corrida). Si la fuente verificada dice otro tamaño, vuelve a la cola como «Corrección de IA» (la decisión de la IA sigue hasta que una persona decida). |
+| Caché | `web-tamanos.json` en la rama `revision-tamanos`; lo no resuelto se reintenta a los 30 días. |
 
 ## Cobertura
 
@@ -59,7 +59,7 @@ La app vive en [`super-compras/`](super-compras/) y se publica sola en GitHub Pa
 - **Producto:** el mismo artículo en cada supermercado, con el más barato marcado y otras presentaciones para comparar.
 - **Mi compra:** la lista completa con su costo en cada supermercado y comprando cada cosa donde está más barata. Se guarda en el dispositivo.
 - **Escanear:** lee el código de barras con la cámara del teléfono (BarcodeDetector o un lector ZXing propio, sin servicios externos) y abre dónde está más barato.
-- **Revisión de tamaños** (`#/admin/revision`, interno): mismo código de barras con tamaños distintos entre súper. la búsqueda web por GTIN aprueba sola lo que una fuente independiente confirma ([búsqueda web por GTIN](#búsqueda-web-por-gtin)); las lecturas de fotos ya guardadas siguen la [Ley de la Mayoría](#ley-de-la-mayoría) ([búsqueda web por GTIN](#búsqueda-web-por-gtin)). Una persona decide, y su decisión siempre reemplaza a la de la IA.
+- **Revisión de tamaños** (`#/admin/revision`, interno): mismo código de barras con tamaños distintos entre súper. la búsqueda por GTIN (Open Food Facts) aprueba sola lo que una fuente independiente confirma ([búsqueda por GTIN](#búsqueda-por-gtin)); las lecturas de fotos ya guardadas siguen la [Ley de la Mayoría](#ley-de-la-mayoría) ([búsqueda por GTIN](#búsqueda-por-gtin)). Una persona decide, y su decisión siempre reemplaza a la de la IA.
 
 La app solo lee archivos estáticos ya publicados (`portfolio-data`, `product-images`). No consulta Turso ni sitios de supermercados desde el navegador, no pide cuenta ni datos personales y tiene una política de seguridad de contenido estricta. La carga inicial pesa ~48 KB (~9 KB gzip, 2 requests) más la portada del catálogo (`home.json`, ~11 KB gzip); el índice de búsqueda (~1.4 MB gzip) baja en segundo plano y las fichas por partición bajo demanda.
 

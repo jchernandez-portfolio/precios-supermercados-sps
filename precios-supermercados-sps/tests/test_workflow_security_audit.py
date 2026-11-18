@@ -778,7 +778,7 @@ def test_size_decisions_workflow_is_owner_only_and_never_inlines_the_payload() -
     assert "fuente_invalida" in save["run"] and "claude_auto" not in raw and "gemini_auto" not in raw
 
 
-AI_STEPS = ["Lectura de fotos con IA (Claude)", "Búsqueda web por GTIN y auto-resolución (Gemini)"]
+AI_STEPS = ["Lectura de fotos con IA (Claude)", "Búsqueda por GTIN y auto-resolución"]
 
 
 @pytest.mark.parametrize(("secret", "step_name", "script"), [
@@ -820,7 +820,9 @@ def test_size_queue_web_resolution_reads_only_the_queue_and_saves_before_publish
     assert names.index(AI_STEPS[0]) < names.index(AI_STEPS[1]) < names.index("Guardar decisiones automáticas de la IA") \
         < names.index("Publicar en un solo commit y push")
     assert search["env"]["WEB_MAX"] == "${{ inputs.web_max || '40' }}"
-    assert "--provider gemini" in search["run"] and "--queue /tmp/cola/cola.json" in search["run"]
+    assert '--provider "$WEB_PROVEEDOR"' in search["run"] and "--queue /tmp/cola/cola.json" in search["run"]
+    assert inputs["web_proveedor"]["default"] == "off" and inputs["web_proveedor"]["options"] == ["off", "gemini"]
+    assert "web_proveedor_invalido" in search["run"]
     assert '--max "$WEB_MAX" --audit-max "$WEB_AUDITAR"' in search["run"]
     assert "--auto-out /tmp/cola/auto-decisiones-web.json" in search["run"]
     assert 'if [ "$WEB_MAX" -gt 300 ]; then WEB_MAX=300; fi' in search["run"]
@@ -839,5 +841,6 @@ def test_size_queue_saves_ai_decisions_only_as_the_engine() -> None:
     assert "claude_auto:auto-decisiones-claude.json" in save["run"] and '--engine "$engine"' in save["run"]
     assert '"gemini_auto:auto-decisiones-web-gemini.json"' in save["run"]
     assert '"claude_auto:auto-decisiones-web-claude.json"' in save["run"]
+    assert '"off_auto:auto-decisiones-web-off.json"' in save["run"]
     assert "--actor" not in save["run"] and "inputs." not in save["run"]
     assert "ANTHROPIC_API_KEY" not in str(save.get("env", {})) and "GEMINI_API_KEY" not in str(save.get("env", {}))

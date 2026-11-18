@@ -30,7 +30,7 @@ Corte del **18 de noviembre de 2026**. 🟢 funciona solo · 🟡 funciona con t
 | --- | :---: | --- | --- |
 | Scrapers (6 cadenas, 11 sucursales) | 🟢 | `██████████` 100 % | Corte diario 05:17 con reintento por cadena; persistencia parcial si una falla. |
 | Base de datos (Turso / libSQL) | 🟢 | `██████████` 100 % | Último dato válido + histórico compacto; los workflows sólo leen salvo los pasos de guardado. |
-| Motor de IA (búsqueda por GTIN) | 🟡 | `███████░░░` 70 % | Gemini busca el peso oficial por GTIN, sin fotos, e ignora los súper de Honduras; aprueba solo lo verificado y re-audita lo resuelto con fotos. Depende de la cuota de Gemini. |
+| Resolución por GTIN | 🟡 | `███████░░░` 70 % | Open Food Facts (gratis) da el contenido neto del código exacto, sin fotos; aprueba solo lo que coincide con algún súper y re-audita lo resuelto con fotos. ~26 % de la cola tiene dato. Gemini con búsqueda queda opcional (su plan gratis no incluye búsqueda). |
 | Panel de revisión de tamaños | 🟡 | `███░░░░░░░` 29 % | 284 de 980 códigos resueltos (216 por la IA, 68 por una persona); 696 en cola (244 empates, 452 atípicos). |
 | Frontend Súper Compras | 🟢 | `██████████` 100 % | Diseño Lima, PWA, escáner propio, esqueletos de carga; CSP estricta y cero dependencias. |
 | PriceSmart: códigos de barras | 🔴 | `█░░░░░░░░░` 2 % | De 1,823 tarjetas sólo 30 traen GTIN; la foto del catálogo es el frente del empaque. El código está en la galería (foto trasera): falta capturarla. |
@@ -42,9 +42,9 @@ flowchart LR
     S["🛒 Scrapers<br/>6 cadenas · 11 sucursales"] -->|captura validada| T[("Turso<br/>products · price_history")]
     T -->|refresco de homologación| H["Homologación<br/>GTIN · GS1 · maestro"]
     H -->|tamaños en conflicto| Q["Cola de revisión<br/>cola.json"]
-    Q -->|marca · nombre · GTIN| G["Gemini<br/>búsqueda por GTIN"]
-    G -->|fuente independiente citada| A{"¿Verificado?"}
-    A -->|sí| D[("size_decisions<br/>engine:gemini_auto")]
+    Q -->|GTIN| G["Open Food Facts<br/>contenido neto por GTIN"]
+    G -->|coincide con algún súper| A{"¿Verificado?"}
+    A -->|sí| D[("size_decisions<br/>engine:off_auto")]
     A -->|no| P["Panel #/admin/revision<br/>decide una persona"]
     P -->|human:*| D
     D -->|siguiente refresco| H
@@ -59,15 +59,15 @@ sequenceDiagram
     autonumber
     participant R as Refresco de homologación
     participant C as Workflow de la cola
-    participant G as Gemini
+    participant G as Open Food Facts
     participant T as Turso
     participant P as Panel (persona)
     R->>C: terminó (workflow_run)
     C->>T: SELECT grupos GTIN en conflicto
-    C->>G: marca, nombre y GTIN (sin fotos)
-    G-->>C: peso oficial + fuente citada (Google Search)
-    alt fuente independiente con el número y coincide con algún súper
-        C->>T: size_decisions (engine:gemini_auto)
+    C->>G: GTIN exacto (sin fotos)
+    G-->>C: contenido neto de la ficha del producto
+    alt el dato coincide con lo que publica algún súper
+        C->>T: size_decisions (engine:off_auto)
     else no se pudo verificar
         C-->>P: cola.json con la nota «Requiere revisión humana»
         P->>T: decisión humana (reemplaza a la IA)
@@ -143,7 +143,7 @@ erDiagram
 
 ## Cómo decide la IA
 
-- **[Búsqueda web por GTIN](precios-supermercados-sps/README.md#búsqueda-web-por-gtin):** se aprueba solo lo que una fuente independiente (no un súper de Honduras) cita y coincide con algún súper; lo demás queda para una persona.
+- **[Búsqueda por GTIN](precios-supermercados-sps/README.md#búsqueda-por-gtin):** se aprueba solo lo que una fuente independiente (Open Food Facts por defecto; nunca un súper de Honduras) da para ese código exacto y coincide con algún súper; lo demás queda para una persona.
 - **[Ley de la Mayoría](precios-supermercados-sps/README.md#ley-de-la-mayoría):** las lecturas de fotos ya guardadas sólo cuentan si todas dicen lo mismo y es el tamaño de más de la mitad de las ofertas.
 
 ## Sobre el repositorio

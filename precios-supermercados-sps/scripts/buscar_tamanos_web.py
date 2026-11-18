@@ -39,7 +39,9 @@ import os
 import re
 import sys
 import time
+import urllib.error
 import urllib.parse
+import urllib.request
 from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -70,8 +72,13 @@ from sugerir_tamanos_ia import (  # noqa: E402
 WEB_SCHEMA = "rpi-size-web/v2"
 WEB_FILE = "web-tamanos.json"
 PROMPT_VERSION = 3
-ENGINE_BY_PROVIDER = {"gemini": "gemini_auto", "claude": "claude_auto"}
-PROVIDER_LABEL = {"gemini": "Gemini", "claude": "Claude"}
+ENGINE_BY_PROVIDER = {"off": "off_auto", "gemini": "gemini_auto", "claude": "claude_auto"}
+PROVIDER_LABEL = {"off": "Open Food Facts", "gemini": "Gemini", "claude": "Claude"}
+OFF_API = "https://world.openfoodfacts.org/api/v2/product/"
+OFF_PAGE = "https://world.openfoodfacts.org/product/"
+OFF_FIELDS = "code,product_name,brands,quantity,product_quantity,product_quantity_unit"
+OFF_UNITS = {"g": "g", "kg": "kg", "mg": None, "ml": "ml", "cl": None, "l": "l"}
+OFF_USER_AGENT = "precios-sps-cola-tamanos/1.0 (+https://github.com/jchernandez-portfolio/precios-supermercados-sps)"
 DEFAULT_MODEL = "claude-sonnet-5-5"
 GEMINI_MAX_MODELS = 3
 DEFAULT_AUDIT_MAX = 20
@@ -389,6 +396,68 @@ class GeminiWebSearch(Gemini):
         return read
 
 
+def off_code(gtin: str) -> str:
+    """GTIN-14 de la cola → código que usa Open Food Facts (EAN-13 si el primer dígito es 0)."""
+    return gtin[1:] if len(gtin) == 14 and gtin.startswith("0") else gtin
+
+
+class OpenFoodFactsLookup:
+    """Open Food Facts por GTIN (gratis, sin llave, datos abiertos). Una consulta exacta por código:
+    no hay búsqueda ni modelo, así que no inventa; sólo usa ``product_quantity`` con unidad de masa
+    o volumen. Respeta el límite público (≤ 100 lecturas por minuto) con la pausa de la corrida."""
+
+    name = "off"
+    model = "openfoodfacts-api-v2"
+
+    def __init__(self, *, opener: Callable = urllib.request.urlopen) -> None:
+        self.opener = opener
+        self.usage = {"entrada": 0, "salida": 0, "busquedas": 0}
+        self.last_error: str | None = None
+
+    def search(self, item: Mapping[str, object]) -> dict[str, object]:
+        code = off_code(str(item.get("gtin")))
+        request = urllib.request.Request(f"{OFF_API}{code}.json?fields={OFF_FIELDS}",
+                                         headers={"User-Agent": OFF_USER_AGENT})
+        try:
+            with self.opener(request, timeout=30) as response:
+                document = json.loads(response.read(2_000_000).decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            self.last_error = f"{error.code}: off"
+            if error.code == 404:
+                document = {"status": 0}
+            elif error.code == 429:
+                raise StopRun("off_http_429") from error
+            else:
+                raise
+        self.usage["busquedas"] += 1
+        return read_off(document, code)
+
+
+def read_off(document: object, code: str) -> dict[str, object]:
+    """Respuesta de Open Food Facts → misma forma que una búsqueda citada (fuente = la ficha del producto)."""
+    product = document.get("product") if isinstance(document, Mapping) and document.get("status") == 1 else None
+    page = {"url": f"{OFF_PAGE}{code}", "title": "world.openfoodfacts.org"}
+    if not isinstance(product, Mapping):
+        return {"text": json.dumps({"encontrado": False}), "results": [], "citations": [], "errors": [],
+                "searches": 1, "usage": {}}
+    unit = OFF_UNITS.get(str(product.get("product_quantity_unit") or "").strip().lower())
+    try:
+        value = Decimal(str(product.get("product_quantity")))
+    except ArithmeticError:
+        value = Decimal(0)
+    quantity = " ".join(str(product.get("quantity") or "").split())[:80]
+    if unit is None or not value.is_finite() or value <= 0:
+        answer = {"encontrado": False}
+        return {"text": json.dumps(answer), "results": [page], "citations": [], "errors": [], "searches": 1,
+                "usage": {}}
+    number = format(value.normalize(), "f")
+    cited = f"{quantity} · product_quantity {number} {unit}".strip(" ·")
+    answer = {"encontrado": True, "valor": number, "unidad": unit, "texto": quantity or f"{number} {unit}",
+              "url": page["url"], "confianza": "alta", "gtin_verificado": True}
+    return {"text": json.dumps(answer), "results": [page], "citations": [{**page, "cited_text": cited[:150]}],
+            "errors": [], "searches": 1, "usage": {}}
+
+
 # ------------------------------------------------------------------ decisión
 
 
@@ -621,7 +690,9 @@ def auto_out_path(base: Path, provider: str) -> Path:
     return base.with_name(f"{base.stem}-{provider}{base.suffix}")
 
 
-def build_client(provider: str, model: str) -> ClaudeWebSearch | GeminiWebSearch | None:
+def build_client(provider: str, model: str) -> ClaudeWebSearch | GeminiWebSearch | OpenFoodFactsLookup | None:
+    if provider == "off":
+        return OpenFoodFactsLookup()
     if provider == "gemini":
         key = os.environ.get("GEMINI_API_KEY", "").strip()
         return GeminiWebSearch(key) if key else None
@@ -638,7 +709,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         help="base de las decisiones automáticas: se escribe <base>-gemini.json y <base>-claude.json")
     parser.add_argument("--cache-in", type=Path, help="web-tamanos.json de la corrida anterior")
     parser.add_argument("--cache-out", type=Path, required=True)
-    parser.add_argument("--provider", choices=sorted(ENGINE_BY_PROVIDER), default="gemini")
+    parser.add_argument("--provider", choices=sorted(ENGINE_BY_PROVIDER), default="off")
     parser.add_argument("--max", type=int, default=DEFAULT_MAX, help="consultas máximas a la cola en esta corrida")
     parser.add_argument("--audit-max", type=int, default=0, help="consultas máximas para re-auditar lo resuelto")
     parser.add_argument("--minutes", type=float, default=DEFAULT_MINUTES)

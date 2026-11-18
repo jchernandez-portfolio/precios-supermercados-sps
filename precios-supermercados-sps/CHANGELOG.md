@@ -7,6 +7,7 @@ número son cambios directos. El detalle de cada incidente vive en
 
 ## 2026-11-18
 
+- Búsqueda por GTIN con Open Food Facts (gratis, sin llave) como fuente por defecto: aprueba sola (`engine:off_auto`) sólo si el contenido neto del código exacto coincide con algún súper. Gemini con búsqueda queda opcional: su plan gratuito no incluye Google Search.
 - Búsqueda directa por GTIN (Gemini con Google Search, sin leer fotos): aprueba sola sólo con una fuente independiente (no un súper de Honduras) que cita el número y coincide con algún súper; re-audita lo resuelto con fotos y devuelve a la cola como «Corrección de IA» lo que la web contradice. La lectura de fotos queda apagada por defecto.
 - Motor de IA con Claude (API de Anthropic): lee las fotos y, para lo que siga en la cola, busca el peso oficial en la web (SDK `anthropic`, `web_search`); aprueba solo (`engine:claude_auto`) lo que una fuente citada confirma y coincide con algún súper. El README principal muestra insignias, estado y diagramas.
 - Cola de tamaños: las ofertas de «Member's Selection» (marca blanca de PriceSmart) no entran a la cola; si sin ellas no hay conflicto, el código no se lista.

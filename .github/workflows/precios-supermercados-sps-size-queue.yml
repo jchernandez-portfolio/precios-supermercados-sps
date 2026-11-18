@@ -4,13 +4,14 @@ name: Precios SPS - Cola de revisión de tamaños
 # en conflicto (sólo SELECT en Turso) y publica `cola.json` en la rama pública
 # `revision-tamanos`, que lee el panel #/admin/revision. Sólo contiene datos ya
 # públicos (cadena, nombre y tamaño publicados). Omite los GTIN ya decididos.
-# Resolución por GTIN (Gemini con Google Search): para lo que sigue en la cola (nunca
-# el catálogo completo) busca el peso oficial con marca, nombre y GTIN, sin leer fotos
-# e ignorando los súper de Honduras (dato circular). Si una fuente independiente lo
-# cita y coincide con lo que publica algún súper, se guarda solo (engine:gemini_auto,
-# nunca sobre una decisión humana); lo demás queda con la nota de revisión humana.
-# También re-audita lo que la IA resolvió con fotos: si la web dice otro tamaño, el
-# código vuelve a la cola como «Corrección de IA». Lo buscado va en `web-tamanos.json`.
+# Resolución por GTIN (Open Food Facts por defecto: gratis, sin llave): para lo que
+# sigue en la cola (nunca el catálogo completo) busca el contenido neto del código
+# exacto, sin leer fotos. Si coincide con lo que publica algún súper, se guarda solo
+# (engine:off_auto, nunca sobre una decisión humana); lo demás queda con la nota de
+# revisión humana. También re-audita lo que la IA resolvió con fotos: si la fuente dice
+# otro tamaño, el código vuelve a la cola como «Corrección de IA». Con
+# `web_proveedor=gemini` usa Gemini con Google Search (requiere un plan con búsqueda).
+# Lo buscado va en `web-tamanos.json`.
 # Lectura de fotos con Claude: sólo si se pide a mano (`ia_minutos` > 0); por defecto
 # sólo aplica las lecturas guardadas. Cada llave de IA entra sólo a su paso; los
 # secretos de Turso, sólo a los pasos de Turso.
@@ -32,8 +33,16 @@ on:
         required: false
         default: "200"
         type: string
+      web_proveedor:
+        description: "Fuente de la búsqueda por GTIN"
+        required: false
+        default: "off"
+        type: choice
+        options:
+          - "off"
+          - gemini
       web_max:
-        description: "Búsquedas web por GTIN (Gemini) para la cola (0 = sólo aplicar lo guardado)"
+        description: "Búsquedas por GTIN para la cola (0 = sólo aplicar lo guardado)"
         required: false
         default: "40"
         type: string
@@ -125,10 +134,11 @@ jobs:
             exit 1
           fi
 
-      - name: Búsqueda web por GTIN y auto-resolución (Gemini)
+      - name: Búsqueda por GTIN y auto-resolución
         continue-on-error: true
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          WEB_PROVEEDOR: ${{ inputs.web_proveedor || 'off' }}
           WEB_MAX: ${{ inputs.web_max || '40' }}
           WEB_AUDITAR: ${{ inputs.web_auditar || '20' }}
           WEB_PRIMERO: ${{ inputs.web_primero || '' }}
@@ -139,12 +149,13 @@ jobs:
           if [ "$WEB_MAX" -gt 300 ]; then WEB_MAX=300; fi
           if [ "$WEB_AUDITAR" -gt 300 ]; then WEB_AUDITAR=300; fi
           case "$WEB_PRIMERO" in (*[!0-9,]*) echo "web_primero_invalido" >&2; exit 1;; esac
+          case "$WEB_PROVEEDOR" in (off|gemini) ;; (*) echo "web_proveedor_invalido" >&2; exit 1;; esac
           if [ -L cola/web-tamanos.json ]; then echo "web_cache_symlink_invalid" >&2; exit 1; fi
           # Sólo los códigos de la cola y los ya resueltos por IA (nunca el catálogo).
           # Si falla, la cola sigue como estaba.
           cp /tmp/cola/cola.json /tmp/cola/cola-sin-web.json
           if [ -f /tmp/cola/cola-con-auto.json ]; then cp /tmp/cola/cola-con-auto.json /tmp/cola/cola-con-auto-sin-web.json; fi
-          if ! python source/precios-supermercados-sps/scripts/buscar_tamanos_web.py --provider gemini \
+          if ! python source/precios-supermercados-sps/scripts/buscar_tamanos_web.py --provider "$WEB_PROVEEDOR" \
               --queue /tmp/cola/cola.json --queue-with-auto /tmp/cola/cola-con-auto.json \
               --auto-out /tmp/cola/auto-decisiones-web.json --cache-in cola/web-tamanos.json \
               --cache-out /tmp/cola/web-tamanos.json --max "$WEB_MAX" --audit-max "$WEB_AUDITAR" \
@@ -156,7 +167,7 @@ jobs:
               rm -f /tmp/cola/cola-con-auto.json
             fi
             rm -f /tmp/cola/web-tamanos.json /tmp/cola/auto-decisiones-web-gemini.json \
-              /tmp/cola/auto-decisiones-web-claude.json
+              /tmp/cola/auto-decisiones-web-claude.json /tmp/cola/auto-decisiones-web-off.json
             exit 1
           fi
 
@@ -170,7 +181,8 @@ jobs:
           # guardar, se publica la cola con esos códigos todavía adentro.
           saved_all=true
           for pair in "gemini_auto:auto-decisiones.json" "claude_auto:auto-decisiones-claude.json" \
-              "gemini_auto:auto-decisiones-web-gemini.json" "claude_auto:auto-decisiones-web-claude.json"; do
+              "gemini_auto:auto-decisiones-web-gemini.json" "claude_auto:auto-decisiones-web-claude.json" \
+              "off_auto:auto-decisiones-web-off.json"; do
             engine="${pair%%:*}"; file="/tmp/cola/${pair#*:}"
             if [ ! -s "$file" ]; then echo "sin_decisiones_automaticas:$engine"; continue; fi
             if ! python source/precios-supermercados-sps/scripts/aplicar_decisiones_tamano.py --turso --apply \
