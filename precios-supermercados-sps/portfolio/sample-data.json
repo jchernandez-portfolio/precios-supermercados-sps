@@ -1,7 +1,7 @@
 {
   "comparison_policy": "fail_closed_strong_identity_and_commercial_consistency",
   "currency": "HNL",
-  "published_at_utc": "2026-11-18T01:31:10Z",
+  "published_at_utc": "2026-11-18T11:50:02Z",
   "row_count": 10,
   "rows": [
     {
@@ -137,7 +137,7 @@
       "savings_vs_highest_pct": "10.85"
     },
     {
-      "best_price": "80.00",
+      "best_price": "60.00",
       "best_supermarket_id": "walmart",
       "canonical_gtin": "07411000204818",
       "canonical_product_id": "prod_gtin_07411000204818",
@@ -155,7 +155,7 @@
           "supermarket_id": "la_colonia"
         },
         {
-          "current_price": "80.00",
+          "current_price": "60.00",
           "is_best_price": true,
           "location_id": "walmart_sps",
           "source_brand": "MCCORMICK",
@@ -166,8 +166,8 @@
           "supermarket_id": "walmart"
         }
       ],
-      "savings_vs_highest": "25.00",
-      "savings_vs_highest_pct": "23.81"
+      "savings_vs_highest": "45.00",
+      "savings_vs_highest_pct": "42.86"
     },
     {
       "best_price": "420.95",
@@ -347,8 +347,8 @@
     }
   ],
   "selection_rule": "highest_absolute_savings_within_safe_common_comparable_universe",
-  "source_as_of": "2026-11-18T01:25:48.379940Z",
+  "source_as_of": "2026-11-18T11:42:49.371878Z",
   "source_head_sha": "6be50f42f3c10a7bf3c3dfbcbe351803adabfd25",
   "source_schema": "rpi-consumer-mart/v2",
-  "source_workflow_run_id": 44215705137
+  "source_workflow_run_id": 44297116216
 }
