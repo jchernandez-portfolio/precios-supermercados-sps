@@ -11,7 +11,7 @@
 // GitHub la rechaza (401/403). Sólo viaja en el encabezado Authorization a api.github.com.
 import {
   RETAILER_NAMES, SIZE_DECISIONS_RUNS_URL, SIZE_UNITS, loadSizeQueue, sendSizeDecisions,
-} from "./data.js?v=20261116-33";
+} from "./data.js?v=20261116-34";
 
 const TOKEN_KEY = "super-compras-admin-github-token";
 // Códigos ya enviados en este dispositivo: {gtin: ISO de envío}. Se ocultan de la cola
@@ -193,7 +193,7 @@ export function photoUrls(offer) {
 const sizeText = (value, unit) => `${value} ${UNIT_LABEL[unit] || unit}`;
 
 // Quién leyó la foto (Claude por API o en sesión, Gemini); lecturas viejas sin fuente: "IA".
-const AI_NAME = { claude: "Claude", claude_sesion: "Claude (sesión)", gemini: "Gemini" };
+const AI_NAME = { claude: "Claude", claude_sesion: "Claude (sesión)", gemini: "Gemini", off: "Open Food Facts" };
 const aiName = (source) => (Object.hasOwn(AI_NAME, source) ? AI_NAME[source] : "IA");
 
 // Lo que la IA leyó en la foto de una oferta: verde si coincide con su título, alerta si no.

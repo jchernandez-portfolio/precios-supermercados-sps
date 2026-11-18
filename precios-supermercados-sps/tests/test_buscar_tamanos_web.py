@@ -253,7 +253,7 @@ class Response:
     def __exit__(self, *exc):
         return False
 
-    def read(self) -> bytes:
+    def read(self, limit: int = -1) -> bytes:
         return self.body
 
 
@@ -307,3 +307,51 @@ def test_audit_sends_photo_decisions_contradicted_by_the_web_back_to_people() ->
     assert [item["gtin"] for item in corrections] == ["07421000825234"]
     assert corrections[0]["kind"] == "correccion_ia"
     assert corrections[0]["web"]["nota"].startswith("Corrección de IA: la IA guardó 400 g por las fotos; la web dice")
+
+
+OFF_HEINZ = {"code": "0013000002189", "status": 1, "product": {
+    "brands": "Heinz", "product_name": "Yellow Mustard", "quantity": "20 oz",
+    "product_quantity": 566.9904625, "product_quantity_unit": "g"}}
+
+
+def test_open_food_facts_lookup_is_exact_by_gtin_and_approves_only_when_a_store_matches() -> None:
+    sent: list = []
+
+    def opener(request, timeout):
+        sent.append(request)
+        return Response(json.dumps(OFF_HEINZ).encode())
+
+    client = web.OpenFoodFactsLookup(opener=opener)
+    result = {**web.parse_answer(client.search(heinz())), "proveedor": "off", "prompt": web.PROMPT_VERSION}
+    assert sent[0].full_url.startswith("https://world.openfoodfacts.org/api/v2/product/0013000002189.json?fields=")
+    assert "precios-sps" in sent[0].get_header("User-agent")
+    assert (result["value"], result["unit"], result["confianza"]) == ("566.99", "g", "alta")
+    assert web.auto_reasons(heinz(), result) == []
+    decision = web.decision_for(heinz(), result)
+    assert decision["value"] == "566" and decision["note"].startswith("Open Food Facts (web, world.openfoodfacts.org)")
+    # Una porción guardada como si fuera el paquete no coincide con ningún súper: no se aprueba.
+    serving = {**OFF_HEINZ, "product": {**OFF_HEINZ["product"], "quantity": "", "product_quantity": 28}}
+    wrong = web.parse_answer(web.read_off(serving, "0013000002189"))
+    assert web.auto_reasons(heinz(), wrong) == ["no_coincide_con_ningun_super"]
+
+
+def test_open_food_facts_without_product_or_quantity_stays_for_a_person() -> None:
+    assert web.parse_answer(web.read_off({"status": 0}, "1"))["reason"] == "no_encontrado"
+    no_quantity = {**OFF_HEINZ, "product": {"product_name": "x", "quantity": "1 caja"}}
+    assert web.parse_answer(web.read_off(no_quantity, "1"))["reason"] == "no_encontrado"
+    milligrams = {**OFF_HEINZ, "product": {**OFF_HEINZ["product"], "product_quantity_unit": "mg"}}
+    assert web.parse_answer(web.read_off(milligrams, "1"))["status"] == "no_encontrado"
+    assert web.off_code("00013000002189") == "0013000002189" and web.off_code("17411000204136") == "17411000204136"
+
+    import urllib.error
+
+    def missing(request, timeout):
+        raise urllib.error.HTTPError(request.full_url, 404, "nf", {}, None)
+
+    assert web.parse_answer(web.OpenFoodFactsLookup(opener=missing).search(heinz()))["status"] == "no_encontrado"
+
+    def limited(request, timeout):
+        raise urllib.error.HTTPError(request.full_url, 429, "slow", {}, None)
+
+    stats = web.search_new([heinz()], {}, client=web.OpenFoodFactsLookup(opener=limited), limit=5, minutes=5, now=NOW)
+    assert stats["detenido_por"] == "off_http_429"

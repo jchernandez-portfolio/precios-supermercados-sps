@@ -82,7 +82,8 @@ def decided_gtins(db: ReadOnly) -> dict[str, str]:
     return {str(gtin): str(by) for gtin, by in db.query(f"SELECT canonical_gtin, decided_by FROM {DECISIONS_TABLE}")}
 
 
-ENGINE_SOURCE = {"engine:claude_sesion": "claude_sesion", "engine:claude_auto": "claude", "engine:gemini_auto": "gemini"}
+ENGINE_SOURCE = {"engine:claude_sesion": "claude_sesion", "engine:claude_auto": "claude", "engine:gemini_auto": "gemini",
+                 "engine:off_auto": "off"}
 
 
 def engine_rows(db: ReadOnly) -> dict[str, dict[str, object]]:
