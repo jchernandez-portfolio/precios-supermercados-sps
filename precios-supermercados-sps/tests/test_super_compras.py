@@ -991,7 +991,9 @@ console.log(JSON.stringify(out));
     assert found["title"].startswith("Fuente: https://www.heinz.com/p/1") and "Google usó: heinz.com" in found["title"]
     assert "javascript" not in found["title"] and "sólo se llena el formulario" in found["title"]
     assert unsafe is None and empty is None and nothing_web is None
-    assert missing["kind"] == "note" and missing["label"] == "🌐 Web: sin resultado"
+    assert missing["kind"] == "note"
+    assert missing["label"] == "🤖 Claude no pudo verificar el dato en la web. Requiere revisión humana"
+    assert "Requiere revisión humana" in found["title"]
     admin = (APP_DIR / "admin.js").read_text(encoding="utf-8")
     # Un clic en la sugerencia web sólo llena el formulario: no envía ni guarda nada.
     web_click = admin.split('pick.addEventListener("click", () => update({')[1].split("}));")[0]

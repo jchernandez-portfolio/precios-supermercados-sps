@@ -260,6 +260,16 @@ def is_private_label(profile: ProductProfile) -> bool:
         _PRIVATE_LABEL.search(text or "") for text in (record.source_brand, record.source_name))
 
 
+def common_brand(members: Sequence[ProductProfile]) -> str | None:
+    """Marca que más súper publican (para la búsqueda web); ``None`` si ninguno la trae."""
+    counts: dict[str, int] = {}
+    for member in members:
+        brand = " ".join((member.record.source_brand or "").split())
+        if brand:
+            counts[brand] = counts.get(brand, 0) + 1
+    return max(counts, key=lambda brand: (counts[brand], brand)) if counts else None
+
+
 def still_in_conflict(offers: Sequence[Mapping[str, object]]) -> bool:
     sizes = {(offer["value"], offer["unit"]) for offer in offers if offer.get("value")}
     return len(offers) >= 2 and len(sizes) >= 2
@@ -288,7 +298,7 @@ def queue_items(groups: Sequence[Mapping[str, object]], skip: set[str]) -> list[
                 continue
         kept = [member for member in members if member.record.source_record_id not in size_excluded]
         title = max((kept or members), key=lambda member: len(member.record.source_name or "")).record.source_name
-        items.append({"gtin": gtin, "kind": kind, "name": title, "offers": offers})
+        items.append({"gtin": gtin, "kind": kind, "name": title, "brand": common_brand(kept or members), "offers": offers})
     items.sort(key=lambda item: (item["kind"] != "empate", -len(item["offers"]), item["gtin"]))
     return items[:MAX_ITEMS]
 

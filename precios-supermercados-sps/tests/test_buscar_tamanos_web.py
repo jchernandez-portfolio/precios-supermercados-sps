@@ -1,12 +1,12 @@
-"""Búsqueda web de tamaños (Gemini con Google Search): sólo la cola, nunca se guarda sola."""
+"""Claude con búsqueda web resuelve la cola de tamaños; sólo lo verificado se aprueba solo."""
 from __future__ import annotations
 
-import io
 import json
 import sys
-import urllib.error
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -15,177 +15,184 @@ import buscar_tamanos_web as web  # noqa: E402
 
 NOW = datetime(2026, 11, 18, 12, 0, tzinfo=UTC)
 HEINZ = "00013000002189"
-
-
-class Response(io.BytesIO):
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc):
-        return False
+URL = "https://www.heinz.com/product/00013000002189"
 
 
 def heinz() -> dict:
-    return {"gtin": HEINZ, "kind": "atipico", "name": "Mostaza Heinz Amarilla Natural Squeeze - 566 g",
-            "offers": [{"store": "walmart", "value": "566", "unit": "g"},
-                       {"store": "colonial", "value": "566", "unit": "g"},
-                       {"store": "comisariato_los_andes", "value": "20", "unit": "oz"}],
-            "ia": {"status": "sugerencia", "value": "566", "unit": "g"}}
+    return {"gtin": HEINZ, "kind": "atipico", "brand": "Heinz", "name": "Mostaza Heinz Amarilla Natural Squeeze - 566 g",
+            "offers": [{"store": "walmart", "size": "566 g", "value": "566", "unit": "g"},
+                       {"store": "colonial", "size": "566 g", "value": "566", "unit": "g"},
+                       {"store": "comisariato_los_andes", "size": "20 oz", "value": "20", "unit": "oz"}]}
 
 
-def answer(payload: object, chunks: list | None = None) -> dict:
-    text = payload if isinstance(payload, str) else "```json\n" + json.dumps(payload) + "\n```"
-    candidate = {"content": {"parts": [{"text": text}]}}
-    if chunks is not None:
-        candidate["groundingMetadata"] = {"groundingChunks": chunks}
-    return {"candidates": [candidate], "usageMetadata": {"promptTokenCount": 30, "candidatesTokenCount": 9}}
+def response(answer: dict | str, *, cited: str = "NET WT 20 OZ (1 LB 4 OZ) 566g", url: str = URL,
+             error: str | None = None) -> dict:
+    final = answer if isinstance(answer, str) else json.dumps(answer)
+    result = {"type": "web_search_tool_result_error", "error_code": error} if error else [
+        {"type": "web_search_result", "url": url, "title": "Heinz", "encrypted_content": "x", "page_age": None},
+        {"type": "web_search_result", "url": "javascript:alert(1)", "title": "x", "encrypted_content": "x"},
+    ]
+    return {"content": [
+        {"type": "server_tool_use", "id": "s1", "name": "web_search", "input": {"query": "heinz 00013000002189"}},
+        {"type": "web_search_tool_result", "tool_use_id": "s1", "content": result},
+        {"type": "text", "text": "La etiqueta dice 20 oz.", "citations": [] if error else [
+            {"type": "web_search_result_location", "url": url, "title": "Heinz", "cited_text": cited}]},
+        {"type": "text", "text": "\n" + final},
+    ], "usage": {"input_tokens": 1200, "output_tokens": 80}}
 
 
-FOUND = {"encontrado": True, "valor": 20, "unidad": "oz", "texto": "NET WT 20 OZ (1 LB 4 OZ) 566g",
-         "url": "https://www.heinz.com/product/00013000002189"}
-CHUNKS = [{"web": {"uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc", "title": "heinz.com"}},
-          {"web": {"uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc", "title": "heinz.com"}},
-          {"web": {"uri": "javascript:alert(1)", "title": "x"}}]
+FOUND = {"encontrado": True, "valor": 20, "unidad": "oz", "texto": "NET WT 20 OZ (1 LB 4 OZ) 566g", "url": URL,
+         "confianza": "alta", "gtin_verificado": True}
 
 
-class FakeSearch:
-    model = "gemini-flash-latest"
-    retries = 0
-    last_error = None
-
+class FakeMessages:
     def __init__(self, answers: list) -> None:
         self.answers = answers
-        self.asked: list[tuple[str, str]] = []
+        self.calls: list[dict] = []
 
-    def search(self, gtin: str, name: str) -> object:
-        self.asked.append((gtin, name))
-        result = self.answers.pop(0)
-        if isinstance(result, Exception):
-            raise result
-        return result
-
-
-def test_answer_with_size_and_sources_becomes_a_web_suggestion() -> None:
-    result = web.parse_answer(answer(FOUND, CHUNKS))
-    assert result["status"] == "encontrado"
-    assert (result["value"], result["unit"]) == ("20", "oz")
-    assert result["url"] == FOUND["url"] and result["verificada"] is True
-    assert result["fuentes"] == [{"title": "heinz.com", "url": CHUNKS[0]["web"]["uri"]}]  # sin repetidos ni javascript:
-    assert result["text"] == FOUND["texto"]
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        answer = self.answers.pop(0)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
 
 
-def test_unsafe_or_empty_answers_never_become_a_suggestion() -> None:
-    assert web.parse_answer(answer({"encontrado": False}, CHUNKS))["reason"] == "no_encontrado"
-    assert web.parse_answer(answer("no sé"))["reason"] == "respuesta_invalida"
-    assert web.parse_answer(answer({**FOUND, "valor": -3}, CHUNKS))["reason"] == "tamano_invalido"
-    assert web.parse_answer(answer({**FOUND, "unidad": "cajas"}, CHUNKS))["reason"] == "tamano_invalido"
-    # Sin páginas de Google ni URL válida no hay de dónde verificar: no se sugiere.
-    assert web.parse_answer(answer({**FOUND, "url": "ftp://x"}, []))["reason"] == "sin_fuente"
-    keyed = web.parse_answer(answer({**FOUND, "url": "https://user:pw@heinz.com/x"}, CHUNKS))
-    assert keyed["url"] == CHUNKS[0]["web"]["uri"] and keyed["verificada"] is False
-    assert web.clean_url("https://a.com/" + "x" * 600) is None and web.clean_url("https://a b.com") is None
+class FakeClient:
+    def __init__(self, answers: list) -> None:
+        self.messages = FakeMessages(answers)
 
 
-def test_only_queue_items_are_searched_first_then_ties_then_unresolved() -> None:
-    items = [
-        {"gtin": "1" * 14, "kind": "atipico", "ia": {"status": "auto"}},
-        {"gtin": "2" * 14, "kind": "atipico", "ia": {"status": "no_legible"}},
-        {"gtin": "3" * 14, "kind": "empate", "ia": {"status": "sugerencia"}},
-        {"gtin": "4" * 14, "kind": "atipico", "ia": {"status": "sugerencia"}},
-        {"gtin": "5" * 14, "kind": "atipico", "ia": {"status": "conflicto"}},
-    ]
-    order = [item["gtin"] for item in web.priority(items, ["4" * 14])]
-    assert order == ["4" * 14, "3" * 14, "2" * 14, "5" * 14]  # el resuelto y la sugerencia clara no se buscan
+class ApiError(Exception):
+    def __init__(self, status: int) -> None:
+        super().__init__(f"Error code: {status}")
+        self.status_code = status
 
 
-def test_annotate_caps_queries_reuses_cache_and_marks_matching_stores() -> None:
-    other = {"gtin": "07501017003075", "kind": "empate", "name": "Otro", "offers": [], "ia": {"status": "no_legible"}}
-    old = (NOW - timedelta(days=40)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    cache = {"07501017003075": {"status": "no_encontrado", "prompt": web.PROMPT_VERSION, "utc": old}}
-    queue = {"items": [heinz(), other, {"gtin": "x", "kind": "empate"}]}
-    client = FakeSearch([answer(FOUND, CHUNKS), answer({"encontrado": False}, [])])
-    sleeps: list[float] = []
-    summary = web.annotate(queue, cache, client=client, limit=5, first=[HEINZ], sleep=sleeps.append, now=NOW)
-    assert [gtin for gtin, _ in client.asked] == [HEINZ, "07501017003075"]  # lo viejo «no encontrado» se reintenta
-    assert sleeps == [web.DEFAULT_DELAY]
-    found = queue["items"][0]["web"]
-    assert found["status"] == "encontrado" and found["coincide_con"] == ["Walmart", "Colonial", "Los Andes"]
-    assert queue["items"][1]["web"]["status"] == "no_encontrado" and "web" not in queue["items"][2]
-    assert summary["consultas"] == 2 and summary["encontrados"] == 1 and summary["no_encontrados"] == 1
-    # Segunda corrida: todo está en caché y vigente, no se pregunta nada más.
-    again = FakeSearch([])
-    web.annotate(queue, cache, client=again, limit=5, now=NOW)
-    assert again.asked == [] and queue["items"][0]["web"]["value"] == "20"
+def claude(answers: list) -> web.ClaudeWebSearch:
+    return web.ClaudeWebSearch(client=FakeClient(answers))
 
 
-def test_quota_or_limit_stops_and_keeps_what_was_found() -> None:
-    items = [{"gtin": f"{n:014d}", "kind": "empate", "name": str(n), "offers": []} for n in range(1, 4)]
+def parsed(answer: dict | str, **kwargs) -> dict:
+    return web.parse_answer(web.read_response(response(answer, **kwargs)))
+
+
+def test_request_sends_brand_name_gtin_and_published_sizes_with_the_web_search_tool() -> None:
+    client = claude([response(FOUND)])
+    client.search(heinz())
+    call = client.client.messages.calls[0]
+    assert call["model"] == "claude-sonnet-5-5" and call["max_tokens"] == web.MAX_TOKENS
+    assert call["tools"] == [{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}]
+    prompt = call["messages"][0]["content"]
+    assert "Marca: Heinz" in prompt and f"GTIN (código de barras): {HEINZ}" in prompt
+    assert "Walmart: 566 g; Colonial: 566 g; Los Andes: 20 oz" in prompt
+    assert "No elijas un tamaño sólo porque lo publica un supermercado" in prompt
+    assert client.usage == {"entrada": 1200, "salida": 80, "busquedas": 1}
+
+
+def test_verified_answer_is_approved_with_the_published_size_that_matches() -> None:
+    item = heinz()
+    result = parsed(FOUND)
+    assert (result["value"], result["unit"], result["confianza"]) == ("20", "oz", "alta")
+    assert result["url_de_busqueda"] is True and result["cita_con_numero"] is True
+    assert result["fuentes"] == [{"title": "Heinz", "url": URL}]  # sin repetidos ni javascript:
+    assert web.auto_reasons(item, result) == []
+    decision = web.decision_for(item, result)
+    # 20 oz = 566 g: se guarda la forma que publican más súper.
+    assert (decision["gtin"], decision["decision"], decision["value"], decision["unit"]) == (HEINZ, "size", "566", "g")
+    assert decision["note"].startswith("Claude (web, heinz.com): NET WT 20 OZ") and URL in decision["note"]
+
+
+@pytest.mark.parametrize(("answer", "kwargs", "reason"), [
+    ({**FOUND, "confianza": "media"}, {}, "confianza_media"),
+    ({**FOUND, "url": "https://inventada.example/heinz"}, {}, "url_no_vino_de_la_busqueda"),
+    (FOUND, {"cited": "Heinz Yellow Mustard squeeze bottle"}, "ninguna_cita_trae_el_numero"),
+    ({**FOUND, "valor": 14, "texto": "14 oz"}, {"cited": "NET WT 14 OZ"}, "no_coincide_con_ningun_super"),
+    ({"encontrado": False}, {}, "no_encontrado"),
+    ("no sé", {}, "respuesta_invalida"),
+    ({**FOUND, "unidad": "cajas"}, {}, "tamano_invalido"),
+    (FOUND, {"error": "max_uses_exceeded"}, "sin_fuente"),
+])
+def test_anything_not_fully_verified_stays_for_a_person(answer, kwargs, reason) -> None:
+    item = heinz()
+    entry = {**parsed(answer, **kwargs), "prompt": web.PROMPT_VERSION}
+    assert reason in web.auto_reasons(item, entry)
+    note = web.web_annotation(item, entry)
+    assert note["auto"] is False and note["nota"] == web.MANUAL_NOTE
+
+
+def test_cited_number_must_be_the_same_number() -> None:
+    cite = [{"cited_text": "Peso neto 1.5 kg (1500 g)"}]
+    assert web._number_cited("1.5", cite) and web._number_cited(1500, cite)
+    assert not web._number_cited(15, cite) and not web._number_cited(150, cite) and not web._number_cited(None, cite)
+
+
+def test_run_resolves_in_queue_order_caps_queries_and_reuses_cache() -> None:
+    tie = {"gtin": "07501017003075", "kind": "empate", "brand": "Sedal", "name": "Shampoo",
+           "offers": [{"store": "walmart", "size": "400 ml", "value": "400", "unit": "ml"}]}
+    queue = {"items": [tie, heinz(), {"gtin": "x", "kind": "empate"}]}
     cache: dict = {}
-    summary = web.annotate({"items": items}, cache, client=FakeSearch([answer(FOUND, CHUNKS)]), limit=1, now=NOW,
-                           sleep=lambda _: None)
-    assert summary["detenido_por"] == "tope_de_consultas" and list(cache) == ["00000000000001"]
-    summary = web.annotate({"items": items}, cache, client=FakeSearch([web.QuotaExceeded("cuota_agotada_429")]),
-                           limit=5, now=NOW, sleep=lambda _: None)
-    assert summary["detenido_por"] == "cuota_agotada" and list(cache) == ["00000000000001"]
-    assert web.annotate({"items": items}, cache, client=None, limit=5, now=NOW)["detenido_por"] == "sin_llave"
+    client = claude([response({"encontrado": False}), response(FOUND)])
+    sleeps: list[float] = []
+    stats = web.search_new(queue["items"], cache, client=client, limit=5, minutes=10, sleep=sleeps.append, now=NOW)
+    assert stats == {"consultas": 2, "errores": 0, "detenido_por": None} and sleeps == [web.DEFAULT_DELAY]
+    remaining, resolved = web.annotate(queue, cache)
+    assert [item["gtin"] for item in resolved] == [HEINZ]
+    assert [item["gtin"] for item in remaining] == ["07501017003075", "x"]
+    assert remaining[0]["web"]["nota"] == web.MANUAL_NOTE and "web" not in remaining[1]
+    assert resolved[0]["web"]["coincide_con"] == ["Walmart", "Colonial", "Los Andes"]
+    # Segunda corrida: lo guardado está vigente, no se pregunta nada.
+    again = claude([])
+    assert web.search_new(queue["items"], cache, client=again, limit=5, minutes=10, now=NOW)["consultas"] == 0
+    # Lo no resuelto se reintenta a los 30 días.
+    later = NOW + timedelta(days=31)
+    retry = claude([response({"encontrado": False})])
+    web.search_new(queue["items"], cache, client=retry, limit=5, minutes=10, now=later, sleep=lambda _: None)
+    assert len(retry.client.messages.calls) == 1
 
 
-def test_search_request_uses_google_search_tool_and_key_only_in_header() -> None:
-    sent: list = []
-
-    def opener(request, timeout):
-        sent.append(request)
-        if request.full_url.endswith("models?pageSize=1000"):
-            models = [{"name": "models/gemini-flash-latest", "supportedGenerationMethods": ["generateContent"]}]
-            return Response(json.dumps({"models": models}).encode())
-        return Response(json.dumps(answer(FOUND, CHUNKS)).encode())
-
-    client = web.WebSearch("SECRET-KEY", opener=opener, sleep=lambda _: None)
-    result = web.parse_answer(client.search(HEINZ, 'Mostaza "Heinz"'))
-    assert result["status"] == "encontrado"
-    body = json.loads(sent[1].data)
-    assert body["tools"] == [{"google_search": {}}] and "responseSchema" not in body["generationConfig"]
-    prompt = body["contents"][0]["parts"][0]["text"]
-    assert prompt.startswith(f"Busca en internet el peso oficial del producto con GTIN {HEINZ} y nombre \"Mostaza 'Heinz'\"")
-    assert "Devuelve el peso y la URL de la fuente" in prompt
-    assert all("SECRET-KEY" not in request.full_url for request in sent)
-    assert sent[1].get_header("X-goog-api-key") == "SECRET-KEY"
+def test_rate_limit_or_bad_key_stops_the_run_and_server_errors_skip_the_item() -> None:
+    items = [{"gtin": f"{n:014d}", "kind": "empate", "name": str(n), "offers": []} for n in range(1, 6)]
+    cache: dict = {}
+    client = claude([ApiError(529), response(FOUND), ApiError(429)])
+    stats = web.search_new(items, cache, client=client, limit=10, minutes=10, now=NOW, sleep=lambda _: None)
+    assert stats == {"consultas": 1, "errores": 1, "detenido_por": "claude_http_429"}
+    assert list(cache) == ["00000000000002"] and "429" in client.last_error
+    many = claude([ApiError(500), ApiError(500), ApiError(500)])
+    assert web.search_new(items, {}, client=many, limit=10, minutes=10, now=NOW,
+                          sleep=lambda _: None)["detenido_por"] == "no_disponible"
+    assert web.search_new(items, {}, client=claude([]), limit=0, minutes=10, now=NOW)["detenido_por"] == "sin_consultas"
+    assert web.search_new(items, {}, client=None, limit=5, minutes=10, now=NOW)["detenido_por"] == "sin_llave"
+    capped = claude([response(FOUND)])
+    assert web.search_new(items, {}, client=capped, limit=1, minutes=10, now=NOW)["detenido_por"] == "tope_de_consultas"
 
 
-def test_quota_error_falls_back_to_the_next_model_then_stops() -> None:
-    def opener(request, timeout):
-        if request.full_url.endswith("models?pageSize=1000"):
-            models = [{"name": f"models/{name}", "supportedGenerationMethods": ["generateContent"]}
-                      for name in ("gemini-flash-latest", "gemini-flash-lite-latest")]
-            return Response(json.dumps({"models": models}).encode())
-        message = {"error": {"message": "Quota exceeded for metric: generate_content_free_tier_requests, limit: 0"}}
-        raise urllib.error.HTTPError(request.full_url, 429, "quota", {}, io.BytesIO(json.dumps(message).encode()))
-
-    client = web.WebSearch("k", opener=opener, sleep=lambda _: None)
-    summary = web.annotate({"items": [heinz()]}, {}, client=client, limit=3, first=[HEINZ], now=NOW)
-    assert summary["detenido_por"] == "cuota_agotada" and client.model == "gemini-flash-lite-latest"
-    # Se ve por qué falló cada modelo (no sólo el último): «limit: 0» = el modelo no tiene cuota gratis.
-    assert "limit: 0" in summary["errores_por_modelo"]["gemini-flash-latest"]
-
-
-def test_main_writes_cache_and_annotated_queue_without_a_key(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    stamp = NOW.strftime("%Y-%m-%dT%H:%M:%SZ")
-    entry = {**web.parse_answer(answer(FOUND, CHUNKS)), "prompt": web.PROMPT_VERSION, "utc": stamp}
+def test_main_writes_engine_decisions_and_a_fallback_queue(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    entry = {**parsed(FOUND), "prompt": web.PROMPT_VERSION, "modelo": "claude-sonnet-5-5",
+             "utc": NOW.strftime("%Y-%m-%dT%H:%M:%SZ")}
+    tie = {"gtin": "07501017003075", "kind": "empate", "name": "Shampoo", "offers": []}
     (tmp_path / "cache.json").write_text(json.dumps({"schema": web.WEB_SCHEMA, "entries": {HEINZ: entry, "../x": {}}}))
-    (tmp_path / "cola.json").write_text(json.dumps({"schema": "rpi-size-queue/v1", "items": [heinz()]}))
-    assert web.main(["--queue", str(tmp_path / "cola.json"), "--cache-in", str(tmp_path / "cache.json"),
+    (tmp_path / "cola.json").write_text(json.dumps({"schema": "rpi-size-queue/v1", "items": [tie, heinz()]}))
+    assert web.main(["--queue", str(tmp_path / "cola.json"), "--queue-with-auto", str(tmp_path / "con-auto.json"),
+                     "--auto-out", str(tmp_path / "auto.json"), "--cache-in", str(tmp_path / "cache.json"),
                      "--cache-out", str(tmp_path / "out.json"), "--max", "0"]) == 0
     queue = json.loads((tmp_path / "cola.json").read_text())
-    assert queue["items"][0]["web"]["url"] == FOUND["url"] and queue["web"]["detenido_por"] == "sin_llave"
+    assert [item["gtin"] for item in queue["items"]] == ["07501017003075"] and queue["counts"]["atipico"] == 0
+    assert queue["web"]["aprobados_solos"] == 1 and queue["web"]["detenido_por"] == "sin_consultas"
+    auto = json.loads((tmp_path / "auto.json").read_text())
+    assert auto["schema"] == "rpi-size-decisions/v1"
+    assert [(d["gtin"], d["value"], d["unit"]) for d in auto["decisions"]] == [(HEINZ, "566", "g")]
+    # Si guardar falla, se publica la cola de respaldo: Heinz sigue adentro, como sugerencia.
+    fallback = json.loads((tmp_path / "con-auto.json").read_text())
+    heinz_item = next(item for item in fallback["items"] if item["gtin"] == HEINZ)
+    assert heinz_item["web"]["auto"] is False and heinz_item["web"]["value"] == "20"
     assert list(json.loads((tmp_path / "out.json").read_text())["entries"]) == [HEINZ]
 
 
 def test_main_rejects_bad_parameters(tmp_path: Path) -> None:
-    for extra in (["--max", "500"], ["--first", "abc"], ["--delay", "0"]):
-        try:
-            web.main(["--queue", str(tmp_path / "c.json"), "--cache-out", str(tmp_path / "o.json"), *extra])
-        except SystemExit as error:
-            assert str(error) == "parametros_invalidos"
-        else:
-            raise AssertionError(extra)
+    base = ["--queue", str(tmp_path / "c.json"), "--queue-with-auto", str(tmp_path / "a.json"),
+            "--auto-out", str(tmp_path / "d.json"), "--cache-out", str(tmp_path / "o.json")]
+    for extra in (["--max", "500"], ["--first", "abc"], ["--model", "gpt-4"], ["--minutes", "500"]):
+        with pytest.raises(SystemExit, match="parametros_invalidos"):
+            web.main([*base, *extra])

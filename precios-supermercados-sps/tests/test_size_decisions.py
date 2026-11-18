@@ -297,6 +297,7 @@ def test_queue_lists_ties_and_outliers_and_skips_decided_gtins() -> None:
     items = cola.queue_items(groups, skip=set())
     by_gtin = {item["gtin"]: item for item in items}
     assert by_gtin[SEDAL]["kind"] == "empate"
+    assert by_gtin[SEDAL]["brand"] == "Sedal"  # para que Claude busque la marca en la web
     assert MCCORMICK not in by_gtin  # v2.9: 180 ml ≈ 180 g en aderezos, ya comparable sin revisión
     assert by_gtin[CHOLULA]["kind"] == "atipico"  # v2.9: Colonial, Walmart y Paiz comparan; Los Andes fuera
     cholula = {offer["store"]: offer for offer in by_gtin[CHOLULA]["offers"]}
