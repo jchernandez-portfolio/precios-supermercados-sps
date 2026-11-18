@@ -56,6 +56,11 @@ on:
         required: false
         default: ""
         type: string
+      fichas_gtin:
+        description: "Prueba: ficha completa con Claude y búsqueda web para estos GTIN (coma; máx. 50; no guarda decisiones)"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: write
@@ -171,6 +176,19 @@ jobs:
             exit 1
           fi
 
+      - name: Fichas de producto con Claude (prueba)
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          FICHAS_GTIN: ${{ inputs.fichas_gtin || '' }}
+        run: |
+          set -euo pipefail
+          if [ -z "$FICHAS_GTIN" ]; then echo "sin_fichas"; exit 0; fi
+          case "$FICHAS_GTIN" in (*[!0-9,]*) echo "fichas_gtin_invalido" >&2; exit 1;; esac
+          # Sólo lectura: escribe fichas-prueba.json; no toca Turso ni la cola.
+          python source/precios-supermercados-sps/scripts/fichas_producto_web.py \
+            --queue /tmp/cola/cola-sin-ia.json --gtins "$FICHAS_GTIN" --output /tmp/cola/fichas-prueba.json
+
       - name: Guardar decisiones automáticas de la IA
         env:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
@@ -202,7 +220,7 @@ jobs:
         run: |
           set -euo pipefail
           repository="$GITHUB_WORKSPACE/cola"
-          for name in cola.json ia-tamanos.json web-tamanos.json; do
+          for name in cola.json ia-tamanos.json web-tamanos.json fichas-prueba.json; do
             if [ -L "$repository/$name" ]; then echo "cola_symlink_boundary_invalid:$name" >&2; exit 1; fi
           done
           # Sólo se publica si cambian los códigos o el resumen de la IA (no sólo la fecha).
@@ -210,13 +228,13 @@ jobs:
               --anterior "$repository/cola.json" --nueva /tmp/cola/cola.json; then
             cp /tmp/cola/cola.json "$repository/cola.json"
           fi
-          for name in ia-tamanos.json web-tamanos.json; do
+          for name in ia-tamanos.json web-tamanos.json fichas-prueba.json; do
             if [ -f "/tmp/cola/$name" ]; then cp "/tmp/cola/$name" "$repository/$name"; fi
           done
           git -C "$repository" config user.name "github-actions[bot]"
           git -C "$repository" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git -C "$repository" add -- cola.json
-          for name in ia-tamanos.json web-tamanos.json; do
+          for name in ia-tamanos.json web-tamanos.json fichas-prueba.json; do
             if [ -f "$repository/$name" ]; then git -C "$repository" add -- "$name"; fi
           done
           if git -C "$repository" diff --cached --quiet; then

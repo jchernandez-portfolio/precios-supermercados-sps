@@ -781,22 +781,37 @@ def test_size_decisions_workflow_is_owner_only_and_never_inlines_the_payload() -
 AI_STEPS = ["Lectura de fotos con IA (Claude)", "Búsqueda por GTIN y auto-resolución"]
 
 
-@pytest.mark.parametrize(("secret", "step_name", "script"), [
-    ("ANTHROPIC_API_KEY", AI_STEPS[0], "sugerir_tamanos_ia.py"),
-    ("GEMINI_API_KEY", AI_STEPS[1], "buscar_tamanos_web.py"),
+SHEETS_STEP = "Fichas de producto con Claude (prueba)"
+
+
+@pytest.mark.parametrize(("secret", "steps"), [
+    ("ANTHROPIC_API_KEY", {AI_STEPS[0]: "sugerir_tamanos_ia.py", SHEETS_STEP: "fichas_producto_web.py"}),
+    ("GEMINI_API_KEY", {AI_STEPS[1]: "buscar_tamanos_web.py"}),
 ])
-def test_size_queue_gives_each_ai_key_only_to_its_step(secret: str, step_name: str, script: str) -> None:
+def test_size_queue_gives_each_ai_key_only_to_its_steps(secret: str, steps: dict[str, str]) -> None:
     path = base.WORKFLOW_DIR / base.SIZE_QUEUE_WORKFLOW
     workflow = base.load_workflow(path)
     raw = path.read_text(encoding="utf-8")
     with_key = [step for step in base.steps(workflow) if secret in str(step.get("env", {}))]
-    assert [step["name"] for step in with_key] == [step_name]
-    step = with_key[0]
-    assert step["env"][secret] == f"${{{{ secrets.{secret} }}}}"
-    assert script in step["run"] and "inputs." not in step["run"]
-    assert step["continue-on-error"] == "true"  # sin IA la cola se publica igual
-    assert "TURSO" not in str(step.get("env", {}))
+    assert sorted(step["name"] for step in with_key) == sorted(steps)
+    for step in with_key:
+        assert step["env"][secret] == f"${{{{ secrets.{secret} }}}}"
+        assert steps[step["name"]] in step["run"] and "inputs." not in step["run"]
+        assert step["continue-on-error"] == "true"  # sin IA la cola se publica igual
+        assert "TURSO" not in str(step.get("env", {}))
     assert f"secrets.{secret}" not in raw.split("Lectura de fotos con IA")[0]
+
+
+def test_product_sheet_test_never_writes_decisions() -> None:
+    workflow = base.load_workflow(base.WORKFLOW_DIR / base.SIZE_QUEUE_WORKFLOW)
+    inputs = workflow["on"]["workflow_dispatch"]["inputs"]
+    assert inputs["fichas_gtin"]["default"] == ""
+    names = [step["name"] for step in base.steps(workflow)]
+    sheets = next(step for step in base.steps(workflow) if step["name"] == SHEETS_STEP)
+    assert names.index(SHEETS_STEP) < names.index("Guardar decisiones automáticas de la IA")
+    assert sheets["env"]["FICHAS_GTIN"] == "${{ inputs.fichas_gtin || '' }}"
+    assert "fichas_gtin_invalido" in sheets["run"] and "--output /tmp/cola/fichas-prueba.json" in sheets["run"]
+    assert "aplicar_decisiones_tamano.py" not in sheets["run"] and "auto-decisiones" not in sheets["run"]
 
 
 def test_size_queue_reads_no_new_photos_unless_asked() -> None:
@@ -829,7 +844,7 @@ def test_size_queue_web_resolution_reads_only_the_queue_and_saves_before_publish
     assert "web_primero_invalido" in search["run"] and "web_cache_symlink_invalid" in search["run"]
     assert "aplicar_decisiones_tamano.py" not in search["run"]
     publish = next(step for step in base.steps(workflow) if step["name"] == "Publicar en un solo commit y push")
-    assert "for name in cola.json ia-tamanos.json web-tamanos.json; do" in publish["run"]
+    assert "for name in cola.json ia-tamanos.json web-tamanos.json fichas-prueba.json; do" in publish["run"]
 
 
 def test_size_queue_saves_ai_decisions_only_as_the_engine() -> None:
