@@ -895,7 +895,7 @@ def test_size_review_panel_sends_only_validated_decisions_to_github(tmp_path: Pa
     (tmp_path / "admin.js").write_text((APP_DIR / "admin.js").read_text(encoding="utf-8"), encoding="utf-8")
     script = """
 import { sizeDecisionsBody, sendSizeDecisions, loadSizeQueue } from './data.js';
-import { searchVariants, storeCode, sizeOptions, decisionOf, aiSuggestion, photoUrls, offerReading } from './admin.js';
+import { searchVariants, storeCode, sizeOptions, decisionOf, aiSuggestion, photoUrls, offerReading, webSuggestion } from './admin.js';
 const calls = [];
 globalThis.fetch = async (url, options = {}) => {
   calls.push({ url, method: options.method || 'GET', headers: options.headers || {}, body: options.body || null,
@@ -922,6 +922,14 @@ out.ai = [
   aiSuggestion({ ia: { status: 'conflicto', reason: 'minoria', value: '1000', unit: 'g', text: 'CONT. NETO 1 KILO' } }),
   aiSuggestion({ ia: { status: 'sin_foto' } }),
   aiSuggestion({}),
+];
+out.web = [
+  webSuggestion({ web: { status: 'encontrado', value: '20', unit: 'oz', text: 'NET WT 20 OZ', url: 'https://www.heinz.com/p/1',
+                         coincide_con: ['Walmart', 'Colonial'], fuentes: [{ title: 'heinz.com', url: 'https://g.co/r' }, { url: 'javascript:x' }] } }),
+  webSuggestion({ web: { status: 'encontrado', value: '20', unit: 'oz', url: 'javascript:alert(1)' } }),
+  webSuggestion({ web: { status: 'encontrado', value: '0', unit: 'oz', url: 'https://a.com' } }),
+  webSuggestion({ web: { status: 'no_encontrado' } }),
+  webSuggestion({}),
 ];
 out.photos = [photoUrls({ foto: 'a'.repeat(24) + '-1111111111' }), photoUrls({ foto: '../x' }), photoUrls({})];
 out.readings = [
@@ -977,6 +985,18 @@ console.log(JSON.stringify(out));
         [],
     ]
     assert result["own"] == ["0049733830119", None, None]
+    found, unsafe, empty, missing, nothing_web = result["web"]
+    assert found["label"] == "🌐 Sugerencia Web: 20 oz" and (found["value"], found["unit"]) == ("20", "oz")
+    assert found["host"] == "heinz.com" and found["matches"] == 2
+    assert found["title"].startswith("Fuente: https://www.heinz.com/p/1") and "Google usó: heinz.com" in found["title"]
+    assert "javascript" not in found["title"] and "sólo se llena el formulario" in found["title"]
+    assert unsafe is None and empty is None and nothing_web is None
+    assert missing["kind"] == "note" and missing["label"] == "🌐 Web: sin resultado"
+    admin = (APP_DIR / "admin.js").read_text(encoding="utf-8")
+    # Un clic en la sugerencia web sólo llena el formulario: no envía ni guarda nada.
+    web_click = admin.split('pick.addEventListener("click", () => update({')[1].split("}));")[0]
+    assert "sendSizeDecisions" not in web_click and "value: web.value, unit: web.unit" in web_click
+    assert 'rel: "noopener noreferrer"' in admin
     suggest, invalid, conflict, no_photo, pending = result["ai"]
     assert suggest["label"] == "🤖 Sugerencia: 240 g" and (suggest["value"], suggest["unit"]) == ("240", "g")
     assert invalid["label"] == "🤖 No legible" and conflict["status"] == "conflicto"

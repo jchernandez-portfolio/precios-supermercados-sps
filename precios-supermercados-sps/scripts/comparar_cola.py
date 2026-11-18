@@ -2,7 +2,7 @@
 """¿La cola nueva cambia algo más que su fecha? (para no publicar commits vacíos).
 
 Compara ``cola.json`` publicada con la recién calculada ignorando sólo las marcas de
-tiempo de la corrida (``generated_utc`` y ``ia.actualizado_utc``). Sale con 0 si hay
+tiempo de la corrida (``generated_utc``, ``ia.actualizado_utc`` y ``web.actualizado_utc``). Sale con 0 si hay
 un cambio relevante (códigos, ofertas, lecturas, resumen de la IA o historial) y con
 1 si sólo cambiaron las fechas. Si la publicada no existe o no se puede leer, cuenta
 como cambio.
@@ -24,9 +24,10 @@ def _relevant(document: object) -> object:
     if not isinstance(document, dict):
         return document
     clean = {key: value for key, value in document.items() if key not in RUN_STAMPS}
-    ia = clean.get("ia")
-    if isinstance(ia, dict):
-        clean["ia"] = {key: value for key, value in ia.items() if key not in IA_STAMPS}
+    for section in ("ia", "web"):
+        summary = clean.get(section)
+        if isinstance(summary, dict):
+            clean[section] = {key: value for key, value in summary.items() if key not in IA_STAMPS}
     return clean
 
 

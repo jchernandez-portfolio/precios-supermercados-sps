@@ -38,3 +38,12 @@ def test_missing_or_broken_previous_queue_counts_as_change(tmp_path: Path) -> No
     assert comparar_cola.changed(tmp_path / "no-existe.json", after) is True
     (tmp_path / "roto.json").write_text("{", encoding="utf-8")
     assert comparar_cola.main(["--anterior", str(tmp_path / "roto.json"), "--nueva", str(after)]) == 0
+
+
+def test_web_search_date_alone_is_not_a_change_but_new_findings_are(tmp_path: Path) -> None:
+    with_web = {**BASE, "web": {"consultas": 3, "actualizado_utc": "2026-11-18T12:00:00Z"}}
+    before = write(tmp_path / "a.json", with_web)
+    later = {**with_web, "web": {**with_web["web"], "actualizado_utc": "2026-11-19T12:00:00Z"}}
+    assert comparar_cola.changed(before, write(tmp_path / "b.json", later)) is False
+    more = {**with_web, "web": {**with_web["web"], "consultas": 4}}
+    assert comparar_cola.changed(before, write(tmp_path / "c.json", more)) is True

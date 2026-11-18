@@ -102,7 +102,7 @@ jobs:
         run: |
           set -euo pipefail
           gh workflow run precios-supermercados-sps-size-queue.yml \
-            --repo "$GITHUB_REPOSITORY" --ref main -f ia_minutos=0
+            --repo "$GITHUB_REPOSITORY" --ref main -f ia_minutos=0 -f web_max=0
           echo "size_queue_dispatched=true"
 
       - name: Guardar resultado

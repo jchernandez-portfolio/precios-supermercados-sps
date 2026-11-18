@@ -11,7 +11,7 @@
 // GitHub la rechaza (401/403). Sólo viaja en el encabezado Authorization a api.github.com.
 import {
   RETAILER_NAMES, SIZE_DECISIONS_RUNS_URL, SIZE_UNITS, loadSizeQueue, sendSizeDecisions,
-} from "./data.js?v=20261116-30";
+} from "./data.js?v=20261116-31";
 
 const TOKEN_KEY = "super-compras-admin-github-token";
 // Códigos ya enviados en este dispositivo: {gtin: ISO de envío}. Se ocultan de la cola
@@ -231,6 +231,34 @@ export function aiSuggestion(item) {
   return { kind: "note", label: "🤖 No legible", title: AI_REASONS[ai.reason] || AI_REASONS.ilegible };
 }
 
+// Sugerencia de la búsqueda web (Gemini con Google Search). Un clic sólo llena el
+// formulario: nunca se guarda sola. La URL va en el título (al pasar el mouse) y en un enlace.
+const safeUrl = (url) => (typeof url === "string" && /^https?:\/\/[^\s]+$/i.test(url) && url.length <= 500 ? url : "");
+export function webSuggestion(item) {
+  const web = item?.web;
+  if (!web || typeof web !== "object") return null;
+  const url = safeUrl(web.url);
+  if (web.status === "encontrado" && Number(web.value) > 0 && SIZE_UNITS.includes(web.unit) && url) {
+    const matches = Array.isArray(web.coincide_con) ? web.coincide_con.filter((name) => typeof name === "string") : [];
+    const sources = Array.isArray(web.fuentes) ? web.fuentes.filter((source) => safeUrl(source?.url)) : [];
+    const host = (() => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return ""; } })();
+    return {
+      kind: "suggest", value: String(web.value), unit: web.unit, url, host,
+      label: `🌐 Sugerencia Web: ${sizeText(web.value, web.unit)}`,
+      title: [
+        `Fuente: ${url}`,
+        typeof web.text === "string" && web.text ? `Dice: ${web.text}` : "",
+        matches.length ? `Coincide con: ${matches.join(", ")}` : "No coincide con ningún título publicado.",
+        sources.length ? `Google usó: ${sources.map((source) => source.title || source.url).join(", ")}` : "",
+        "Revisa la fuente: al tocarlo sólo se llena el formulario.",
+      ].filter(Boolean).join("\n"),
+      matches: matches.length,
+    };
+  }
+  if (web.status === "no_encontrado") return { kind: "note", label: "🌐 Web: sin resultado", title: "La búsqueda web no encontró el tamaño oficial de este código." };
+  return null;
+}
+
 // Tamaños publicados, el más repetido primero: son los botones rápidos.
 export function sizeOptions(item) {
   const groups = new Map();
@@ -384,6 +412,20 @@ export function mountSizeReview(main, { h, fill }) {
     } else if (suggestion) {
       aiNode = h("span", { class: "rv-ai-note", title: suggestion.title }, suggestion.label);
     }
+    const web = webSuggestion(item);
+    let webNode = null;
+    if (web?.kind === "suggest") {
+      const active = !entry.different && entry.value === web.value && entry.unit === web.unit;
+      const pick = h("button", { type: "button", class: "rv-pick rv-web", "aria-pressed": String(active), title: web.title },
+        web.label, h("span", { class: "muted" }, web.matches ? ` (${web.matches})` : " (ninguno)"));
+      pick.addEventListener("click", () => update({
+        value: web.value, unit: web.unit, different: false, note: entry.note || `Fuente web: ${web.url}`.slice(0, 200),
+      }));
+      webNode = h("span", { class: "rv-web-wrap" }, pick,
+        h("a", { class: "rv-web-source", href: web.url, target: "_blank", rel: "noopener noreferrer", title: web.url }, `${web.host || "fuente"} ↗`));
+    } else if (web) {
+      webNode = h("span", { class: "rv-ai-note", title: web.title }, web.label);
+    }
     const row = h("article", { class: `rv-row${decided ? " done" : ""}${sent ? " sent" : ""}` },
       h("div", {},
         h("h2", { class: "rv-name" }, item.name),
@@ -396,7 +438,7 @@ export function mountSizeReview(main, { h, fill }) {
         item.ia?.status === "auto"
           ? h("p", { class: "rv-auto" }, "La IA guardó este tamaño sola. Si está mal, elige el correcto y guarda: tu decisión reemplaza la de la IA.")
           : null,
-        h("div", { class: "rv-picks" }, aiNode, picks, different),
+        h("div", { class: "rv-picks" }, aiNode, webNode, picks, different),
         h("div", { class: "rv-manual" }, value, unit),
         note));
     return row;
