@@ -158,11 +158,14 @@ def test_quota_error_falls_back_to_the_next_model_then_stops() -> None:
             models = [{"name": f"models/{name}", "supportedGenerationMethods": ["generateContent"]}
                       for name in ("gemini-flash-latest", "gemini-flash-lite-latest")]
             return Response(json.dumps({"models": models}).encode())
-        raise urllib.error.HTTPError(request.full_url, 429, "quota", {}, io.BytesIO(b"{}"))
+        message = {"error": {"message": "Quota exceeded for metric: generate_content_free_tier_requests, limit: 0"}}
+        raise urllib.error.HTTPError(request.full_url, 429, "quota", {}, io.BytesIO(json.dumps(message).encode()))
 
     client = web.WebSearch("k", opener=opener, sleep=lambda _: None)
     summary = web.annotate({"items": [heinz()]}, {}, client=client, limit=3, first=[HEINZ], now=NOW)
     assert summary["detenido_por"] == "cuota_agotada" and client.model == "gemini-flash-lite-latest"
+    # Se ve por qué falló cada modelo (no sólo el último): «limit: 0» = el modelo no tiene cuota gratis.
+    assert "limit: 0" in summary["errores_por_modelo"]["gemini-flash-latest"]
 
 
 def test_main_writes_cache_and_annotated_queue_without_a_key(tmp_path: Path, monkeypatch) -> None:
