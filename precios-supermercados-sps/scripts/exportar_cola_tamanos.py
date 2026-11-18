@@ -10,6 +10,11 @@ tamaño oficial:
 - ``atipico``: el grupo compara, pero una o más ofertas quedaron fuera por
   tamaño.
 
+Las ofertas de la marca blanca de PriceSmart («Member's Selection») no entran a la
+cola: siguen en el catálogo, pero no se comparan como si fueran otro producto. Si al
+quitarlas no queda un conflicto (menos de dos ofertas o un solo tamaño), el código no
+se lista.
+
 Omite los GTIN que ya tienen fila en ``size_decisions`` (y publica cuáles decidió
 la IA, para auditarlos, con sus ofertas en ``resueltas_motor``). Cada oferta lleva la foto de su tarjeta en el bucket R2
 (``foto``: la misma que lee Gemini) y de qué súper vino esa foto. Sólo publica
@@ -245,6 +250,21 @@ def engine_items(groups: Sequence[Mapping[str, object]], rows: Mapping[str, Mapp
     return items[:MAX_ITEMS]
 
 
+_PRIVATE_LABEL = re.compile(r"\bmember\W*s?\W*selection\b", re.IGNORECASE)
+
+
+def is_private_label(profile: ProductProfile) -> bool:
+    """Marca blanca de PriceSmart («Member's Selection») por marca o título."""
+    record = profile.record
+    return record.supermarket_id == "pricesmart" and any(
+        _PRIVATE_LABEL.search(text or "") for text in (record.source_brand, record.source_name))
+
+
+def still_in_conflict(offers: Sequence[Mapping[str, object]]) -> bool:
+    sizes = {(offer["value"], offer["unit"]) for offer in offers if offer.get("value")}
+    return len(offers) >= 2 and len(sizes) >= 2
+
+
 def queue_items(groups: Sequence[Mapping[str, object]], skip: set[str]) -> list[dict[str, object]]:
     items: list[dict[str, object]] = []
     for group in groups:
@@ -260,6 +280,12 @@ def queue_items(groups: Sequence[Mapping[str, object]], skip: set[str]) -> list[
         else:
             continue
         members, offers = group_offers(group, size_excluded)
+        private = {member.record.source_record_id for member in members if is_private_label(member)}
+        if private:
+            members = [member for member in members if member.record.source_record_id not in private]
+            offers = [offer for offer in offers if offer["ref"] not in private]
+            if not still_in_conflict(offers):
+                continue
         kept = [member for member in members if member.record.source_record_id not in size_excluded]
         title = max((kept or members), key=lambda member: len(member.record.source_name or "")).record.source_name
         items.append({"gtin": gtin, "kind": kind, "name": title, "offers": offers})

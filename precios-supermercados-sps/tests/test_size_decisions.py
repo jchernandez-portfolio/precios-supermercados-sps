@@ -308,6 +308,24 @@ def test_queue_lists_ties_and_outliers_and_skips_decided_gtins() -> None:
     assert [item["gtin"] for item in cola.queue_items(groups, skip={SEDAL})] == [CHOLULA]
 
 
+def test_queue_leaves_out_pricesmart_private_label_offers() -> None:
+    nuts = [
+        (41, "walmart", "Mezcla de Nueces Planters 400 g", "Planters", "400 g", "Snacks", "0029000016712"),
+        (42, "paiz", "Mezcla de Nueces Planters 400 g", "Planters", "400 g", "Snacks", "0029000016712"),
+        (43, "pricesmart", "Member's Selection Mezcla de Nueces 1.13 kg", "Member's Selection", "1130 g", "Snacks",
+         "0029000016712"),
+    ]
+    sedal = [*SHAMPOO_ROWS,
+             (44, "pricesmart", "Members Selection Shampoo 1 L", "MEMBERS SELECTION", "1000 ml", "Cuidado personal",
+              "7501056330217")]
+    groups = resolve_groups(build_profiles([record for _, record in records_from_product_rows(nuts + sedal)]))
+    by_gtin = {item["gtin"]: item for item in cola.queue_items(groups, skip=set())}
+    # Sin la marca blanca las nueces ya no tienen conflicto: no se listan.
+    assert "00029000016712" not in by_gtin
+    # El shampoo sigue en conflicto (400 ml contra 400 g), pero sin la oferta de PriceSmart.
+    assert [offer["store"] for offer in by_gtin[SEDAL]["offers"]] == ["paiz", "walmart"]
+
+
 def test_queue_sizes_are_rounded_to_two_decimals() -> None:
     rows = [
         (21, "colonial", "Harina Pan 2.2 lb", "PAN", None, "Harinas", "0739907000010"),

@@ -7,6 +7,7 @@ número son cambios directos. El detalle de cada incidente vive en
 
 ## 2026-11-18
 
+- Cola de tamaños: las ofertas de «Member's Selection» (marca blanca de PriceSmart) no entran a la cola; si sin ellas no hay conflicto, el código no se lista.
 - README: insignias, estado por pieza (🟢🟡🔴), diagramas Mermaid (flujo, secuencia de revisión y modelo de datos) y tablas de la Ley de la Mayoría y la búsqueda con Grounding.
 - #122 Búsqueda web: el resumen `web` de la cola anota el error de cada modelo de Gemini (`errores_por_modelo`).
 - #121 IA de tamaños sólo con Gemini y búsqueda web del peso oficial (Gemini con Google Search) sólo para la cola; el panel muestra «🌐 Sugerencia Web» con su fuente y nunca la guarda sola.
