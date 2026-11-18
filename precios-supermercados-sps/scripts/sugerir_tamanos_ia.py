@@ -680,7 +680,7 @@ def _error_message(error: urllib.error.HTTPError) -> str:
         message = document.get("error", {}).get("message") if isinstance(document, Mapping) else None
     except (OSError, ValueError, AttributeError):
         message = None
-    return f"{error.code}: {' '.join(str(message or '').split())[:160]}"
+    return f"{error.code}: {' '.join(str(message or '').split())[:300]}"
 
 
 # ------------------------------------------------------------------- corrida

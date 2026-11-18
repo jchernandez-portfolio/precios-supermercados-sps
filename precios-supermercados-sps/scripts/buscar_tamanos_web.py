@@ -165,6 +165,16 @@ class WebSearch(Gemini):
 
     name = "gemini_web"
 
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.errors_by_model: dict[str, str] = {}
+
+    def _next_model(self) -> bool:
+        # Antes de cambiar de modelo se anota por qué falló (p. ej. 429 «limit: 0» = sin cuota gratis).
+        if self.model and self.last_error:
+            self.errors_by_model[self.model] = self.last_error
+        return super()._next_model()
+
     def search(self, gtin: str, name: str) -> object:
         prompt = PROMPT.format(gtin=gtin, name=" ".join(name.replace('"', "'").split())[:120])
         body = {
@@ -284,7 +294,8 @@ def annotate(queue: dict[str, object], cache: dict[str, dict[str, object]], *, c
         stats["encontrados" if entry.get("status") == "encontrado" else "no_encontrados"] += 1
     return {**stats, "en_cola": shown, "detenido_por": stop, "modelo": client.model if client else None,
             "reintentos": client.retries if client else 0,
-            "ultimo_error_api": client.last_error if client else None}
+            "ultimo_error_api": client.last_error if client else None,
+            "errores_por_modelo": dict(getattr(client, "errors_by_model", {}) or {})}
 
 
 def load_cache(path: Path | None) -> dict[str, dict[str, object]]:
