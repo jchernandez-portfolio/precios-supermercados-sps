@@ -879,14 +879,14 @@ console.log(JSON.stringify({
 }));
 """
     result = json.loads(_node(script, tmp_path))
-    assert result["keys"] == ["todos", "empate", "atipico", "pendiente", "ia"]
+    assert result["keys"] == ["todos", "empate", "atipico", "pendiente", "correccion_ia", "ia"]
     assert result["todos"] == ["1", "2", "3", "4"]  # lo ya enviado no se vuelve a revisar
     assert result["empate"] == ["1", "2"] and result["atipico"] == ["3", "4"]
     assert result["pendiente"] == ["1", "2", "4"]  # el 3 ya tiene tamaño marcado; el 4 está incompleto
     assert result["ia"] == ["9", "10"]  # sólo lo que size_decisions tiene como engine:*
-    assert result["counts"] == {"todos": 4, "empate": 2, "atipico": 2, "pendiente": 3, "ia": 2}
+    assert result["counts"] == {"todos": 4, "empate": 2, "atipico": 2, "pendiente": 3, "correccion_ia": 0, "ia": 2}
     assert result["noList"] == ["11"]  # cola vieja sin decididas_ia: se muestra todo lo resuelto
-    assert result["empty"] == {"todos": 0, "empate": 0, "atipico": 0, "pendiente": 0, "ia": 0}
+    assert result["empty"] == {"todos": 0, "empate": 0, "atipico": 0, "pendiente": 0, "correccion_ia": 0, "ia": 0}
     admin = (APP_DIR / "admin.js").read_text(encoding="utf-8")
     assert 'h("span", { class: "rv-chip-count" }' in admin and "chipsBar.scrollIntoView" in admin
 
@@ -992,13 +992,14 @@ console.log(JSON.stringify(out));
     assert "javascript" not in found["title"] and "sólo se llena el formulario" in found["title"]
     assert unsafe is None and empty is None and nothing_web is None
     assert missing["kind"] == "note"
-    assert missing["label"] == "🤖 Claude no pudo verificar el dato en la web. Requiere revisión humana"
+    assert missing["label"] == "🤖 No se pudo verificar el dato en la web. Requiere revisión humana"
     assert "Requiere revisión humana" in found["title"]
     admin = (APP_DIR / "admin.js").read_text(encoding="utf-8")
     # Un clic en la sugerencia web sólo llena el formulario: no envía ni guarda nada.
     web_click = admin.split('pick.addEventListener("click", () => update({')[1].split("}));")[0]
     assert "sendSizeDecisions" not in web_click and "value: web.value, unit: web.unit" in web_click
     assert 'rel: "noopener noreferrer"' in admin
+    assert 'correccion_ia: "Corrección de IA' in admin and 'item.kind === "correccion_ia"' in admin
     suggest, invalid, conflict, no_photo, pending = result["ai"]
     assert suggest["label"] == "🤖 Sugerencia: 240 g" and (suggest["value"], suggest["unit"]) == ("240", "g")
     assert invalid["label"] == "🤖 No legible" and conflict["status"] == "conflicto"

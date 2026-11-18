@@ -17,7 +17,7 @@ Sistema que **captura, valida, homologa y publica todos los días** los precios 
 
 ## Ley de la Mayoría
 
-Cómo decide la lectura de fotos con Claude (`scripts/sugerir_tamanos_ia.py`). Sólo guarda sola cuando **todas** las fotos legibles dicen lo mismo **y** ese tamaño es el que publica **más de la mitad** de las ofertas.
+Cómo decide la lectura de fotos (`scripts/sugerir_tamanos_ia.py`; desde el 18-nov-2026 sólo se leen fotos nuevas si se pide). Sólo guarda sola cuando **todas** las fotos legibles dicen lo mismo **y** ese tamaño es el que publica **más de la mitad** de las ofertas.
 
 | Situación | Ejemplo | Resultado |
 | --- | --- | --- |
@@ -28,18 +28,18 @@ Cómo decide la lectura de fotos con Claude (`scripts/sugerir_tamanos_ia.py`). S
 | Foto ilegible, de otro producto o sin foto | — | `no_legible` / `sin_foto`: decide una persona |
 | Ya existe una decisión humana | — | La IA nunca la reemplaza; la persona sí reemplaza a la IA |
 
-## Búsqueda web con Claude
+## Búsqueda web por GTIN
 
-Para lo que la foto no resuelve, Claude (API de Anthropic, herramienta de servidor `web_search`) busca el peso oficial del fabricante (`scripts/buscar_tamanos_web.py`).
+Para los códigos de la cola, Gemini (Grounding with Google Search) busca el peso oficial con marca, nombre y GTIN, **sin leer fotos** (`scripts/buscar_tamanos_web.py`; Claude con `web_search` queda como alternativa con `--provider claude`).
 
 | Regla | Cómo se cumple |
 | --- | --- |
-| Sólo la cola, nunca el catálogo | Lee `cola.json` en su orden (empates primero; antes, los GTIN pedidos en `web_primero`). Tope de 40 consultas por corrida (máximo 300) y de 60 minutos; hasta 3 búsquedas por producto. |
-| Qué se le da | Marca, nombre, GTIN y el tamaño que publica cada súper, con la instrucción de no elegir un tamaño sólo porque lo publica un súper. |
-| Se aprueba sola (`engine:claude_auto`) | Sólo si: confianza **alta**, la URL salió de la búsqueda, alguna **cita textual** de la fuente trae el número, y el tamaño coincide con el que publica al menos un súper. Se guarda la forma publicada que coincide (la de más súper). Nunca sobre una decisión humana. |
-| Si no se puede verificar | Se queda en la cola con «🤖 Claude no pudo verificar el dato en la web. Requiere revisión humana»; si encontró algo, el panel lo muestra como «🌐 Sugerencia Web» con su fuente. |
-| Caché y límites | `web-tamanos.json` en la rama `revision-tamanos`; lo no resuelto se reintenta a los 30 días. Ante 429, llave inválida o búsqueda deshabilitada, para y guarda lo avanzado. |
-| Llave | `ANTHROPIC_API_KEY` sólo entra a los dos pasos de IA; el SDK la manda en un encabezado, nunca en URLs ni logs. |
+| Sólo la cola, nunca el catálogo | Lee `cola.json` en su orden (empates primero; antes, los GTIN de `web_primero`). Tope de 40 consultas por corrida (máximo 300) y 60 minutos. |
+| Qué se pregunta | «Busca el peso oficial del producto [Marca] [Nombre] con GTIN [GTIN]. Revisa fabricantes, GS1, Open Food Facts y supermercados de Centroamérica. Ignora los supermercados de Honduras». Sin los tamaños de los súper, para no sesgar. |
+| Se aprueba sola (`engine:gemini_auto`) | Confianza alta o media, la fuente salió de la búsqueda y **no es un súper de Honduras**, un pasaje citado de una fuente independiente trae el número, y el tamaño coincide con el que publica al menos un súper. Nunca sobre una decisión humana. |
+| Si no se puede verificar | Se queda en la cola con «🤖 No se pudo verificar el dato en la web. Requiere revisión humana»; si encontró algo, el panel lo muestra como «🌐 Sugerencia Web» con su fuente. |
+| Re-auditoría | Lo que la IA resolvió con fotos también se busca (`web_auditar`, 20 por corrida). Si una fuente verificada dice otro tamaño, vuelve a la cola como «Corrección de IA» (la decisión de la IA sigue hasta que una persona decida). |
+| Caché y cuota | `web-tamanos.json` en la rama `revision-tamanos`; lo no resuelto se reintenta a los 30 días. Sin cuota prueba 3 modelos como mucho y para, guardando lo avanzado. |
 
 ## Cobertura
 
@@ -59,7 +59,7 @@ La app vive en [`super-compras/`](super-compras/) y se publica sola en GitHub Pa
 - **Producto:** el mismo artículo en cada supermercado, con el más barato marcado y otras presentaciones para comparar.
 - **Mi compra:** la lista completa con su costo en cada supermercado y comprando cada cosa donde está más barata. Se guarda en el dispositivo.
 - **Escanear:** lee el código de barras con la cámara del teléfono (BarcodeDetector o un lector ZXing propio, sin servicios externos) y abre dónde está más barato.
-- **Revisión de tamaños** (`#/admin/revision`, interno): mismo código de barras con tamaños distintos entre súper. Claude lee las fotos y resuelve lo claro ([Ley de la Mayoría](#ley-de-la-mayoría)); para el resto busca el peso oficial en internet y aprueba solo lo que la fuente confirma ([búsqueda web con Claude](#búsqueda-web-con-claude)). Una persona decide, y su decisión siempre reemplaza a la de la IA.
+- **Revisión de tamaños** (`#/admin/revision`, interno): mismo código de barras con tamaños distintos entre súper. la búsqueda web por GTIN aprueba sola lo que una fuente independiente confirma ([búsqueda web por GTIN](#búsqueda-web-por-gtin)); las lecturas de fotos ya guardadas siguen la [Ley de la Mayoría](#ley-de-la-mayoría) ([búsqueda web por GTIN](#búsqueda-web-por-gtin)). Una persona decide, y su decisión siempre reemplaza a la de la IA.
 
 La app solo lee archivos estáticos ya publicados (`portfolio-data`, `product-images`). No consulta Turso ni sitios de supermercados desde el navegador, no pide cuenta ni datos personales y tiene una política de seguridad de contenido estricta. La carga inicial pesa ~48 KB (~9 KB gzip, 2 requests) más la portada del catálogo (`home.json`, ~11 KB gzip); el índice de búsqueda (~1.4 MB gzip) baja en segundo plano y las fichas por partición bajo demanda.
 

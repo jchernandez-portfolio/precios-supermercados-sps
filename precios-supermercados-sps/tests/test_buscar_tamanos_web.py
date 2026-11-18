@@ -1,4 +1,4 @@
-"""Claude con búsqueda web resuelve la cola de tamaños; sólo lo verificado se aprueba solo."""
+"""Búsqueda web por GTIN (Gemini o Claude): sólo lo verificado con fuente independiente se aprueba solo."""
 from __future__ import annotations
 
 import json
@@ -77,16 +77,17 @@ def parsed(answer: dict | str, **kwargs) -> dict:
     return web.parse_answer(web.read_response(response(answer, **kwargs)))
 
 
-def test_request_sends_brand_name_gtin_and_published_sizes_with_the_web_search_tool() -> None:
+def test_claude_request_sends_brand_name_and_gtin_with_the_web_search_tool() -> None:
     client = claude([response(FOUND)])
     client.search(heinz())
     call = client.client.messages.calls[0]
     assert call["model"] == "claude-sonnet-5-5" and call["max_tokens"] == web.MAX_TOKENS
     assert call["tools"] == [{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}]
     prompt = call["messages"][0]["content"]
-    assert "Marca: Heinz" in prompt and f"GTIN (código de barras): {HEINZ}" in prompt
-    assert "Walmart: 566 g; Colonial: 566 g; Los Andes: 20 oz" in prompt
-    assert "No elijas un tamaño sólo porque lo publica un supermercado" in prompt
+    assert prompt.startswith(f"Busca el peso oficial del producto Heinz Mostaza Heinz Amarilla Natural Squeeze - 566 g "
+                             f"con GTIN {HEINZ}. Revisa fabricantes, GS1, Open Food Facts y supermercados de Centroamérica.")
+    assert "Ignora los supermercados de Honduras" in prompt
+    assert "Walmart: 566 g" not in prompt  # sin los tamaños de los súper, para no sesgar
     assert client.usage == {"entrada": 1200, "salida": 80, "busquedas": 1}
 
 
@@ -104,9 +105,11 @@ def test_verified_answer_is_approved_with_the_published_size_that_matches() -> N
 
 
 @pytest.mark.parametrize(("answer", "kwargs", "reason"), [
-    ({**FOUND, "confianza": "media"}, {}, "confianza_media"),
+    ({**FOUND, "confianza": "baja"}, {}, "confianza_baja"),
     ({**FOUND, "url": "https://inventada.example/heinz"}, {}, "url_no_vino_de_la_busqueda"),
-    (FOUND, {"cited": "Heinz Yellow Mustard squeeze bottle"}, "ninguna_cita_trae_el_numero"),
+    (FOUND, {"cited": "Heinz Yellow Mustard squeeze bottle"}, "ninguna_cita_independiente_trae_el_numero"),
+    ({**FOUND, "url": "https://www.lacolonia.com/mostaza"}, {"url": "https://www.lacolonia.com/mostaza"},
+     "fuente_es_un_super_de_honduras"),
     ({**FOUND, "valor": 14, "texto": "14 oz"}, {"cited": "NET WT 14 OZ"}, "no_coincide_con_ningun_super"),
     ({"encontrado": False}, {}, "no_encontrado"),
     ("no sé", {}, "respuesta_invalida"),
@@ -176,11 +179,13 @@ def test_main_writes_engine_decisions_and_a_fallback_queue(tmp_path: Path, monke
     (tmp_path / "cola.json").write_text(json.dumps({"schema": "rpi-size-queue/v1", "items": [tie, heinz()]}))
     assert web.main(["--queue", str(tmp_path / "cola.json"), "--queue-with-auto", str(tmp_path / "con-auto.json"),
                      "--auto-out", str(tmp_path / "auto.json"), "--cache-in", str(tmp_path / "cache.json"),
+                     "--provider", "claude",
                      "--cache-out", str(tmp_path / "out.json"), "--max", "0"]) == 0
     queue = json.loads((tmp_path / "cola.json").read_text())
     assert [item["gtin"] for item in queue["items"]] == ["07501017003075"] and queue["counts"]["atipico"] == 0
     assert queue["web"]["aprobados_solos"] == 1 and queue["web"]["detenido_por"] == "sin_consultas"
-    auto = json.loads((tmp_path / "auto.json").read_text())
+    assert json.loads((tmp_path / "auto-gemini.json").read_text())["decisions"] == []
+    auto = json.loads((tmp_path / "auto-claude.json").read_text())
     assert auto["schema"] == "rpi-size-decisions/v1"
     assert [(d["gtin"], d["value"], d["unit"]) for d in auto["decisions"]] == [(HEINZ, "566", "g")]
     # Si guardar falla, se publica la cola de respaldo: Heinz sigue adentro, como sugerencia.
@@ -193,6 +198,112 @@ def test_main_writes_engine_decisions_and_a_fallback_queue(tmp_path: Path, monke
 def test_main_rejects_bad_parameters(tmp_path: Path) -> None:
     base = ["--queue", str(tmp_path / "c.json"), "--queue-with-auto", str(tmp_path / "a.json"),
             "--auto-out", str(tmp_path / "d.json"), "--cache-out", str(tmp_path / "o.json")]
-    for extra in (["--max", "500"], ["--first", "abc"], ["--model", "gpt-4"], ["--minutes", "500"]):
+    for extra in (["--max", "500"], ["--first", "abc"], ["--model", "gpt-4"], ["--minutes", "500"],
+                  ["--audit-max", "-1"]):
         with pytest.raises(SystemExit, match="parametros_invalidos"):
             web.main([*base, *extra])
+
+
+def test_honduran_store_pages_never_count_as_the_cited_source() -> None:
+    item = heinz()
+    entry = parsed(FOUND, url="https://www.walmart.com.hn/mostaza-heinz", cited="Mostaza Heinz 566 g / 20 oz")
+    # La URL inventada no salió de la búsqueda y la única cita es de un súper de Honduras.
+    reasons = web.auto_reasons(item, entry)
+    assert "ninguna_cita_independiente_trae_el_numero" in reasons and "url_no_vino_de_la_busqueda" in reasons
+    assert web.is_honduran_store("tienda.lacolonia.com") and not web.is_honduran_store("heinz.com")
+
+
+GEMINI_ANSWER = {
+    "candidates": [{"content": {"parts": [{"text": "Heinz publica NET WT 20 OZ. "},
+                                          {"text": json.dumps({**FOUND, "url": "https://www.heinz.com/p/1"})}]},
+                    "groundingMetadata": {
+                        "webSearchQueries": ["heinz 00013000002189", "heinz mustard 20 oz"],
+                        "groundingChunks": [
+                            {"web": {"uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/a",
+                                     "title": "heinz.com"}},
+                            {"web": {"uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/b",
+                                     "title": "walmart.com.hn"}}],
+                        "groundingSupports": [
+                            {"segment": {"text": "Heinz publica NET WT 20 OZ."}, "groundingChunkIndices": [0, 1]}]}}],
+    "usageMetadata": {"promptTokenCount": 300, "candidatesTokenCount": 40},
+}
+
+
+def test_gemini_grounding_answer_is_read_like_a_cited_search() -> None:
+    read = web.read_gemini(GEMINI_ANSWER)
+    assert read["searches"] == 2 and read["usage"] == {"input_tokens": 300, "output_tokens": 40}
+    assert [c["title"] for c in read["citations"]] == ["heinz.com", "walmart.com.hn"]
+    result = web.parse_answer(read)
+    # La URL de Gemini se reconoce por el dominio de la página (las URIs son redirecciones de Google).
+    assert result["url"] == "https://www.heinz.com/p/1" and result["url_de_busqueda"] is True
+    assert result["cita_con_numero"] is True and result["fuente_hondurena"] is False
+    assert web.auto_reasons(heinz(), result) == []
+    only_walmart = json.loads(json.dumps(GEMINI_ANSWER))
+    only_walmart["candidates"][0]["groundingMetadata"]["groundingSupports"][0]["groundingChunkIndices"] = [1]
+    assert not web.parse_answer(web.read_gemini(only_walmart))["cita_con_numero"]
+
+
+class Response:
+    def __init__(self, body: bytes) -> None:
+        self.body = body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def read(self) -> bytes:
+        return self.body
+
+
+def test_gemini_client_uses_google_search_and_stops_without_quota() -> None:
+    sent: list = []
+
+    def opener(request, timeout):
+        sent.append(request)
+        if request.full_url.endswith("models?pageSize=1000"):
+            models = [{"name": f"models/{name}", "supportedGenerationMethods": ["generateContent"]}
+                      for name in ("gemini-flash-latest", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash")]
+            return Response(json.dumps({"models": models}).encode())
+        return Response(json.dumps(GEMINI_ANSWER).encode())
+
+    client = web.GeminiWebSearch("SECRET", opener=opener, sleep=lambda _: None)
+    read = client.search(heinz())
+    body = json.loads(sent[1].data)
+    assert body["tools"] == [{"google_search": {}}] and "Ignora los supermercados de Honduras" in \
+        body["contents"][0]["parts"][0]["text"]
+    assert all("SECRET" not in request.full_url for request in sent) and read["searches"] == 2
+    assert client.usage == {"entrada": 300, "salida": 40, "busquedas": 2}
+
+    import urllib.error
+
+    def no_quota(request, timeout):
+        if request.full_url.endswith("models?pageSize=1000"):
+            return opener(request, timeout)
+        raise urllib.error.HTTPError(request.full_url, 429, "quota", {}, None)
+
+    broke = web.GeminiWebSearch("k", opener=no_quota, sleep=lambda _: None)
+    stats = web.search_new([heinz()], {}, client=broke, limit=5, minutes=10, now=NOW)
+    assert stats["detenido_por"] == "cuota_agotada"
+    assert len(broke.errors_by_model) == web.GEMINI_MAX_MODELS  # prueba 3 de los 4 modelos, no todos
+
+
+def test_audit_sends_photo_decisions_contradicted_by_the_web_back_to_people() -> None:
+    def resolved(gtin: str, value: str, unit: str) -> dict:
+        return {"gtin": gtin, "kind": "resuelto_ia", "name": "x", "offers": [],
+                "ia": {"status": "auto", "fuente": "gemini", "value": value, "unit": unit}}
+
+    ok, wrong, unknown = resolved(HEINZ, "566", "g"), resolved("07421000825234", "400", "g"), \
+        resolved("07501017003075", "100", "g")
+    entry = {**parsed(FOUND), "prompt": web.PROMPT_VERSION}
+    other = {**parsed({**FOUND, "valor": 1, "unidad": "lb", "texto": "1 lb"}, cited="Peso neto 1 lb (453.6 g)"),
+             "prompt": web.PROMPT_VERSION}
+    cache = {HEINZ: entry, "07421000825234": other}
+    queue = {"items": [], "auto_resueltas": [ok, wrong, unknown, {"gtin": "9", "ia": {"status": "otro_producto"}}]}
+    assert [item["gtin"] for item in web.audit_candidates(queue)] == [HEINZ, "07421000825234", "07501017003075"]
+    corrections, confirmed = web.audit(web.audit_candidates(queue), cache)
+    assert confirmed == 1 and ok["web"]["verifica"] is True and "nota" not in ok["web"]
+    assert [item["gtin"] for item in corrections] == ["07421000825234"]
+    assert corrections[0]["kind"] == "correccion_ia"
+    assert corrections[0]["web"]["nota"].startswith("Corrección de IA: la IA guardó 400 g por las fotos; la web dice")
