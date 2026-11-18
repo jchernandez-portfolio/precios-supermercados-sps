@@ -5,6 +5,15 @@ número son cambios directos. El detalle de cada incidente vive en
 [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md) y el de cada error de datos en
 [`docs/calidad/errores-confirmados.csv`](docs/calidad/errores-confirmados.csv).
 
+## 2026-11-18
+
+- README: insignias, estado por pieza (🟢🟡🔴), diagramas Mermaid (flujo, secuencia de revisión y modelo de datos) y tablas de la Ley de la Mayoría y la búsqueda con Grounding.
+- #122 Búsqueda web: el resumen `web` de la cola anota el error de cada modelo de Gemini (`errores_por_modelo`).
+- #121 IA de tamaños sólo con Gemini y búsqueda web del peso oficial (Gemini con Google Search) sólo para la cola; el panel muestra «🌐 Sugerencia Web» con su fuente y nunca la guarda sola.
+- #120 Panel de tamaños: contador en cada pestaña, «Resueltos por IA» sólo con decisiones del motor y vuelta al inicio al cambiar de pestaña.
+- #119 Súper Compras: se quita el modo oscuro; queda sólo la paleta Lima clara.
+- #118 Cola de tamaños: oculta lo ya enviado, reintenta el índice de fotos (429/5xx) y reusa las fotos de la cola anterior; el panel de decisiones regenera la cola.
+
 ## 2026-11-16
 
 - Historial de 30 días: el catálogo v3 publica `history_30d` (puntos de cambio `[días_atrás, "precio"]`, sólo en ofertas que cambiaron de precio en 30 días, desde los mismos periodos de `historical_summary`) y la ficha dibuja una sparkline SVG de la oferta más barata. Crecimiento medido: +1.6–2.0 % gzip del catálogo SPS.
