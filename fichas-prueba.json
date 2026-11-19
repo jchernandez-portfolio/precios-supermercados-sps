@@ -1,0 +1,719 @@
+{
+ "schema": "rpi-product-sheet-test/v1",
+ "generated_utc": "2026-11-19T00:10:47Z",
+ "modelo": "claude-sonnet-5-5",
+ "detenido_por": null,
+ "uso": {
+  "entrada": 300883,
+  "salida": 11908,
+  "busquedas": 26
+ },
+ "ultimo_error_api": null,
+ "fichas": [
+  {
+   "gtin": "00795893419311",
+   "nombre_super": "LEYDE QuesilloTipo Sureno 1Lb",
+   "marca_super": "RMS",
+   "tamanos_super": [
+    "453.59 g",
+    "453.59 g",
+    "400 g",
+    "400 g",
+    "454 g",
+    "454 g"
+   ],
+   "encontrado": true,
+   "marca": "Leyde",
+   "fabricante": "Leche y Derivados S.A. (LEYDE)",
+   "nombre_estandar": "Leyde Quesillo Estilo Sureño 454 g",
+   "variante": "Estilo Sureño",
+   "medida_valor": "454",
+   "medida_unidad": "g",
+   "unidades": "1",
+   "contenido_por_unidad": null,
+   "descripcion": "Queso fresco tipo quesillo estilo sureño, elaborado con leche de vaca, de sabor suave y ligeramente salado. Se presenta en bolsa individual de 454 g (1 lb).",
+   "categoria": "Lácteos > Quesos > Quesillo",
+   "url": "https://www.walmart.com.hn/quesillo-leyde-454g/p",
+   "texto_citado": "Quesillo Leyde Estilo Sureño - 454 g",
+   "confianza": "baja",
+   "url_de_busqueda": true,
+   "fuente_hondurena": true,
+   "cita_con_numero": true,
+   "citas": [
+    {
+     "url": "https://super-del-corral.myshopify.com/products/leyde-quesillo-sureno-400-g",
+     "texto": "# LEYDE QUESILLO SUREÑO 400 G ## L 115.00 Ahorra L -115 SKU: 795893419311 #### Disponible Ahora!"
+    },
+    {
+     "url": "https://www.walmart.com.hn/quesillo-leyde-454g/p",
+     "texto": "Lácteos Queso Más Quesos Quesillo Leyde Estilo Sureño - 454 g GTIN-0795893419311-01 GTIN-0795893419311-02 GTIN-0795893419311-03 GTIN-0795893419311..."
+    },
+    {
+     "url": "https://tiendaenlinea.supermercadoelexito.hn/shop/795893419311-quesillo-leyde-1-lb-15853",
+     "texto": "QUESILLO LEYDE 1 LB 2."
+    },
+    {
+     "url": "https://leyde.hn/productos/quesos/quesillo/",
+     "texto": "# Quesillo Leyde # Quesillo queso-tipo-quesillo-454g Con todo el sabor y tradición de nuestro país."
+    }
+   ],
+   "paginas": [
+    {
+     "url": "https://en.wikipedia.org/wiki/L-797591",
+     "title": "L-797591"
+    },
+    {
+     "url": "https://super-del-corral.myshopify.com/products/leyde-quesillo-sureno-400-g",
+     "title": "LEYDE QUESILLO SUREÑO 400 G - Supermercados Del Corral"
+    },
+    {
+     "url": "https://www.lacolonia.com/queso-tipo-quesillo-leyde-estilo-sureno-400-gr-ref795893419311/p",
+     "title": "Queso Tipo Quesillo Leyde Estilo Sureño 400 Gr"
+    },
+    {
+     "url": "https://tiendaenlinea.supermercadoelexito.hn/shop/795893419311-quesillo-leyde-1-lb-15853",
+     "title": "QUESILLO LEYDE 1 LB"
+    },
+    {
+     "url": "https://mobile.lacolonia.com/supermercado/lacteos-no-lacteos-derivados-y-huevos/quesos%20artesanales/mantequilla-chayitos-prolaga-x-lb",
+     "title": "Lácteos, Derivados y Huevos"
+    },
+    {
+     "url": "https://huggingface.co/datasets/society-ethics/stable-bias-generations/tree/8bd8edee1a1cb76259c21a9500b558bdd98832c9/images/prompthero-openjourney/Photo_portrait_of_a_cleaner",
+     "title": "- 159346266"
+    },
+    {
+     "url": "https://huggingface.co/datasets/society-ethics/stable-bias-generations/tree/6dff9f1c45d5813f7332206e484e9d27afa456f5/images/prompthero-openjourney/Photo_portrait_of_a_courier",
+     "title": "- 209474111"
+    },
+    {
+     "url": "https://huggingface.co/datasets/society-ethics/stable-bias-generations/tree/1fdc9239f6766558bd39f7c7faf9050df5f38b04/images/prompthero-openjourney/Photo_portrait_of_a_clergy",
+     "title": "- 144795795"
+    }
+   ],
+   "busquedas": 4,
+   "explicacion": "No encontré una ficha independiente (GS1, Open Food Facts ni tiendas fuera de Honduras) para este GTIN, y las fuentes se contradicen en el contenido. El GTIN 795893419311 (EAN 0795893419311) aparece como quesillo Leyde estilo sureño. Super del Corral y La Colonia lo listan como \"LEYDE QUESILLO SUREÑO 400 G\", mientras que Walmart Honduras (que debía ignorar) lo muestra como \"Quesillo Leyde Estilo Sureño - 454 g\". El Éxito Honduras lo lista como \"QUESILLO LEYDE 1 LB\". La página del fabricante, leyde.hn, usa una imagen llamada \"queso-tipo-quesillo-454g\", y 1 lb equivale a unos 454 g. La mayoría d"
+  },
+  {
+   "gtin": "00748757001566",
+   "nombre_super": "Diana elotitos con limon",
+   "marca_super": "Marca COMANDES",
+   "tamanos_super": [
+    "194 g",
+    null,
+    "157 g"
+   ],
+   "encontrado": true,
+   "marca": "Diana",
+   "fabricante": "Productos Diana",
+   "nombre_estandar": "Diana Elotitos Limón 115 g",
+   "variante": "Limón",
+   "medida_valor": "115",
+   "medida_unidad": "g",
+   "unidades": "1",
+   "contenido_por_unidad": null,
+   "descripcion": "Granos de maíz fritos con sabor a limón, en bolsa individual de 115 g (4.05 oz). Snack salado de origen salvadoreño.",
+   "categoria": "Snacks > Boquitas de maíz",
+   "url": "https://lasivarshop.com/products/elotitos-con-limon-diana",
+   "texto_citado": "Peso neto: 115g / 4.05oz",
+   "confianza": "media",
+   "url_de_busqueda": true,
+   "fuente_hondurena": false,
+   "cita_con_numero": false,
+   "citas": [
+    {
+     "url": "https://lasivarshop.com/products/elotitos-con-limon-diana",
+     "texto": "- Nombre oficial: Elotitos con Limón / Cornbits with Lime - Marca: Diana (El Salvador — más de 60 años) - Tipo: Fried Corn Kernels with Lime Flavor - "
+    },
+    {
+     "url": "https://247bits.com/product/diana-elotitos-con-limon-4-05oz/",
+     "texto": "Weight: 10.11 lbs · Pack: 35ct · Brand: Diana · Size: 4.05oz **SKU: 748757001566** Categories: Central American Food, Snacks # Diana Elotitos con Lim."
+    },
+    {
+     "url": "https://www.instacart.com/products/1864976-diana-limon-elotitos-cornbits-snack-4-3-oz?retailerSlug=market-fresh",
+     "texto": "## Market Fresh Front of Latino Foods Diana’s Cornbits Limon Snack, Elotitos con Limon, image 1 of 3 Diana’s Cornbits Limon Snack, Elotitos con Limon."
+    },
+    {
+     "url": "https://www.amazon.com/Diana-Cornbits-Limon-Snack-4-3/dp/B005GLNXYS",
+     "texto": "Product details: **UPC : 748757001566** · Manufacturer : Productos Diana · ASIN : B005GLNXYS · Units : 157 Grams · Best Sellers Rank: #207,378 in Groc"
+    }
+   ],
+   "paginas": [
+    {
+     "url": "https://www.amazon.com/-/es/Diana-Cornbits-Limon-Snack-4-3/dp/B005GLNXYS",
+     "title": "Diana Cornbits Limon Snack 4.3 oz - Elotitos con Limon : Comida Gourmet y Alimen"
+    },
+    {
+     "url": "https://www.amazon.com/Diana-Cornbits-Limon-Snack-4-3/dp/B005GLNXYS",
+     "title": "Diana Cornbits Limon Snack 4.3 oz - Elotitos con Limon"
+    },
+    {
+     "url": "http://www.palimexinc.com/member/catalog?category=144&sub=862&page=4",
+     "title": "PaliMex Distributors - Wholesale"
+    },
+    {
+     "url": "https://freshisbestonbroadway.ca/product/diana-cornbits-lime/",
+     "title": "Diana Cornbits Lime 115g - Fresh is Best on Broadway",
+     "page_age": "253 days ago"
+    },
+    {
+     "url": "https://247bits.com/product-category/244-central-american-product/241-central-american-food/",
+     "title": "Central American Food"
+    },
+    {
+     "url": "https://bertha-foods.com/product/diana-elotito-con-limon-cornbits-lime-35x4-05oz/",
+     "title": "Diana Elotito con Limon ( Cornbits/Lime) 35X4.05oz"
+    },
+    {
+     "url": "https://247bits.com/product/diana-elotitos-con-limon-4-05oz/",
+     "title": "Diana Elotitos con Limon 4.05oz"
+    },
+    {
+     "url": "https://247bits.com/product/diana-palitos-spicy-lime-5-6oz/",
+     "title": "Diana Palitos Spicy Lime 5.6oz"
+    }
+   ],
+   "busquedas": 2,
+   "explicacion": "El GTIN 748757001566 corresponde a Diana Elotitos con Limón (Cornbits with Lime), pero las fuentes no coinciden en el contenido neto. La mayoría de ellas indican 4.05 oz, que equivale a unos 115 g: - La tienda La Sivar Shop lista el código de barras 748757001566 con Peso neto: 115g / 4.05oz. - Los distribuidores 247bits y PaliMex lo registran como Diana Elotitos con Limon 4.05oz, y Instacart muestra 4.05 oz. Amazon, con el mismo UPC, es la fuente que difiere: Units : 157 Grams, y en el título dice 4.3 oz. Probablemente es una presentación anterior, y 4.3 oz tampoco equivale a 157 g. Otras tien"
+  },
+  {
+   "gtin": "00748757006714",
+   "nombre_super": "Diana picnic galleta vainilla 24pk",
+   "marca_super": "Marca COMANDES",
+   "tamanos_super": [
+    "24 unit",
+    null,
+    "408 g"
+   ],
+   "encontrado": false,
+   "marca": "Diana",
+   "fabricante": "Productos Alimenticios Diana",
+   "nombre_estandar": "Diana Picnic Galleta Wafer Vainilla 14.39 oz",
+   "variante": "Vainilla",
+   "medida_valor": "14.39",
+   "medida_unidad": "oz",
+   "unidades": "24",
+   "contenido_por_unidad": null,
+   "descripcion": "Galletas tipo wafer con relleno sabor a vainilla, en paquete con 24 piezas. El peso total del empaque es de 14.39 oz (unos 408 g).",
+   "categoria": "Galletas > Galletas wafer",
+   "url": "https://eltesorosm.com/products/diana-picnic-wafer-cookies-vanilla-14-39-oz-24-count",
+   "texto_citado": "Diana Picnic Wafer Cookies Vanilla 14.39 oz 24 count",
+   "confianza": "baja",
+   "url_de_busqueda": true,
+   "fuente_hondurena": false,
+   "cita_con_numero": true,
+   "citas": [
+    {
+     "url": "https://eltesorosm.com/products/diana-picnic-wafer-cookies-vanilla-14-39-oz-24-count",
+     "texto": "Diana Picnic Wafer Cookies Vanilla 14.39 oz 24 count Diana Picnic Wafer Cookies Vanilla 14.39 oz 24 count Diana Picnic Wafer Cookies Vanilla 14.39 o.."
+    },
+    {
+     "url": "https://www.ladespensadedonjuan.com.sv/galleta-diana-picnic-vainilla-24-uds-312-g-3/p",
+     "texto": "Compra en línea | Galleta Diana Picnic Vainilla 24 Uds - 312 g | Contamos con gran cantidad de artículos de Abarrotes | Variedad de Galletas Saladas |"
+    },
+    {
+     "url": "https://picnic.snacksdiana.us/products",
+     "texto": "8 wafers Vanilla 12 wafers Vanilla 24 wafers Vanilla ## Vanilla Vanilla Discover the smoothness of Diana's PicNic Vanilla."
+    }
+   ],
+   "paginas": [
+    {
+     "url": "https://www.lacolonia.com/galleta-diana-picnic-vainilla-408-gr/p",
+     "title": "Galleta Diana Picnic Vainilla 408 Gr"
+    },
+    {
+     "url": "https://super-del-corral.myshopify.com/products/diana-galleta-picnic-vai-24-un",
+     "title": "DIANA GALLETA PICNIC VAI 24 UN"
+    },
+    {
+     "url": "https://www.last.fm/zh/music/Spice+World",
+     "title": "www.last.fm"
+    },
+    {
+     "url": "https://huggingface.co/datasets/Symato/cc/tree/refs%2Fpr%2F67142/crawl-data/CC-MAIN-2014-41/segments",
+     "title": "- 1410657102753.15"
+    },
+    {
+     "url": "https://last.fm/zh/music/The+Overtures",
+     "title": "last.fm"
+    },
+    {
+     "url": "https://www.last.fm/zh/music/N%27sync",
+     "title": "www.last.fm"
+    },
+    {
+     "url": "https://www.last.fm/zh/music/Capital+Cities/De+Afrekening+55/Safe+and+Sound",
+     "title": "www.last.fm"
+    },
+    {
+     "url": "https://last.fm/zh/music/Soft+Cell%2FMarc+Almond",
+     "title": "last.fm"
+    }
+   ],
+   "busquedas": 3,
+   "explicacion": "No encontré este GTIN exacto fuera de Honduras, así que la confianza es baja. Las únicas páginas con el código 748757006714 son de Honduras: La Colonia (la ignoro) y la tienda Super del Corral, que parece hondureña (precio en L). Fuera de Honduras, el producto equivalente es \"Diana Picnic Wafer Cookies Vanilla 14.39 oz 24 count\", de eltesorosm. Esa página no muestra GTIN. Sus 14.39 oz equivalen a unos 408 g, que coincide con el dato hondureño. Otras fuentes no cuadran. La Despensa de Don Juan (El Salvador) titula \"Galleta Diana Picnic Vainilla 24 Uds - 312 g\" pero en la ficha dice 264 g, con o"
+  },
+  {
+   "gtin": "00750894680368",
+   "nombre_super": "Salsa De Tomate Issima Ranchera 90 Gr",
+   "marca_super": "RMS",
+   "tamanos_super": [
+    "100 g",
+    "106 g",
+    "90 g"
+   ],
+   "encontrado": true,
+   "marca": "Issima",
+   "fabricante": null,
+   "nombre_estandar": "Issima Salsita de Tomate Ranchera 106 g",
+   "variante": "Ranchera",
+   "medida_valor": "106",
+   "medida_unidad": "g",
+   "unidades": "1",
+   "contenido_por_unidad": null,
+   "descripcion": "Salsita de tomate sabor ranchera lista para usar, en presentación individual de 106 g. Las fuentes discrepan: el fabricante y el nombre del súper indican 90 g.",
+   "categoria": "Abarrotes > Salsas > Salsas de tomate",
+   "url": "https://www.maxidespensa.com.gt/salsita-issima-ranchera-106gr/p",
+   "texto_citado": "Salsita Issima ranchera - 106 g",
+   "confianza": "media",
+   "url_de_busqueda": true,
+   "fuente_hondurena": false,
+   "cita_con_numero": true,
+   "citas": [
+    {
+     "url": "https://www.maxidespensa.com.gt/salsita-issima-ranchera-106gr/p",
+     "texto": "EAN: 0750894680368 Compra en línea | Salsita Issima Ranchera - 106gr | Contamos con gran cantidad de artículos de Abarrotes | Variedad de Salsa para ."
+    },
+    {
+     "url": "https://www.maxidespensa.com.gt/salsita-issima-ranchera-106gr/p",
+     "texto": "EAN: 0750894680368 Compra en línea | Salsita Issima Ranchera - 106gr | Contamos con gran cantidad de artículos de Abarrotes | Variedad de Salsa para ."
+    },
+    {
+     "url": "https://www.maxidespensa.com.sv/salsita-issima-ranchera-90-gr-2/p",
+     "texto": "Salsita Issima Ranchera 90 Gr Salsita Issima Ranchera 90 Gr Abarrotes Salsa, Aderezos y Vinagre Cátsup y Mostaza Salsita Issima ranchera - 106 g # ..."
+    },
+    {
+     "url": "https://comidasissima.com/producto/salsita-ranchera/",
+     "texto": "**Salsita de Tomate Ranchera, 90g** 96 unidades por caja · Tamaño por presentación varia de acuerdo al país # Salsita Ranchera - Salsita de Tomate R.."
+    }
+   ],
+   "paginas": [
+    {
+     "url": "https://mundofoods.com/productos-hondurenos/425-sopa-sabor-pollo-issima-64-gr.html",
+     "title": "Tienda online donde comprar sopa instantánea sabor pollo 64 gr. Enviamos a toda "
+    },
+    {
+     "url": "https://en.wikipedia.org/wiki/64,079",
+     "title": "64,079"
+    },
+    {
+     "url": "https://en.wikipedia.org/wiki/800_(number)",
+     "title": "800 (number)"
+    },
+    {
+     "url": "https://www.mass.gov/doc/quadimgspdf/download",
+     "title": "www.mass.gov"
+    },
+    {
+     "url": "https://www.walmart.com/ip/Modelones-gel-nail-polish-0516-7/16548565581",
+     "title": "modelones Nail Dehydrator, 30 ml Nail Prep Dehydrator for Press Ons/Acrylic Nail"
+    },
+    {
+     "url": "https://www.last.fm/zh/music/Joy+Again/Pop+Summer+Hits+2024/Looking+Out+For+You",
+     "title": "www.last.fm"
+    },
+    {
+     "url": "https://huggingface.co/datasets/Symato/cc/tree/refs%2Fpr%2F70505/crawl-data/CC-MAIN-2013-20/segments",
+     "title": "- 1368696381249"
+    },
+    {
+     "url": "https://www.stayexempt.irs.gov/pub/irs-soi/eo2007compflat.txt",
+     "title": "www.stayexempt.irs.gov"
+    }
+   ],
+   "busquedas": 4,
+   "explicacion": "Encontré el GTIN exacto, pero las fuentes no coinciden en el peso, así que la confianza es media. - **Fuentes que dicen 106 g:** Maxi Despensa Guatemala lista el EAN 0750894680368 como \"Salsita Issima ranchera - 106 g\", con marca ISSIMA. Mundofoods (España) muestra la referencia 750894680368 como «Salsita de tomate ranchera Issima 106 gr». - **Fuentes que dicen 90 g:** la página de Maxi Despensa El Salvador tiene el mismo EAN y el título «106 g», pero su URL y un encabezado interno dicen Salsita Issima Ranchera 90 Gr. En el sitio del fabricante (comidasissima.com), la Salsita de ranchera apare"
+  },
+  {
+   "gtin": "00783094004030",
+   "nombre_super": "RAYOVAC Bateria AA4",
+   "marca_super": "RMS",
+   "tamanos_super": [
+    null,
+    "6 unit",
+    "4 unit"
+   ],
+   "encontrado": true,
+   "marca": "Rayovac",
+   "fabricante": "Rayovac",
+   "nombre_estandar": "Rayovac Baterías AA 4 unidades",
+   "variante": "AA",
+   "medida_valor": "4",
+   "medida_unidad": "unidades",
+   "unidades": "4",
+   "contenido_por_unidad": null,
+   "descripcion": "Pack de 4 baterías (pilas) tamaño AA de la marca Rayovac, en empaque blíster. Las fuentes consultadas no especifican el tipo de química.",
+   "categoria": "Electrónica > Pilas y baterías > Pilas AA",
+   "url": "https://www.super99.com/10134370-rayovac-pilas-7lp-blist-4-tip-aa",
+   "texto_citado": "Rayovac Baterias Aa 4 Unidades",
+   "confianza": "media",
+   "url_de_busqueda": true,
+   "fuente_hondurena": false,
+   "cita_con_numero": true,
+   "citas": [
+    {
+     "url": "https://www.super99.com/10134370-rayovac-pilas-7lp-blist-4-tip-aa",
+     "texto": "# Rayovac Baterias Aa 4 Unidades **UPC** 783094004030 - SKU 10134370 $1.65 Precio/Unidad $1.65 Pack de 4 baterías Rayovac AA, de alto rendimient..."
+    },
+    {
+     "url": "https://www.super99.com/10134370-rayovac-pilas-7lp-blist-4-tip-aa",
+     "texto": "Pack de 4 baterías Rayovac AA, de alto rendimiento y durabilidad."
+    },
+    {
+     "url": "https://www.superxtra.com/rayovac-pilas-7lp-blist-4aa/p",
+     "texto": "783094004030 # Rayovac Pilas 7lp Blist 4aa EAN: 783094004030 Rayovac-Pilas-7lp-Blist-4aa $ 1.63 ## Descripción del producto ### MEDIOS DE PAGO ##..."
+    }
+   ],
+   "paginas": [
+    {
+     "url": "https://www.oemstrade.com/search/7830",
+     "title": "7830 Results on OEMsTrade"
+    },
+    {
+     "url": "https://www.tractorhouse.com/listings/auction-results/john-deere/7830/tractors/1100",
+     "title": "JOHN DEERE 7830 Tractors Auction Results"
+    },
+    {
+     "url": "https://www.tractordata.com/farm-tractors/003/4/1/3410-john-deere-7830.html",
+     "title": "TractorData.com John Deere 7830 tractor information",
+     "page_age": "3522 days ago"
+    },
+    {
+     "url": "https://en.wikipedia.org/wiki/List_of_minor_planets:_783001%E2%80%93784000",
+     "title": "List of minor planets: 783001%E2%80%93784000"
+    },
+    {
+     "url": "https://www.superxtra.com/rayovac-pilas-7lp-blist-4aa/p",
+     "title": "Rayovac Pilas 7lp Blist 4aa - Super Xtra - Compra Online"
+    },
+    {
+     "url": "https://www.agriaffaires.us/used/farm-tractors/1/4039/john-deere/7830.html",
+     "title": "Used Farm Tractors John Deere 7830 For Sale - Agriaffaires USA"
+    },
+    {
+     "url": "https://www.super99.com/10134370-rayovac-pilas-7lp-blist-4-tip-aa",
+     "title": "Rayovac Baterias Aa 4 Unidades"
+    },
+    {
+     "url": "https://trademarks.justia.com/browse-by-serial-number/78/83",
+     "title": "Browse Trademarks by Serial Number from 78830000 to 78839999"
+    }
+   ],
+   "busquedas": 2,
+   "explicacion": "Encontré el GTIN exacto en dos tiendas de Panamá. Super 99 lo lista con UPC 783094004030 como \"Rayovac Baterias Aa 4 Unidades\", y lo describe como un pack de 4 baterías Rayovac AA. Super Xtra lo muestra como \"Rayovac Pilas 7lp Blist 4aa\", EAN 783094004030. Las dos fuentes coinciden en marca, tamaño AA y 4 piezas. No encontré la ficha del fabricante, ni GS1 ni Open Food Facts para este GTIN. Ninguna fuente indica el tipo de química (alcalina o de zinc-carbono), el voltaje ni el contenido en gramos, así que no lo afirmo y dejo la confianza en media. El \"RMS\" del súper no aparece en ninguna fuent"
+  },
+  {
+   "gtin": "00785381015569",
+   "nombre_super": "Desinfectante Magia Blanca Citronela - 1/2 Galón",
+   "marca_super": "MAGIA BLANCA",
+   "tamanos_super": [
+    "0.5 g",
+    "1890 ml",
+    null
+   ],
+   "encontrado": true,
+   "marca": "Magia Blanca",
+   "fabricante": "Magia Blanca",
+   "nombre_estandar": "Magia Blanca Desinfectante Citronela y Menta 1892 ml",
+   "variante": "Citronela y Menta",
+   "medida_valor": "1892",
+   "medida_unidad": "ml",
+   "unidades": "1",
+   "contenido_por_unidad": null,
+   "descripcion": "Desinfectante líquido multiusos sin cloro, con aroma a citronela y menta, en botella de 1/2 galón. Se usa para limpiar y desinfectar pisos y superficies del hogar.",
+   "categoria": "Limpieza del hogar > Desinfectantes",
+   "url": "https://www.superxtra.com/desinfectante-mancha-blanca-citronela-1892-ml-12-gl/p",
+   "texto_citado": "Desinfectante Mancha blanca Citronela 1892 Ml 1/2 Gl",
+   "confianza": "media",
+   "url_de_busqueda": true,
+   "fuente_hondurena": false,
+   "cita_con_numero": true,
+   "citas": [
+    {
+     "url": "https://www.superxtra.com/desinfectante-mancha-blanca-citronela-1892-ml-12-gl/p",
+     "texto": "785381015569 # Desinfectante Mancha blanca Citronela 1892 Ml 1/2 Gl EAN: 785381015569 Desinfectante-Mancha-blanca-Citronela-1892-Ml-1-2-Gl -30%de d..."
+    },
+    {
+     "url": "https://supercarnes.com/la_chorrera/desinfecte-magia-blanca-citronel-1892ml-785381015569",
+     "texto": "Inicio · Cuidado Del Hogar · Productos De Limpieza · Desinfectantes · DESINFECTE MAGIA BLANCA CITRONEL 1892ML - Inicio - Cuidado Del Hogar - Producto."
+    },
+    {
+     "url": "https://www.superselectos.com/products?category=071209&productId=104231",
+     "texto": "DESINFECTANTE MAGIA BLANCA CITRON 1/2 GALON # Desinfectante Magia Blanca Citron 1.895 L Botella Desinfección **$4.15** ###### Descripción DESINFEC..."
+    },
+    {
+     "url": "https://www.pacifiko.com/compras-en-linea/desinfectante-magia-blaca-olor-citronela-de-1-2-galon&pid=NzFiZDhjYT",
+     "texto": "Número de modelo · 785381015569 # Desinfectante Magia Blaca Olor Citronela De 1/2 Galón ## Visita la tienda de MAGIA BLANCA ### Información del produ."
+    },
+    {
+     "url": "https://magiablanca.com/producto/2",
+     "texto": "1/2 Galón # Limpiadores multipropósito **Desinfectante Citronela Menta** No contiene cloro Tamaño 100ml 450ml 450ml **Desinfectante Citronela M..."
+    }
+   ],
+   "paginas": [
+    {
+     "url": "https://mobile.lacolonia.com/supermercado/magia-blanca",
+     "title": "Supermercado Magia Blanca"
+    },
+    {
+     "url": "https://www.pacifiko.com/compras-en-linea/desinfectante-magia-blaca-olor-citronela-de-1-2-galon&pid=NzFiZDhjYT",
+     "title": "Desinfectante Magia Blaca Olor Citronela De 1/2 Galón"
+    },
+    {
+     "url": "https://mobile.lacolonia.com/supermercado/cuidado-del-hogar/magia-blanca",
+     "title": "Supermercado - Cuidado del Hogar Magia Blanca"
+    },
+    {
+     "url": "https://mobile.lacolonia.com/supermercado/Papel%20Higienico?PS=20&map=c%2CspecificationFilter_90",
+     "title": "Supermercado Papel Higienico"
+    },
+    {
+     "url": "https://www.superxtra.com/desinfectante-mancha-blanca-citronela-1892-ml-12-gl/p",
+     "title": "Desinfectante Mancha blanca Citronela 1892 Ml 1/2 Gl - Super Xtra - Compra Onlin"
+    },
+    {
+     "url": "https://supercarnes.com/la_chorrera/desinfecte-magia-blanca-citronel-1892ml-785381015569",
+     "title": "DESINFECTE MAGIA BLANCA CITRONEL 1892ML"
+    },
+    {
+     "url": "https://www.lacolonia.com/desinfectante-magia-blanca-citronela-y-menta-1-89-lt/p",
+     "title": "Desinfectante Magia Blanca Citronela Y Menta 1.89 Lt"
+    },
+    {
+     "url": "https://trademarks.justia.com/781/85/n-a-78185389.html",
+     "title": "Image Trademark with Serial Number 78185389"
+    }
+   ],
+   "busquedas": 3,
+   "explicacion": "Encontré este GTIN exacto en tiendas de Panamá, El Salvador y Guatemala, y todas lo describen como el desinfectante Magia Blanca Citronela de 1/2 galón. Super Xtra Panamá lo lista como \"Desinfectante Mancha blanca Citronela 1892 Ml 1/2 Gl\" con EAN 785381015569, y Super Carnes lo lista como \"DESINFECTE MAGIA BLANCA CITRONEL 1892ML\". Super Selectos El Salvador anota 1.895 L para el mismo 1/2 galón, así que hay una pequeña diferencia (1892 ml frente a 1.895 L) y bajé la confianza a media. Pacifiko lo vende como \"Desinfectante Magia Blaca Olor Citronela De 1/2 Galón\" con número de modelo 785381015"
+  },
+  {
+   "gtin": "00785381015583",
+   "nombre_super": "Desinfectante Magia Blanca Manzana Verde - 1/2 Galón",
+   "marca_super": "MAGIA BLANCA",
+   "tamanos_super": [
+    "0.5 g",
+    "1998 g",
+    null
+   ],
+   "encontrado": true,
+   "marca": "Magia Blanca",
+   "fabricante": "Magia Blanca (Magia Blanca Latam)",
+   "nombre_estandar": "Magia Blanca Desinfectante Manzana Verde 1/2 galón",
+   "variante": "Manzana Verde",
+   "medida_valor": "1895",
+   "medida_unidad": "ml",
+   "unidades": "1",
+   "contenido_por_unidad": null,
+   "descripcion": "Desinfectante líquido multipropósito para el hogar, con aroma a manzana verde, sin cloro. Se presenta en envase de medio galón (1,895 ml).",
+   "categoria": "Limpieza del hogar > Desinfectantes",
+   "url": "https://www.paiz.com.gt/mb-desinfectante-manzana-1895ml/p",
+   "texto_citado": "Desinfectante Magia Blanca Manzana Verde - 1/2 Galón (EAN: 0785381015583)",
+   "confianza": "media",
+   "url_de_busqueda": true,
+   "fuente_hondurena": false,
+   "cita_con_numero": false,
+   "citas": [],
+   "paginas": [
+    {
+     "url": "https://trademarks.justia.com/browse-by-serial-number/78/53",
+     "title": "Browse Trademarks by Serial Number from 78530000 to 78539999"
+    },
+    {
+     "url": "https://trademark.justia.com/785/75/n-a-78575883.html",
+     "title": "Image Trademark with Serial Number 78575883"
+    },
+    {
+     "url": "https://trademarks.justia.com/browse-by-serial-number/78/58",
+     "title": "Browse Trademarks by Serial Number from 78580000 to 78589999"
+    },
+    {
+     "url": "https://trademark.justia.com/788/61/n-a-78861583.html",
+     "title": "Image Trademark with Serial Number 78861583"
+    },
+    {
+     "url": "https://www.mhlw.go.jp/content/001059574.pdf",
+     "title": "www.mhlw.go.jp"
+    },
+    {
+     "url": "https://trademark.justia.com/785/34/n-a-78534188.html",
+     "title": "Image Trademark with Serial Number 78534188"
+    },
+    {
+     "url": "https://trademark.justia.com/785/83/n-a-78583915.html",
+     "title": "Image Trademark with Serial Number 78583915"
+    },
+    {
+     "url": "https://www.mass.gov/doc/quadimgspdf/download",
+     "title": "www.mass.gov"
+    }
+   ],
+   "busquedas": 3,
+   "explicacion": "Encontré el GTIN exacto en Paiz Guatemala (no es un súper de Honduras). Lo lista como EAN 0785381015583 con el nombre «Desinfectante Magia Blanca Manzana Verde - 1/2 Galón». La URL de esa ficha termina en \"1895ml\", lo que equivale a medio galón (1,895 L). La página del fabricante (magiablanca.com) tiene el \"Desinfectante Manzana Verde\" en tamaño \"1/2 galón\", y afirma que elimina el 99.99 % de bacterias y que no contiene hipoclorito de sodio. La fuente nunca muestra el contenido en mililitros dentro del texto, así que 1895 ml sale de la URL y de la conversión. Tampoco hallé GS1 ni Open Food Fac"
+  },
+  {
+   "gtin": "07411000314548",
+   "nombre_super": "Desodorante Rexona Dama Bamboo Y Aloe Vera Aerosol 3 Pack - 150ml",
+   "marca_super": "REXONA",
+   "tamanos_super": [
+    null,
+    null,
+    null
+   ],
+   "encontrado": true,
+   "marca": "Rexona",
+   "fabricante": "Unilever",
+   "nombre_estandar": "Rexona Women Bamboo y Aloe Vera aerosol 3 pack 450 ml",
+   "variante": "Bamboo y Aloe Vera",
+   "medida_valor": "450",
+   "medida_unidad": "ml",
+   "unidades": "3",
+   "contenido_por_unidad": "150 ml",
+   "descripcion": "Paquete de 3 desodorantes antitranspirantes en aerosol para dama, variante Bamboo y Aloe Vera, de 150 ml cada uno.",
+   "categoria": "Higiene y Belleza > Desodorantes > Desodorante en aerosol mujer",
+   "url": "https://www.walmart.com.gt/3-pack-desodorante-rexona-spray-bamboo-150ml/p",
+   "texto_citado": "3 Pack Desodorante Rexona Bamboo Y Aloe Vera Aerosol - 450ml",
+   "confianza": "alta",
+   "url_de_busqueda": true,
+   "fuente_hondurena": false,
+   "cita_con_numero": false,
+   "citas": [
+    {
+     "url": "https://www.walmart.com.gt/3-pack-desodorante-rexona-spray-bamboo-150ml/p",
+     "texto": "EAN: 7411000314548 EAN: 7411000314548"
+    },
+    {
+     "url": "https://www.masxmenos.cr/3-pack-desodorante-rexona-spray-bamboo-150ml/p",
+     "texto": "Higiene y Belleza Cuidado Corporal Desodorantes Desodorante Rexona Dama Bamboo Y Aloe Vera Aerosol 3 Pack - 150ml 8468 8468 8468 8468 8468 8468 ..."
+    },
+    {
+     "url": "https://www.rexona.com/mx/p/antitranspirante-rexona-r-bamboo-and-aloe-vera-en-aerosol-para-mujer-150-ml.html/07791293032450",
+     "texto": "Siéntete protegida del sudor y malos olores por 72 h. Rexona DESODORANTE AEROSOL Bamboo & Aloe 89 GR Desodorante Antitranspirante **Rexona® Bamboo & A"
+    }
+   ],
+   "paginas": [
+    {
+     "url": "https://www.walmart.com.gt/3-pack-desodorante-rexona-spray-bamboo-150ml/p",
+     "title": "Comprar 3 Pack Desodorante Rexona Bamboo Y Aloe Vera Aerosol - 450ml"
+    },
+    {
+     "url": "https://mobile.lacolonia.com/supermercado/rexona/dora",
+     "title": "Dora en Supermercado Rexona"
+    },
+    {
+     "url": "https://www.masxmenos.cr/3-pack-desodorante-rexona-spray-bamboo-150ml/p",
+     "title": "Comprar Desodorante Rexona Dama Bamboo Y Aloe Vera Aerosol 3 Pack - 150ml"
+    },
+    {
+     "url": "https://en.wikipedia.org/wiki/List_of_minor_planets:_743001%E2%80%93744000",
+     "title": "List of minor planets: 743001%E2%80%93744000"
+    },
+    {
+     "url": "https://en.wikipedia.org/wiki/List_of_minor_planets:_748001%E2%80%93749000",
+     "title": "List of minor planets: 748001%E2%80%93749000"
+    },
+    {
+     "url": "https://www.paiz.com.hn/3-pack-desodorante-rexona-spray-bamboo-150ml/p",
+     "title": "Desodorante Rexona Dama Bamboo Y Aloe Vera Aerosol 3 Pack - 150ml - Paiz"
+    },
+    {
+     "url": "https://trademarks.justia.com/browse-by-serial-number/74/41",
+     "title": "Browse Trademarks by Serial Number from 74410000 to 74419999"
+    },
+    {
+     "url": "https://npgallery.nps.gov/GetAsset/41b7450f-73ed-4986-94a4-99f8987b3a4f",
+     "title": "41b7450f 73ed 4986 94a4 99f8987b3a4f"
+    }
+   ],
+   "busquedas": 2,
+   "explicacion": "El GTIN 7411000314548 aparece en dos tiendas de la región que no son de Honduras. Walmart Guatemala lo titula \"3 Pack Desodorante Rexona Bamboo Y Aloe Vera Aerosol - 450ml\", con el EAN 7411000314548. Más x Menos Costa Rica lo lista con el mismo EAN como Desodorante Rexona Dama Bamboo Y Aloe Vera Aerosol 3 Pack - 150ml. Los dos datos son compatibles: 3 latas de 150 ml suman 450 ml. En la página de Rexona México, el producto individual de 150 ml aparece como Antitranspirante Rexona® Bamboo & Aloe Vera en Aerosol 150ml. Esa página es de una sola lata y tiene otro código, así que sirve solo para c"
+  },
+  {
+   "gtin": "07413100005074",
+   "nombre_super": "Aceite Orisol Oliva Light Doy Pack 410 Ml",
+   "marca_super": "RMS",
+   "tamanos_super": [
+    "443 ml",
+    "443 ml",
+    "410 ml"
+   ],
+   "encontrado": false,
+   "marca": "Orisol",
+   "fabricante": null,
+   "nombre_estandar": "Orisol Aceite con oliva Light 410 ml",
+   "variante": "Light con oliva",
+   "medida_valor": "410",
+   "medida_unidad": "ml",
+   "unidades": "1",
+   "contenido_por_unidad": null,
+   "descripcion": "Aceite vegetal mezclado con aceite de oliva, versión Light, en bolsa tipo doypack de 410 ml.",
+   "categoria": "Abarrotes > Aceites > Aceites mezclados",
+   "url": "https://www.superselectos.com/products?category=03163",
+   "texto_citado": "Aceite Orisol Oliva Light 410 mL Bolsa",
+   "confianza": "baja",
+   "url_de_busqueda": true,
+   "fuente_hondurena": false,
+   "cita_con_numero": true,
+   "citas": [
+    {
+     "url": "https://www.superselectos.com/products?category=03163",
+     "texto": "$9.00$12.69 $3.69 Aceite Orisol Canoliva Light 2 750 mL Pet Aceites mezclados · $15.05 Aceite Orisol Oliva Light 3 450 mL Pet Aceites mezclados · $2.0"
+    },
+    {
+     "url": "https://www.superselectos.com/?productId=13170",
+     "texto": "2 Pack Aceite Orisol Oliva Light 410 mL ACEITE CON OLIVA ORISOL 443 ML DOYPACK 2 # 2 Pack Aceite Orisol Oliva Light 410 mL Aceites mezclados **$3...."
+    },
+    {
+     "url": "https://www.maxidespensa.com.sv/aceite-orisol-canoliva-light-3000ml/p",
+     "texto": "Abarrotes Aceites de cocina Aceite de Maíz Aceite Orisol Canoliva Light - 3000 ml Compra en línea | Aceite Orisol Canoliva Light - 3000Ml | Contamos ."
+    }
+   ],
+   "paginas": [
+    {
+     "url": "https://mobile.lacolonia.com/orisol",
+     "title": "Supermercado Orisol"
+    },
+    {
+     "url": "https://mobile.lacolonia.com/supermercado/orisol/aceites%20de%20oliva",
+     "title": "Aceites De Oliva en Supermercado Orisol"
+    },
+    {
+     "url": "https://tiendaenlinea.supermercadoelexito.hn/shop/7413100005074-aceite-orisol-light-oliva-443-14707",
+     "title": "ACEITE ORISOL LIGHT OLIVA 443"
+    },
+    {
+     "url": "https://mobile.lacolonia.com/supermercado/abarrotes/aceites-y-mantecas/aceites%20de%20oliva/291/mantecas",
+     "title": "Aceites y Mantecas"
+    },
+    {
+     "url": "https://www.oemstrade.com/search/7413",
+     "title": "7413 Results on OEMsTrade"
+    },
+    {
+     "url": "https://datasheetarchive.com/7413-datasheet.html",
+     "title": "Datasheet Archive: 7413 datasheets"
+    },
+    {
+     "url": "https://www.numwrite.com/7413-number-english.html",
+     "title": "7413 in Words, How to Write 7413 in English on a Check"
+    },
+    {
+     "url": "https://www.ic-components.com/products/Io-Audio-Technologies/7413.jsp",
+     "title": "7413 Mail Boss"
+    }
+   ],
+   "busquedas": 3,
+   "explicacion": "No encontré el GTIN 7413100005074 en ninguna fuente fuera de Honduras: ni en la página del fabricante, ni en GS1, ni en Open Food Facts. Por eso la confianza es baja. Los resultados con ese código son todos de La Colonia, El Éxito y Diprova, que son supermercados hondureños y los ignoré. El producto más cercano está en Super Selectos (El Salvador), que lista \"Aceite Orisol Oliva Light 410 mL\" en bolsa a $2.00. Esa ficha no muestra el GTIN, y aparte existe una versión de 2 unidades que se vende como \"2 Pack Aceite Orisol Oliva Light 410 mL\". En el catálogo salvadoreño, otros Orisol comparten el"
+  }
+ ]
+}
