@@ -198,7 +198,11 @@ def read_response(response: object) -> dict[str, object]:
                 result = _as_dict(result)
                 url = clean_url(result.get("url")) if isinstance(result, Mapping) else None
                 if url and all(seen["url"] != url for seen in results):
-                    results.append({"url": url, "title": " ".join(str(result.get("title") or "").split())[:80]})
+                    page = {"url": url, "title": " ".join(str(result.get("title") or "").split())[:80]}
+                    age = result.get("page_age")
+                    if isinstance(age, str) and age.strip():
+                        page["page_age"] = " ".join(age.split())[:40]
+                    results.append(page)
     usage = _as_dict(document.get("usage")) if isinstance(document, Mapping) else None
     return {"text": "".join(texts), "results": results, "citations": citations, "errors": errors,
             "searches": searches, "usage": usage if isinstance(usage, Mapping) else {}}
@@ -335,12 +339,13 @@ class ClaudeWebSearch:
         self.usage = {"entrada": 0, "salida": 0, "busquedas": 0}
         self.last_error: str | None = None
 
-    def search(self, item: Mapping[str, object]) -> dict[str, object]:
+    def search(self, item: Mapping[str, object], *, prompt: str | None = None, max_uses: int = MAX_SEARCHES,
+               max_tokens: int = MAX_TOKENS) -> dict[str, object]:
         try:
             response = self.client.messages.create(
-                model=self.model, max_tokens=MAX_TOKENS,
-                tools=[{"type": WEB_SEARCH_TOOL, "name": "web_search", "max_uses": MAX_SEARCHES}],
-                messages=[{"role": "user", "content": build_prompt(item)}],
+                model=self.model, max_tokens=max_tokens,
+                tools=[{"type": WEB_SEARCH_TOOL, "name": "web_search", "max_uses": max_uses}],
+                messages=[{"role": "user", "content": prompt or build_prompt(item)}],
             )
         except Exception as error:  # noqa: BLE001 - se clasifica por código HTTP
             status = getattr(error, "status_code", None)
