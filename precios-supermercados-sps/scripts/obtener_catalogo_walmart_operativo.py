@@ -32,6 +32,7 @@ FINAL_DRIFT_CONFIRMATION_DELAY = 60.0
 RETRYABLE_HTTP_STATUSES = frozenset({429, 500, 502, 503, 504})
 UA = "Mozilla/5.0 (compatible; PreciosSupermercadosSPS-Walmart/1.0; read-only)"
 CATEGORY2_PARTITIONS = {"articulos-para-el-hogar", "ropa-y-zapateria"}
+CATEGORY2_FACET_GAP_STRATEGY = "category2_facet_gap_parent_restart"
 
 
 def utc_now() -> str:
@@ -337,6 +338,49 @@ def _capture_partitions(
     return category_products, page_evidence
 
 
+def _capture_parent_twice(
+    capture: Capture,
+    *,
+    seller: str,
+    category: str,
+    expected_total: int,
+    common: dict[str, str],
+    tag_suffix: str,
+) -> tuple[dict[str, dict], list[dict], list[dict]]:
+    """Captura ``category-1`` completa dos veces y exige la misma membresía exacta."""
+    if math.ceil(expected_total / PAGE_SIZE) > MAX_SEARCH_PAGES:
+        raise RuntimeError(f"category2_parent_recovery_too_large:{seller}:{category}")
+    parent_partition = [(f"category-1/{category}", expected_total)]
+    try:
+        first_products, first_evidence = _capture_partitions(
+            capture,
+            seller=seller,
+            common=common,
+            partitions=parent_partition,
+            tag_suffix=tag_suffix,
+        )
+        confirmed_products, confirmed_evidence = _capture_partitions(
+            capture,
+            seller=seller,
+            common=common,
+            partitions=parent_partition,
+            tag_suffix=f"{tag_suffix}-confirmation",
+        )
+    except (PartitionTotalChanged, PartitionMembershipOverlap) as repeated:
+        raise RuntimeError(
+            f"category2_parent_recovery_changed:{seller}:{category}:{repeated.tag}"
+        ) from repeated
+    if set(first_products) != set(confirmed_products):
+        raise RuntimeError(
+            f"category2_parent_membership_not_confirmed:{seller}:{category}"
+        )
+    return confirmed_products, first_evidence, confirmed_evidence
+
+
+def _evidence_sha256(evidence: list[dict]) -> str:
+    return hashlib.sha256("\n".join(item["sha256"] for item in evidence).encode()).hexdigest()
+
+
 def _capture_category(
     capture: Capture,
     *,
@@ -360,8 +404,42 @@ def _capture_category(
             common,
         )
         children = facet_counts(child_doc, "category-2")
-        if sum(children.values()) != expected_total:
-            raise RuntimeError(f"category2_total_mismatch:{seller}:{category}")
+        children_total = sum(children.values())
+        if children_total != expected_total:
+            # Hay productos sin ``category-2`` (o en dos): las subcategorías no pueden
+            # reconstruir la categoría. Sólo se acepta el padre completo, leído dos
+            # veces con la misma membresía exacta; si no cabe, falla como antes.
+            if math.ceil(expected_total / PAGE_SIZE) > MAX_SEARCH_PAGES:
+                raise RuntimeError(f"category2_total_mismatch:{seller}:{category}")
+            products, first_evidence, evidence = _capture_parent_twice(
+                capture,
+                seller=seller,
+                category=category,
+                expected_total=expected_total,
+                common=common,
+                tag_suffix=f"{tag_suffix}/recovery-category2-facet-gap",
+            )
+            return (
+                products,
+                evidence,
+                expected_total,
+                {
+                    "category": category,
+                    "strategy": CATEGORY2_FACET_GAP_STRATEGY,
+                    "trigger_tag": child_record["tag"],
+                    "trigger_sha256": child_record["sha256"],
+                    "trigger_observed_at": child_record["observed_at"],
+                    "previous_total": expected_total,
+                    "recovered_total": expected_total,
+                    "category2_total": children_total,
+                    "category2_facet_sha256": child_record["sha256"],
+                    "first_parent_evidence_sha256": _evidence_sha256(first_evidence),
+                    "confirmed_parent_evidence_sha256": _evidence_sha256(evidence),
+                    "confirmed_membership_sha256": hashlib.sha256(
+                        "\n".join(sorted(products)).encode()
+                    ).hexdigest(),
+                },
+            )
         partitions = [
             (f"category-1/{category}/category-2/{child}", count)
             for child, count in children.items()
@@ -402,39 +480,16 @@ def _capture_category(
                     raise RuntimeError(
                         f"category2_drift_not_confirmed:{seller}:{category}:{drift_child}"
                     ) from drift
-                if math.ceil(expected_total / PAGE_SIZE) > MAX_SEARCH_PAGES:
-                    raise RuntimeError(
-                        f"category2_parent_recovery_too_large:{seller}:{category}"
-                    ) from drift
-                parent_partition = [(f"category-1/{category}", expected_total)]
-                try:
-                    first_products, first_evidence = _capture_partitions(
+                confirmed_products, first_evidence, confirmed_evidence = (
+                    _capture_parent_twice(
                         capture,
                         seller=seller,
+                        category=category,
+                        expected_total=expected_total,
                         common=common,
-                        partitions=parent_partition,
-                        tag_suffix=(
-                            f"{tag_suffix}/recovery-parent-facet-disagreement"
-                        ),
+                        tag_suffix=f"{tag_suffix}/recovery-parent-facet-disagreement",
                     )
-                    confirmed_products, confirmed_evidence = _capture_partitions(
-                        capture,
-                        seller=seller,
-                        common=common,
-                        partitions=parent_partition,
-                        tag_suffix=(
-                            f"{tag_suffix}/recovery-parent-facet-disagreement-confirmation"
-                        ),
-                    )
-                except (PartitionTotalChanged, PartitionMembershipOverlap) as repeated:
-                    raise RuntimeError(
-                        f"category2_parent_recovery_changed:{seller}:{category}:"
-                        f"{repeated.tag}"
-                    ) from repeated
-                if set(first_products) != set(confirmed_products):
-                    raise RuntimeError(
-                        f"category2_parent_membership_not_confirmed:{seller}:{category}"
-                    ) from drift
+                )
                 membership = hashlib.sha256(
                     "\n".join(sorted(confirmed_products)).encode()
                 ).hexdigest()
@@ -450,12 +505,10 @@ def _capture_category(
                     "observed_partition_total": drift.observed_total,
                     "category2_facet_sha256": child_record["sha256"],
                     "facet_recheck_sha256": rechecked_record["sha256"],
-                    "first_parent_evidence_sha256": hashlib.sha256(
-                        "\n".join(item["sha256"] for item in first_evidence).encode()
-                    ).hexdigest(),
-                    "confirmed_parent_evidence_sha256": hashlib.sha256(
-                        "\n".join(item["sha256"] for item in confirmed_evidence).encode()
-                    ).hexdigest(),
+                    "first_parent_evidence_sha256": _evidence_sha256(first_evidence),
+                    "confirmed_parent_evidence_sha256": _evidence_sha256(
+                        confirmed_evidence
+                    ),
                     "confirmed_membership_sha256": membership,
                 }
                 return (
@@ -720,12 +773,18 @@ def _recover_final_facet_category(
                 (
                     "category_changed_during_final_recovery:",
                     "category2_total_mismatch:",
+                    "category2_parent_recovery_changed:",
+                    "category2_parent_membership_not_confirmed:",
                 )
             ):
                 second["recapture_result"] = "source_changed_again"
                 continue
             raise
-        if nested_recovery is not None or recovered_total != stable_total:
+        facet_gap = (
+            nested_recovery is not None
+            and nested_recovery["strategy"] == CATEGORY2_FACET_GAP_STRATEGY
+        )
+        if (nested_recovery is not None and not facet_gap) or recovered_total != stable_total:
             second["recapture_result"] = "nested_recovery_or_total_mismatch"
             continue
 
@@ -748,6 +807,7 @@ def _recover_final_facet_category(
                 ),
                 "confirmation_delay_seconds": FINAL_DRIFT_CONFIRMATION_DELAY,
                 "stabilization_observations": observations,
+                **({"category2_facet_gap": nested_recovery} if facet_gap else {}),
             },
         )
 

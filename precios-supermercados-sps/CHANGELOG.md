@@ -5,6 +5,10 @@ número son cambios directos. El detalle de cada incidente vive en
 [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md) y el de cada error de datos en
 [`docs/calidad/errores-confirmados.csv`](docs/calidad/errores-confirmados.csv).
 
+## 2026-11-20
+
+- Walmart: si las subcategorías (`category-2`) de una categoría partida no suman su total (un producto sin subcategoría; «ropa y zapatería» en SPS falló cuatro intentos el 19-nov con `category2_total_mismatch`), la captura lee la categoría completa dos veces y exige la misma membresía exacta (`category2_facet_gap_parent_restart`); si no cabe en la ventana de búsqueda sigue fallando cerrado.
+
 ## 2026-11-18
 
 - Búsqueda por GTIN con Open Food Facts (gratis, sin llave) como fuente por defecto: aprueba sola (`engine:off_auto`) sólo si el contenido neto del código exacto coincide con algún súper. Gemini con búsqueda queda opcional: su plan gratuito no incluye Google Search.
