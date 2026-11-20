@@ -1,25 +1,25 @@
 {
-  "as_of": "2026-11-20T01:23:21.488227Z",
+  "as_of": "2026-11-20T11:44:08.606839Z",
   "business_schema": "rpi-business-mart/v1",
   "comparison_status": "COMPARABLE",
   "consumer_schema": "rpi-consumer-mart/v2",
   "files_sha256": {
-    "business-mart.json": "f07e6380212f8fb148a233e55db87ff1c94e6c821263a0d747e719b9bf797f53",
+    "business-mart.json": "e7d43a853dab515bce7091f28e14ce7ae66e5f2d17501c5841cb809fb3dfe1f0",
     "business/dim_brand.csv": "da8cf7d5012e841bfdb7f6be65b08455f0d8f7f8355c546859ca899f61f3b1d9",
     "business/dim_category.csv": "0ceb5155345f2e789f2895ce1c156395a40352874d3d3f5d3fafa7a4ee9597f6",
     "business/dim_location.csv": "6f175ad42c74963066a926b216128df0ee070ba0d5f3d13240c0121929312c8b",
-    "business/dim_product.csv": "784d27c74c387785722a926725c0ffa2f82b2e04834a768b67901d47edf5aeb6",
+    "business/dim_product.csv": "58416e1abea0803a77559113666a9903940a98c65124aaa2f676b9d264591985",
     "business/dim_retailer.csv": "86dbe9a105aedeb14753388495fcecf66589219babbddd0394a2556f84553cbf",
-    "business/fact_basket_cost.csv": "6609be17a1254786309bc25c2b1dcc3fc05c89210271b80c1c26edb3fd588a4b",
-    "business/fact_current_comparison.csv": "14a53295deab6049367168d8092d0305a3b7ee7af4900f52bf3add2844041c2b",
-    "business/fact_metric_coverage.csv": "1bd113526cc194039c9cf1e73c7150a3d3196f475e745057bd02fcc7f0218912",
-    "business/fact_price_history.csv": "2b5717db8e181e2a87bca26c9fe346578563cb1dbd2a9e47087204a16d703e37",
-    "business/fact_promotion_analysis.csv": "1b8c9168a862185850d7452197985a3ce602df067edfd7c37eec415311e71803",
-    "consumer-mart.json": "89c168c6f7ebebba9d5d17ca0c4d960179fafb8985ad3e018c6dedaaff0c9a38"
+    "business/fact_basket_cost.csv": "baf5bb5c3baaac35131ce8d1bb4c84e509a6a3a25ef25647a0f112be917487d9",
+    "business/fact_current_comparison.csv": "2fb55931f72bccefeea2273197ca8d64fec5c2b6b830c92edd7691169eb4a606",
+    "business/fact_metric_coverage.csv": "f419bce68bf5c21b5409ad43bceea4c5ed021253d5396cbe257707d1b9d1740c",
+    "business/fact_price_history.csv": "f14b2c73dee0ec3a21ab299c2f9585813345943eff0fc7fd637c3b07041ef5b9",
+    "business/fact_promotion_analysis.csv": "e4378d57287589ff30d9608bbe36e5f8c0aff21f5b79cc1660e7855c3f54612e",
+    "consumer-mart.json": "124ea623d9b7481b65c41e5999224302a466900c83ba8091ed0cc360b394fad1"
   },
-  "generated_at_utc": "2026-11-20T01:23:46.061570Z",
-  "safe_offers": 200,
-  "safe_products": 100,
+  "generated_at_utc": "2026-11-20T11:44:33.016599Z",
+  "safe_offers": 198,
+  "safe_products": 99,
   "schema": "rpi-marts-manifest/v1",
   "scope": [
     {

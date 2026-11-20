@@ -1,7 +1,7 @@
 {
   "comparison_policy": "fail_closed_strong_identity_and_commercial_consistency",
   "currency": "HNL",
-  "published_at_utc": "2026-11-20T01:28:57Z",
+  "published_at_utc": "2026-11-20T11:49:58Z",
   "row_count": 10,
   "rows": [
     {
@@ -137,37 +137,37 @@
       "savings_vs_highest_pct": "10.85"
     },
     {
-      "best_price": "60.00",
+      "best_price": "173.50",
       "best_supermarket_id": "walmart",
-      "canonical_gtin": "07411000204818",
-      "canonical_product_id": "prod_gtin_07411000204818",
-      "highest_price": "105.00",
+      "canonical_gtin": "07441001609541",
+      "canonical_product_id": "prod_gtin_07441001609541",
+      "highest_price": "207.00",
       "offers": [
         {
-          "current_price": "105.00",
+          "current_price": "207.00",
           "is_best_price": false,
           "location_id": "la_colonia_sps",
-          "source_brand": "McCormick",
+          "source_brand": "Dos Pinos",
           "source_category": "Alimentos",
-          "source_name": "Mayonesa Mccormick 800 Gr",
-          "source_presentation": "800 Gr",
-          "source_record_id": "la_colonia:2299",
+          "source_name": "Helado Dos Pinos Sabor Vainilla Y Caramelo 1028 Gr",
+          "source_presentation": "1028 Gr",
+          "source_record_id": "la_colonia:664",
           "supermarket_id": "la_colonia"
         },
         {
-          "current_price": "60.00",
+          "current_price": "173.50",
           "is_best_price": true,
           "location_id": "walmart_sps",
-          "source_brand": "MCCORMICK",
+          "source_brand": "DOS PINOS",
           "source_category": "Alimentos",
-          "source_name": "Mayonesa McCormick  - 800 g",
+          "source_name": "Helado Dos Pinos Sabor Vainilla Caramelo - 1028 g",
           "source_presentation": null,
-          "source_record_id": "walmart:23499",
+          "source_record_id": "walmart:18799",
           "supermarket_id": "walmart"
         }
       ],
-      "savings_vs_highest": "45.00",
-      "savings_vs_highest_pct": "42.86"
+      "savings_vs_highest": "33.50",
+      "savings_vs_highest_pct": "16.18"
     },
     {
       "best_price": "420.95",
@@ -203,72 +203,6 @@
       "savings_vs_highest_pct": "5.15"
     },
     {
-      "best_price": "284.35",
-      "best_supermarket_id": "la_colonia",
-      "canonical_gtin": "07610113025239",
-      "canonical_product_id": "prod_gtin_07610113025239",
-      "highest_price": "306.50",
-      "offers": [
-        {
-          "current_price": "284.35",
-          "is_best_price": true,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Bacardi",
-          "source_category": "Bebidas",
-          "source_name": "Ron Bacardí Spiced 700 Ml",
-          "source_presentation": "700 Ml",
-          "source_record_id": "la_colonia:6301",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "306.50",
-          "is_best_price": false,
-          "location_id": "walmart_sps",
-          "source_brand": "BACARDI",
-          "source_category": "Bebidas",
-          "source_name": "Ron Bacardi Spiced 700 Ml",
-          "source_presentation": null,
-          "source_record_id": "walmart:27279",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "22.15",
-      "savings_vs_highest_pct": "7.23"
-    },
-    {
-      "best_price": "58.50",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "07421000811640",
-      "canonical_product_id": "prod_gtin_07421000811640",
-      "highest_price": "79.15",
-      "offers": [
-        {
-          "current_price": "79.15",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Sula",
-          "source_category": "Bebidas",
-          "source_name": "Jugo Sula Ponche De Frutas 1.89 Lt",
-          "source_presentation": "1.89 Lt",
-          "source_record_id": "la_colonia:740",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "58.50",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "SULA",
-          "source_category": "Bebidas",
-          "source_name": "Jugo de Frutas Sula Ponche De Frutas - 1.89 L",
-          "source_presentation": null,
-          "source_record_id": "walmart:31798",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "20.65",
-      "savings_vs_highest_pct": "26.09"
-    },
-    {
       "best_price": "48.10",
       "best_supermarket_id": "walmart",
       "canonical_gtin": "00099176120834",
@@ -302,6 +236,39 @@
       "savings_vs_highest_pct": "29.21"
     },
     {
+      "best_price": "104.40",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "00750894621217",
+      "canonical_product_id": "prod_gtin_00750894621217",
+      "highest_price": "121.90",
+      "offers": [
+        {
+          "current_price": "121.90",
+          "is_best_price": false,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Mazola",
+          "source_category": "Alimentos",
+          "source_name": "Aceite De Canola Mazola 946 Ml",
+          "source_presentation": "946 Ml",
+          "source_record_id": "la_colonia:4441",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "104.40",
+          "is_best_price": true,
+          "location_id": "walmart_sps",
+          "source_brand": "MAZOLA",
+          "source_category": "Alimentos",
+          "source_name": "Aceite Mazola canola - 946 ml",
+          "source_presentation": null,
+          "source_record_id": "walmart:28321",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "17.50",
+      "savings_vs_highest_pct": "14.36"
+    },
+    {
       "best_price": "271.40",
       "best_supermarket_id": "walmart",
       "canonical_gtin": "08410352910254",
@@ -333,6 +300,39 @@
       ],
       "savings_vs_highest": "14.20",
       "savings_vs_highest_pct": "4.97"
+    },
+    {
+      "best_price": "233.40",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "00041331011051",
+      "canonical_product_id": "prod_gtin_00041331011051",
+      "highest_price": "246.95",
+      "offers": [
+        {
+          "current_price": "246.95",
+          "is_best_price": false,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Goya",
+          "source_category": "Alimentos",
+          "source_name": "Aceite Goya Oliva Extra Virgen 250 ml",
+          "source_presentation": "250 ml",
+          "source_record_id": "la_colonia:2868",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "233.40",
+          "is_best_price": true,
+          "location_id": "walmart_sps",
+          "source_brand": "GOYA",
+          "source_category": "Alimentos",
+          "source_name": "Goya Aceite Oliva Extra Virgen 250 Ml",
+          "source_presentation": null,
+          "source_record_id": "walmart:20760",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "13.55",
+      "savings_vs_highest_pct": "5.49"
     }
   ],
   "schema": "precios-sps-safe-portfolio-sample/v1",
@@ -347,8 +347,8 @@
     }
   ],
   "selection_rule": "highest_absolute_savings_within_safe_common_comparable_universe",
-  "source_as_of": "2026-11-20T01:23:21.488227Z",
-  "source_head_sha": "212fd20f79366f9046e94352bd1830a8d5cca388",
+  "source_as_of": "2026-11-20T11:44:08.606839Z",
+  "source_head_sha": "aba85ccc4ce9ae5cbe14ce9549f113ce7690d90e",
   "source_schema": "rpi-consumer-mart/v2",
-  "source_workflow_run_id": 44653187786
+  "source_workflow_run_id": 44729961272
 }
