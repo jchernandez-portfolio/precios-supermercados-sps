@@ -614,3 +614,189 @@ def test_final_facet_recovery_waits_until_facets_and_search_agree(monkeypatch):
         True,
     ]
     assert waits == [120.0, 60.0, 600.0, 60.0]
+
+
+def _category2_facet_gap_responses() -> dict[str, dict]:
+    """Seis productos en la categoría y sólo cinco con ``category-2`` (caso 19-nov-2026)."""
+    parent = "seller/category-1/electronica"
+    first = f"{parent}/recovery-category2-facet-gap"
+    responses = {
+        "seller/electronica/category2-facets": facets("category-2", audio=3, video=2),
+    }
+    for prefix in (first, f"{first}-confirmation"):
+        responses[f"{prefix}/page-001"] = page(6, "1", "2")
+        responses[f"{prefix}/page-002"] = page(6, "3", "4")
+        responses[f"{prefix}/page-003"] = page(6, "5", "6")
+    return responses
+
+
+def test_category2_facet_gap_captures_parent_twice_with_exact_membership(monkeypatch):
+    monkeypatch.setattr(operational, "PAGE_SIZE", 2)
+    monkeypatch.setattr(operational, "CATEGORY2_PARTITIONS", {"electronica"})
+    capture = FakeCapture(_category2_facet_gap_responses())
+
+    products, evidence, final_total, recovery = operational._capture_category(
+        capture,
+        seller="seller",
+        category="electronica",
+        expected_total=6,
+        common={},
+        facets_root="/facets/seller",
+    )
+
+    assert set(products) == {"1", "2", "3", "4", "5", "6"}
+    assert final_total == 6
+    assert len(evidence) == 3
+    assert recovery is not None
+    assert recovery["strategy"] == "category2_facet_gap_parent_restart"
+    assert recovery["previous_total"] == recovery["recovered_total"] == 6
+    assert recovery["category2_total"] == 5
+    assert recovery["confirmed_membership_sha256"]
+    assert recovery["first_parent_evidence_sha256"]
+    assert recovery["confirmed_parent_evidence_sha256"]
+    # Ninguna petición a las subcategorías: no pueden reconstruir la categoría.
+    assert not [call for call in capture.calls if "/category-2/" in call]
+    assert len(capture.calls) == 7
+
+
+def test_category2_facet_gap_rejects_unconfirmed_parent_membership(monkeypatch):
+    monkeypatch.setattr(operational, "PAGE_SIZE", 2)
+    monkeypatch.setattr(operational, "CATEGORY2_PARTITIONS", {"electronica"})
+    responses = _category2_facet_gap_responses()
+    responses[
+        "seller/category-1/electronica/recovery-category2-facet-gap-confirmation/page-003"
+    ] = page(6, "5", "7")
+
+    with pytest.raises(RuntimeError, match="category2_parent_membership_not_confirmed"):
+        operational._capture_category(
+            FakeCapture(responses),
+            seller="seller",
+            category="electronica",
+            expected_total=6,
+            common={},
+            facets_root="/facets/seller",
+        )
+
+
+def test_category2_facet_gap_fails_closed_if_parent_total_changes(monkeypatch):
+    monkeypatch.setattr(operational, "PAGE_SIZE", 2)
+    monkeypatch.setattr(operational, "CATEGORY2_PARTITIONS", {"electronica"})
+    responses = _category2_facet_gap_responses()
+    responses[
+        "seller/category-1/electronica/recovery-category2-facet-gap/page-002"
+    ] = page(7, "3", "4")
+
+    with pytest.raises(RuntimeError, match="category2_parent_recovery_changed"):
+        operational._capture_category(
+            FakeCapture(responses),
+            seller="seller",
+            category="electronica",
+            expected_total=6,
+            common={},
+            facets_root="/facets/seller",
+        )
+
+
+def test_category2_facet_gap_keeps_failing_when_parent_does_not_fit(monkeypatch):
+    monkeypatch.setattr(operational, "PAGE_SIZE", 2)
+    monkeypatch.setattr(operational, "MAX_SEARCH_PAGES", 2)
+    monkeypatch.setattr(operational, "CATEGORY2_PARTITIONS", {"electronica"})
+    capture = FakeCapture(_category2_facet_gap_responses())
+
+    with pytest.raises(RuntimeError, match="category2_total_mismatch:seller:electronica"):
+        operational._capture_category(
+            capture,
+            seller="seller",
+            category="electronica",
+            expected_total=6,
+            common={},
+            facets_root="/facets/seller",
+        )
+    assert capture.calls == ["seller/electronica/category2-facets"]
+
+
+def test_store_reports_category2_facet_gap_as_total_recovery(monkeypatch):
+    monkeypatch.setattr(operational, "PAGE_SIZE", 2)
+    monkeypatch.setattr(operational, "CATEGORY2_PARTITIONS", {"electronica"})
+    monkeypatch.setattr(operational, "parse_products", _parsed_products)
+    responses = _category2_facet_gap_responses()
+    responses.update(
+        {
+            "seller/facets-before": facets("category-1", electronica=6, abarrotes=2),
+            "seller/root-before": page(8, "root"),
+            "seller/category-1/abarrotes/page-001": page(2, "7", "8"),
+            "seller/facets-after": facets("category-1", electronica=6, abarrotes=2),
+            "seller/root-after": page(8, "root"),
+        }
+    )
+
+    snapshot = operational.capture_store(
+        FakeCapture(responses),
+        seller="seller",
+        location_id="location",
+        city="city",
+        store_name="store",
+        home_sha="h" * 64,
+    )
+
+    assert snapshot["catalog_products_reported"] == 8
+    assert snapshot["unique_products_extracted"] == 8
+    assert snapshot["membership_recoveries"] == []
+    assert [item["strategy"] for item in snapshot["category_total_recoveries"]] == [
+        "category2_facet_gap_parent_restart"
+    ]
+    evidence_tags = {item["tag"] for item in snapshot["page_evidence"]}
+    assert (
+        "seller/category-1/electronica/recovery-category2-facet-gap-confirmation/page-001"
+        in evidence_tags
+    )
+
+
+def test_final_facet_recovery_accepts_category2_facet_gap(monkeypatch):
+    """La categoría con hueco cambia de total al final: la recaptura vuelve a usar el padre."""
+    monkeypatch.setattr(operational, "PAGE_SIZE", 2)
+    monkeypatch.setattr(operational, "CATEGORY2_PARTITIONS", {"electronica"})
+    monkeypatch.setattr(operational, "parse_products", _parsed_products)
+    monkeypatch.setattr(operational.time, "sleep", lambda _seconds: None)
+    responses = _category2_facet_gap_responses()
+    final = "seller/category-1/electronica/recovery-final-facet-stabilization-1"
+    gap = f"{final}/recovery-category2-facet-gap"
+    responses.update(
+        {
+            "seller/facets-before": facets("category-1", electronica=6, abarrotes=2),
+            "seller/root-before": page(8, "root"),
+            "seller/category-1/abarrotes/page-001": page(2, "7", "8"),
+            "seller/facets-after": facets("category-1", electronica=4, abarrotes=2),
+            "seller/electronica/category2-facets/recovery-final-facet-stabilization-1": facets(
+                "category-2", audio=2, video=1
+            ),
+            "seller/facets-after/recovery-confirmation": facets(
+                "category-1", electronica=4, abarrotes=2
+            ),
+            "seller/root-after": page(6, "root"),
+        }
+    )
+    for prefix in (gap, f"{gap}-confirmation"):
+        responses[f"{prefix}/page-001"] = page(4, "1", "2")
+        responses[f"{prefix}/page-002"] = page(4, "3", "4")
+    responses.update(_stability_probe_responses(cycle=1, facet_total=4, search_total=4))
+
+    snapshot = operational.capture_store(
+        FakeCapture(responses),
+        seller="seller",
+        location_id="location",
+        city="city",
+        store_name="store",
+        home_sha="h" * 64,
+    )
+
+    assert snapshot["catalog_products_reported"] == 6
+    assert {row["source_key"] for row in snapshot["products"]} == {"1", "2", "3", "4", "7", "8"}
+    strategies = [item["strategy"] for item in snapshot["category_total_recoveries"]]
+    assert strategies == [
+        "category2_facet_gap_parent_restart",
+        "final_facet_stabilized_category_restart",
+    ]
+    final_recovery = snapshot["category_total_recoveries"][1]
+    assert final_recovery["recovered_total"] == 4
+    assert final_recovery["category2_facet_gap"]["category2_total"] == 3
