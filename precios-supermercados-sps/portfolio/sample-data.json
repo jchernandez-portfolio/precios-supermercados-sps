@@ -1,7 +1,7 @@
 {
   "comparison_policy": "fail_closed_strong_identity_and_commercial_consistency",
   "currency": "HNL",
-  "published_at_utc": "2026-11-20T11:49:58Z",
+  "published_at_utc": "2026-11-21T11:48:12Z",
   "row_count": 10,
   "rows": [
     {
@@ -137,6 +137,72 @@
       "savings_vs_highest_pct": "10.85"
     },
     {
+      "best_price": "60.00",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "07411000204818",
+      "canonical_product_id": "prod_gtin_07411000204818",
+      "highest_price": "105.00",
+      "offers": [
+        {
+          "current_price": "105.00",
+          "is_best_price": false,
+          "location_id": "la_colonia_sps",
+          "source_brand": "McCormick",
+          "source_category": "Alimentos",
+          "source_name": "Mayonesa Mccormick 800 Gr",
+          "source_presentation": "800 Gr",
+          "source_record_id": "la_colonia:2299",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "60.00",
+          "is_best_price": true,
+          "location_id": "walmart_sps",
+          "source_brand": "MCCORMICK",
+          "source_category": "Alimentos",
+          "source_name": "Mayonesa McCormick  - 800 g",
+          "source_presentation": null,
+          "source_record_id": "walmart:23499",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "45.00",
+      "savings_vs_highest_pct": "42.86"
+    },
+    {
+      "best_price": "157.56",
+      "best_supermarket_id": "la_colonia",
+      "canonical_gtin": "00099176231813",
+      "canonical_product_id": "prod_gtin_00099176231813",
+      "highest_price": "193.50",
+      "offers": [
+        {
+          "current_price": "157.56",
+          "is_best_price": true,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Suavitel",
+          "source_category": "Limpieza",
+          "source_name": "Suavizante de Telas Suavitel Complete Fresca Primavera 1.9 L",
+          "source_presentation": "1.9 L",
+          "source_record_id": "la_colonia:3868",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "193.50",
+          "is_best_price": false,
+          "location_id": "walmart_sps",
+          "source_brand": "SUAVITEL",
+          "source_category": "Limpieza",
+          "source_name": "Suavizante de Telas Suavitel Complete Fresca Primavera -1.9 L",
+          "source_presentation": null,
+          "source_record_id": "walmart:23045",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "35.94",
+      "savings_vs_highest_pct": "18.57"
+    },
+    {
       "best_price": "173.50",
       "best_supermarket_id": "walmart",
       "canonical_gtin": "07441001609541",
@@ -170,6 +236,72 @@
       "savings_vs_highest_pct": "16.18"
     },
     {
+      "best_price": "160.76",
+      "best_supermarket_id": "la_colonia",
+      "canonical_gtin": "07421001641338",
+      "canonical_product_id": "prod_gtin_07421001641338",
+      "highest_price": "190.00",
+      "offers": [
+        {
+          "current_price": "160.76",
+          "is_best_price": true,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Limpiox",
+          "source_category": "Limpieza",
+          "source_name": "Desinfectante Limpiox Lavanda 5 Lt",
+          "source_presentation": "5 Lt",
+          "source_record_id": "la_colonia:4848",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "190.00",
+          "is_best_price": false,
+          "location_id": "walmart_sps",
+          "source_brand": "LIMPIOX",
+          "source_category": "Limpieza",
+          "source_name": "Desinfectante Limpiox Lavanda - 5000 ml",
+          "source_presentation": null,
+          "source_record_id": "walmart:31901",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "29.24",
+      "savings_vs_highest_pct": "15.39"
+    },
+    {
+      "best_price": "203.89",
+      "best_supermarket_id": "la_colonia",
+      "canonical_gtin": "07401063400029",
+      "canonical_product_id": "prod_gtin_07401063400029",
+      "highest_price": "232.00",
+      "offers": [
+        {
+          "current_price": "203.89",
+          "is_best_price": true,
+          "location_id": "la_colonia_sps",
+          "source_brand": "Fido",
+          "source_category": "Cuidado personal",
+          "source_name": "Shampoo Para Perro Fido 480 Ml",
+          "source_presentation": "480 Ml",
+          "source_record_id": "la_colonia:8210",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "232.00",
+          "is_best_price": false,
+          "location_id": "walmart_sps",
+          "source_brand": "FIDO",
+          "source_category": "Cuidado personal",
+          "source_name": "Shampoo Fido Para Perro - 480 ml",
+          "source_presentation": null,
+          "source_record_id": "walmart:31532",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "28.11",
+      "savings_vs_highest_pct": "12.12"
+    },
+    {
       "best_price": "420.95",
       "best_supermarket_id": "la_colonia",
       "canonical_gtin": "04022025811030",
@@ -201,138 +333,6 @@
       ],
       "savings_vs_highest": "22.85",
       "savings_vs_highest_pct": "5.15"
-    },
-    {
-      "best_price": "48.10",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "00099176120834",
-      "canonical_product_id": "prod_gtin_00099176120834",
-      "highest_price": "67.95",
-      "offers": [
-        {
-          "current_price": "67.95",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Ajax",
-          "source_category": "Limpieza",
-          "source_name": "Limpiador Multiusos Ajax Triclorín con Cloro en Polvo 600 g",
-          "source_presentation": "600 g",
-          "source_record_id": "la_colonia:8062",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "48.10",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "AJAX",
-          "source_category": "Limpieza",
-          "source_name": "Limpiador en Polvo Multiusos Ajax Triclorín con Cloro - 600 g",
-          "source_presentation": null,
-          "source_record_id": "walmart:22987",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "19.85",
-      "savings_vs_highest_pct": "29.21"
-    },
-    {
-      "best_price": "104.40",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "00750894621217",
-      "canonical_product_id": "prod_gtin_00750894621217",
-      "highest_price": "121.90",
-      "offers": [
-        {
-          "current_price": "121.90",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Mazola",
-          "source_category": "Alimentos",
-          "source_name": "Aceite De Canola Mazola 946 Ml",
-          "source_presentation": "946 Ml",
-          "source_record_id": "la_colonia:4441",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "104.40",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "MAZOLA",
-          "source_category": "Alimentos",
-          "source_name": "Aceite Mazola canola - 946 ml",
-          "source_presentation": null,
-          "source_record_id": "walmart:28321",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "17.50",
-      "savings_vs_highest_pct": "14.36"
-    },
-    {
-      "best_price": "271.40",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "08410352910254",
-      "canonical_product_id": "prod_gtin_08410352910254",
-      "highest_price": "285.60",
-      "offers": [
-        {
-          "current_price": "285.60",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Elmigo",
-          "source_category": "Alimentos",
-          "source_name": "Aceite De Girasol Elmigo 3 Lt",
-          "source_presentation": "3 Lt",
-          "source_record_id": "la_colonia:3310",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "271.40",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "ELMIGO",
-          "source_category": "Alimentos",
-          "source_name": "Aceite Elmigo de girasol - 3 L",
-          "source_presentation": null,
-          "source_record_id": "walmart:25623",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "14.20",
-      "savings_vs_highest_pct": "4.97"
-    },
-    {
-      "best_price": "233.40",
-      "best_supermarket_id": "walmart",
-      "canonical_gtin": "00041331011051",
-      "canonical_product_id": "prod_gtin_00041331011051",
-      "highest_price": "246.95",
-      "offers": [
-        {
-          "current_price": "246.95",
-          "is_best_price": false,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Goya",
-          "source_category": "Alimentos",
-          "source_name": "Aceite Goya Oliva Extra Virgen 250 ml",
-          "source_presentation": "250 ml",
-          "source_record_id": "la_colonia:2868",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "233.40",
-          "is_best_price": true,
-          "location_id": "walmart_sps",
-          "source_brand": "GOYA",
-          "source_category": "Alimentos",
-          "source_name": "Goya Aceite Oliva Extra Virgen 250 Ml",
-          "source_presentation": null,
-          "source_record_id": "walmart:20760",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "13.55",
-      "savings_vs_highest_pct": "5.49"
     }
   ],
   "schema": "precios-sps-safe-portfolio-sample/v1",
@@ -347,8 +347,8 @@
     }
   ],
   "selection_rule": "highest_absolute_savings_within_safe_common_comparable_universe",
-  "source_as_of": "2026-11-20T11:44:08.606839Z",
+  "source_as_of": "2026-11-21T11:42:45.385279Z",
   "source_head_sha": "aba85ccc4ce9ae5cbe14ce9549f113ce7690d90e",
   "source_schema": "rpi-consumer-mart/v2",
-  "source_workflow_run_id": 44729961272
+  "source_workflow_run_id": 44900364560
 }
