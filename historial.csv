@@ -419,3 +419,17 @@ fecha,ciudad,catalogo,problema,cantidad
 2026-11-21,Tegucigalpa,2026-11-21T11:45:25.319918Z,Distinto entre ciudades,0
 2026-11-21,Tegucigalpa,2026-11-21T11:45:25.319918Z,Sin presentación,431
 2026-11-21,Tegucigalpa,2026-11-21T11:45:25.319918Z,Corregido en la web,65
+2026-11-22,San Pedro Sula,2026-11-21T11:43:09.307017Z,Peso o volumen imposible,20
+2026-11-22,San Pedro Sula,2026-11-21T11:43:09.307017Z,Precio por unidad: probable error,55
+2026-11-22,San Pedro Sula,2026-11-21T11:43:09.307017Z,Precio por unidad: revisar,96
+2026-11-22,San Pedro Sula,2026-11-21T11:43:09.307017Z,Medida mal escrita por el súper,1
+2026-11-22,San Pedro Sula,2026-11-21T11:43:09.307017Z,Distinto entre ciudades,0
+2026-11-22,San Pedro Sula,2026-11-21T11:43:09.307017Z,Sin presentación,632
+2026-11-22,San Pedro Sula,2026-11-21T11:43:09.307017Z,Corregido en la web,24
+2026-11-22,Tegucigalpa,2026-11-21T11:45:25.319918Z,Peso o volumen imposible,22
+2026-11-22,Tegucigalpa,2026-11-21T11:45:25.319918Z,Precio por unidad: probable error,83
+2026-11-22,Tegucigalpa,2026-11-21T11:45:25.319918Z,Precio por unidad: revisar,64
+2026-11-22,Tegucigalpa,2026-11-21T11:45:25.319918Z,Medida mal escrita por el súper,1
+2026-11-22,Tegucigalpa,2026-11-21T11:45:25.319918Z,Distinto entre ciudades,0
+2026-11-22,Tegucigalpa,2026-11-21T11:45:25.319918Z,Sin presentación,431
+2026-11-22,Tegucigalpa,2026-11-21T11:45:25.319918Z,Corregido en la web,65
