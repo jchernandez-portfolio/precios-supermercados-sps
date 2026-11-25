@@ -1,7 +1,7 @@
 {
   "comparison_policy": "fail_closed_strong_identity_and_commercial_consistency",
   "currency": "HNL",
-  "published_at_utc": "2026-11-25T11:50:04Z",
+  "published_at_utc": "2026-11-25T23:41:38Z",
   "row_count": 10,
   "rows": [
     {
@@ -135,6 +135,39 @@
       ],
       "savings_vs_highest": "52.95",
       "savings_vs_highest_pct": "10.85"
+    },
+    {
+      "best_price": "60.00",
+      "best_supermarket_id": "walmart",
+      "canonical_gtin": "07411000204818",
+      "canonical_product_id": "prod_gtin_07411000204818",
+      "highest_price": "105.00",
+      "offers": [
+        {
+          "current_price": "105.00",
+          "is_best_price": false,
+          "location_id": "la_colonia_sps",
+          "source_brand": "McCormick",
+          "source_category": "Alimentos",
+          "source_name": "Mayonesa Mccormick 800 Gr",
+          "source_presentation": "800 Gr",
+          "source_record_id": "la_colonia:2299",
+          "supermarket_id": "la_colonia"
+        },
+        {
+          "current_price": "60.00",
+          "is_best_price": true,
+          "location_id": "walmart_sps",
+          "source_brand": "MCCORMICK",
+          "source_category": "Alimentos",
+          "source_name": "Mayonesa McCormick  - 800 g",
+          "source_presentation": null,
+          "source_record_id": "walmart:23499",
+          "supermarket_id": "walmart"
+        }
+      ],
+      "savings_vs_highest": "45.00",
+      "savings_vs_highest_pct": "42.86"
     },
     {
       "best_price": "157.56",
@@ -300,39 +333,6 @@
       ],
       "savings_vs_highest": "22.85",
       "savings_vs_highest_pct": "5.15"
-    },
-    {
-      "best_price": "284.35",
-      "best_supermarket_id": "la_colonia",
-      "canonical_gtin": "07610113025239",
-      "canonical_product_id": "prod_gtin_07610113025239",
-      "highest_price": "306.50",
-      "offers": [
-        {
-          "current_price": "284.35",
-          "is_best_price": true,
-          "location_id": "la_colonia_sps",
-          "source_brand": "Bacardi",
-          "source_category": "Bebidas",
-          "source_name": "Ron Bacardí Spiced 700 Ml",
-          "source_presentation": "700 Ml",
-          "source_record_id": "la_colonia:6301",
-          "supermarket_id": "la_colonia"
-        },
-        {
-          "current_price": "306.50",
-          "is_best_price": false,
-          "location_id": "walmart_sps",
-          "source_brand": "BACARDI",
-          "source_category": "Bebidas",
-          "source_name": "Ron Bacardi Spiced 700 Ml",
-          "source_presentation": null,
-          "source_record_id": "walmart:27279",
-          "supermarket_id": "walmart"
-        }
-      ],
-      "savings_vs_highest": "22.15",
-      "savings_vs_highest_pct": "7.23"
     }
   ],
   "schema": "precios-sps-safe-portfolio-sample/v1",
@@ -347,8 +347,8 @@
     }
   ],
   "selection_rule": "highest_absolute_savings_within_safe_common_comparable_universe",
-  "source_as_of": "2026-11-25T11:42:55.350543Z",
+  "source_as_of": "2026-11-25T23:35:48.202929Z",
   "source_head_sha": "aba85ccc4ce9ae5cbe14ce9549f113ce7690d90e",
   "source_schema": "rpi-consumer-mart/v2",
-  "source_workflow_run_id": 45606938278
+  "source_workflow_run_id": 45722549603
 }
